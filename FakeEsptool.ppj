@@ -51,7 +51,8 @@ POC_PROJECT_ZIPEXTRA = #
 # 
 FakeEsptool.exe: \
 	output\main.obj \
-	output\main.res
+	output\main.res \
+	output\SerialPort.obj
 	$(LINK) $(LINKFLAGS) -out:"$@" $**
 
 # 
@@ -70,6 +71,14 @@ output\main.res: \
 	main.h \
 	main.ico
 	$(RC) $(RCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build SerialPort.obj.
+# 
+output\SerialPort.obj: \
+	SerialPort.c \
+	SerialPort.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 .SILENT:
 
