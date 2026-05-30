@@ -1,7 +1,50 @@
-.vscode/
+# Build directories
 build/
-output/
+cmake-build-*/
+
+# Object files
+*.obj
+*.o
+
+# Executables
 *.exe
+*.dll
+
+# Libraries
 *.lib
+*.a
+
+# Debug files
+*.pdb
+*.ilk
+*.exp
+
+# IDE files
+.vs/
+.vscode/
+*.suo
+*.user
+*.ncb
+*.sdf
+
+# Pelles C
 *.ppx
 *.tag
+output/
+
+# Temporary files
+*.tmp
+*.bak
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Application config (optional, uncomment to track)
+FakeEsptool.ini

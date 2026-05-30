@@ -1,0 +1,127 @@
+/*
+ * resource.rc - Resource file for FakeEsptool
+ *
+ * English (US) resources with LANGUAGE directive support for future i18n.
+ */
+
+#include <windows.h>
+#include <commctrl.h>
+#include "resource.h"
+
+/* Shared resources (language independent) */
+IDI_APP ICON "../res/app.ico"
+IDB_TOOLBAR BITMAP "../res/toolbar.bmp"
+1 RT_MANIFEST "../res/res1.xml"
+
+/* ============================================================ */
+/* English (US)                                                 */
+/* ============================================================ */
+
+LANGUAGE LANG_ENGLISH,SUBLANG_ENGLISH_US
+
+IDR_MAIN_MENU MENUEX
+{
+  POPUP "&File", 0, 0, 0
+  {
+    MENUITEM "E&xit", IDM_EXIT, 0, 0
+  }
+  POPUP "&Serial", 0, 0, 0
+  {
+    MENUITEM "&Connect", IDM_CONNECT, 0, 0
+    MENUITEM "&Disconnect", IDM_DISCONNECT, 0, 0|MFS_GRAYED
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    MENUITEM "&Ping", IDM_PING, 0, 0|MFS_GRAYED
+  }
+  POPUP "&Log", 0, 0, 0
+  {
+    MENUITEM "&Clear", IDM_LOG_CLEAR, 0, 0
+    MENUITEM "Save &as...", IDM_LOG_SAVEAS, 0, 0
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    MENUITEM "&Font...", IDM_LOG_FONT, 0, 0
+  }
+  POPUP "&Help", 0, 0, 0
+  {
+    MENUITEM "&About", IDM_ABOUT, 0, 0
+  }
+}
+
+IDD_PORT_SELECT DIALOGEX 0, 0, 280, 100
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Select Port"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    COMBOBOX        IDC_PORT_COMBO, 50, 10, 220, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Port:", -1, 10, 13, 35, 8
+    LTEXT           "Baud Rate: 115200 (Fixed)", -1, 10, 35, 260, 8
+    LTEXT           "Data: 8   Parity: None   Stop: 1", -1, 10, 50, 260, 8
+    DEFPUSHBUTTON   "OK", IDOK, 100, 75, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 170, 75, 50, 14
+END
+
+IDD_ABOUT DIALOGEX 0, 0, 250, 110
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About FakeEsptool"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON            IDI_APP, -1, 14, 14, 20, 20
+    LTEXT           "FakeEsptool v1.0", -1, 44, 14, 190, 10
+    LTEXT           "Serial Port Loopback Device Simulator", -1, 44, 28, 190, 10
+    LTEXT           "Copyright (c) 2026 Larry Li", -1, 44, 46, 190, 10
+    DEFPUSHBUTTON   "OK", IDOK, 95, 85, 60, 14
+END
+
+STRINGTABLE
+{
+    IDS_APP_NAME        "FakeEsptool"
+    IDS_DISCONNECTED    "Disconnected"
+    IDS_TITLE_FORMAT    "FakeEsptool - %s"
+    IDS_TIP_CONNECT     "Connect"
+    IDS_TIP_DISCONNECT  "Disconnect"
+    IDS_TIP_PING        "Ping"
+    IDS_TIP_CLEAR       "Clear Log"
+    IDS_TIP_SAVEAS      "Save Log As..."
+}
+
+STRINGTABLE
+{
+    IDS_MSG_NOT_CONN    "Serial port is not connected"
+    IDS_MSG_CONN_TITLE  "Connection"
+    IDS_MSG_CONFIRM_EXIT "Serial port is connected. Are you sure you want to exit?"
+    IDS_MSG_CONFIRM_CAP "Confirm Exit"
+    IDS_MSG_PORT_ERROR  "Failed to open serial port"
+    IDS_MSG_ERROR       "Error"
+    IDS_MSG_SELECT_PORT "Please select a port"
+    IDS_MSG_WARNING     "Warning"
+    IDS_MSG_INVALID_PORT "Invalid port selection"
+    IDS_MSG_SAVE_ERROR  "Failed to create file"
+    IDS_MSG_DEV_REMOVED "Serial port device has been disconnected."
+    IDS_MSG_DEV_TITLE   "Device Removed"
+    IDS_LOG_SAVE_FILTER "Log Files (*.log)\0*.log\0All Files (*.*)\0*.*\0"
+    IDS_MSG_CONN_LOST   "Connection lost. Serial port error."
+}
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+FILEFLAGSMASK 0x3F
+FILEFLAGS 0x0
+FILEOS VOS__WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE VFT2_UNKNOWN
+{
+  BLOCK "StringFileInfo"
+  {
+    BLOCK "040904B0"
+    {
+      VALUE "FileDescription", "Serial Port Loopback Device Simulator\0"
+      VALUE "FileVersion", "1.0.0.0\0"
+      VALUE "LegalCopyright", "Copyright (c) 2026 Larry Li\0"
+      VALUE "ProductName", "FakeEsptool\0"
+      VALUE "ProductVersion", "1.0.0.0\0"
+    }
+  }
+  BLOCK "VarFileInfo"
+  {
+    VALUE "Translation", 0x409, 0x4B0
+  }
+}
