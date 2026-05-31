@@ -13,7 +13,6 @@
 /* Menu command IDs */
 #define IDM_CONNECT         2001
 #define IDM_DISCONNECT      2002
-#define IDM_PING            2003
 #define IDM_LOG_CLEAR       2004
 #define IDM_LOG_SAVEAS      2005
 #define IDM_LOG_FONT        2006
@@ -40,7 +39,6 @@
 /* Tooltip strings */
 #define IDS_TIP_CONNECT     10030
 #define IDS_TIP_DISCONNECT  10031
-#define IDS_TIP_PING        10032
 #define IDS_TIP_CLEAR       10033
 #define IDS_TIP_SAVEAS      10034
 

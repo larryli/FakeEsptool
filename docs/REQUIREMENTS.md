@@ -2,11 +2,12 @@
 
 ## 项目概述
 
-串口设备模拟器，基于 com0com 虚拟串口驱动方案。程序作为设备端，实现数据回环功能（接收数据原样返回）。
+ESP 芯片设备端模拟器，基于 com0com 虚拟串口驱动方案。程序模拟 ESP8266/ESP32 系列芯片，响应 esptool 客户端的烧录协议。
 
 - **技术栈**: C + CMake + Win32 API
-- **波特率**: 115200, 8N1（固定）
+- **波特率**: 115200, 8N1（默认，支持动态修改）
 - **串口选择**: 弹出对话框手动选择
+- **协议**: esptool SLIP 协议
 
 ---
 
@@ -24,7 +25,6 @@
 |--------|------|----------|
 | Connect | 弹出串口选择对话框 | 已连接时禁用（灰色） |
 | Disconnect | 断开当前串口 | 未连接时禁用（灰色） |
-| Ping | 发送随机数据测试连接 | 未连接时禁用（灰色） |
 
 ### Log 日志菜单
 
@@ -61,13 +61,12 @@
 |------|------|----------|----------|
 | 连接 | toolbar.bmp[0] | Serial/Connect | 已连接时禁用 |
 | 断开 | toolbar.bmp[1] | Serial/Disconnect | 未连接时禁用 |
-| Ping | toolbar.bmp[4] | Serial/Ping | 未连接时禁用 |
 | *(分隔符)* | - | - | - |
 | 清除 | toolbar.bmp[2] | Log/Clear | 始终可用 |
 | 保存 | toolbar.bmp[3] | Log/Save as... | 始终可用 |
 
 **工具栏要求：**
-- 使用合并的 BMP 位图（5个16x16图标）
+- 使用合并的 BMP 位图（4个16x16图标）
 - 只显示图标，不显示文本
 - 鼠标悬停显示提示文字
 
@@ -93,10 +92,11 @@
 ### 日志格式
 
 ```
-2026-05-29 14:30:25.123 [RX] 48 65 6C 6C 6F 20 57 6F  72 6C 64 21 0D 0A
-2026-05-29 14:30:25.124 [TX] 4F 4B 0D 0A
-2026-05-29 14:30:26.001 [RX] 01 02 03 04 05 06 07 08  09 0A 0B 0C 0D 0E 0F 10
-                             11 12 13 14
+2026-05-29 14:30:25.123 [RX] C0 00 08 00 00 00 00 00  00 EF C0
+2026-05-29 14:30:25.124 [TX] C0 01 08 00 24 00 00 00  07 07 12 20 55 55 55 55
+                             55 55 55 55 55 55 55 55  55 55 55 55 55 55 55 55
+                             55 55 55 55 55 55 55 55  55 55 55 55 55 55 55 55
+                             C0
 ```
 
 **格式规则：**
@@ -115,7 +115,7 @@
 |------|------|------|
 | 第1栏 | *(保留，空)* | 随窗口大小变化 |
 | 第2栏 | 当前串口号（如 `COM10`）或 `Disconnected` | 固定 |
-| 第3栏 | `115200,8N1` | 固定 |
+| 第3栏 | `115200,8N1`（动态更新） | 固定 |
 
 ---
 
@@ -125,7 +125,7 @@
 - 标题: "About FakeEsptool"
 - 内容:
   - FakeEsptool v1.0
-  - Serial Port Loopback Device Simulator
+  - ESP Chip Device Simulator
   - Uses com0com virtual serial port driver
   - Copyright (c) 2026
 - 确定按钮
@@ -137,7 +137,7 @@
 - 标题: "Select Port"
 - 串口下拉列表（自动枚举系统可用串口，显示友好名称）
 - 自动选择上次连接的串口（若存在）
-- 显示配置信息: 115200,8N1（固定）
+- 显示配置信息: 115200,8N1（默认）
 - 确定/取消按钮
 
 ---
@@ -176,9 +176,9 @@ LastPort=COM10
 
 ## 串口通信
 
-- **角色**: 设备端（模拟设备）
-- **功能**: 数据回环（接收什么返回什么）
-- **波特率**: 115200
+- **角色**: 设备端（模拟 ESP 芯片）
+- **功能**: 响应 esptool 客户端命令
+- **波特率**: 115200（默认，支持动态修改）
 - **数据位**: 8
 - **校验**: 无
 - **停止位**: 1
@@ -186,29 +186,59 @@ LastPort=COM10
 
 ---
 
-## 协议处理框架
+## esptool 协议
 
-协议处理模块 `protocol.c/protocol.h` 提供简单的数据处理接口。
+### 协议概述
 
-### 当前实现
+基于 SLIP 封装的请求/响应协议，模拟 ESP 芯片设备端行为。
 
-| 功能 | 说明 |
-|------|------|
-| ECHO | 接收数据原样返回（回环测试） |
-| PING | 发送 1-256 字节的随机数据 |
+### SLIP 封装
 
-### 二次开发
+- 帧起始/结束: `0xC0`
+- 转义 `0xC0`: `0xDB 0xDC`
+- 转义 `0xDB`: `0xDB 0xDD`
 
-修改 `Protocol_ProcessData()` 函数实现自定义协议：
+### 命令格式
 
-```c
-void Protocol_ProcessData(SERIAL_CTX *ctx, const BYTE *data,
-                           DWORD len, HWND hNotify)
-{
-    // Example: Respond to specific commands
-    if (data[0] == 0x01) {
-        BYTE resp[] = {0x01, GetSensorValue()};
-        Serial_WriteData(ctx, resp, sizeof(resp), hNotify);
-    }
-}
+请求包:
 ```
+[dir=0x00][cmd][size:2][value:4][data:N][checksum:1]
+```
+
+响应包:
+```
+[dir=0x01][cmd][size:2][status:4][data:N]
+```
+
+### 支持的命令
+
+| 码 | 名称 | 说明 |
+|----|------|------|
+| 0x08 | SYNC | 同步握手 |
+| 0x09 | SPI_SET_PARAMS | 设置 Flash 参数 |
+| 0x0A | READ_REG | 读寄存器 |
+| 0x0B | WRITE_REG | 写寄存器 |
+| 0x0D | SPI_ATTACH | 附加 SPI |
+| 0x0F | CHANGE_BAUDRATE | 修改波特率 |
+| 0x13 | SPI_FLASH_MD5 | 计算 Flash MD5 |
+| 0x14 | SPI_READ_FLASH | 读取 Flash |
+| 0x15 | SPI_ERASE_FLASH | 擦除 Flash |
+| 0x16 | SPI_ERASE_BLOCK | 擦除块 |
+| 0x20 | FLASH_DEFL_BEGIN | 压缩写入开始 |
+| 0x21 | FLASH_DEFL_DATA | 压缩写入数据 |
+| 0x22 | FLASH_DEFL_END | 压缩写入结束 |
+| 0x23 | FLASH_DEFL_MD5 | 压缩写入 MD5 |
+
+### 芯片支持
+
+| 芯片 | 说明 |
+|------|------|
+| ESP8266 | 经典 WiFi 芯片 |
+| ESP32 | 双核 WiFi+BT |
+| ESP32-S2 | 单核 WiFi |
+| ESP32-S3 | 双核 WiFi+BT5 |
+| ESP32-C2 | 低成本 WiFi |
+| ESP32-C3 | RISC-V WiFi+BT |
+| ESP32-C6 | WiFi 6+BLE 5 |
+| ESP32-C61 | WiFi 6+BLE 5 |
+| ESP32-H2 | BLE 5+Zigbee/Thread |

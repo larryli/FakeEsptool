@@ -1,343 +1,243 @@
-# 二次开发指南
+# FakeEsptool 开发文档
 
-本文档介绍如何基于 FakeEsptool 框架开发自定义串口设备模拟器。
+## 项目概述
+
+FakeEsptool 是一个 ESP 芯片设备端模拟器，用于模拟 ESP8266/ESP32 系列芯片响应 esptool 客户端的烧录协议。
 
 ## 架构概览
 
 ```
-┌─────────────┐     ┌─────────────┐          ┌─────────────┐
-│   main.c    │────▶│  serial.c   │──回调──▶│ protocol.c  │
-│  (UI层)     │     │ (通信层)    │          │ (协议层)    │
-└─────────────┘     └─────────────┘          └─────────────┘
+┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
+│   main.c    │────▶│  serial.c   │────▶│ esptool_proto.c │
+│  (UI层)     │     │ (通信层)    │     │    (适配层)     │
+└─────────────┘     └─────────────┘     └────────┬────────┘
+                                                 │
+                                    ┌────────────┴────────────┐
+                                    ▼                         ▼
+                            ┌─────────────┐           ┌─────────────┐
+                            │   slip.c    │           │  esptool.c  │
+                            │ (SLIP编解码) │           │ (命令处理)   │
+                            └─────────────┘           └─────────────┘
+                                    │                         │
+                            ┌───────┴───────┐         ┌───────┴───────┐
+                            ▼               ▼         ▼               ▼
+                      ┌──────────┐   ┌──────────┐ ┌──────────┐ ┌──────────┐
+                      │  chip.c  │   │  flash.c │ │          │ │          │
+                      │ (芯片特性)│   │(Flash存储)│ │          │ │          │
+                      └──────────┘   └──────────┘ └──────────┘ └──────────┘
 ```
 
 | 模块 | 职责 |
 |------|------|
-| `main.c` | 用户界面，注册协议回调，显示日志 |
+| `main.c` | 用户界面，菜单、工具栏、日志显示 |
 | `serial.c` | 串口通信，数据收发，信号控制 |
-| `protocol.c` | 协议处理，响应接收数据 |
+| `esptool_proto.c/h` | 协议适配层，对接 serial 回调 |
+| `esptool/slip.c/h` | SLIP 协议编解码 |
+| `esptool/chip.c/h` | 芯片特性模拟（efuse、MAC等） |
+| `esptool/flash.c/h` | Flash 存储模拟 |
+| `esptool/esptool.c/h` | esptool 命令解析与响应 |
 
-## 快速开始
-
-### 1. 创建协议文件
-
-```c
-// src/my_protocol.h
-#ifndef MY_PROTOCOL_H
-#define MY_PROTOCOL_H
-
-#include "serial.h"
-
-void MyProtocol_Init(void);
-void MyProtocol_OnData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify);
-void MyProtocol_OnSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify);
-
-#endif
-```
-
-```c
-// src/my_protocol.c
-#include "my_protocol.h"
-#include "utils/trace.h"
-
-static const char *TAG = "MY";
-
-void MyProtocol_Init(void)
-{
-    TRACE_PROTO(TAG, "Protocol initialized");
-}
-
-void MyProtocol_OnData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify)
-{
-    if (!ctx || !data || len == 0) return;
-
-    // ECHO: send received data back
-    BYTE *buf = (BYTE *)HeapAlloc(GetProcessHeap(), 0, len);
-    if (buf) {
-        CopyMemory(buf, data, len);
-        Serial_WriteData(ctx, buf, len, hNotify);
-        HeapFree(GetProcessHeap(), 0, buf);
-    }
-}
-
-void MyProtocol_OnSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
-{
-    BOOL dsr = (modemStatus & MS_DSR_ON) != 0;
-    BOOL cts = (modemStatus & MS_CTS_ON) != 0;
-
-    TRACE_PROTO(TAG, "Signal: DSR=%d CTS=%d", dsr, cts);
-}
-```
-
-### 2. 注册回调
-
-```c
-// main.c - Main_OnConnect()
-#include "my_protocol.h"
-
-Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)MyProtocol_OnData);
-Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)MyProtocol_OnSignal);
-```
-
-### 3. 更新构建
-
-```cmake
-# CMakeLists.txt
-add_executable(FakeEsptool WIN32
-    src/main.c
-    src/serial.c
-    src/my_protocol.c  # 添加
-    ...
-)
-```
-
-## 回调机制
-
-### 数据接收回调
-
-```c
-// 类型定义
-typedef void (*SERIAL_RX_CB)(void *ctx, const BYTE *data, DWORD len, HWND hNotify);
-
-// 注册（main.c 中）
-Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)MyProtocol_OnData);
-
-// 实现（协议层）
-void MyProtocol_OnData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify)
-{
-    // ctx: 串口上下文，可用于 Serial_WriteData
-    // data: 接收数据
-    // len: 数据长度
-    // hNotify: UI 窗口句柄
-}
-```
-
-### 信号变化回调
-
-```c
-// 类型定义
-typedef void (*SERIAL_SIGNAL_CB)(void *ctx, DWORD modemStatus, HWND hNotify);
-
-// 注册
-Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)MyProtocol_OnSignal);
-
-// 实现
-void MyProtocol_OnSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
-{
-    BOOL dsr = (modemStatus & MS_DSR_ON) != 0;  // 主机 DTR 状态
-    BOOL cts = (modemStatus & MS_CTS_ON) != 0;  // 主机 RTS 状态
-}
-```
-
-**注意：** 回调函数签名使用 `SERIAL_CTX *`，注册时需要类型转换 `(SERIAL_RX_CB)`。
-
-## 数据发送
-
-### 直接发送
-
-```c
-BYTE data[] = {0xAA, 0x55, 0x01, 0x02};
-Serial_WriteData(ctx, data, sizeof(data), hNotify);
-```
-
-### 定时发送
-
-```c
-#include "utils/timer.h"
-
-static TIMER_CTX *g_timer = NULL;
-
-void StartHeartbeat(SERIAL_CTX *ctx)
-{
-    g_timer = Timer_Create();
-    Timer_Start(g_timer, 5000, OnHeartbeat, ctx);
-}
-
-void OnHeartbeat(void *userData)
-{
-    SERIAL_CTX *ctx = (SERIAL_CTX *)userData;
-    BYTE hb[] = {0xAA, 0x55};
-    Serial_WriteData(ctx, hb, sizeof(hb), ctx->hNotify);
-}
-
-void StopHeartbeat(void)
-{
-    Timer_Destroy(g_timer);
-    g_timer = NULL;
-}
-```
-
-## 信号控制
-
-```c
-// 读取当前信号状态
-DWORD baudRate;
-BYTE dataBits, parity, stopBits;
-Serial_GetConfig(ctx, &baudRate, &dataBits, &parity, &stopBits);
-
-// 控制输出信号
-Serial_SetDtr(ctx, TRUE);   // DTR 置高
-Serial_SetRts(ctx, FALSE);  // RTS 置低
-
-// 修改串口参数
-Serial_SetBaudRate(ctx, CBR_921600);
-```
-
-## 配置持久化
-
-使用 `config.h` 接口保存/加载配置，存储在 `FakeEsptool.ini`：
-
-```c
-#include "utils/config.h"
-
-// 保存
-Config_SetString(L"MyProtocol", L"Mode", L"Normal");
-Config_SetInt(L"MyProtocol", L"Timeout", 5000);
-Config_SetBool(L"MyProtocol", L"AutoReply", TRUE);
-
-// 加载（第三个参数为默认值）
-WCHAR mode[32];
-Config_GetString(L"MyProtocol", L"Mode", mode, 32, L"Normal");
-int timeout = Config_GetInt(L"MyProtocol", L"Timeout", 3000);
-BOOL autoReply = Config_GetBool(L"MyProtocol", L"AutoReply", FALSE);
-```
-
-## 调试日志
-
-### 启用日志
+## 编译
 
 ```powershell
-cmake .. -DENABLE_TRACE_PROTO=ON   # 协议日志
-cmake .. -DENABLE_TRACE_FW=ON      # 框架日志
+# 配置
+cmake -S . -B build -G "NMake Makefiles"
+
+# 编译
+cmake --build build
+
+# 启用调试日志
+cmake -S . -B build -G "NMake Makefiles" -DENABLE_TRACE_PROTO=ON
+cmake --build build
 ```
 
-### 使用日志宏
+## esptool 协议
 
-```c
-#include "utils/trace.h"
+### SLIP 封装
 
-static const char *TAG = "MY";
+```
+0xC0 [payload] 0xC0
 
-TRACE_PROTO(TAG, "Received %lu bytes", len);
-TRACE_PROTO(TAG, "Command: 0x%02X", data[0]);
+转义规则:
+0xC0 → 0xDB 0xDC
+0xDB → 0xDB 0xDD
 ```
 
-### 自定义日志输出到主窗口
+### 命令格式
 
-```c
-// 基础版本
-Serial_PostLog(hNotify, L"MODBUS", L"Frame received");
-
-// 格式化版本（更方便）
-Serial_PostLogF(hNotify, L"MODBUS", L"Received %lu bytes, CRC: 0x%04X", len, crc);
-Serial_PostLogF(hNotify, L"MODBUS", L"Register %d = %d", addr, value);
+请求:
+```
+[dir=0x00][cmd][size_lo][size_hi][val_4bytes][data...][checksum]
 ```
 
-日志以橙色显示，格式：`HH:MM:SS.mmm [TAG] Message`
+响应:
+```
+[dir=0x01][cmd][size_lo][size_hi][status_4bytes][data...]
+```
 
-## 完整示例
+### 支持的命令
+
+| 码 | 名称 | 说明 |
+|----|------|------|
+| 0x08 | SYNC | 同步握手 |
+| 0x09 | SPI_SET_PARAMS | 设置Flash参数 |
+| 0x0A | READ_REG | 读寄存器 |
+| 0x0B | WRITE_REG | 写寄存器 |
+| 0x0D | SPI_ATTACH | 附加SPI |
+| 0x0F | CHANGE_BAUDRATE | 修改波特率 |
+| 0x13 | SPI_FLASH_MD5 | 计算Flash MD5 |
+| 0x14 | SPI_READ_FLASH | 读取Flash |
+| 0x15 | SPI_ERASE_FLASH | 擦除Flash |
+| 0x16 | SPI_ERASE_BLOCK | 擦除块 |
+| 0x20 | FLASH_DEFL_BEGIN | 压缩写入开始 |
+| 0x21 | FLASH_DEFL_DATA | 压缩写入数据 |
+| 0x22 | FLASH_DEFL_END | 压缩写入结束 |
+| 0x23 | FLASH_DEFL_MD5 | 压缩写入MD5 |
+
+## 芯片支持
+
+| 枚举值 | 芯片 |
+|--------|------|
+| CHIP_ESP8266 | ESP8266 |
+| CHIP_ESP32 | ESP32 |
+| CHIP_ESP32S2 | ESP32-S2 |
+| CHIP_ESP32S3 | ESP32-S3 |
+| CHIP_ESP32C2 | ESP32-C2 |
+| CHIP_ESP32C3 | ESP32-C3 |
+| CHIP_ESP32C6 | ESP32-C6 |
+| CHIP_ESP32C61 | ESP32-C61 |
+| CHIP_ESP32H2 | ESP32-H2 |
+
+## 使用示例
 
 ```c
-// my_protocol.c - 自定义协议示例
-#include "serial.h"
-#include "utils/trace.h"
-#include "utils/config.h"
+#include "esptool_proto.h"
 
-static const char *TAG = "MY";
+// 初始化
+EsptoolProto_Init();
 
-static int g_mode = 0;
+// 设置芯片
+EsptoolProto_SetChipType(CHIP_ESP32);
+EsptoolProto_SetFlashSize(4 * 1024 * 1024);
 
-void MyProtocol_Init(void)
-{
-    g_mode = Config_GetInt(L"MyProtocol", L"Mode", 0);
-    TRACE_PROTO(TAG, "Protocol initialized, mode=%d", g_mode);
-}
-
-void MyProtocol_OnData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify)
-{
-    if (!ctx || !data || len == 0) return;
-
-    TRACE_PROTO(TAG, "Received %lu bytes", len);
-
-    // 根据命令类型处理
-    switch (data[0]) {
-    case 0x01:  // 查询命令
-    {
-        BYTE resp[4] = {0x01, 0x00, (BYTE)g_mode, 0x00};
-        Serial_WriteData(ctx, resp, sizeof(resp), hNotify);
-        break;
-    }
-    case 0x02:  // 设置命令
-        if (len >= 2) {
-            g_mode = data[1];
-            Config_SetInt(L"MyProtocol", L"Mode", g_mode);
-            BYTE ack[] = {0x02, 0x01};  // ACK
-            Serial_WriteData(ctx, ack, sizeof(ack), hNotify);
-        }
-        break;
-    default:    // ECHO
-        Serial_WriteData(ctx, data, len, hNotify);
-        break;
-    }
-}
-
-void MyProtocol_OnSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
-{
-    BOOL dsr = (modemStatus & MS_DSR_ON) != 0;
-    BOOL cts = (modemStatus & MS_CTS_ON) != 0;
-
-    TRACE_PROTO(TAG, "Signal: DSR=%d CTS=%d", dsr, cts);
-
-    if (dsr && cts) {
-        TRACE_PROTO(TAG, "Host ready");
-    }
-}
+// 注册回调
+Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)EsptoolProto_ProcessData);
+Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)EsptoolProto_OnSignal);
 ```
 
 ## API 参考
 
-### serial.h - 串口通信
+### esptool_proto.h
 
 | 函数 | 说明 |
 |------|------|
-| `Serial_Open(ctx, portName, hNotify)` | 打开串口 |
+| `EsptoolProto_Init()` | 初始化协议层 |
+| `EsptoolProto_ProcessData()` | 数据接收回调 |
+| `EsptoolProto_OnSignal()` | 信号变化回调 |
+| `EsptoolProto_SetChipType(type)` | 设置芯片类型 |
+| `EsptoolProto_SetFlashSize(size)` | 设置Flash大小 |
+
+### esptool.h
+
+| 函数 | 说明 |
+|------|------|
+| `Esptool_Init(ctx)` | 初始化上下文 |
+| `Esptool_Feed(ctx, data, len)` | 喂入串口数据 |
+| `Esptool_SetChipType(ctx, type)` | 设置芯片类型 |
+| `Esptool_SetFlashSize(ctx, size)` | 设置Flash大小 |
+| `Esptool_SendResponse(ctx, cmd, status, data, len)` | 发送响应 |
+
+### chip.h
+
+| 函数 | 说明 |
+|------|------|
+| `Chip_Init(ctx, type)` | 初始化芯片 |
+| `Chip_GetName(ctx)` | 获取芯片名称 |
+| `Chip_SetMac(ctx, mac)` | 设置MAC地址 |
+| `Chip_GetMac(ctx)` | 获取MAC地址 |
+| `Chip_GetEfuseBlock(ctx, block, data)` | 读取efuse块 |
+| `Chip_SetFlashSize(ctx, size)` | 设置Flash大小 |
+| `Chip_GetFlashSize(ctx)` | 获取Flash大小 |
+
+### flash.h
+
+| 函数 | 说明 |
+|------|------|
+| `Flash_Init(ctx, size)` | 初始化Flash |
+| `Flash_Close(ctx)` | 释放Flash |
+| `Flash_Read(ctx, addr, buf, len)` | 读取数据 |
+| `Flash_Write(ctx, addr, data, len)` | 写入数据 |
+| `Flash_Erase(ctx, addr, len)` | 擦除区域 |
+| `Flash_EraseAll(ctx)` | 擦除全部 |
+| `Flash_CalcMd5(ctx, addr, len, md5)` | 计算MD5 |
+
+### slip.h
+
+| 函数 | 说明 |
+|------|------|
+| `Slip_Init(ctx)` | 初始化解码器 |
+| `Slip_PutByte(ctx, b)` | 喂入字节 |
+| `Slip_IsComplete(ctx)` | 检查帧完成 |
+| `Slip_GetPayload(ctx)` | 获取载荷 |
+| `Slip_GetLength(ctx)` | 获取长度 |
+| `Slip_Reset(ctx)` | 重置状态 |
+| `Slip_Encode(data, len, out, max)` | 编码一帧 |
+
+### serial.h
+
+| 函数 | 说明 |
+|------|------|
+| `Serial_Open(ctx, port, hNotify)` | 打开串口 |
 | `Serial_Close(ctx)` | 关闭串口 |
-| `Serial_IsOpen(ctx)` | 检查连接状态 |
+| `Serial_IsOpen(ctx)` | 检查状态 |
 | `Serial_WriteData(ctx, data, len, hNotify)` | 写入数据 |
-| `Serial_SetReceiveCallback(ctx, cb)` | 设置数据接收回调 |
-| `Serial_SetSignalCallback(ctx, cb)` | 设置信号变化回调 |
-| `Serial_SetDtr(ctx, state)` | 设置 DTR |
-| `Serial_SetRts(ctx, state)` | 设置 RTS |
-| `Serial_SetBaudRate(ctx, baudRate)` | 修改波特率 |
-| `Serial_SetDataBits(ctx, bits)` | 修改数据位 |
-| `Serial_SetParity(ctx, parity)` | 修改校验 |
-| `Serial_SetStopBits(ctx, bits)` | 修改停止位 |
-| `Serial_GetConfig(ctx, ...)` | 读取当前配置 |
-| `Serial_PostLog(hNotify, tag, text)` | 发送自定义日志 |
-| `Serial_PostLogF(hNotify, tag, fmt, ...)` | 发送格式化日志 |
+| `Serial_SetReceiveCallback(ctx, cb)` | 设置接收回调 |
+| `Serial_SetSignalCallback(ctx, cb)` | 设置信号回调 |
+| `Serial_GetConfig(ctx, ...)` | 读取配置 |
+| `Serial_PostLog(hNotify, tag, text)` | 发送日志 |
+| `Serial_PostLogF(hNotify, tag, fmt, ...)` | 格式化日志 |
 
-### config.h - 配置持久化
+## 调试
 
-| 函数 | 说明 |
-|------|------|
-| `Config_GetString/SetString` | 字符串读写 |
-| `Config_GetInt/SetInt` | 整数读写 |
-| `Config_GetBool/SetBool` | 布尔读写 |
-| `Config_GetFont/SetFont` | 字体设置 |
-| `Config_GetLastPort/SetLastPort` | 最后连接端口 |
+### 启用日志
 
-### timer.h - 定时器
+```powershell
+cmake -S . -B build -G "NMake Makefiles" -DENABLE_TRACE_PROTO=ON -DENABLE_TRACE_FW=ON
+cmake --build build
+```
 
-| 函数 | 说明 |
-|------|------|
-| `Timer_Create()` | 创建定时器 |
-| `Timer_Destroy(ctx)` | 销毁定时器 |
-| `Timer_Start(ctx, ms, cb, data)` | 启动一次性定时器 |
-| `Timer_Cancel(ctx)` | 取消定时器 |
+### 日志宏
 
-### trace.h - 调试日志
+```c
+#include "utils/trace.h"
 
-| 宏 | 说明 |
-|-----|------|
-| `TRACE_FW(tag, ...)` | 框架日志 |
-| `TRACE_PROTO(tag, ...)` | 协议日志 |
+static const char *TAG = "ESP";
+
+TRACE_FW(TAG, "Framework message");
+TRACE_PROTO(TAG, "Protocol message: 0x%02X", cmd);
+```
+
+### 窗口日志
+
+```c
+Serial_PostLog(hNotify, L"ESP", L"Command received");
+Serial_PostLogF(hNotify, L"ESP", L"Flash addr=0x%08lX", addr);
+```
+
+## 测试
+
+使用 esptool.py 测试:
+
+```bash
+# 读取MAC
+esptool.py --port COM10 read_mac
+
+# 读取Flash
+esptool.py --port COM10 read_flash 0 0x1000 flash.bin
+
+# 写入Flash
+esptool.py --port COM10 write_flash 0 firmware.bin
+
+# 擦除Flash
+esptool.py --port COM10 erase_flash
+```

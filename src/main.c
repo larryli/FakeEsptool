@@ -8,7 +8,6 @@
 #include <windows.h>
 #include "main.h"
 #include "serial.h"
-#include "protocol.h"
 #include "resource.h"
 #include "utils/config.h"
 #include "utils/lang.h"
@@ -54,11 +53,9 @@ static void UpdateMenuState(HWND hWnd)
 
     EnableMenuItem(hMenu, IDM_CONNECT, connected ? MF_GRAYED : MF_ENABLED);
     EnableMenuItem(hMenu, IDM_DISCONNECT, connected ? MF_ENABLED : MF_GRAYED);
-    EnableMenuItem(hMenu, IDM_PING, connected ? MF_ENABLED : MF_GRAYED);
 
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_CONNECT, !connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_DISCONNECT, connected);
-    SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_PING, connected);
 }
 
 /* Update window title with port name */
@@ -376,9 +373,6 @@ static void Main_OnConnect(HWND hMainWnd)
         return;
     }
 
-    /* Register protocol callback */
-    Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)Protocol_ProcessData);
-
     TRACE_FW(TAG, "Serial_Open succeeded");
 
     /* Save last connected port */
@@ -407,17 +401,6 @@ static void Main_OnDisconnect(HWND hMainWnd)
     UpdateMenuState(hMainWnd);
     UpdateStatusBar();
     SetFocus(g_hEdit);
-}
-
-/* Handle Serial > Ping command - send random data */
-static void Main_OnPing(HWND hMainWnd)
-{
-    if (!Serial_IsOpen(&g_serial)) {
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_NOT_CONN), LoadStr(IDS_MSG_CONN_TITLE), MB_OK | MB_ICONWARNING);
-        return;
-    }
-
-    Protocol_SendPing(&g_serial, hMainWnd);
 }
 
 /* Handle Log > Clear command */
@@ -578,14 +561,14 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             SendMessageW(g_hToolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
             SendMessageW(g_hToolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(16, 16));
 
-            /* Load merged toolbar bitmap (5 icons: Connect, Disconnect, Clear, Save, Ping) */
+            /* Load merged toolbar bitmap (4 icons: Connect, Disconnect, Clear, Save) */
             TBADDBITMAP tbab = {0};
             tbab.hInst = hInst;
             tbab.nID = IDB_TOOLBAR;
-            int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 5, (LPARAM)&tbab);
+            int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 4, (LPARAM)&tbab);
 
-            /* Toolbar buttons: Connect, Disconnect, separator, Ping, separator, Clear, Save */
-            TBBUTTON buttons[7] = {0};
+            /* Toolbar buttons: Connect, Disconnect, separator, Clear, Save */
+            TBBUTTON buttons[5] = {0};
 
             buttons[0].iBitmap = iBase + 0;  /* Connect icon */
             buttons[0].idCommand = IDM_CONNECT;
@@ -605,31 +588,19 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             buttons[2].fsStyle = BTNS_SEP;
             buttons[2].iString = -1;
 
-            buttons[3].iBitmap = iBase + 4;  /* Ping icon */
-            buttons[3].idCommand = IDM_PING;
-            buttons[3].fsState = 0;  /* Disabled initially */
+            buttons[3].iBitmap = iBase + 2;  /* Clear icon */
+            buttons[3].idCommand = IDM_LOG_CLEAR;
+            buttons[3].fsState = TBSTATE_ENABLED;
             buttons[3].fsStyle = BTNS_BUTTON;
             buttons[3].iString = -1;
 
-            buttons[4].iBitmap = 0;
-            buttons[4].idCommand = -1;
-            buttons[4].fsState = 0;
-            buttons[4].fsStyle = BTNS_SEP;
+            buttons[4].iBitmap = iBase + 3;  /* Save icon */
+            buttons[4].idCommand = IDM_LOG_SAVEAS;
+            buttons[4].fsState = TBSTATE_ENABLED;
+            buttons[4].fsStyle = BTNS_BUTTON;
             buttons[4].iString = -1;
 
-            buttons[5].iBitmap = iBase + 2;  /* Clear icon */
-            buttons[5].idCommand = IDM_LOG_CLEAR;
-            buttons[5].fsState = TBSTATE_ENABLED;
-            buttons[5].fsStyle = BTNS_BUTTON;
-            buttons[5].iString = -1;
-
-            buttons[6].iBitmap = iBase + 3;  /* Save icon */
-            buttons[6].idCommand = IDM_LOG_SAVEAS;
-            buttons[6].fsState = TBSTATE_ENABLED;
-            buttons[6].fsStyle = BTNS_BUTTON;
-            buttons[6].iString = -1;
-
-            SendMessageW(g_hToolbar, TB_ADDBUTTONS, 7, (LPARAM)buttons);
+            SendMessageW(g_hToolbar, TB_ADDBUTTONS, 5, (LPARAM)buttons);
 
             /* Create status bar */
             g_hStatusbar = CreateWindowExW(0, STATUSCLASSNAMEW, NULL,
@@ -697,10 +668,6 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             Main_OnDisconnect(hWnd);
             SetFocus(g_hEdit);
             return 0;
-        case IDM_PING:
-            Main_OnPing(hWnd);
-            SetFocus(g_hEdit);
-            return 0;
         case IDM_LOG_CLEAR:
             Main_OnLogClear(hWnd);
             return 0;
@@ -733,9 +700,6 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 return 0;
             case IDM_DISCONNECT:
                 ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_DISCONNECT);
-                return 0;
-            case IDM_PING:
-                ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_PING);
                 return 0;
             case IDM_LOG_CLEAR:
                 ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_CLEAR);
@@ -904,9 +868,6 @@ static BOOL Main_Init(HINSTANCE hInstance)
 {
     INITCOMMONCONTROLSEX icex = { .dwSize = sizeof(icex), .dwICC = ICC_BAR_CLASSES };
     InitCommonControlsEx(&icex);
-
-    /* Initialize protocol module */
-    Protocol_Init();
 
     WNDCLASSEXW wc = {
         .cbSize = sizeof(WNDCLASSEXW),
