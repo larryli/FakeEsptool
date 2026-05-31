@@ -11,7 +11,9 @@
 
 #pragma comment(lib, "advapi32.lib")
 
+#if ENABLE_TRACE
 static const char *TAG = "FLASH";
+#endif
 
 BOOL Flash_Init(FLASH_CTX *ctx, DWORD size)
 {

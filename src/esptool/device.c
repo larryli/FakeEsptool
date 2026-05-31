@@ -8,7 +8,9 @@
 #include "../utils/trace.h"
 #include <string.h>
 
+#if ENABLE_TRACE
 static const char *TAG = "DEV";
+#endif
 
 BOOL Device_Init(DEVICE_CTX *ctx, CHIP_TYPE chipType, DWORD flashSize, const BYTE mac[6])
 {

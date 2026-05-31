@@ -8,7 +8,9 @@
 #include "timer.h"
 #include "trace.h"
 
+#if ENABLE_TRACE
 static const char *TAG = "TIMER";
+#endif
 
 /* Timer context structure */
 struct TIMER_CTX {

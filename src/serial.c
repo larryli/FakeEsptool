@@ -17,7 +17,9 @@
 
 #pragma comment(lib, "setupapi.lib")
 
+#if ENABLE_TRACE
 static const char *TAG = "SER";
+#endif
 
 #define READ_BUFFER_SIZE 4096
 #define MAX_PORTS 64

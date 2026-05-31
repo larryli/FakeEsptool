@@ -10,7 +10,9 @@
 #include <string.h>
 #include <stdio.h>
 
+#if ENABLE_TRACE
 static const char *TAG = "ESP";
+#endif
 
 /* Command info structure */
 typedef struct {
@@ -95,6 +97,10 @@ void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD status, const BYTE *
 {
     BYTE resp[2048];
     int pos = 0;
+
+    /* Check for buffer overflow */
+    if (8 + data_len > sizeof(resp))
+        return;
 
     resp[pos++] = ESP_DIR_RESPONSE;
     resp[pos++] = cmd;

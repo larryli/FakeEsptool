@@ -9,7 +9,9 @@
 #include <string.h>
 #include <stdlib.h>
 
+#if ENABLE_TRACE
 static const char *TAG = "CHIP";
+#endif
 
 static void InitEsp8266(CHIP_CTX *ctx)
 {
@@ -269,7 +271,7 @@ const BYTE *Chip_GetMac(const CHIP_CTX *ctx)
 
 DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
 {
-    if (addr >= 0x3FF00000 && addr < 0x3FF00000 + ctx->efuse_size) {
+    if (addr >= 0x3FF00000 && addr < 0x3FF00000 + (DWORD)ctx->efuse_size) {
         int offset = (int)(addr - 0x3FF00000);
         if (offset + 3 < ctx->efuse_size) {
             return ctx->efuse[offset] | 
@@ -290,7 +292,7 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
 
 BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
 {
-    if (addr >= 0x3FF00000 && addr < 0x3FF00000 + ctx->efuse_size) {
+    if (addr >= 0x3FF00000 && addr < 0x3FF00000 + (DWORD)ctx->efuse_size) {
         int offset = (int)(addr - 0x3FF00000);
         if (offset + 3 < ctx->efuse_size) {
             ctx->efuse[offset] |= (BYTE)(val & 0xFF);

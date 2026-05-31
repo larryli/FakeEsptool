@@ -7,7 +7,9 @@
 #include "slip.h"
 #include "../utils/trace.h"
 
+#if ENABLE_TRACE
 static const char *TAG = "SLIP";
+#endif
 
 void Slip_Init(SLIP_CTX *ctx)
 {

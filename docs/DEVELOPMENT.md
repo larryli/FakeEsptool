@@ -40,6 +40,8 @@ FakeEsptool 是一个 ESP 芯片设备端模拟器，用于模拟 ESP8266/ESP32 
 
 ## 编译
 
+### CMake (推荐)
+
 ```powershell
 # 配置
 cmake -S . -B build -G "NMake Makefiles"
@@ -51,6 +53,12 @@ cmake --build build
 cmake -S . -B build -G "NMake Makefiles" -DENABLE_TRACE_PROTO=ON
 cmake --build build
 ```
+
+### Pelles C
+
+1. 打开 `FakeEsptool.ppj`
+2. 选择 Release 或 Debug 模式
+3. 按 F9 编译
 
 ## esptool 协议
 

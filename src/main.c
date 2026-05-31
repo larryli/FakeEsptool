@@ -24,13 +24,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <wchar.h>
 
 #pragma comment(lib, "Shell32.lib")
 #pragma comment(lib, "Version.lib")
 
 #pragma comment(lib, "comctl32.lib")
 
+#if ENABLE_TRACE
 static const char *TAG = "GUI";
+#endif
 
 /* Default font settings */
 #define DEFAULT_FONT_NAME L"Consolas"

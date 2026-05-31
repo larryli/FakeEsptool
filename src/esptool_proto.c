@@ -7,7 +7,9 @@
 #include "esptool_proto.h"
 #include "utils/trace.h"
 
+#if ENABLE_TRACE
 static const char *TAG = "ESPPROTO";
+#endif
 
 ESPTOOL_CTX g_esptool;
 
@@ -31,10 +33,11 @@ void EsptoolProto_OnSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
     (void)ctx;
     (void)hNotify;
 
+#if ENABLE_TRACE
     BOOL dsr = (modemStatus & MS_DSR_ON) != 0;
     BOOL cts = (modemStatus & MS_CTS_ON) != 0;
-
     TRACE_PROTO(TAG, "Signal: DSR=%d CTS=%d", dsr, cts);
+#endif
 }
 
 void EsptoolProto_SetChipType(CHIP_TYPE type)
