@@ -40,6 +40,7 @@ void Esptool_SetNotify(ESPTOOL_CTX *ctx, HWND hNotify)
 void Esptool_SetChipType(ESPTOOL_CTX *ctx, CHIP_TYPE type)
 {
     Flash_Close(&ctx->flash);
+    Chip_Close(&ctx->chip);
     Chip_Init(&ctx->chip, type);
     Flash_Init(&ctx->flash, ctx->chip.flash_size);
 }
@@ -117,22 +118,9 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     DWORD addr = pkt->value;
-    DWORD val = 0;
+    DWORD val = Chip_ReadReg(&ctx->chip, addr);
 
-    TRACE_PROTO(TAG, "READ_REG addr=0x%08lX", addr);
-
-    if (addr >= 0x3FF00000 && addr < 0x3FF00000 + EFUSE_SIZE) {
-        int offset = (int)(addr - 0x3FF00000);
-        BYTE efuse[4];
-        memcpy(efuse, &ctx->chip.efuse[offset & ~3], 4);
-        val = efuse[0] | ((DWORD)efuse[1] << 8) |
-              ((DWORD)efuse[2] << 16) | ((DWORD)efuse[3] << 24);
-    } else if (addr == 0x3FF5A000) {
-        val = ctx->chip.chip_id;
-    } else if (addr == 0x3F400010) {
-        val = ctx->chip.flash_size >> 16;
-    }
-
+    TRACE_PROTO(TAG, "READ_REG addr=0x%08lX val=0x%08lX", addr, val);
     Esptool_SendResponse(ctx, ESP_CMD_READ_REG, ESP_OK, (const BYTE *)&val, 4);
 }
 
