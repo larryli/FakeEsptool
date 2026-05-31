@@ -8,6 +8,7 @@
 #include <windows.h>
 #include "main.h"
 #include "serial.h"
+#include "esptool_proto.h"
 #include "resource.h"
 #include "utils/config.h"
 #include "utils/lang.h"
@@ -28,9 +29,10 @@ static const char *TAG = "GUI";
 #define DEFAULT_FONT_SIZE 10
 
 /* Status bar part widths */
-#define STATUS_PART1_WIDTH  0    /* Reserved, stretches */
-#define STATUS_PART2_WIDTH  140  /* Port name */
-#define STATUS_PART3_WIDTH  140  /* Port config */
+#define STATUS_PART1_WIDTH  100  /* Chip model */
+#define STATUS_PART2_WIDTH  80   /* Flash size */
+#define STATUS_PART3_WIDTH  140  /* Port name */
+#define STATUS_PART4_WIDTH  140  /* Port config */
 
 /* Message size limit */
 #define MAX_MSG_SIZE        65536
@@ -75,18 +77,21 @@ static void UpdateStatusBar(void)
     if (!g_hStatusbar)
         return;
 
-    int parts[3];
+    int parts[5];
     RECT rc;
     GetClientRect(GetParent(g_hStatusbar), &rc);
-    parts[0] = rc.right - STATUS_PART2_WIDTH - STATUS_PART3_WIDTH;
-    parts[1] = rc.right - STATUS_PART3_WIDTH;
-    parts[2] = -1;
-    SendMessageW(g_hStatusbar, SB_SETPARTS, 3, (LPARAM)parts);
+    parts[0] = STATUS_PART1_WIDTH;
+    parts[1] = parts[0] + STATUS_PART2_WIDTH;
+    parts[2] = parts[1] + STATUS_PART3_WIDTH;
+    parts[3] = parts[2] + STATUS_PART4_WIDTH;
+    parts[4] = -1;
+    SendMessageW(g_hStatusbar, SB_SETPARTS, 5, (LPARAM)parts);
 
-    SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)L"");
+    SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)L"ESP8266");
+    SendMessageW(g_hStatusbar, SB_SETTEXT, 1, (LPARAM)L"4M Flash");
 
     if (Serial_IsOpen(&g_serial)) {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 1, (LPARAM)g_szPort);
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)g_szPort);
 
         /* Build config string from current serial settings */
         DWORD baudRate = 115200;
@@ -111,10 +116,10 @@ static void UpdateStatusBar(void)
 
         WCHAR configBuf[32];
         wsprintfW(configBuf, L"%lu,%d%s%s", baudRate, dataBits, parityStr, stopStr);
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)configBuf);
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)configBuf);
     } else {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 1, (LPARAM)LoadStr(IDS_DISCONNECTED));
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)L"");
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)LoadStr(IDS_DISCONNECTED));
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)L"");
     }
 }
 
@@ -372,6 +377,10 @@ static void Main_OnConnect(HWND hMainWnd)
         MessageBoxW(hMainWnd, LoadStr(IDS_MSG_PORT_ERROR), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
+
+    /* Register esptool protocol callbacks */
+    Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)EsptoolProto_ProcessData);
+    Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)EsptoolProto_OnSignal);
 
     TRACE_FW(TAG, "Serial_Open succeeded");
 
@@ -868,6 +877,9 @@ static BOOL Main_Init(HINSTANCE hInstance)
 {
     INITCOMMONCONTROLSEX icex = { .dwSize = sizeof(icex), .dwICC = ICC_BAR_CLASSES };
     InitCommonControlsEx(&icex);
+
+    /* Initialize esptool protocol */
+    EsptoolProto_Init();
 
     WNDCLASSEXW wc = {
         .cbSize = sizeof(WNDCLASSEXW),
