@@ -34,6 +34,11 @@
 #define IDD_NEW_DEVICE      3004
 #define IDD_DEVICE_PROPS    3005
 
+/* About dialog controls */
+#define IDD_APPNAME         3020
+#define IDD_COPYRIGHT       3021
+#define IDD_WEBSITE         3022
+
 /* New Device dialog controls */
 #define IDC_CHIP_COMBO      3010
 #define IDC_FLASH_SIZE_COMBO 3011
