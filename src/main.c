@@ -345,6 +345,8 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
             SendMessageW(hFreq, CB_SETCURSEL, 0, 0);
 
             CheckDlgButton(hDlg, IDC_INIT_BLANK, BST_CHECKED);
+            EnableWindow(GetDlgItem(hDlg, IDC_INIT_FILE_PATH), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_BROWSE_FILE), FALSE);
 
             WCHAR macStr[32];
             wsprintfW(macStr, L"%02X:%02X:%02X:%02X:%02X:%02X",
