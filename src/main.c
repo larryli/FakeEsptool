@@ -34,8 +34,9 @@ static const char *TAG = "GUI";
 /* Status bar part widths */
 #define STATUS_PART1_WIDTH  100  /* Chip model */
 #define STATUS_PART2_WIDTH  80   /* Flash size */
-#define STATUS_PART3_WIDTH  140  /* Port name */
-#define STATUS_PART4_WIDTH  140  /* Port config */
+#define STATUS_PART3_WIDTH  150  /* MAC address */
+#define STATUS_PART4_WIDTH  120  /* Port name */
+#define STATUS_PART5_WIDTH  140  /* Port config */
 
 /* Message size limit */
 #define MAX_MSG_SIZE        65536
@@ -43,9 +44,11 @@ static const char *TAG = "GUI";
 /* Global state */
 static SERIAL_CTX g_serial = { .hPort = NULL, .hThread = NULL, .hStartEvent = NULL, .hNotify = NULL, .bRunning = FALSE };
 static DEVICE_CTX g_device = {0};
+static HWND g_hWnd = NULL;           /* Main window handle */
 static HWND g_hToolbar = NULL;
 static HWND g_hStatusbar = NULL;
 static HWND g_hEdit = NULL;
+static HMODULE g_hRichEdit = NULL;   /* RichEdit DLL handle */
 static HDEVNOTIFY g_hDevNotify = NULL;  /* Device notification handle */
 static WCHAR g_szPort[32] = {0};
 static WCHAR g_szSelectedPort[32] = {0};
@@ -60,6 +63,8 @@ static void UpdateStatusBar(void);
 static void OnDeviceModified(void)
 {
     Device_SetModified(&g_device, TRUE);
+    if (g_hWnd)
+        UpdateTitle(g_hWnd);
 }
 
 /* Check if serial is connected, prompt to disconnect if needed */
@@ -154,24 +159,59 @@ static void UpdateMenuState(HWND hWnd)
     EnableMenuItem(hMenu, IDM_CONNECT, connected ? MF_GRAYED : MF_ENABLED);
     EnableMenuItem(hMenu, IDM_DISCONNECT, connected ? MF_ENABLED : MF_GRAYED);
     EnableMenuItem(hMenu, IDM_RECONNECT, canReconnect ? MF_ENABLED : MF_GRAYED);
+    EnableMenuItem(hMenu, IDM_DEVICE_PROPS, connected ? MF_GRAYED : MF_ENABLED);
+    EnableMenuItem(hMenu, IDM_FLASH_IMPORT, connected ? MF_GRAYED : MF_ENABLED);
 
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_CONNECT, !connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_DISCONNECT, connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_RECONNECT, canReconnect);
 }
 
-/* Update window title with port name */
+/* Update window title: FakeEsptool - [Chip] - [File][*] - [Port] */
 static void UpdateTitle(HWND hWnd)
 {
-    WCHAR title[128];
-    if (Serial_IsOpen(&g_serial))
-        wsprintfW(title, LoadStr(IDS_TITLE_FORMAT), g_szPort);
-    else
-        lstrcpyW(title, LoadStr(IDS_APP_NAME));
+    WCHAR title[256] = {0};
+    WCHAR *p = title;
+
+    /* Base name */
+    lstrcpyW(title, L"FakeEsptool");
+    p = title + lstrlenW(title);
+
+    /* Chip type */
+    if (g_device.chip.name[0]) {
+        WCHAR chipName[32];
+        MultiByteToWideChar(CP_UTF8, 0, g_device.chip.name, -1, chipName, 32);
+        wsprintfW(p, L" - %s", chipName);
+        p += lstrlenW(p);
+    }
+
+    /* File name */
+    const WCHAR *filename = Device_GetFilename(&g_device);
+    if (filename[0]) {
+        /* Extract filename without path */
+        const WCHAR *name = wcsrchr(filename, L'\\');
+        name = name ? name + 1 : filename;
+        wsprintfW(p, L" - %s", name);
+    } else {
+        lstrcatW(p, L" - Untitled");
+    }
+    p += lstrlenW(p);
+
+    /* Modified indicator */
+    if (Device_IsModified(&g_device)) {
+        lstrcatW(p, L"*");
+        p++;
+    }
+
+    /* Serial port */
+    if (Serial_IsOpen(&g_serial)) {
+        wsprintfW(p, L" - %s", g_szPort);
+    }
+
     SetWindowTextW(hWnd, title);
 }
 
-/* Update status bar content and part widths */
+/* Update status bar: [Chip] [Flash] [MAC] [Port] [Config] */
 static void UpdateStatusBar(void)
 {
     if (!g_hStatusbar)
@@ -187,6 +227,7 @@ static void UpdateStatusBar(void)
     parts[4] = -1;
     SendMessageW(g_hStatusbar, SB_SETPARTS, 5, (LPARAM)parts);
 
+    /* Part 1: Chip type */
     if (g_device.chip.name[0]) {
         WCHAR chipName[32];
         MultiByteToWideChar(CP_UTF8, 0, g_device.chip.name, -1, chipName, 32);
@@ -195,6 +236,7 @@ static void UpdateStatusBar(void)
         SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)L"No Device");
     }
 
+    /* Part 2: Flash size */
     if (g_device.flash.size > 0) {
         WCHAR flashSize[32];
         if (g_device.flash.size >= 1024*1024)
@@ -206,8 +248,20 @@ static void UpdateStatusBar(void)
         SendMessageW(g_hStatusbar, SB_SETTEXT, 1, (LPARAM)L"");
     }
 
+    /* Part 3: MAC address */
+    if (g_device.chip.name[0]) {
+        const BYTE *mac = Chip_GetMac(&g_device.chip);
+        WCHAR macStr[32];
+        wsprintfW(macStr, L"%02X:%02X:%02X:%02X:%02X:%02X",
+                  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)macStr);
+    } else {
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)L"");
+    }
+
+    /* Part 4 & 5: Serial port and config */
     if (Serial_IsOpen(&g_serial)) {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)g_szPort);
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)g_szPort);
 
         DWORD baudRate = 115200;
         BYTE dataBits = 8, parity = NOPARITY, stopBits = ONESTOPBIT;
@@ -231,10 +285,10 @@ static void UpdateStatusBar(void)
 
         WCHAR configBuf[32];
         wsprintfW(configBuf, L"%lu,%d%s%s", baudRate, dataBits, parityStr, stopStr);
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)configBuf);
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)configBuf);
     } else {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)LoadStr(IDS_DISCONNECTED));
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)L"");
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)LoadStr(IDS_DISCONNECTED));
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)L"");
     }
 }
 
@@ -361,6 +415,162 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
                     EndDialog(hDlg, IDOK);
                 } else {
                     MessageBoxW(hDlg, L"Failed to create device", L"Error", MB_OK | MB_ICONERROR);
+                }
+            }
+            return TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, IDCANCEL);
+            return TRUE;
+        }
+        break;
+    }
+    return FALSE;
+}
+
+/* Device Properties dialog procedure */
+static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    static BYTE mac[6];
+    static CHIP_TYPE selectedChip;
+    static DWORD selectedFlash;
+
+    (void)lParam;
+    switch (msg) {
+    case WM_INITDIALOG:
+        {
+            /* Save current values */
+            selectedChip = g_device.chip.type;
+            selectedFlash = g_device.flash.size;
+            memcpy(mac, g_device.chip.mac, 6);
+
+            HWND hChip = GetDlgItem(hDlg, IDC_CHIP_COMBO);
+            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP8266");
+            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32");
+            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-S2");
+            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-S3");
+            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C2");
+            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C3");
+            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C6");
+            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C61");
+            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-H2");
+            SendMessageW(hChip, CB_SETCURSEL, (WPARAM)selectedChip, 0);
+
+            HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
+            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"256KB");
+            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"512KB");
+            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"1MB");
+            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"2MB");
+            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"4MB");
+            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"8MB");
+            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"16MB");
+            /* Select current flash size */
+            DWORD flashSizes[] = {256*1024, 512*1024, 1024*1024, 2*1024*1024,
+                                  4*1024*1024, 8*1024*1024, 16*1024*1024};
+            int flashIdx = 4;
+            for (int i = 0; i < 7; i++) {
+                if (flashSizes[i] == selectedFlash) {
+                    flashIdx = i;
+                    break;
+                }
+            }
+            SendMessageW(hFlash, CB_SETCURSEL, flashIdx, 0);
+
+            HWND hMode = GetDlgItem(hDlg, IDC_FLASH_MODE_COMBO);
+            SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"QIO");
+            SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"QOUT");
+            SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"DIO");
+            SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"DOUT");
+            SendMessageW(hMode, CB_SETCURSEL, g_device.chip.flash_mode, 0);
+
+            HWND hFreq = GetDlgItem(hDlg, IDC_FLASH_FREQ_COMBO);
+            SendMessageW(hFreq, CB_ADDSTRING, 0, (LPARAM)L"40MHz");
+            SendMessageW(hFreq, CB_ADDSTRING, 0, (LPARAM)L"26MHz");
+            SendMessageW(hFreq, CB_ADDSTRING, 0, (LPARAM)L"20MHz");
+            SendMessageW(hFreq, CB_ADDSTRING, 0, (LPARAM)L"80MHz");
+            SendMessageW(hFreq, CB_SETCURSEL, g_device.chip.flash_freq, 0);
+
+            WCHAR macStr[32];
+            wsprintfW(macStr, L"%02X:%02X:%02X:%02X:%02X:%02X",
+                      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+            SetDlgItemTextW(hDlg, IDC_MAC_EDIT, macStr);
+
+            srand((unsigned)time(NULL));
+        }
+        return TRUE;
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_RANDOM_MAC:
+            {
+                mac[0] = 0xAA;
+                mac[1] = 0xBB;
+                mac[2] = (BYTE)(rand() & 0xFF);
+                mac[3] = (BYTE)(rand() & 0xFF);
+                mac[4] = (BYTE)(rand() & 0xFF);
+                mac[5] = (BYTE)(rand() & 0xFF);
+                WCHAR macStr[32];
+                wsprintfW(macStr, L"%02X:%02X:%02X:%02X:%02X:%02X",
+                          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+                SetDlgItemTextW(hDlg, IDC_MAC_EDIT, macStr);
+            }
+            return TRUE;
+
+        case IDOK:
+            {
+                HWND hChip = GetDlgItem(hDlg, IDC_CHIP_COMBO);
+                int chipSel = (int)SendMessageW(hChip, CB_GETCURSEL, 0, 0);
+                selectedChip = (CHIP_TYPE)chipSel;
+
+                HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
+                int flashSel = (int)SendMessageW(hFlash, CB_GETCURSEL, 0, 0);
+                DWORD flashSizes[] = {256*1024, 512*1024, 1024*1024, 2*1024*1024,
+                                      4*1024*1024, 8*1024*1024, 16*1024*1024};
+                selectedFlash = flashSizes[flashSel];
+
+                WCHAR macStr[32];
+                GetDlgItemTextW(hDlg, IDC_MAC_EDIT, macStr, 32);
+                swscanf(macStr, L"%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                        &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
+
+                HWND hMode = GetDlgItem(hDlg, IDC_FLASH_MODE_COMBO);
+                BYTE flashMode = (BYTE)SendMessageW(hMode, CB_GETCURSEL, 0, 0);
+
+                HWND hFreq = GetDlgItem(hDlg, IDC_FLASH_FREQ_COMBO);
+                BYTE flashFreq = (BYTE)SendMessageW(hFreq, CB_GETCURSEL, 0, 0);
+
+                /* Check if anything changed */
+                BOOL changed = (selectedChip != g_device.chip.type) ||
+                               (selectedFlash != g_device.flash.size) ||
+                               (memcmp(mac, g_device.chip.mac, 6) != 0) ||
+                               (flashMode != g_device.chip.flash_mode) ||
+                               (flashFreq != g_device.chip.flash_freq);
+
+                if (changed) {
+                    /* Reinitialize device with new settings */
+                    FLASH_CTX oldFlash = g_device.flash;
+                    g_device.flash.data = NULL;
+                    g_device.flash.allocated = FALSE;
+
+                    Device_Close(&g_device);
+                    if (Device_Init(&g_device, selectedChip, selectedFlash, mac)) {
+                        g_device.chip.flash_mode = flashMode;
+                        g_device.chip.flash_freq = flashFreq;
+
+                        /* Copy old flash data if same size or larger */
+                        if (oldFlash.data && oldFlash.size <= selectedFlash) {
+                            memcpy(g_device.flash.data, oldFlash.data, oldFlash.size);
+                        }
+                        Flash_Close(&oldFlash);
+
+                        Device_SetModified(&g_device, TRUE);
+                        EndDialog(hDlg, IDOK);
+                    } else {
+                        Flash_Close(&oldFlash);
+                        MessageBoxW(hDlg, L"Failed to update device", L"Error", MB_OK | MB_ICONERROR);
+                    }
+                } else {
+                    EndDialog(hDlg, IDOK);
                 }
             }
             return TRUE;
@@ -708,6 +918,80 @@ static void Main_OnDisconnect(HWND hMainWnd)
     SetFocus(g_hEdit);
 }
 
+/* Handle Flash > Import command */
+static void Main_OnFlashImport(HWND hMainWnd)
+{
+    if (Serial_IsOpen(&g_serial)) {
+        MessageBoxW(hMainWnd, L"Disconnect serial port before importing Flash", LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    OPENFILENAMEW ofn = {0};
+    WCHAR szFile[MAX_PATH] = {0};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hMainWnd;
+    ofn.lpstrFilter = LoadStr(IDS_BIN_FILTER);
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_FILEMUSTEXIST;
+
+    if (!GetOpenFileNameW(&ofn))
+        return;
+
+    /* Check file size */
+    HANDLE hFile = CreateFileW(szFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        MessageBoxW(hMainWnd, L"Failed to open file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    DWORD fileSize = GetFileSize(hFile, NULL);
+    if (fileSize != g_device.flash.size) {
+        CloseHandle(hFile);
+        WCHAR msg[128];
+        wsprintfW(msg, L"File size (%lu bytes) does not match Flash size (%lu bytes)", fileSize, g_device.flash.size);
+        MessageBoxW(hMainWnd, msg, LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    DWORD bytesRead;
+    ReadFile(hFile, g_device.flash.data, fileSize, &bytesRead, NULL);
+    CloseHandle(hFile);
+
+    Device_SetModified(&g_device, TRUE);
+    UpdateTitle(hMainWnd);
+    Serial_PostLog(hMainWnd, L"FLASH", L"Flash imported from file");
+}
+
+/* Handle Flash > Export command */
+static void Main_OnFlashExport(HWND hMainWnd)
+{
+    OPENFILENAMEW ofn = {0};
+    WCHAR szFile[MAX_PATH] = {0};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hMainWnd;
+    ofn.lpstrFilter = LoadStr(IDS_BIN_FILTER);
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+    ofn.lpstrDefExt = L"bin";
+
+    if (!GetSaveFileNameW(&ofn))
+        return;
+
+    HANDLE hFile = CreateFileW(szFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        MessageBoxW(hMainWnd, L"Failed to create file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    DWORD bytesWritten;
+    WriteFile(hFile, g_device.flash.data, g_device.flash.size, &bytesWritten, NULL);
+    CloseHandle(hFile);
+
+    Serial_PostLog(hMainWnd, L"FLASH", L"Flash exported to file");
+}
+
 /* Handle Log > Clear command */
 static void Main_OnLogClear(HWND hMainWnd)
 {
@@ -852,6 +1136,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
     switch (msg) {
     case WM_CREATE:
         {
+            g_hWnd = hWnd;
             HINSTANCE hInst = ((CREATESTRUCT *)lParam)->hInstance;
 
             /* Create toolbar */
@@ -868,7 +1153,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             tbab.nID = IDB_TOOLBAR;
             int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 4, (LPARAM)&tbab);
 
-            /* Toolbar buttons: Connect, Disconnect, Reconnect, separator, Clear, Save */
+            /* Toolbar buttons: Connect, Reconnect, separator, Disconnect, separator, Clear, Save */
             TBBUTTON buttons[7] = {0};
 
             buttons[0].iBitmap = iBase + 0;  /* Connect icon */
@@ -877,40 +1162,40 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             buttons[0].fsStyle = BTNS_BUTTON;
             buttons[0].iString = -1;
 
-            buttons[1].iBitmap = iBase + 1;  /* Disconnect icon */
-            buttons[1].idCommand = IDM_DISCONNECT;
+            buttons[1].iBitmap = iBase + 0;  /* Reconnect icon (reuse Connect) */
+            buttons[1].idCommand = IDM_RECONNECT;
             buttons[1].fsState = 0;  /* Disabled initially */
             buttons[1].fsStyle = BTNS_BUTTON;
             buttons[1].iString = -1;
 
-            buttons[2].iBitmap = iBase + 0;  /* Reconnect icon (reuse Connect) */
-            buttons[2].idCommand = IDM_RECONNECT;
-            buttons[2].fsState = 0;  /* Disabled initially */
-            buttons[2].fsStyle = BTNS_BUTTON;
+            buttons[2].iBitmap = 0;
+            buttons[2].idCommand = -1;
+            buttons[2].fsState = 0;
+            buttons[2].fsStyle = BTNS_SEP;
             buttons[2].iString = -1;
 
-            buttons[3].iBitmap = 0;
-            buttons[3].idCommand = -1;
-            buttons[3].fsState = 0;
-            buttons[3].fsStyle = BTNS_SEP;
+            buttons[3].iBitmap = iBase + 1;  /* Disconnect icon */
+            buttons[3].idCommand = IDM_DISCONNECT;
+            buttons[3].fsState = 0;  /* Disabled initially */
+            buttons[3].fsStyle = BTNS_BUTTON;
             buttons[3].iString = -1;
 
-            buttons[4].iBitmap = iBase + 2;  /* Clear icon */
-            buttons[4].idCommand = IDM_LOG_CLEAR;
-            buttons[4].fsState = TBSTATE_ENABLED;
-            buttons[4].fsStyle = BTNS_BUTTON;
+            buttons[4].iBitmap = 0;
+            buttons[4].idCommand = -1;
+            buttons[4].fsState = 0;
+            buttons[4].fsStyle = BTNS_SEP;
             buttons[4].iString = -1;
 
-            buttons[5].iBitmap = iBase + 3;  /* Save icon */
-            buttons[5].idCommand = IDM_LOG_SAVEAS;
+            buttons[5].iBitmap = iBase + 2;  /* Clear icon */
+            buttons[5].idCommand = IDM_LOG_CLEAR;
             buttons[5].fsState = TBSTATE_ENABLED;
             buttons[5].fsStyle = BTNS_BUTTON;
             buttons[5].iString = -1;
 
-            buttons[6].iBitmap = 0;
-            buttons[6].idCommand = -1;
-            buttons[6].fsState = 0;
-            buttons[6].fsStyle = BTNS_SEP;
+            buttons[6].iBitmap = iBase + 3;  /* Save icon */
+            buttons[6].idCommand = IDM_LOG_SAVEAS;
+            buttons[6].fsState = TBSTATE_ENABLED;
+            buttons[6].fsStyle = BTNS_BUTTON;
             buttons[6].iString = -1;
 
             SendMessageW(g_hToolbar, TB_ADDBUTTONS, 7, (LPARAM)buttons);
@@ -921,8 +1206,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_STATUSBAR, hInst, NULL);
 
             /* Create RichEdit log display */
-            HMODULE hRichEdit = LoadLibraryW(L"riched20.dll");
-            (void)hRichEdit;
+            g_hRichEdit = LoadLibraryW(L"riched20.dll");
             g_hEdit = CreateWindowExW(0, RICHEDIT_CLASSW, NULL,
                 WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
                 0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_EDIT, hInst, NULL);
@@ -984,6 +1268,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             }
             if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_NEW_DEVICE), hWnd, NewDeviceDlgProc) == IDOK) {
                 EsptoolProto_SetModifiedCallback(OnDeviceModified);
+                Config_SetLastDeviceFile(NULL);
                 UpdateStatusBar();
                 UpdateTitle(hWnd);
                 SetWindowTextW(g_hEdit, L"");
@@ -1012,6 +1297,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     Device_Close(&g_device);
                     if (Device_Load(&g_device, szFile)) {
                         EsptoolProto_SetModifiedCallback(OnDeviceModified);
+                        Config_SetLastDeviceFile(szFile);
                         UpdateStatusBar();
                         UpdateTitle(hWnd);
                         SetWindowTextW(g_hEdit, L"");
@@ -1026,7 +1312,9 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             {
                 const WCHAR *filename = Device_GetFilename(&g_device);
                 if (filename[0]) {
-                    Device_Save(&g_device, filename);
+                    if (Device_Save(&g_device, filename)) {
+                        Config_SetLastDeviceFile(filename);
+                    }
                 } else {
                     /* No filename, do Save As */
                     SendMessageW(hWnd, WM_COMMAND, IDM_SAVE_DEVICE_AS, 0);
@@ -1046,9 +1334,22 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
                 ofn.lpstrDefExt = L"esp";
                 if (GetSaveFileNameW(&ofn)) {
-                    if (!Device_Save(&g_device, szFile)) {
+                    if (Device_Save(&g_device, szFile)) {
+                        Config_SetLastDeviceFile(szFile);
+                    } else {
                         MessageBoxW(hWnd, L"Failed to save device file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
                     }
+                }
+            }
+            SetFocus(g_hEdit);
+            return 0;
+        case IDM_DEVICE_PROPS:
+            if (Serial_IsOpen(&g_serial)) {
+                MessageBoxW(hWnd, L"Disconnect serial port before modifying device properties", LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+            } else {
+                if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_DEVICE_PROPS), hWnd, DevicePropsDlgProc) == IDOK) {
+                    UpdateStatusBar();
+                    UpdateTitle(hWnd);
                 }
             }
             SetFocus(g_hEdit);
@@ -1063,6 +1364,14 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             return 0;
         case IDM_RECONNECT:
             Main_OnReconnect(hWnd);
+            SetFocus(g_hEdit);
+            return 0;
+        case IDM_FLASH_IMPORT:
+            Main_OnFlashImport(hWnd);
+            SetFocus(g_hEdit);
+            return 0;
+        case IDM_FLASH_EXPORT:
+            Main_OnFlashExport(hWnd);
             SetFocus(g_hEdit);
             return 0;
         case IDM_LOG_CLEAR:
@@ -1245,6 +1554,41 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
         DestroyWindow(hWnd);
         return 0;
 
+    case WM_APP_INIT:
+        /* Initialization - check for last device file */
+        {
+            WCHAR lastFile[MAX_PATH] = {0};
+            if (Config_GetLastDeviceFile(lastFile, MAX_PATH)) {
+                /* Check if file exists */
+                DWORD attr = GetFileAttributesW(lastFile);
+                if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
+                    /* Prompt user */
+                    WCHAR msg[MAX_PATH + 64];
+                    wsprintfW(msg, L"Open last device file?\n%s", lastFile);
+                    int ret = MessageBoxW(hWnd, msg, L"Open Device", MB_YESNO | MB_ICONQUESTION);
+                    if (ret == IDYES) {
+                        if (Device_Load(&g_device, lastFile)) {
+                            EsptoolProto_SetModifiedCallback(OnDeviceModified);
+                            UpdateStatusBar();
+                            UpdateTitle(hWnd);
+                            SetWindowTextW(g_hEdit, L"");
+                            return 0;
+                        }
+                    }
+                }
+            }
+            /* No last file or user declined - show New Device dialog */
+            if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_NEW_DEVICE), hWnd, NewDeviceDlgProc) != IDOK) {
+                /* User cancelled - exit */
+                DestroyWindow(hWnd);
+            } else {
+                EsptoolProto_SetModifiedCallback(OnDeviceModified);
+                UpdateStatusBar();
+                UpdateTitle(hWnd);
+            }
+        }
+        return 0;
+
     case WM_DESTROY:
         /* Unregister device notifications */
         if (g_hDevNotify) {
@@ -1252,6 +1596,11 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             g_hDevNotify = NULL;
         }
         Serial_Close(&g_serial);
+        Device_Close(&g_device);
+        if (g_hRichEdit) {
+            FreeLibrary(g_hRichEdit);
+            g_hRichEdit = NULL;
+        }
         PostQuitMessage(0);
         return 0;
     }
@@ -1335,6 +1684,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     }
 
     TRACE_FW(TAG, "Main window created: %p", hWnd);
+
+    /* Trigger initialization - check for last device file */
+    PostMessage(hWnd, WM_APP_INIT, 0, 0);
 
     /* Main message loop */
     MSG msg;

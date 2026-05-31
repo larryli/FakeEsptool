@@ -54,7 +54,11 @@ BOOL Config_GetFont(LOGFONTW *lf)
     if (size <= 0)
         return FALSE;
 
-    lf->lfHeight = -MulDiv(size, 96, 72);  /* Convert point size to pixels */
+    HDC hdc = GetDC(NULL);
+    int dpi = GetDeviceCaps(hdc, LOGPIXELSY);
+    ReleaseDC(NULL, hdc);
+
+    lf->lfHeight = -MulDiv(size, dpi, 72);  /* Convert point size to pixels */
     lf->lfWeight = weight;
     lf->lfCharSet = DEFAULT_CHARSET;
     lf->lfOutPrecision = OUT_TT_PRECIS;
@@ -108,6 +112,31 @@ void Config_SetLastPort(const WCHAR *portName)
         return;
 
     WritePrivateProfileStringW(SECTION_PORT, KEY_LAST_PORT, portName, g_iniPath);
+}
+
+/*
+ * Config_GetLastDeviceFile - Get last opened device file path
+ */
+BOOL Config_GetLastDeviceFile(WCHAR *filePath, int maxLen)
+{
+    if (!g_iniPath[0])
+        return FALSE;
+
+    GetPrivateProfileStringW(L"Device", L"LastFile", L"",
+                             filePath, maxLen, g_iniPath);
+
+    return (filePath[0] != L'\0');
+}
+
+/*
+ * Config_SetLastDeviceFile - Save last opened device file path
+ */
+void Config_SetLastDeviceFile(const WCHAR *filePath)
+{
+    if (!g_iniPath[0])
+        return;
+
+    WritePrivateProfileStringW(L"Device", L"LastFile", filePath ? filePath : L"", g_iniPath);
 }
 
 /*

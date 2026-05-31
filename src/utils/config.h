@@ -43,6 +43,20 @@ BOOL Config_GetLastPort(WCHAR *portName, int maxLen);
 void Config_SetLastPort(const WCHAR *portName);
 
 /*
+ * Config_GetLastDeviceFile - Get last opened device file path
+ * @filePath: Buffer to receive file path
+ * @maxLen: Buffer size in characters
+ * Returns: TRUE if file path was loaded
+ */
+BOOL Config_GetLastDeviceFile(WCHAR *filePath, int maxLen);
+
+/*
+ * Config_SetLastDeviceFile - Save last opened device file path
+ * @filePath: File path to save (NULL to clear)
+ */
+void Config_SetLastDeviceFile(const WCHAR *filePath);
+
+/*
  * Config_GetString - Get string value from config
  * @section: Section name
  * @key: Key name

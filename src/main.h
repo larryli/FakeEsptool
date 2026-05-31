@@ -18,4 +18,7 @@
 #define WM_SERIAL_SIGNAL  (WM_USER + 5)  /* Signal change: wParam=modemStatus */
 #define WM_SERIAL_CONFIG  (WM_USER + 6)  /* Config change: wParam=baudRate, lParam=config flags */
 
+/* Custom message for application initialization */
+#define WM_APP_INIT       (WM_USER + 100)
+
 #endif /* MAIN_H */

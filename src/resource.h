@@ -15,20 +15,24 @@
 #define IDM_OPEN_DEVICE     2001
 #define IDM_SAVE_DEVICE     2002
 #define IDM_SAVE_DEVICE_AS  2003
-#define IDM_CONNECT         2004
-#define IDM_DISCONNECT      2005
-#define IDM_RECONNECT       2006
-#define IDM_LOG_CLEAR       2007
-#define IDM_LOG_SAVEAS      2008
-#define IDM_LOG_FONT        2009
-#define IDM_EXIT            2010
-#define IDM_ABOUT           2011
+#define IDM_DEVICE_PROPS    2004
+#define IDM_CONNECT         2005
+#define IDM_DISCONNECT      2006
+#define IDM_RECONNECT       2007
+#define IDM_FLASH_IMPORT    2008
+#define IDM_FLASH_EXPORT    2009
+#define IDM_LOG_CLEAR       2010
+#define IDM_LOG_SAVEAS      2011
+#define IDM_LOG_FONT        2012
+#define IDM_EXIT            2013
+#define IDM_ABOUT           2014
 
 /* Dialog IDs */
 #define IDD_PORT_SELECT     3001
 #define IDC_PORT_COMBO      3002
 #define IDD_ABOUT           3003
 #define IDD_NEW_DEVICE      3004
+#define IDD_DEVICE_PROPS    3005
 
 /* New Device dialog controls */
 #define IDC_CHIP_COMBO      3010
@@ -78,5 +82,7 @@
 #define IDS_MSG_CONN_LOST   10074
 #define IDS_DEVICE_FILTER   10075
 #define IDS_DEVICE_SAVE_FILTER 10076
+#define IDS_BIN_FILTER      10077
+#define IDS_FLASH_SIZE_MISMATCH 10078
 
 #endif /* RESOURCE_H */

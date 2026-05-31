@@ -28,14 +28,21 @@ IDR_MAIN_MENU MENUEX
     MENUITEM "&Save Device", IDM_SAVE_DEVICE, 0, 0
     MENUITEM "Save Device &As...", IDM_SAVE_DEVICE_AS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    MENUITEM "Device &Properties...", IDM_DEVICE_PROPS, 0, 0
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "E&xit", IDM_EXIT, 0, 0
   }
   POPUP "&Serial", 0, 0, 0
   {
     MENUITEM "&Connect", IDM_CONNECT, 0, 0
-    MENUITEM "&Disconnect", IDM_DISCONNECT, 0, 0|MFS_GRAYED
-    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "&Reconnect", IDM_RECONNECT, 0, 0|MFS_GRAYED
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    MENUITEM "&Disconnect", IDM_DISCONNECT, 0, 0|MFS_GRAYED
+  }
+  POPUP "F&lash", 0, 0, 0
+  {
+    MENUITEM "&Import Flash...", IDM_FLASH_IMPORT, 0, 0
+    MENUITEM "&Export Flash...", IDM_FLASH_EXPORT, 0, 0
   }
   POPUP "&Log", 0, 0, 0
   {
@@ -105,6 +112,31 @@ BEGIN
     PUSHBUTTON      "Cancel", IDCANCEL, 135, 162, 55, 16
 END
 
+IDD_DEVICE_PROPS DIALOGEX 0, 0, 260, 130
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Device Properties"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "Chip:", -1, 10, 12, 40, 8
+    COMBOBOX        IDC_CHIP_COMBO, 55, 10, 195, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "Flash:", -1, 10, 30, 40, 8
+    COMBOBOX        IDC_FLASH_SIZE_COMBO, 55, 28, 195, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "MAC:", -1, 10, 48, 40, 8
+    EDITTEXT        IDC_MAC_EDIT, 55, 46, 140, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "Random", IDC_RANDOM_MAC, 200, 45, 50, 16
+
+    GROUPBOX        "Flash Options", -1, 7, 68, 246, 40
+    LTEXT           "Mode:", -1, 15, 82, 30, 8
+    COMBOBOX        IDC_FLASH_MODE_COMBO, 50, 80, 80, 80, CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Freq:", -1, 140, 82, 25, 8
+    COMBOBOX        IDC_FLASH_FREQ_COMBO, 170, 80, 75, 80, CBS_DROPDOWNLIST | WS_TABSTOP
+
+    DEFPUSHBUTTON   "OK", IDOK, 70, 110, 55, 16
+    PUSHBUTTON      "Cancel", IDCANCEL, 135, 110, 55, 16
+END
+
 STRINGTABLE
 {
     IDS_APP_NAME        "FakeEsptool"
@@ -135,6 +167,8 @@ STRINGTABLE
     IDS_MSG_CONN_LOST   "Connection lost. Serial port error."
     IDS_DEVICE_FILTER   "ESP Device (*.esp)\0*.esp\0All Files (*.*)\0*.*\0"
     IDS_DEVICE_SAVE_FILTER "ESP Device (*.esp)\0*.esp\0All Files (*.*)\0*.*\0"
+    IDS_BIN_FILTER      "Binary Files (*.bin)\0*.bin\0All Files (*.*)\0*.*\0"
+    IDS_FLASH_SIZE_MISMATCH "Flash file size does not match current device Flash size"
 }
 
 VS_VERSION_INFO VERSIONINFO
