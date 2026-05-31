@@ -1064,7 +1064,7 @@ static void Main_OnLogSaveAs(HWND hMainWnd)
     /* Generate default filename with timestamp */
     SYSTEMTIME st;
     GetLocalTime(&st);
-    wsprintfW(szFile, L"SerialEcho_%04d%02d%02d_%02d%02d%02d.log",
+    wsprintfW(szFile, L"FakeEsptool_%04d%02d%02d_%02d%02d%02d.log",
               st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
 
     ofn.lStructSize = sizeof(ofn);
@@ -1672,7 +1672,7 @@ static BOOL Main_Init(HINSTANCE hInstance)
         .hInstance = hInstance,
         .hCursor = LoadCursor(NULL, IDC_ARROW),
         .hbrBackground = (HBRUSH)(COLOR_WINDOW + 1),
-        .lpszClassName = L"SerialEchoClass",
+        .lpszClassName = L"FakeEsptoolClass",
         .hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP)),
     };
     RegisterClassExW(&wc);
@@ -1684,7 +1684,7 @@ static HWND Main_CreateWindow(HINSTANCE hInstance)
 {
     HMENU hMenu = LoadMenuW(hInstance, MAKEINTRESOURCEW(IDR_MAIN_MENU));
 
-    HWND hWnd = CreateWindowExW(0, L"SerialEchoClass", LoadStr(IDS_APP_NAME),
+    HWND hWnd = CreateWindowExW(0, L"FakeEsptoolClass", LoadStr(IDS_APP_NAME),
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
         NULL, hMenu, hInstance, NULL);

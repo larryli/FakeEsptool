@@ -1,3 +1,9 @@
+/*
+ * chip.c - ESP chip characteristics implementation
+ *
+ * Simulates chip properties, eFuse, and register access.
+ */
+
 #include "chip.h"
 #include "../utils/trace.h"
 #include <string.h>

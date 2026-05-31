@@ -1,3 +1,9 @@
+/*
+ * slip.c - SLIP protocol encoder/decoder implementation
+ *
+ * Handles SLIP framing for esptool serial communication.
+ */
+
 #include "slip.h"
 #include "../utils/trace.h"
 

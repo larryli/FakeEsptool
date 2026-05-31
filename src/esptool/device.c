@@ -1,3 +1,9 @@
+/*
+ * device.c - Device file management implementation
+ *
+ * Handles save/load of device configuration (.esp files).
+ */
+
 #include "device.h"
 #include "../utils/trace.h"
 #include <string.h>

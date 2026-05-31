@@ -1,3 +1,9 @@
+/*
+ * esptool_proto.c - Protocol adapter layer implementation
+ *
+ * Bridges serial.c callbacks to esptool protocol processing.
+ */
+
 #include "esptool_proto.h"
 #include "utils/trace.h"
 

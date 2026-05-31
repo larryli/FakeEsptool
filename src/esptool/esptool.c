@@ -1,3 +1,9 @@
+/*
+ * esptool.c - esptool protocol handler implementation
+ *
+ * Parses SLIP frames, routes commands, and sends responses.
+ */
+
 #include "esptool.h"
 #include "../serial.h"
 #include "../utils/trace.h"

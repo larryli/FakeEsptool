@@ -1,3 +1,9 @@
+/*
+ * flash.c - Flash storage simulation implementation
+ *
+ * Provides read/write/erase operations on simulated flash memory.
+ */
+
 #include "flash.h"
 #include "../utils/trace.h"
 #include <wincrypt.h>

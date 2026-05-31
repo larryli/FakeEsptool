@@ -12,19 +12,19 @@ FakeEsptool 是一个 ESP 芯片设备端模拟器，用于模拟 ESP8266/ESP32 
 │  (UI层)     │     │ (通信层)    │     │    (适配层)     │
 └─────────────┘     └─────────────┘     └────────┬────────┘
                                                  │
-                                    ┌────────────┴────────────┐
-                                    ▼                         ▼
-                            ┌─────────────┐           ┌─────────────┐
-                            │   slip.c    │           │  esptool.c  │
-                            │ (SLIP编解码) │           │ (命令处理)   │
-                            └─────────────┘           └─────────────┘
-                                    │                         │
-                            ┌───────┴───────┐         ┌───────┴───────┐
-                            ▼               ▼         ▼               ▼
-                      ┌──────────┐   ┌──────────┐ ┌──────────┐ ┌──────────┐
-                      │  chip.c  │   │  flash.c │ │          │ │          │
-                      │ (芯片特性)│   │(Flash存储)│ │          │ │          │
-                      └──────────┘   └──────────┘ └──────────┘ └──────────┘
+                              ┌──────────────────┼──────────────────┐
+                              ▼                  ▼                  ▼
+                    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+                    │   slip.c    │    │  esptool.c  │    │  device.c   │
+                    │ (SLIP编解码) │    │ (命令处理)   │    │(设备文件管理)│
+                    └─────────────┘    └─────────────┘    └─────────────┘
+                            │                  │
+                    ┌───────┴───────┐  ┌───────┴───────┐
+                    ▼               ▼  ▼               ▼
+              ┌──────────┐   ┌──────────┐
+              │  chip.c  │   │  flash.c │
+              │ (芯片特性)│   │(Flash存储)│
+              └──────────┘   └──────────┘
 ```
 
 | 模块 | 职责 |
@@ -35,6 +35,7 @@ FakeEsptool 是一个 ESP 芯片设备端模拟器，用于模拟 ESP8266/ESP32 
 | `esptool/slip.c/h` | SLIP 协议编解码 |
 | `esptool/chip.c/h` | 芯片特性模拟（efuse、MAC等） |
 | `esptool/flash.c/h` | Flash 存储模拟 |
+| `esptool/device.c/h` | 设备文件管理 |
 | `esptool/esptool.c/h` | esptool 命令解析与响应 |
 
 ## 编译
@@ -79,6 +80,9 @@ cmake --build build
 
 | 码 | 名称 | 说明 |
 |----|------|------|
+| 0x05 | MEM_BEGIN | 内存写入开始 |
+| 0x06 | MEM_END | 内存写入结束 |
+| 0x07 | MEM_DATA | 内存写入数据 |
 | 0x08 | SYNC | 同步握手 |
 | 0x09 | SPI_SET_PARAMS | 设置Flash参数 |
 | 0x0A | READ_REG | 读寄存器 |
@@ -86,9 +90,10 @@ cmake --build build
 | 0x0D | SPI_ATTACH | 附加SPI |
 | 0x0F | CHANGE_BAUDRATE | 修改波特率 |
 | 0x13 | SPI_FLASH_MD5 | 计算Flash MD5 |
-| 0x14 | SPI_READ_FLASH | 读取Flash |
-| 0x15 | SPI_ERASE_FLASH | 擦除Flash |
-| 0x16 | SPI_ERASE_BLOCK | 擦除块 |
+| 0x14 | SPI_FLASH_DATA | 写入Flash数据 |
+| 0x15 | SPI_READ_FLASH | 读取Flash |
+| 0x16 | SPI_ERASE_FLASH | 擦除Flash |
+| 0x17 | SPI_ERASE_BLOCK | 擦除块 |
 | 0x20 | FLASH_DEFL_BEGIN | 压缩写入开始 |
 | 0x21 | FLASH_DEFL_DATA | 压缩写入数据 |
 | 0x22 | FLASH_DEFL_END | 压缩写入结束 |
@@ -142,22 +147,31 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)EsptoolProto_OnSignal);
 | 函数 | 说明 |
 |------|------|
 | `Esptool_Init(ctx)` | 初始化上下文 |
+| `Esptool_SetNotify(ctx, hNotify)` | 设置通知窗口 |
+| `Esptool_SetModifiedCallback(ctx, cb)` | 设置修改回调 |
 | `Esptool_Feed(ctx, data, len)` | 喂入串口数据 |
+| `Esptool_ProcessFrame(ctx, frame, frame_len)` | 处理一帧数据 |
 | `Esptool_SetChipType(ctx, type)` | 设置芯片类型 |
 | `Esptool_SetFlashSize(ctx, size)` | 设置Flash大小 |
 | `Esptool_SendResponse(ctx, cmd, status, data, len)` | 发送响应 |
+| `Esptool_CalcChecksum(data, len)` | 计算校验和 |
 
 ### chip.h
 
 | 函数 | 说明 |
 |------|------|
 | `Chip_Init(ctx, type)` | 初始化芯片 |
+| `Chip_Close(ctx)` | 释放芯片 |
 | `Chip_GetName(ctx)` | 获取芯片名称 |
 | `Chip_SetMac(ctx, mac)` | 设置MAC地址 |
 | `Chip_GetMac(ctx)` | 获取MAC地址 |
-| `Chip_GetEfuseBlock(ctx, block, data)` | 读取efuse块 |
+| `Chip_ReadReg(ctx, addr)` | 读取寄存器 |
+| `Chip_WriteReg(ctx, addr, val)` | 写入寄存器 |
 | `Chip_SetFlashSize(ctx, size)` | 设置Flash大小 |
 | `Chip_GetFlashSize(ctx)` | 获取Flash大小 |
+| `Chip_GetChipId(ctx)` | 获取芯片ID |
+| `Chip_GetEfuse(ctx)` | 获取efuse数据 |
+| `Chip_GetEfuseSize(ctx)` | 获取efuse大小 |
 
 ### flash.h
 
@@ -183,6 +197,18 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)EsptoolProto_OnSignal);
 | `Slip_Reset(ctx)` | 重置状态 |
 | `Slip_Encode(data, len, out, max)` | 编码一帧 |
 
+### device.h
+
+| 函数 | 说明 |
+|------|------|
+| `Device_Init(ctx, chipType, flashSize, mac)` | 初始化设备 |
+| `Device_Close(ctx)` | 关闭设备 |
+| `Device_Save(ctx, filename)` | 保存设备文件 |
+| `Device_Load(ctx, filename)` | 加载设备文件 |
+| `Device_IsModified(ctx)` | 检查是否已修改 |
+| `Device_SetModified(ctx, modified)` | 设置修改标记 |
+| `Device_GetFilename(ctx)` | 获取文件名 |
+
 ### serial.h
 
 | 函数 | 说明 |
@@ -193,7 +219,16 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)EsptoolProto_OnSignal);
 | `Serial_WriteData(ctx, data, len, hNotify)` | 写入数据 |
 | `Serial_SetReceiveCallback(ctx, cb)` | 设置接收回调 |
 | `Serial_SetSignalCallback(ctx, cb)` | 设置信号回调 |
+| `Serial_SetDtr(ctx, state)` | 设置DTR |
+| `Serial_SetRts(ctx, state)` | 设置RTS |
+| `Serial_SetBaudRate(ctx, baudRate)` | 修改波特率 |
+| `Serial_SetDataBits(ctx, bits)` | 修改数据位 |
+| `Serial_SetParity(ctx, parity)` | 修改校验 |
+| `Serial_SetStopBits(ctx, bits)` | 修改停止位 |
 | `Serial_GetConfig(ctx, ...)` | 读取配置 |
+| `Serial_GetRxBytes(ctx)` | 获取接收字节数 |
+| `Serial_GetTxBytes(ctx)` | 获取发送字节数 |
+| `Serial_GetPortName(index, portName, maxLen)` | 获取端口名 |
 | `Serial_PostLog(hNotify, tag, text)` | 发送日志 |
 | `Serial_PostLogF(hNotify, tag, fmt, ...)` | 格式化日志 |
 
