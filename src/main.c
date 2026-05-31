@@ -1200,58 +1200,93 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             SendMessageW(g_hToolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
             SendMessageW(g_hToolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(16, 16));
 
-            /* Load merged toolbar bitmap (4 icons: Connect, Disconnect, Clear, Save) */
+            /* Load merged toolbar bitmap (10 icons) */
             TBADDBITMAP tbab = {0};
             tbab.hInst = hInst;
             tbab.nID = IDB_TOOLBAR;
-            int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 4, (LPARAM)&tbab);
+            int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 10, (LPARAM)&tbab);
 
-            /* Toolbar buttons: Connect, Reconnect, separator, Disconnect, separator, Clear, Save */
-            TBBUTTON buttons[7] = {0};
+            /* Toolbar buttons: New, Open, Save | Connect, Reconnect, Disconnect | Import, Export | Clear, SaveLog */
+            TBBUTTON buttons[14] = {0};
+            int btn = 0;
 
-            buttons[0].iBitmap = iBase + 0;  /* Connect icon */
-            buttons[0].idCommand = IDM_CONNECT;
-            buttons[0].fsState = TBSTATE_ENABLED;
-            buttons[0].fsStyle = BTNS_BUTTON;
-            buttons[0].iString = -1;
+            /* File group */
+            buttons[btn].iBitmap = iBase + 0;  /* New */
+            buttons[btn].idCommand = IDM_NEW_DEVICE;
+            buttons[btn].fsState = TBSTATE_ENABLED;
+            buttons[btn].fsStyle = BTNS_BUTTON;
+            btn++;
 
-            buttons[1].iBitmap = iBase + 0;  /* Reconnect icon (reuse Connect) */
-            buttons[1].idCommand = IDM_RECONNECT;
-            buttons[1].fsState = 0;  /* Disabled initially */
-            buttons[1].fsStyle = BTNS_BUTTON;
-            buttons[1].iString = -1;
+            buttons[btn].iBitmap = iBase + 1;  /* Open */
+            buttons[btn].idCommand = IDM_OPEN_DEVICE;
+            buttons[btn].fsState = TBSTATE_ENABLED;
+            buttons[btn].fsStyle = BTNS_BUTTON;
+            btn++;
 
-            buttons[2].iBitmap = 0;
-            buttons[2].idCommand = -1;
-            buttons[2].fsState = 0;
-            buttons[2].fsStyle = BTNS_SEP;
-            buttons[2].iString = -1;
+            buttons[btn].iBitmap = iBase + 2;  /* Save */
+            buttons[btn].idCommand = IDM_SAVE_DEVICE;
+            buttons[btn].fsState = TBSTATE_ENABLED;
+            buttons[btn].fsStyle = BTNS_BUTTON;
+            btn++;
 
-            buttons[3].iBitmap = iBase + 1;  /* Disconnect icon */
-            buttons[3].idCommand = IDM_DISCONNECT;
-            buttons[3].fsState = 0;  /* Disabled initially */
-            buttons[3].fsStyle = BTNS_BUTTON;
-            buttons[3].iString = -1;
+            /* Separator */
+            buttons[btn].fsStyle = BTNS_SEP;
+            btn++;
 
-            buttons[4].iBitmap = 0;
-            buttons[4].idCommand = -1;
-            buttons[4].fsState = 0;
-            buttons[4].fsStyle = BTNS_SEP;
-            buttons[4].iString = -1;
+            /* Serial group */
+            buttons[btn].iBitmap = iBase + 3;  /* Connect */
+            buttons[btn].idCommand = IDM_CONNECT;
+            buttons[btn].fsState = TBSTATE_ENABLED;
+            buttons[btn].fsStyle = BTNS_BUTTON;
+            btn++;
 
-            buttons[5].iBitmap = iBase + 2;  /* Clear icon */
-            buttons[5].idCommand = IDM_LOG_CLEAR;
-            buttons[5].fsState = TBSTATE_ENABLED;
-            buttons[5].fsStyle = BTNS_BUTTON;
-            buttons[5].iString = -1;
+            buttons[btn].iBitmap = iBase + 4;  /* Reconnect */
+            buttons[btn].idCommand = IDM_RECONNECT;
+            buttons[btn].fsState = 0;  /* Disabled initially */
+            buttons[btn].fsStyle = BTNS_BUTTON;
+            btn++;
 
-            buttons[6].iBitmap = iBase + 3;  /* Save icon */
-            buttons[6].idCommand = IDM_LOG_SAVEAS;
-            buttons[6].fsState = TBSTATE_ENABLED;
-            buttons[6].fsStyle = BTNS_BUTTON;
-            buttons[6].iString = -1;
+            buttons[btn].iBitmap = iBase + 5;  /* Disconnect */
+            buttons[btn].idCommand = IDM_DISCONNECT;
+            buttons[btn].fsState = 0;  /* Disabled initially */
+            buttons[btn].fsStyle = BTNS_BUTTON;
+            btn++;
 
-            SendMessageW(g_hToolbar, TB_ADDBUTTONS, 7, (LPARAM)buttons);
+            /* Separator */
+            buttons[btn].fsStyle = BTNS_SEP;
+            btn++;
+
+            /* Flash group */
+            buttons[btn].iBitmap = iBase + 6;  /* Import */
+            buttons[btn].idCommand = IDM_FLASH_IMPORT;
+            buttons[btn].fsState = TBSTATE_ENABLED;
+            buttons[btn].fsStyle = BTNS_BUTTON;
+            btn++;
+
+            buttons[btn].iBitmap = iBase + 7;  /* Export */
+            buttons[btn].idCommand = IDM_FLASH_EXPORT;
+            buttons[btn].fsState = TBSTATE_ENABLED;
+            buttons[btn].fsStyle = BTNS_BUTTON;
+            btn++;
+
+            /* Separator */
+            buttons[btn].fsStyle = BTNS_SEP;
+            btn++;
+
+            /* Log group */
+            buttons[btn].iBitmap = iBase + 8;  /* Clear */
+            buttons[btn].idCommand = IDM_LOG_CLEAR;
+            buttons[btn].fsState = TBSTATE_ENABLED;
+            buttons[btn].fsStyle = BTNS_BUTTON;
+            btn++;
+
+            buttons[btn].iBitmap = iBase + 9;  /* Save Log */
+            buttons[btn].idCommand = IDM_LOG_SAVEAS;
+            buttons[btn].fsState = TBSTATE_ENABLED;
+            buttons[btn].fsStyle = BTNS_BUTTON;
+            btn++;
+
+            SendMessageW(g_hToolbar, TB_ADDBUTTONS, btn, (LPARAM)buttons);
 
             /* Create status bar */
             g_hStatusbar = CreateWindowExW(0, STATUSCLASSNAMEW, NULL,
