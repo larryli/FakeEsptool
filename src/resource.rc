@@ -34,6 +34,8 @@ IDR_MAIN_MENU MENUEX
   {
     MENUITEM "&Connect", IDM_CONNECT, 0, 0
     MENUITEM "&Disconnect", IDM_DISCONNECT, 0, 0|MFS_GRAYED
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    MENUITEM "&Reconnect", IDM_RECONNECT, 0, 0|MFS_GRAYED
   }
   POPUP "&Log", 0, 0, 0
   {
@@ -110,6 +112,7 @@ STRINGTABLE
     IDS_TITLE_FORMAT    "FakeEsptool - %s"
     IDS_TIP_CONNECT     "Connect"
     IDS_TIP_DISCONNECT  "Disconnect"
+    IDS_TIP_RECONNECT   "Reconnect"
     IDS_TIP_CLEAR       "Clear Log"
     IDS_TIP_SAVEAS      "Save Log As..."
 }

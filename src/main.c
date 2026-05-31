@@ -121,17 +121,43 @@ static BOOL PromptSaveIfNeeded(HWND hWnd)
     }
 }
 
+/* Check if a specific port exists in the system */
+static BOOL IsPortAvailable(const WCHAR *portName)
+{
+    WCHAR fullPort[32];
+    wsprintfW(fullPort, L"\\\\.\\%s", portName);
+    HANDLE hPort = CreateFileW(fullPort, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+                               OPEN_EXISTING, 0, NULL);
+    if (hPort == INVALID_HANDLE_VALUE)
+        return FALSE;
+    CloseHandle(hPort);
+    return TRUE;
+}
+
+/* Check if reconnect is available (last port exists and not connected) */
+static BOOL CanReconnect(void)
+{
+    if (Serial_IsOpen(&g_serial))
+        return FALSE;
+    if (!g_szPort[0])
+        return FALSE;
+    return IsPortAvailable(g_szPort);
+}
+
 /* Update menu and toolbar button states based on connection status */
 static void UpdateMenuState(HWND hWnd)
 {
     HMENU hMenu = GetMenu(hWnd);
     BOOL connected = Serial_IsOpen(&g_serial);
+    BOOL canReconnect = CanReconnect();
 
     EnableMenuItem(hMenu, IDM_CONNECT, connected ? MF_GRAYED : MF_ENABLED);
     EnableMenuItem(hMenu, IDM_DISCONNECT, connected ? MF_ENABLED : MF_GRAYED);
+    EnableMenuItem(hMenu, IDM_RECONNECT, canReconnect ? MF_ENABLED : MF_GRAYED);
 
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_CONNECT, !connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_DISCONNECT, connected);
+    SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_RECONNECT, canReconnect);
 }
 
 /* Update window title with port name */
@@ -623,6 +649,51 @@ static void Main_OnConnect(HWND hMainWnd)
     TRACE_FW(TAG, "Main_OnConnect completed");
 }
 
+/* Handle Reconnect command - connect to last port directly */
+static void Main_OnReconnect(HWND hMainWnd)
+{
+    TRACE_FW(TAG, "Main_OnReconnect called");
+
+    if (Serial_IsOpen(&g_serial)) {
+        TRACE_FW(TAG, "Port already open");
+        return;
+    }
+
+    if (!g_szPort[0]) {
+        MessageBoxW(hMainWnd, L"No last port available", LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    if (!IsPortAvailable(g_szPort)) {
+        MessageBoxW(hMainWnd, L"Port is not available", LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    TRACE_FW(TAG, "Reconnecting to port: %s", g_szPort);
+
+    if (!Serial_Open(&g_serial, g_szPort, hMainWnd)) {
+        TRACE_FW(TAG, "ERROR: Serial_Open failed");
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_PORT_ERROR), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    /* Register esptool protocol callbacks */
+    Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)EsptoolProto_ProcessData);
+    Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)EsptoolProto_OnSignal);
+
+    TRACE_FW(TAG, "Serial_Open succeeded");
+
+    /* Clear log on new connection */
+    SetWindowTextW(g_hEdit, L"");
+
+    UpdateTitle(hMainWnd);
+    UpdateMenuState(hMainWnd);
+    UpdateStatusBar();
+    SetFocus(g_hEdit);
+
+    TRACE_FW(TAG, "Main_OnReconnect completed");
+}
+
 /* Handle Disconnect command */
 static void Main_OnDisconnect(HWND hMainWnd)
 {
@@ -797,8 +868,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             tbab.nID = IDB_TOOLBAR;
             int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 4, (LPARAM)&tbab);
 
-            /* Toolbar buttons: Connect, Disconnect, separator, Clear, Save */
-            TBBUTTON buttons[5] = {0};
+            /* Toolbar buttons: Connect, Disconnect, Reconnect, separator, Clear, Save */
+            TBBUTTON buttons[7] = {0};
 
             buttons[0].iBitmap = iBase + 0;  /* Connect icon */
             buttons[0].idCommand = IDM_CONNECT;
@@ -812,25 +883,37 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             buttons[1].fsStyle = BTNS_BUTTON;
             buttons[1].iString = -1;
 
-            buttons[2].iBitmap = 0;
-            buttons[2].idCommand = -1;
-            buttons[2].fsState = 0;
-            buttons[2].fsStyle = BTNS_SEP;
+            buttons[2].iBitmap = iBase + 0;  /* Reconnect icon (reuse Connect) */
+            buttons[2].idCommand = IDM_RECONNECT;
+            buttons[2].fsState = 0;  /* Disabled initially */
+            buttons[2].fsStyle = BTNS_BUTTON;
             buttons[2].iString = -1;
 
-            buttons[3].iBitmap = iBase + 2;  /* Clear icon */
-            buttons[3].idCommand = IDM_LOG_CLEAR;
-            buttons[3].fsState = TBSTATE_ENABLED;
-            buttons[3].fsStyle = BTNS_BUTTON;
+            buttons[3].iBitmap = 0;
+            buttons[3].idCommand = -1;
+            buttons[3].fsState = 0;
+            buttons[3].fsStyle = BTNS_SEP;
             buttons[3].iString = -1;
 
-            buttons[4].iBitmap = iBase + 3;  /* Save icon */
-            buttons[4].idCommand = IDM_LOG_SAVEAS;
+            buttons[4].iBitmap = iBase + 2;  /* Clear icon */
+            buttons[4].idCommand = IDM_LOG_CLEAR;
             buttons[4].fsState = TBSTATE_ENABLED;
             buttons[4].fsStyle = BTNS_BUTTON;
             buttons[4].iString = -1;
 
-            SendMessageW(g_hToolbar, TB_ADDBUTTONS, 5, (LPARAM)buttons);
+            buttons[5].iBitmap = iBase + 3;  /* Save icon */
+            buttons[5].idCommand = IDM_LOG_SAVEAS;
+            buttons[5].fsState = TBSTATE_ENABLED;
+            buttons[5].fsStyle = BTNS_BUTTON;
+            buttons[5].iString = -1;
+
+            buttons[6].iBitmap = 0;
+            buttons[6].idCommand = -1;
+            buttons[6].fsState = 0;
+            buttons[6].fsStyle = BTNS_SEP;
+            buttons[6].iString = -1;
+
+            SendMessageW(g_hToolbar, TB_ADDBUTTONS, 7, (LPARAM)buttons);
 
             /* Create status bar */
             g_hStatusbar = CreateWindowExW(0, STATUSCLASSNAMEW, NULL,
@@ -978,6 +1061,10 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             Main_OnDisconnect(hWnd);
             SetFocus(g_hEdit);
             return 0;
+        case IDM_RECONNECT:
+            Main_OnReconnect(hWnd);
+            SetFocus(g_hEdit);
+            return 0;
         case IDM_LOG_CLEAR:
             Main_OnLogClear(hWnd);
             return 0;
@@ -1010,6 +1097,9 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 return 0;
             case IDM_DISCONNECT:
                 ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_DISCONNECT);
+                return 0;
+            case IDM_RECONNECT:
+                ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_RECONNECT);
                 return 0;
             case IDM_LOG_CLEAR:
                 ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_CLEAR);
@@ -1225,6 +1315,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
     /* Initialize configuration */
     Config_Init();
+
+    /* Load last connected port for reconnect */
+    Config_GetLastPort(g_szPort, 32);
 
     /* Initialize GUI subsystem */
     if (!Main_Init(hInstance)) {

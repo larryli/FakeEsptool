@@ -17,11 +17,12 @@
 #define IDM_SAVE_DEVICE_AS  2003
 #define IDM_CONNECT         2004
 #define IDM_DISCONNECT      2005
-#define IDM_LOG_CLEAR       2006
-#define IDM_LOG_SAVEAS      2007
-#define IDM_LOG_FONT        2008
-#define IDM_EXIT            2009
-#define IDM_ABOUT           2010
+#define IDM_RECONNECT       2006
+#define IDM_LOG_CLEAR       2007
+#define IDM_LOG_SAVEAS      2008
+#define IDM_LOG_FONT        2009
+#define IDM_EXIT            2010
+#define IDM_ABOUT           2011
 
 /* Dialog IDs */
 #define IDD_PORT_SELECT     3001
@@ -56,6 +57,7 @@
 /* Tooltip strings */
 #define IDS_TIP_CONNECT     10030
 #define IDS_TIP_DISCONNECT  10031
+#define IDS_TIP_RECONNECT   10032
 #define IDS_TIP_CLEAR       10033
 #define IDS_TIP_SAVEAS      10034
 
