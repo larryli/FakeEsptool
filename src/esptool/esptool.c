@@ -126,12 +126,12 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
 static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
-    (void)ctx;
     DWORD addr = pkt->value;
     DWORD val = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                 ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
 
     TRACE_PROTO(TAG, "WRITE_REG addr=0x%08lX val=0x%08lX", addr, val);
+    Chip_WriteReg(&ctx->chip, addr, val);
     Esptool_SendResponse(ctx, ESP_CMD_WRITE_REG, ESP_OK, NULL, 0);
 }
 

@@ -284,9 +284,16 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
 
 BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
 {
-    (void)ctx;
-    (void)addr;
-    (void)val;
+    if (addr >= 0x3FF00000 && addr < 0x3FF00000 + ctx->efuse_size) {
+        int offset = (int)(addr - 0x3FF00000);
+        if (offset + 3 < ctx->efuse_size) {
+            ctx->efuse[offset] |= (BYTE)(val & 0xFF);
+            ctx->efuse[offset + 1] |= (BYTE)((val >> 8) & 0xFF);
+            ctx->efuse[offset + 2] |= (BYTE)((val >> 16) & 0xFF);
+            ctx->efuse[offset + 3] |= (BYTE)((val >> 24) & 0xFF);
+            TRACE_FW(TAG, "eFuse write: offset=0x%X val=0x%08lX", offset, val);
+        }
+    }
     return TRUE;
 }
 
