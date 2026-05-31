@@ -11,18 +11,35 @@
 #define IDC_MAIN_STATUSBAR  1003
 
 /* Menu command IDs */
-#define IDM_CONNECT         2001
-#define IDM_DISCONNECT      2002
-#define IDM_LOG_CLEAR       2004
-#define IDM_LOG_SAVEAS      2005
-#define IDM_LOG_FONT        2006
-#define IDM_EXIT            2007
-#define IDM_ABOUT           2008
+#define IDM_NEW_DEVICE      2000
+#define IDM_OPEN_DEVICE     2001
+#define IDM_SAVE_DEVICE     2002
+#define IDM_SAVE_DEVICE_AS  2003
+#define IDM_CONNECT         2004
+#define IDM_DISCONNECT      2005
+#define IDM_LOG_CLEAR       2006
+#define IDM_LOG_SAVEAS      2007
+#define IDM_LOG_FONT        2008
+#define IDM_EXIT            2009
+#define IDM_ABOUT           2010
 
 /* Dialog IDs */
 #define IDD_PORT_SELECT     3001
 #define IDC_PORT_COMBO      3002
 #define IDD_ABOUT           3003
+#define IDD_NEW_DEVICE      3004
+
+/* New Device dialog controls */
+#define IDC_CHIP_COMBO      3010
+#define IDC_FLASH_SIZE_COMBO 3011
+#define IDC_MAC_EDIT        3012
+#define IDC_RANDOM_MAC      3013
+#define IDC_FLASH_MODE_COMBO 3014
+#define IDC_FLASH_FREQ_COMBO 3015
+#define IDC_INIT_BLANK      3016
+#define IDC_INIT_FILE       3017
+#define IDC_INIT_FILE_PATH  3018
+#define IDC_BROWSE_FILE     3019
 
 /* Icon and menu resource IDs */
 #define IDI_APP             5001
@@ -57,5 +74,7 @@
 #define IDS_MSG_DEV_TITLE   10071
 #define IDS_LOG_SAVE_FILTER 10072
 #define IDS_MSG_CONN_LOST   10074
+#define IDS_DEVICE_FILTER   10075
+#define IDS_DEVICE_SAVE_FILTER 10076
 
 #endif /* RESOURCE_H */

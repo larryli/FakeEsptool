@@ -19,6 +19,7 @@ add_executable(FakeEsptool WIN32
     src/esptool/chip.c
     src/esptool/flash.c
     src/esptool/esptool.c
+    src/esptool/device.c
     src/utils/config.c
     src/utils/lang.c
     src/utils/trace.c

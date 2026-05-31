@@ -37,6 +37,11 @@ void Esptool_SetNotify(ESPTOOL_CTX *ctx, HWND hNotify)
     ctx->hNotify = hNotify;
 }
 
+void Esptool_SetModifiedCallback(ESPTOOL_CTX *ctx, ESP_MODIFIED_CB cb)
+{
+    ctx->onModified = cb;
+}
+
 void Esptool_SetChipType(ESPTOOL_CTX *ctx, CHIP_TYPE type)
 {
     Flash_Close(&ctx->flash);
@@ -132,6 +137,7 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "WRITE_REG addr=0x%08lX val=0x%08lX", addr, val);
     Chip_WriteReg(&ctx->chip, addr, val);
+    if (ctx->onModified) ctx->onModified();
     Esptool_SendResponse(ctx, ESP_CMD_WRITE_REG, ESP_OK, NULL, 0);
 }
 
@@ -245,12 +251,7 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "FLASH_DEFL_DATA seq=%lu len=%u", seq, pkt->size);
 
-    if (pkt->size >= 16) {
-        DWORD uncompressed = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                             ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-        TRACE_PROTO(TAG, "  uncompressed=%lu", uncompressed);
-    }
-
+    if (ctx->onModified) ctx->onModified();
     Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_DEFL_DATA, ESP_OK, NULL, 0);
 }
 
@@ -312,6 +313,7 @@ static void HandleEraseFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG, "ERASE_FLASH");
 
     Flash_EraseAll(&ctx->flash);
+    if (ctx->onModified) ctx->onModified();
     Esptool_SendResponse(ctx, ESP_CMD_SPI_ERASE_FLASH, ESP_OK, NULL, 0);
 }
 
@@ -323,10 +325,12 @@ static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "ERASE_BLOCK offset=0x%08lX len=%lu", offset, len);
 
-    if (Flash_Erase(&ctx->flash, offset, len))
+    if (Flash_Erase(&ctx->flash, offset, len)) {
+        if (ctx->onModified) ctx->onModified();
         Esptool_SendResponse(ctx, ESP_CMD_SPI_ERASE_BLOCK, ESP_OK, NULL, 0);
-    else
+    } else {
         Esptool_SendResponse(ctx, ESP_CMD_SPI_ERASE_BLOCK, ESP_FAIL, NULL, 0);
+    }
 }
 
 static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)

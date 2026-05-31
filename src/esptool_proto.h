@@ -12,5 +12,6 @@ void EsptoolProto_OnSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify);
 
 void EsptoolProto_SetChipType(CHIP_TYPE type);
 void EsptoolProto_SetFlashSize(DWORD size);
+void EsptoolProto_SetModifiedCallback(ESP_MODIFIED_CB cb);
 
 #endif

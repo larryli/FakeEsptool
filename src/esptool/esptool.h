@@ -46,12 +46,15 @@
 #define ESP_FLASH_BLOCK_SIZE    0x1000
 #define ESP_FLASH_ERASE_SIZE    0x10000
 
+typedef void (*ESP_MODIFIED_CB)(void);
+
 typedef struct {
     SLIP_CTX  slip;
     CHIP_CTX  chip;
     FLASH_CTX flash;
     BOOL      synced;
     HWND      hNotify;
+    ESP_MODIFIED_CB onModified;
 } ESPTOOL_CTX;
 
 typedef struct {
@@ -64,6 +67,7 @@ typedef struct {
 
 void Esptool_Init(ESPTOOL_CTX *ctx);
 void Esptool_SetNotify(ESPTOOL_CTX *ctx, HWND hNotify);
+void Esptool_SetModifiedCallback(ESPTOOL_CTX *ctx, ESP_MODIFIED_CB cb);
 void Esptool_SetChipType(ESPTOOL_CTX *ctx, CHIP_TYPE type);
 void Esptool_SetFlashSize(ESPTOOL_CTX *ctx, DWORD size);
 BOOL Esptool_Feed(ESPTOOL_CTX *ctx, const BYTE *data, int len);

@@ -23,6 +23,11 @@ IDR_MAIN_MENU MENUEX
 {
   POPUP "&File", 0, 0, 0
   {
+    MENUITEM "&New Device...", IDM_NEW_DEVICE, 0, 0
+    MENUITEM "&Open Device...", IDM_OPEN_DEVICE, 0, 0
+    MENUITEM "&Save Device", IDM_SAVE_DEVICE, 0, 0
+    MENUITEM "Save Device &As...", IDM_SAVE_DEVICE_AS, 0, 0
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "E&xit", IDM_EXIT, 0, 0
   }
   POPUP "&Serial", 0, 0, 0
@@ -68,6 +73,36 @@ BEGIN
     DEFPUSHBUTTON   "OK", IDOK, 95, 75, 60, 14
 END
 
+IDD_NEW_DEVICE DIALOGEX 0, 0, 260, 185
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "New Device"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "Chip:", -1, 10, 12, 40, 8
+    COMBOBOX        IDC_CHIP_COMBO, 55, 10, 195, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "Flash:", -1, 10, 30, 40, 8
+    COMBOBOX        IDC_FLASH_SIZE_COMBO, 55, 28, 195, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "MAC:", -1, 10, 48, 40, 8
+    EDITTEXT        IDC_MAC_EDIT, 55, 46, 140, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "Random", IDC_RANDOM_MAC, 200, 45, 50, 16
+
+    GROUPBOX        "Flash Options", -1, 7, 68, 246, 55
+    LTEXT           "Mode:", -1, 15, 82, 30, 8
+    COMBOBOX        IDC_FLASH_MODE_COMBO, 50, 80, 80, 80, CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Freq:", -1, 140, 82, 25, 8
+    COMBOBOX        IDC_FLASH_FREQ_COMBO, 170, 80, 75, 80, CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Initial:", -1, 15, 100, 30, 8
+    AUTORADIOBUTTON "Blank", IDC_INIT_BLANK, 50, 99, 50, 10, WS_GROUP | WS_TABSTOP
+    AUTORADIOBUTTON "From file:", IDC_INIT_FILE, 105, 99, 55, 10
+    EDITTEXT        IDC_INIT_FILE_PATH, 50, 113, 150, 12, ES_AUTOHSCROLL | WS_DISABLED
+    PUSHBUTTON      "...", IDC_BROWSE_FILE, 205, 112, 20, 14
+
+    DEFPUSHBUTTON   "OK", IDOK, 70, 162, 55, 16
+    PUSHBUTTON      "Cancel", IDCANCEL, 135, 162, 55, 16
+END
+
 STRINGTABLE
 {
     IDS_APP_NAME        "FakeEsptool"
@@ -95,6 +130,8 @@ STRINGTABLE
     IDS_MSG_DEV_TITLE   "Device Removed"
     IDS_LOG_SAVE_FILTER "Log Files (*.log)\0*.log\0All Files (*.*)\0*.*\0"
     IDS_MSG_CONN_LOST   "Connection lost. Serial port error."
+    IDS_DEVICE_FILTER   "ESP Device (*.esp)\0*.esp\0All Files (*.*)\0*.*\0"
+    IDS_DEVICE_SAVE_FILTER "ESP Device (*.esp)\0*.esp\0All Files (*.*)\0*.*\0"
 }
 
 VS_VERSION_INFO VERSIONINFO
@@ -110,7 +147,7 @@ FILESUBTYPE VFT2_UNKNOWN
   {
     BLOCK "040904B0"
     {
-      VALUE "FileDescription", "Serial Port Loopback Device Simulator\0"
+      VALUE "FileDescription", "ESP Chip Device Simulator\0"
       VALUE "FileVersion", "1.0.0.0\0"
       VALUE "LegalCopyright", "Copyright (c) 2026 Larry Li\0"
       VALUE "ProductName", "FakeEsptool\0"

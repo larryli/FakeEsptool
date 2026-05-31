@@ -40,3 +40,8 @@ void EsptoolProto_SetFlashSize(DWORD size)
 {
     Esptool_SetFlashSize(&g_esptool, size);
 }
+
+void EsptoolProto_SetModifiedCallback(ESP_MODIFIED_CB cb)
+{
+    Esptool_SetModifiedCallback(&g_esptool, cb);
+}
