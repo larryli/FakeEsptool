@@ -1773,14 +1773,19 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
     TRACE_FW(TAG, "Main window created: %p", hWnd);
 
+    /* Load accelerator table */
+    HACCEL hAccel = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDR_MAIN_ACCEL));
+
     /* Trigger initialization - check for last device file */
     PostMessage(hWnd, WM_APP_INIT, 0, 0);
 
     /* Main message loop */
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        if (!TranslateAccelerator(hWnd, hAccel, &msg)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
     }
 
     TRACE_FW(TAG, "=== FakeEsptool Exiting ===");

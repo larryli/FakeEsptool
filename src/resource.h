@@ -54,6 +54,7 @@
 /* Icon and menu resource IDs */
 #define IDI_APP             5001
 #define IDR_MAIN_MENU       6001
+#define IDR_MAIN_ACCEL      6002
 
 /* Toolbar bitmap resources */
 #define IDB_TOOLBAR         7001

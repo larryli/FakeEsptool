@@ -23,19 +23,19 @@ IDR_MAIN_MENU MENUEX
 {
   POPUP "&File", 0, 0, 0
   {
-    MENUITEM "&New Device...", IDM_NEW_DEVICE, 0, 0
-    MENUITEM "&Open Device...", IDM_OPEN_DEVICE, 0, 0
-    MENUITEM "&Save Device", IDM_SAVE_DEVICE, 0, 0
-    MENUITEM "Save Device &As...", IDM_SAVE_DEVICE_AS, 0, 0
+    MENUITEM "&New Device...       Ctrl+N", IDM_NEW_DEVICE, 0, 0
+    MENUITEM "&Open Device...      Ctrl+O", IDM_OPEN_DEVICE, 0, 0
+    MENUITEM "&Save Device         Ctrl+S", IDM_SAVE_DEVICE, 0, 0
+    MENUITEM "Save Device &As...   F12", IDM_SAVE_DEVICE_AS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "Device &Properties...", IDM_DEVICE_PROPS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
-    MENUITEM "E&xit", IDM_EXIT, 0, 0
+    MENUITEM "E&xit                Alt+F4", IDM_EXIT, 0, 0
   }
   POPUP "&Serial", 0, 0, 0
   {
     MENUITEM "&Connect", IDM_CONNECT, 0, 0
-    MENUITEM "&Reconnect", IDM_RECONNECT, 0, 0|MFS_GRAYED
+    MENUITEM "&Reconnect          Ctrl+R", IDM_RECONNECT, 0, 0|MFS_GRAYED
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "&Disconnect", IDM_DISCONNECT, 0, 0|MFS_GRAYED
   }
@@ -46,15 +46,26 @@ IDR_MAIN_MENU MENUEX
   }
   POPUP "&Log", 0, 0, 0
   {
-    MENUITEM "&Clear", IDM_LOG_CLEAR, 0, 0
+    MENUITEM "&Clear               Ctrl+L", IDM_LOG_CLEAR, 0, 0
     MENUITEM "Save &as...", IDM_LOG_SAVEAS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "&Font...", IDM_LOG_FONT, 0, 0
   }
   POPUP "&Help", 0, 0, 0
   {
-    MENUITEM "&About", IDM_ABOUT, 0, 0
+    MENUITEM "&About               F1", IDM_ABOUT, 0, 0
   }
+}
+
+IDR_MAIN_ACCEL ACCELERATORS
+{
+  VK_F1,      IDM_ABOUT,          VIRTKEY
+  VK_F12,     IDM_SAVE_DEVICE_AS, VIRTKEY
+  "N",        IDM_NEW_DEVICE,     VIRTKEY, CONTROL
+  "O",        IDM_OPEN_DEVICE,    VIRTKEY, CONTROL
+  "S",        IDM_SAVE_DEVICE,    VIRTKEY, CONTROL
+  "R",        IDM_RECONNECT,      VIRTKEY, CONTROL
+  "L",        IDM_LOG_CLEAR,      VIRTKEY, CONTROL
 }
 
 IDD_PORT_SELECT DIALOGEX 0, 0, 280, 100
