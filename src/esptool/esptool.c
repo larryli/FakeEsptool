@@ -117,10 +117,11 @@ void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD status, const BYTE *
     resp[pos++] = (BYTE)((status >> 16) & 0xFF);
     resp[pos++] = (BYTE)((status >> 24) & 0xFF);
 
-    if (data && data_len > 0 && data_len <= sizeof(resp) - pos)
+    if (data && data_len > 0) {
+        if (data_len > sizeof(resp) - pos)
+            return;
         memcpy(&resp[pos], data, data_len);
-	else
-		return;
+    }
     pos += data_len;
 
     BYTE encoded[4096];

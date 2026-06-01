@@ -124,31 +124,21 @@ cmake --build build
 ## 使用示例
 
 ```c
-#include "esptool_proto.h"
+#include "esptool/esptool.h"
 
 // 初始化
-EsptoolProto_Init();
+Esptool_Init(&g_esptool);
 
 // 设置芯片
-EsptoolProto_SetChipType(CHIP_ESP32);
-EsptoolProto_SetFlashSize(4 * 1024 * 1024);
+Esptool_SetChipType(&g_esptool, CHIP_ESP32);
+Esptool_SetFlashSize(&g_esptool, 4 * 1024 * 1024);
 
 // 注册回调
-Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)EsptoolProto_ProcessData);
-Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)EsptoolProto_OnSignal);
+Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)OnEsptoolProcessData);
+Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 ```
 
 ## API 参考
-
-### esptool_proto.h
-
-| 函数 | 说明 |
-|------|------|
-| `EsptoolProto_Init()` | 初始化协议层 |
-| `EsptoolProto_ProcessData()` | 数据接收回调 |
-| `EsptoolProto_OnSignal()` | 信号变化回调 |
-| `EsptoolProto_SetChipType(type)` | 设置芯片类型 |
-| `EsptoolProto_SetFlashSize(size)` | 设置Flash大小 |
 
 ### esptool.h
 
@@ -157,6 +147,8 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)EsptoolProto_OnSignal);
 | `Esptool_Init(ctx)` | 初始化上下文 |
 | `Esptool_SetNotify(ctx, hNotify)` | 设置通知窗口 |
 | `Esptool_SetModifiedCallback(ctx, cb)` | 设置修改回调 |
+| `Esptool_SetWriteCallback(ctx, cb)` | 设置串口写回调 |
+| `Esptool_SetBaudRateCallback(ctx, cb)` | 设置波特率修改回调 |
 | `Esptool_Feed(ctx, data, len)` | 喂入串口数据 |
 | `Esptool_ProcessFrame(ctx, frame, frame_len)` | 处理一帧数据 |
 | `Esptool_SetChipType(ctx, type)` | 设置芯片类型 |

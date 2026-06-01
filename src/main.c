@@ -595,8 +595,11 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
 
                 WCHAR macStr[32];
                 GetDlgItemTextW(hDlg, IDC_MAC_EDIT, macStr, 32);
-                swscanf(macStr, L"%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
-                        &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
+                unsigned int tmp[6] = {0};
+                swscanf(macStr, L"%x:%x:%x:%x:%x:%x",
+                        &tmp[0], &tmp[1], &tmp[2], &tmp[3], &tmp[4], &tmp[5]);
+                for (int j = 0; j < 6; j++)
+                    mac[j] = (BYTE)tmp[j];
 
                 HWND hMode = GetDlgItem(hDlg, IDC_FLASH_MODE_COMBO);
                 BYTE flashMode = (BYTE)SendMessageW(hMode, CB_GETCURSEL, 0, 0);

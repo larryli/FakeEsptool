@@ -78,8 +78,12 @@ void Config_SetFont(const LOGFONTW *lf)
     if (!g_iniPath[0])
         return;
 
-    /* Calculate point size from pixel height */
-    int size = MulDiv(-lf->lfHeight, 72, 96);
+    /* Calculate point size from pixel height using actual DPI */
+    HDC hdc = GetDC(NULL);
+    int dpi = GetDeviceCaps(hdc, LOGPIXELSY);
+    ReleaseDC(NULL, hdc);
+
+    int size = MulDiv(-lf->lfHeight, 72, dpi);
 
     WCHAR buf[32];
     wsprintfW(buf, L"%d", size);

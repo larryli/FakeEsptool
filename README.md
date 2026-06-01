@@ -44,7 +44,6 @@ FakeEsptool/
 ├── src/                        # 源代码
 │   ├── main.c / main.h         # 程序入口和 GUI 实现
 │   ├── serial.c / serial.h     # 串口通信模块
-│   ├── esptool_proto.c/h       # 协议适配层
 │   ├── resource.h              # 资源 ID
 │   ├── resource.rc             # 资源文件（菜单、对话框、字符串）
 │   ├── esptool/                # esptool 协议模块

@@ -17,6 +17,9 @@ static const char *TAG = "FLASH";
 
 BOOL Flash_Init(FLASH_CTX *ctx, DWORD size)
 {
+    if (size == 0)
+        return FALSE;
+
     ctx->data = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
     if (!ctx->data) {
         TRACE_FW(TAG, "Failed to allocate %lu bytes", size);

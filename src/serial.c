@@ -290,7 +290,7 @@ BOOL Serial_Open(SERIAL_CTX *ctx, const WCHAR *portName, HWND hNotify)
     if (ctx->hPort == INVALID_HANDLE_VALUE) {
         TRACE_FW(TAG, "ERROR: CreateFileW failed: %lu", GetLastError());
         CloseHandle(ctx->hStartEvent);
-                return FALSE;
+        return FALSE;
     }
 
     /* Configure serial port: 115200 baud, 8 data bits, no parity, 1 stop bit */
@@ -299,7 +299,7 @@ BOOL Serial_Open(SERIAL_CTX *ctx, const WCHAR *portName, HWND hNotify)
         CloseHandle(ctx->hPort);
         ctx->hPort = INVALID_HANDLE_VALUE;
         CloseHandle(ctx->hStartEvent);
-                return FALSE;
+        return FALSE;
     }
 
     dcb.BaudRate = CBR_115200;
@@ -317,7 +317,7 @@ BOOL Serial_Open(SERIAL_CTX *ctx, const WCHAR *portName, HWND hNotify)
         CloseHandle(ctx->hPort);
         ctx->hPort = INVALID_HANDLE_VALUE;
         CloseHandle(ctx->hStartEvent);
-                return FALSE;
+        return FALSE;
     }
 
     /* Set timeouts */
@@ -352,7 +352,7 @@ BOOL Serial_Open(SERIAL_CTX *ctx, const WCHAR *portName, HWND hNotify)
         CloseHandle(ctx->hPort);
         ctx->hPort = INVALID_HANDLE_VALUE;
         CloseHandle(ctx->hStartEvent);
-                return FALSE;
+        return FALSE;
     }
 
     /* Wait for thread to start */
