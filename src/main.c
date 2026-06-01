@@ -105,7 +105,29 @@ static void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, H
 static void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
 {
     (void)ctx;
-    (void)hNotify;
+
+    static BOOL prev_dtr = FALSE;
+    static BOOL prev_rts = FALSE;
+
+    BOOL dtr = (modemStatus & MS_DSR_ON) != 0;  /* DTR maps to DSR */
+    BOOL cts = (modemStatus & MS_CTS_ON) != 0;  /* RTS maps to CTS */
+
+    if (dtr != prev_dtr || cts != prev_rts) {
+        Serial_PostLogF(hNotify, L"SIG", L"DSR:%s CTS:%s",
+                        dtr ? L"ON" : L"OFF", cts ? L"ON" : L"OFF");
+
+        /* Download mode: DTR=0,RTS=1 (GPIO0 low, EN high) */
+        if (prev_dtr && !prev_rts && !dtr && cts) {
+            Serial_PostLog(hNotify, L"SIG", L"Download mode entered");
+        }
+        /* Normal boot: DTR=1,RTS=0 (GPIO0 high, EN low) */
+        else if (!prev_dtr && prev_rts && dtr && !cts) {
+            Serial_PostLog(hNotify, L"SIG", L"Chip reset");
+        }
+
+        prev_dtr = dtr;
+        prev_rts = cts;
+    }
 }
 
 /* Check if serial is connected, prompt to disconnect if needed */
