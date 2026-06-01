@@ -215,7 +215,7 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
                      * Call the registered callback to process received data.
                      * Set callback via Serial_SetReceiveCallback().
                      *
-                     * Current: esptool protocol (esptool_proto.c)
+                     * Current: esptool protocol (main.c / esptool.c)
                      *
                      * To customize: implement your own callback and register it.
                      *

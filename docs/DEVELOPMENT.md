@@ -7,31 +7,30 @@ FakeEsptool 是一个 ESP 芯片设备端模拟器，用于模拟 ESP8266/ESP32 
 ## 架构概览
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
-│   main.c    │────▶│  serial.c   │────▶│ esptool_proto.c │
-│  (UI层)     │     │ (通信层)    │     │    (适配层)     │
-└─────────────┘     └─────────────┘     └────────┬────────┘
-                                                 │
-                              ┌──────────────────┼──────────────────┐
-                              ▼                  ▼                  ▼
-                    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-                    │   slip.c    │    │  esptool.c  │    │  device.c   │
-                    │ (SLIP编解码) │    │ (命令处理)   │    │(设备文件管理)│
-                    └─────────────┘    └─────────────┘    └─────────────┘
-                            │                  │
-                    ┌───────┴───────┐  ┌───────┴───────┐
-                    ▼               ▼  ▼               ▼
-              ┌──────────┐   ┌──────────┐
-              │  chip.c  │   │  flash.c │
-              │ (芯片特性)│   │(Flash存储)│
-              └──────────┘   └──────────┘
+┌─────────────┐     ┌─────────────┐     ┌───────────────────┐
+│   main.c    │────▶│  serial.c   │────▶│  esptool/esptool.c│
+│  (UI层)     │     │ (通信层)    │     │   (协议层)        │
+└─────────────┘     └─────────────┘     └────────┬──────────┘
+                                                  │
+                               ┌──────────────────┼──────────────────┐
+                               ▼                  ▼                  ▼
+                     ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+                     │   slip.c    │    │  esptool.c  │    │  device.c   │
+                     │ (SLIP编解码) │    │ (命令处理)   │    │(设备文件管理)│
+                     └─────────────┘    └─────────────┘    └─────────────┘
+                             │                  │
+                     ┌───────┴───────┐  ┌───────┴───────┐
+                     ▼               ▼  ▼               ▼
+               ┌──────────┐   ┌──────────┐
+               │  chip.c  │   │  flash.c │
+               │ (芯片特性)│   │(Flash存储)│
+               └──────────┘   └──────────┘
 ```
 
 | 模块 | 职责 |
 |------|------|
-| `main.c` | 用户界面，菜单、工具栏、日志显示 |
+| `main.c` | 用户界面，菜单、工具栏、日志显示，esptool 回调注册与设备同步 |
 | `serial.c` | 串口通信，数据收发，信号控制 |
-| `esptool_proto.c/h` | 协议适配层，对接 serial 回调 |
 | `esptool/slip.c/h` | SLIP 协议编解码 |
 | `esptool/chip.c/h` | 芯片特性模拟（efuse、MAC等） |
 | `esptool/flash.c/h` | Flash 存储模拟 |
@@ -40,7 +39,7 @@ FakeEsptool 是一个 ESP 芯片设备端模拟器，用于模拟 ESP8266/ESP32 
 
 ## 编译
 
-### CMake (推荐)
+### CMake
 
 ```powershell
 # 配置
@@ -53,12 +52,6 @@ cmake --build build
 cmake -S . -B build -G "NMake Makefiles" -DENABLE_TRACE_PROTO=ON
 cmake --build build
 ```
-
-### Pelles C
-
-1. 打开 `FakeEsptool.ppj`
-2. 选择 Release 或 Debug 模式
-3. 按 F9 编译
 
 ## esptool 协议
 
@@ -153,7 +146,7 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 | `Esptool_ProcessFrame(ctx, frame, frame_len)` | 处理一帧数据 |
 | `Esptool_SetChipType(ctx, type)` | 设置芯片类型 |
 | `Esptool_SetFlashSize(ctx, size)` | 设置Flash大小 |
-| `Esptool_SendResponse(ctx, cmd, status, data, len)` | 发送响应 |
+| `Esptool_SendResponse(ctx, cmd, req_val, status, data, len)` | 发送响应 |
 | `Esptool_CalcChecksum(data, len)` | 计算校验和 |
 
 ### chip.h

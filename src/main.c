@@ -92,6 +92,22 @@ static BOOL OnBaudRateChange(DWORD baudRate)
     return Serial_SetBaudRate(&g_serial, baudRate);
 }
 
+/* Sync g_device chip/flash state to g_esptool protocol context */
+static void SyncDeviceToEsptool(void)
+{
+    Flash_Close(&g_esptool.flash);
+    Chip_Close(&g_esptool.chip);
+    Chip_Init(&g_esptool.chip, g_device.chip.type);
+    Chip_SetMac(&g_esptool.chip, g_device.chip.mac);
+    if (g_device.chip.efuse && g_esptool.chip.efuse)
+        memcpy(g_esptool.chip.efuse, g_device.chip.efuse, g_device.chip.efuse_size);
+    g_esptool.chip.flash_mode = g_device.chip.flash_mode;
+    g_esptool.chip.flash_freq = g_device.chip.flash_freq;
+    Flash_Init(&g_esptool.flash, g_device.flash.size);
+    if (g_device.flash.data)
+        memcpy(g_esptool.flash.data, g_device.flash.data, g_device.flash.size);
+}
+
 /* esptool protocol data receive callback */
 static void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify)
 {
@@ -637,6 +653,8 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
                         }
                         Flash_Close(&oldFlash);
 
+                        SyncDeviceToEsptool();
+                        Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                         Device_SetModified(&g_device, TRUE);
                         EndDialog(hDlg, IDOK);
                     } else {
@@ -1418,6 +1436,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 return 0;
             }
             if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_NEW_DEVICE), hWnd, NewDeviceDlgProc) == IDOK) {
+                SyncDeviceToEsptool();
                 Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                 Config_SetLastDeviceFile(NULL);
                 UpdateStatusBar();
@@ -1447,6 +1466,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 if (GetOpenFileNameW(&ofn)) {
                     Device_Close(&g_device);
                     if (Device_Load(&g_device, szFile)) {
+                        SyncDeviceToEsptool();
                         Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                         Config_SetLastDeviceFile(szFile);
                         UpdateStatusBar();
@@ -1719,6 +1739,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     int ret = MessageBoxW(hWnd, msg, L"Open Device", MB_YESNO | MB_ICONQUESTION);
                     if (ret == IDYES) {
                         if (Device_Load(&g_device, lastFile)) {
+                            SyncDeviceToEsptool();
                             Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                             UpdateStatusBar();
                             UpdateTitle(hWnd);
@@ -1733,6 +1754,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 /* User cancelled - exit */
                 DestroyWindow(hWnd);
             } else {
+                SyncDeviceToEsptool();
                 Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                 UpdateStatusBar();
                 UpdateTitle(hWnd);

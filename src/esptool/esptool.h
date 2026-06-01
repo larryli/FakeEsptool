@@ -124,8 +124,8 @@ BOOL Esptool_Feed(ESPTOOL_CTX *ctx, const BYTE *data, int len);
 /* Process a complete SLIP frame */
 BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len);
 
-/* Send response packet */
-void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD status, const BYTE *data, WORD data_len);
+/* Send response packet with status in data (2 bytes) */
+void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD status, const BYTE *data, WORD data_len);
 
 /* Calculate XOR checksum */
 BYTE Esptool_CalcChecksum(const BYTE *data, int len);

@@ -9,6 +9,7 @@ cmake_minimum_required(VERSION 3.20)
 project(FakeEsptool C)
 
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Source files
 add_executable(FakeEsptool WIN32
