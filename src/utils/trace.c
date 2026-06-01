@@ -2,12 +2,13 @@
  * trace.c - Trace logging utility implementation
  */
 
-#if defined(ENABLE_TRACE_FW) || defined(ENABLE_TRACE_PROTO)
-
-#include "trace.h"
 #include <wchar.h>
 #include <stdio.h>
 #include <stdarg.h>
+
+#if defined(ENABLE_TRACE_FW) || defined(ENABLE_TRACE_PROTO)
+
+#include "trace.h"
 
 static HANDLE g_hTraceFile = INVALID_HANDLE_VALUE;
 static CRITICAL_SECTION g_csTrace;
