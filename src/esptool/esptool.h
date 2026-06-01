@@ -24,6 +24,11 @@
 #define ESP_OK              0x00
 #define ESP_FAIL            0x01
 
+/* Flash commands (ESP8266/ESP32 ROM) */
+#define ESP_CMD_FLASH_BEGIN     0x02
+#define ESP_CMD_FLASH_DATA      0x03
+#define ESP_CMD_FLASH_END       0x04
+
 /* Memory operation commands */
 #define ESP_CMD_MEM_BEGIN       0x05
 #define ESP_CMD_MEM_END         0x06
@@ -32,33 +37,28 @@
 /* Synchronization command */
 #define ESP_CMD_SYNC            0x08
 
-/* SPI and flash commands */
-#define ESP_CMD_SPI_SET_PARAMS  0x09
-#define ESP_CMD_SPI_ATTACH      0x0D
+/* Register access commands */
+#define ESP_CMD_WRITE_REG       0x09
+#define ESP_CMD_READ_REG        0x0A
+
+/* Baud rate change */
 #define ESP_CMD_CHANGE_BAUDRATE 0x0F
 
-/* Register access commands */
-#define ESP_CMD_READ_REG        0x0A
-#define ESP_CMD_WRITE_REG       0x0B
-
-/* Flash operation commands */
-#define ESP_CMD_SPI_FLASH_MD5   0x13
-#define ESP_CMD_SPI_FLASH_DATA  0x14
-#define ESP_CMD_SPI_READ_FLASH  0x15
-#define ESP_CMD_SPI_ERASE_FLASH 0x16
-#define ESP_CMD_SPI_ERASE_BLOCK 0x17
-#define ESP_CMD_SPI_FLASH_BLOCK 0x18
-#define ESP_CMD_READ_FLASH_SFDP 0x1A
-
 /* Compressed flash write commands */
-#define ESP_CMD_SPI_FLASH_DEFL_BEGIN  0x20
-#define ESP_CMD_SPI_FLASH_DEFL_DATA   0x21
-#define ESP_CMD_SPI_FLASH_DEFL_END    0x22
-#define ESP_CMD_SPI_FLASH_DEFL_MD5    0x23
+#define ESP_CMD_FLASH_DEFL_BEGIN  0x10
+#define ESP_CMD_FLASH_DEFL_DATA   0x11
+#define ESP_CMD_FLASH_DEFL_END    0x12
 
-/* Legacy flash commands (unused) */
-#define ESP_CMD_READ_FLASH      0xE0
-#define ESP_CMD_WRITE_FLASH     0xE1
+/* Flash MD5 */
+#define ESP_CMD_SPI_FLASH_MD5   0x13
+
+/* Security info (ESP32-S2+) */
+#define ESP_CMD_GET_SECURITY_INFO 0x14
+
+/* Stub-only commands */
+#define ESP_CMD_ERASE_FLASH     0xD0
+#define ESP_CMD_ERASE_REGION    0xD1
+#define ESP_CMD_READ_FLASH      0xD2
 
 /* SYNC sequence length */
 #define ESP_SYNC_SEQ_LEN    36

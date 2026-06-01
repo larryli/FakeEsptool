@@ -22,24 +22,24 @@ typedef struct {
 
 /* Command table for protocol logging */
 static const ESP_CMD_INFO commandTable[256] = {
+    [0x02] = {"FLASH_BEGIN", "Begin flash download"},
+    [0x03] = {"FLASH_DATA", "Flash download data"},
+    [0x04] = {"FLASH_END", "End flash download"},
     [0x05] = {"MEM_BEGIN", "Begin memory download"},
     [0x06] = {"MEM_END", "End memory download"},
     [0x07] = {"MEM_DATA", "Memory download data"},
     [0x08] = {"SYNC", "Sync handshake"},
-    [0x09] = {"SPI_SET_PARAMS", "Set SPI parameters"},
+    [0x09] = {"WRITE_REG", "Write register"},
     [0x0A] = {"READ_REG", "Read register"},
-    [0x0B] = {"WRITE_REG", "Write register"},
-    [0x0D] = {"SPI_ATTACH", "Attach SPI flash"},
     [0x0F] = {"CHANGE_BAUDRATE", "Change baud rate"},
-    [0x13] = {"FLASH_MD5", "Calculate flash MD5"},
-    [0x14] = {"FLASH_DATA", "Flash download data"},
-    [0x15] = {"READ_FLASH", "Read flash"},
-    [0x16] = {"ERASE_FLASH", "Erase flash"},
-    [0x17] = {"ERASE_BLOCK", "Erase flash block"},
-    [0x20] = {"FLASH_DEFL_BEGIN", "Begin compressed flash download"},
-    [0x21] = {"FLASH_DEFL_DATA", "Compressed flash download data"},
-    [0x22] = {"FLASH_DEFL_END", "End compressed flash download"},
-    [0x23] = {"FLASH_DEFL_MD5", "Calculate compressed flash MD5"},
+    [0x10] = {"FLASH_DEFL_BEGIN", "Begin compressed flash download"},
+    [0x11] = {"FLASH_DEFL_DATA", "Compressed flash download data"},
+    [0x12] = {"FLASH_DEFL_END", "End compressed flash download"},
+    [0x13] = {"SPI_FLASH_MD5", "Calculate flash MD5"},
+    [0x14] = {"GET_SECURITY_INFO", "Get security info"},
+    [0xD0] = {"ERASE_FLASH", "Erase entire flash"},
+    [0xD1] = {"ERASE_REGION", "Erase flash region"},
+    [0xD2] = {"READ_FLASH", "Read flash"},
 };
 
 static const BYTE sync_response[ESP_SYNC_SEQ_LEN] = {
@@ -171,7 +171,10 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG, "SYNC received");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Sync handshake");
     ctx->synced = TRUE;
-    Esptool_SendResponse(ctx, ESP_CMD_SYNC, ESP_OK, sync_response, ESP_SYNC_SEQ_LEN);
+
+    /* SYNC response: 4 bytes, all zeros = success */
+    BYTE sync_resp[4] = {0x00, 0x00, 0x00, 0x00};
+    Esptool_SendResponse(ctx, ESP_CMD_SYNC, ESP_OK, sync_resp, 4);
 }
 
 static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -195,37 +198,6 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Chip_WriteReg(&ctx->chip, addr, val);
     if (ctx->onModified) ctx->onModified();
     Esptool_SendResponse(ctx, ESP_CMD_WRITE_REG, ESP_OK, NULL, 0);
-}
-
-static void HandleSpiAttach(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
-{
-    (void)pkt;
-    TRACE_PROTO(TAG, "SPI_ATTACH");
-    Serial_PostLog(ctx->hNotify, L"ESP", L"  Attach SPI flash");
-
-    BYTE resp[4] = {0};
-    Esptool_SendResponse(ctx, ESP_CMD_SPI_ATTACH, ESP_OK, resp, 4);
-}
-
-static void HandleSpiSetParams(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
-{
-    if (pkt->size >= 24) {
-        DWORD id = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                   ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-        DWORD size = pkt->data[16] | ((DWORD)pkt->data[17] << 8) |
-                     ((DWORD)pkt->data[18] << 16) | ((DWORD)pkt->data[19] << 24);
-
-        TRACE_PROTO(TAG, "SPI_SET_PARAMS id=0x%08lX size=%lu", id, size);
-        Serial_PostLogF(ctx->hNotify, L"ESP", L"  id=0x%08lX size=%lu", id, size);
-
-        if (size > 0 && size <= 16 * 1024 * 1024) {
-            Flash_Close(&ctx->flash);
-            Chip_SetFlashSize(&ctx->chip, size);
-            Flash_Init(&ctx->flash, size);
-        }
-    }
-
-    Esptool_SendResponse(ctx, ESP_CMD_SPI_SET_PARAMS, ESP_OK, NULL, 0);
 }
 
 static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -314,7 +286,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
                     total, blocks, bsize, offset);
 
-    Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_DEFL_BEGIN, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_FLASH_DEFL_BEGIN, ESP_OK, NULL, 0);
 }
 
 static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -325,7 +297,7 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%u", seq, pkt->size);
 
     if (ctx->onModified) ctx->onModified();
-    Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_DEFL_DATA, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_FLASH_DEFL_DATA, ESP_OK, NULL, 0);
 }
 
 static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -333,7 +305,7 @@ static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     (void)pkt;
     TRACE_PROTO(TAG, "FLASH_DEFL_END");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  End compressed flash download");
-    Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_DEFL_END, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_FLASH_DEFL_END, ESP_OK, NULL, 0);
 }
 
 static void HandleFlashDeflMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -357,7 +329,7 @@ static void HandleFlashDeflMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "  MD5=%s", md5str);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  MD5=%hs", md5str);
-    Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_DEFL_MD5, ESP_OK, (const BYTE *)md5str, 32);
+    Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_MD5, ESP_OK, (const BYTE *)md5str, 32);
 }
 
 static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -378,9 +350,9 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     BYTE buf[4096];
     if (Flash_Read(&ctx->flash, addr, buf, len)) {
-        Esptool_SendResponse(ctx, ESP_CMD_SPI_READ_FLASH, ESP_OK, buf, (WORD)len);
+        Esptool_SendResponse(ctx, ESP_CMD_READ_FLASH, ESP_OK, buf, (WORD)len);
     } else {
-        Esptool_SendResponse(ctx, ESP_CMD_SPI_READ_FLASH, ESP_FAIL, NULL, 0);
+        Esptool_SendResponse(ctx, ESP_CMD_READ_FLASH, ESP_FAIL, NULL, 0);
     }
 }
 
@@ -392,7 +364,7 @@ static void HandleEraseFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     Flash_EraseAll(&ctx->flash);
     if (ctx->onModified) ctx->onModified();
-    Esptool_SendResponse(ctx, ESP_CMD_SPI_ERASE_FLASH, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_ERASE_FLASH, ESP_OK, NULL, 0);
 }
 
 static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -406,9 +378,9 @@ static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     if (Flash_Erase(&ctx->flash, offset, len)) {
         if (ctx->onModified) ctx->onModified();
-        Esptool_SendResponse(ctx, ESP_CMD_SPI_ERASE_BLOCK, ESP_OK, NULL, 0);
+        Esptool_SendResponse(ctx, ESP_CMD_ERASE_REGION, ESP_OK, NULL, 0);
     } else {
-        Esptool_SendResponse(ctx, ESP_CMD_SPI_ERASE_BLOCK, ESP_FAIL, NULL, 0);
+        Esptool_SendResponse(ctx, ESP_CMD_ERASE_REGION, ESP_FAIL, NULL, 0);
     }
 }
 
@@ -462,23 +434,20 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
     }
 
     switch (pkt.command) {
-    case ESP_CMD_SYNC:                 HandleSync(ctx, &pkt); break;
-    case ESP_CMD_READ_REG:             HandleReadReg(ctx, &pkt); break;
-    case ESP_CMD_WRITE_REG:            HandleWriteReg(ctx, &pkt); break;
-    case ESP_CMD_SPI_ATTACH:           HandleSpiAttach(ctx, &pkt); break;
-    case ESP_CMD_SPI_SET_PARAMS:       HandleSpiSetParams(ctx, &pkt); break;
-    case ESP_CMD_CHANGE_BAUDRATE:      HandleChangeBaudrate(ctx, &pkt); break;
-    case ESP_CMD_MEM_BEGIN:            HandleMemBegin(ctx, &pkt); break;
-    case ESP_CMD_MEM_DATA:             HandleMemData(ctx, &pkt); break;
-    case ESP_CMD_MEM_END:              HandleMemEnd(ctx, &pkt); break;
-    case ESP_CMD_SPI_FLASH_DEFL_BEGIN: HandleFlashDeflBegin(ctx, &pkt); break;
-    case ESP_CMD_SPI_FLASH_DEFL_DATA:  HandleFlashDeflData(ctx, &pkt); break;
-    case ESP_CMD_SPI_FLASH_DEFL_END:   HandleFlashDeflEnd(ctx, &pkt); break;
-    case ESP_CMD_SPI_FLASH_DEFL_MD5:   HandleFlashDeflMd5(ctx, &pkt); break;
-    case ESP_CMD_SPI_READ_FLASH:       HandleReadFlash(ctx, &pkt); break;
-    case ESP_CMD_SPI_ERASE_FLASH:      HandleEraseFlash(ctx, &pkt); break;
-    case ESP_CMD_SPI_ERASE_BLOCK:      HandleEraseBlock(ctx, &pkt); break;
-    case ESP_CMD_SPI_FLASH_MD5:        HandleFlashMd5(ctx, &pkt); break;
+    case ESP_CMD_SYNC:              HandleSync(ctx, &pkt); break;
+    case ESP_CMD_READ_REG:          HandleReadReg(ctx, &pkt); break;
+    case ESP_CMD_WRITE_REG:         HandleWriteReg(ctx, &pkt); break;
+    case ESP_CMD_CHANGE_BAUDRATE:   HandleChangeBaudrate(ctx, &pkt); break;
+    case ESP_CMD_MEM_BEGIN:         HandleMemBegin(ctx, &pkt); break;
+    case ESP_CMD_MEM_DATA:          HandleMemData(ctx, &pkt); break;
+    case ESP_CMD_MEM_END:           HandleMemEnd(ctx, &pkt); break;
+    case ESP_CMD_FLASH_DEFL_BEGIN:  HandleFlashDeflBegin(ctx, &pkt); break;
+    case ESP_CMD_FLASH_DEFL_DATA:   HandleFlashDeflData(ctx, &pkt); break;
+    case ESP_CMD_FLASH_DEFL_END:    HandleFlashDeflEnd(ctx, &pkt); break;
+    case ESP_CMD_SPI_FLASH_MD5:     HandleFlashMd5(ctx, &pkt); break;
+    case ESP_CMD_ERASE_FLASH:       HandleEraseFlash(ctx, &pkt); break;
+    case ESP_CMD_ERASE_REGION:      HandleEraseBlock(ctx, &pkt); break;
+    case ESP_CMD_READ_FLASH:        HandleReadFlash(ctx, &pkt); break;
     default:
         TRACE_FW(TAG, "Unknown cmd: 0x%02X", pkt.command);
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  Unknown command: 0x%02X", pkt.command);

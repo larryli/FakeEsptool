@@ -337,21 +337,20 @@ ESP 芯片通过 DTR/RTS 信号控制 GPIO0 和 EN 引脚进入下载模式：
 | RTS | EN/RST | 0=低电平, 1=高电平 |
 
 **进入下载模式时序**：
-1. DTR=1, RTS=0 → GPIO0 高，EN 低（复位）
-2. DTR=0, RTS=1 → GPIO0 低，EN 高（进入下载模式）
-
-**进入正常模式时序**：
-1. DTR=0, RTS=1 → GPIO0 低，EN 高（下载模式）
-2. DTR=1, RTS=0 → GPIO0 高，EN 低（复位，正常启动）
+1. DSR:OFF CTS:ON → GPIO0 低
+2. DSR:ON CTS:ON → 中间状态
+3. DSR:ON CTS:OFF → 复位（EN 低）
+4. DSR:OFF CTS:OFF → 进入下载模式
 
 **日志输出**：
 - 信号变化：`[SIG] DSR:ON CTS:OFF`
 - 进入下载模式：`[SIG] Download mode entered`
-- 芯片复位：`[SIG] Chip reset`
 
 ---
 
 ## esptool 协议
+
+详见 [PROTOCOL.md](PROTOCOL.md)。
 
 ### 协议概述
 

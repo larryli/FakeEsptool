@@ -106,27 +106,33 @@ static void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
 {
     (void)ctx;
 
-    static BOOL prev_dtr = FALSE;
-    static BOOL prev_rts = FALSE;
+    static BOOL prev_dsr = FALSE;
+    static BOOL prev_cts = FALSE;
+    static BOOL reset_pending = FALSE;
 
-    BOOL dtr = (modemStatus & MS_DSR_ON) != 0;  /* DTR maps to DSR */
-    BOOL cts = (modemStatus & MS_CTS_ON) != 0;  /* RTS maps to CTS */
+    BOOL dsr = (modemStatus & MS_DSR_ON) != 0;
+    BOOL cts = (modemStatus & MS_CTS_ON) != 0;
 
-    if (dtr != prev_dtr || cts != prev_rts) {
+    if (dsr != prev_dsr || cts != prev_cts) {
         Serial_PostLogF(hNotify, L"SIG", L"DSR:%s CTS:%s",
-                        dtr ? L"ON" : L"OFF", cts ? L"ON" : L"OFF");
+                        dsr ? L"ON" : L"OFF", cts ? L"ON" : L"OFF");
 
-        /* Download mode: DTR=0,RTS=1 (GPIO0 low, EN high) */
-        if (prev_dtr && !prev_rts && !dtr && cts) {
+        /* Detect reset: DSR=ON, CTS=OFF (DTR high, RTS low) */
+        if (dsr && !cts) {
+            reset_pending = TRUE;
+        }
+        /* Detect download mode entry: DSR=OFF, CTS=OFF after reset */
+        else if (reset_pending && !dsr && !cts) {
             Serial_PostLog(hNotify, L"SIG", L"Download mode entered");
+            reset_pending = FALSE;
         }
-        /* Normal boot: DTR=1,RTS=0 (GPIO0 high, EN low) */
-        else if (!prev_dtr && prev_rts && dtr && !cts) {
-            Serial_PostLog(hNotify, L"SIG", L"Chip reset");
+        /* Any other state cancels pending reset */
+        else {
+            reset_pending = FALSE;
         }
 
-        prev_dtr = dtr;
-        prev_rts = cts;
+        prev_dsr = dsr;
+        prev_cts = cts;
     }
 }
 
