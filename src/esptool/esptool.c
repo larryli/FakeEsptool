@@ -127,11 +127,18 @@ void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD status, const BYTE *
     BYTE encoded[4096];
     int enc_len = Slip_Encode(resp, pos, encoded, sizeof(encoded));
     if (enc_len > 0) {
-        /* Write to serial port via callback (callback handles UI logging) */
+        /* Write to serial port via callback */
         if (ctx->onWrite) {
             ctx->onWrite(encoded, (DWORD)enc_len);
         }
     }
+
+    /* Log TX to main window with command name */
+    const char *cmdName = commandTable[cmd].name;
+    if (!cmdName)
+        cmdName = "UNKNOWN";
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"[RES] %hs size=%u status=0x%08lX",
+                    cmdName, data_len, status);
 
     TRACE_PROTO(TAG, "TX cmd=0x%02X status=%lu len=%u", cmd, status, data_len);
 }
