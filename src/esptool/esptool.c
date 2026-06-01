@@ -78,6 +78,16 @@ void Esptool_SetModifiedCallback(ESPTOOL_CTX *ctx, ESP_MODIFIED_CB cb)
     ctx->onModified = cb;
 }
 
+void Esptool_SetWriteCallback(ESPTOOL_CTX *ctx, ESP_WRITE_CB cb)
+{
+    ctx->onWrite = cb;
+}
+
+void Esptool_SetBaudRateCallback(ESPTOOL_CTX *ctx, ESP_BAUDRATE_CB cb)
+{
+    ctx->onBaudRate = cb;
+}
+
 void Esptool_SetChipType(ESPTOOL_CTX *ctx, CHIP_TYPE type)
 {
     Flash_Close(&ctx->flash);
@@ -117,12 +127,10 @@ void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD status, const BYTE *
 
     BYTE encoded[4096];
     int enc_len = Slip_Encode(resp, pos, encoded, sizeof(encoded));
-    if (enc_len > 0 && ctx->hNotify) {
-        BYTE *copy = (BYTE *)HeapAlloc(GetProcessHeap(), 0, enc_len);
-        if (copy) {
-            memcpy(copy, encoded, enc_len);
-            if (!PostMessage(ctx->hNotify, WM_SERIAL_TX, (WPARAM)enc_len, (LPARAM)copy))
-                HeapFree(GetProcessHeap(), 0, copy);
+    if (enc_len > 0) {
+        /* Write to serial port via callback (callback handles UI logging) */
+        if (ctx->onWrite) {
+            ctx->onWrite(encoded, (DWORD)enc_len);
         }
     }
 
@@ -236,7 +244,14 @@ static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     resp[6] = (BYTE)((new_baud >> 16) & 0xFF);
     resp[7] = (BYTE)((new_baud >> 24) & 0xFF);
 
+    /* Send response at old baud rate first */
     Esptool_SendResponse(ctx, ESP_CMD_CHANGE_BAUDRATE, ESP_OK, resp, 8);
+
+    /* Then switch to new baud rate */
+    if (ctx->onBaudRate) {
+        ctx->onBaudRate(new_baud);
+        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Baud rate switched to %lu", new_baud);
+    }
 }
 
 static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)

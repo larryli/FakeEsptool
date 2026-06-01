@@ -70,6 +70,12 @@
 /* Callback type for device modification notification */
 typedef void (*ESP_MODIFIED_CB)(void);
 
+/* Callback type for writing data to serial port */
+typedef DWORD (*ESP_WRITE_CB)(const BYTE *data, DWORD len);
+
+/* Callback type for changing baud rate */
+typedef BOOL (*ESP_BAUDRATE_CB)(DWORD baudRate);
+
 /* ESP protocol context */
 typedef struct {
     SLIP_CTX  slip;           /* SLIP decoder context */
@@ -78,6 +84,8 @@ typedef struct {
     BOOL      synced;         /* SYNC handshake completed */
     HWND      hNotify;        /* Window for UI notifications */
     ESP_MODIFIED_CB onModified; /* Device modification callback */
+    ESP_WRITE_CB onWrite;     /* Serial write callback */
+    ESP_BAUDRATE_CB onBaudRate; /* Baud rate change callback */
 } ESPTOOL_CTX;
 
 /* ESP protocol packet */
@@ -103,6 +111,12 @@ void Esptool_SetChipType(ESPTOOL_CTX *ctx, CHIP_TYPE type);
 
 /* Set flash size and reinitialize */
 void Esptool_SetFlashSize(ESPTOOL_CTX *ctx, DWORD size);
+
+/* Set write callback for sending data to serial port */
+void Esptool_SetWriteCallback(ESPTOOL_CTX *ctx, ESP_WRITE_CB cb);
+
+/* Set baud rate change callback */
+void Esptool_SetBaudRateCallback(ESPTOOL_CTX *ctx, ESP_BAUDRATE_CB cb);
 
 /* Feed raw serial data to protocol decoder */
 BOOL Esptool_Feed(ESPTOOL_CTX *ctx, const BYTE *data, int len);

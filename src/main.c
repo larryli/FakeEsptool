@@ -8,7 +8,7 @@
 #include <windows.h>
 #include "main.h"
 #include "serial.h"
-#include "esptool_proto.h"
+#include "esptool/esptool.h"
 #include "esptool/device.h"
 #include "resource.h"
 #include "utils/config.h"
@@ -52,6 +52,7 @@ static const char *TAG = "GUI";
 /* Global state */
 static SERIAL_CTX g_serial = { .hPort = NULL, .hThread = NULL, .hStartEvent = NULL, .hNotify = NULL, .bRunning = FALSE };
 static DEVICE_CTX g_device = {0};
+static ESPTOOL_CTX g_esptool = {0};
 static HWND g_hWnd = NULL;           /* Main window handle */
 static HWND g_hToolbar = NULL;
 static HWND g_hStatusbar = NULL;
@@ -73,6 +74,38 @@ static void OnDeviceModified(void)
     Device_SetModified(&g_device, TRUE);
     if (g_hWnd)
         UpdateTitle(g_hWnd);
+}
+
+/* Callback to write data to serial port */
+static DWORD OnSerialWrite(const BYTE *data, DWORD len)
+{
+    if (!Serial_IsOpen(&g_serial))
+        return 0;
+    return Serial_WriteData(&g_serial, data, len, g_hWnd);
+}
+
+/* Callback to change serial port baud rate */
+static BOOL OnBaudRateChange(DWORD baudRate)
+{
+    if (!Serial_IsOpen(&g_serial))
+        return FALSE;
+    return Serial_SetBaudRate(&g_serial, baudRate);
+}
+
+/* esptool protocol data receive callback */
+static void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify)
+{
+    if (!ctx || !data || len == 0)
+        return;
+    g_esptool.hNotify = hNotify;
+    Esptool_Feed(&g_esptool, data, (int)len);
+}
+
+/* esptool protocol signal change callback */
+static void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
+{
+    (void)ctx;
+    (void)hNotify;
 }
 
 /* Check if serial is connected, prompt to disconnect if needed */
@@ -849,9 +882,8 @@ static void Main_OnConnect(HWND hMainWnd)
         return;
     }
 
-    /* Register esptool protocol callbacks */
-    Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)EsptoolProto_ProcessData);
-    Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)EsptoolProto_OnSignal);
+    Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)OnEsptoolProcessData);
+    Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 
     TRACE_FW(TAG, "Serial_Open succeeded");
 
@@ -898,8 +930,8 @@ static void Main_OnReconnect(HWND hMainWnd)
     }
 
     /* Register esptool protocol callbacks */
-    Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)EsptoolProto_ProcessData);
-    Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)EsptoolProto_OnSignal);
+    Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)OnEsptoolProcessData);
+    Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 
     TRACE_FW(TAG, "Serial_Open succeeded");
 
@@ -1355,7 +1387,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 return 0;
             }
             if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_NEW_DEVICE), hWnd, NewDeviceDlgProc) == IDOK) {
-                EsptoolProto_SetModifiedCallback(OnDeviceModified);
+                Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                 Config_SetLastDeviceFile(NULL);
                 UpdateStatusBar();
                 UpdateTitle(hWnd);
@@ -1384,7 +1416,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 if (GetOpenFileNameW(&ofn)) {
                     Device_Close(&g_device);
                     if (Device_Load(&g_device, szFile)) {
-                        EsptoolProto_SetModifiedCallback(OnDeviceModified);
+                        Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                         Config_SetLastDeviceFile(szFile);
                         UpdateStatusBar();
                         UpdateTitle(hWnd);
@@ -1656,7 +1688,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     int ret = MessageBoxW(hWnd, msg, L"Open Device", MB_YESNO | MB_ICONQUESTION);
                     if (ret == IDYES) {
                         if (Device_Load(&g_device, lastFile)) {
-                            EsptoolProto_SetModifiedCallback(OnDeviceModified);
+                            Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                             UpdateStatusBar();
                             UpdateTitle(hWnd);
                             SetWindowTextW(g_hEdit, L"");
@@ -1670,7 +1702,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 /* User cancelled - exit */
                 DestroyWindow(hWnd);
             } else {
-                EsptoolProto_SetModifiedCallback(OnDeviceModified);
+                Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                 UpdateStatusBar();
                 UpdateTitle(hWnd);
             }
@@ -1703,7 +1735,9 @@ static BOOL Main_Init(HINSTANCE hInstance)
     InitCommonControlsEx(&icex);
 
     /* Initialize esptool protocol */
-    EsptoolProto_Init();
+    Esptool_Init(&g_esptool);
+    Esptool_SetWriteCallback(&g_esptool, OnSerialWrite);
+    Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 
     WNDCLASSEXW wc = {
         .cbSize = sizeof(WNDCLASSEXW),

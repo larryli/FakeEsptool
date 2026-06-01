@@ -50,19 +50,18 @@ POC_PROJECT_ZIPEXTRA = #
 # Build FakeEsptool.exe.
 # 
 FakeEsptool.exe: \
-	output\chip.obj \
-	output\config.obj \
-	output\device.obj \
-	output\esptool.obj \
-	output\esptool_proto.obj \
-	output\flash.obj \
-	output\lang.obj \
 	output\main.obj \
-	output\main.res \
 	output\serial.obj \
-	output\slip.obj \
+	output\config.obj \
+	output\lang.obj \
+	output\trace.obj \
 	output\timer.obj \
-	output\trace.obj
+	output\slip.obj \
+	output\chip.obj \
+	output\flash.obj \
+	output\esptool.obj \
+	output\device.obj \
+	output\main.res
 	$(LINK) $(LINKFLAGS) -out:"$@" $**
 
 # 
@@ -70,15 +69,11 @@ FakeEsptool.exe: \
 # 
 output\main.obj: \
 	src\main.c \
-	src\esptool\chip.h \
-	src\esptool\device.h \
-	src\esptool\esptool.h \
-	src\esptool\flash.h \
-	src\esptool\slip.h \
-	src\esptool_proto.h \
 	src\main.h \
-	src\resource.h \
 	src\serial.h \
+	src\esptool\esptool.h \
+	src\esptool\device.h \
+	src\resource.h \
 	src\utils\config.h \
 	src\utils\lang.h \
 	src\utils\trace.h
@@ -91,20 +86,6 @@ output\serial.obj: \
 	src\serial.c \
 	src\main.h \
 	src\resource.h \
-	src\serial.h \
-	src\utils\trace.h
-	$(CC) $(CCFLAGS) "$!" -Fo"$@"
-
-# 
-# Build esptool_proto.obj.
-# 
-output\esptool_proto.obj: \
-	src\esptool_proto.c \
-	src\esptool\chip.h \
-	src\esptool\esptool.h \
-	src\esptool\flash.h \
-	src\esptool\slip.h \
-	src\esptool_proto.h \
 	src\serial.h \
 	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
