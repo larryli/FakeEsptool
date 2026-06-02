@@ -465,6 +465,20 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
     if (addr == 0x40001000)
         return ctx->chip_id;
 
+    /* UART clock divider register (0x60000014) - used by ESP8266 for crystal detection.
+       Divisor = APB_CLK / baud_rate, where APB_CLK = 2 * crystal_freq.
+       flash_freq: 0=40M, 1=26M, 2=20M, 3=80M */
+    if (addr == 0x60000014) {
+        DWORD xtal;
+        switch (ctx->flash_freq) {
+        case 1:  xtal = 26000000; break;
+        case 2:  xtal = 20000000; break;
+        case 3:  xtal = 80000000; break;
+        default: xtal = 40000000; break;
+        }
+        return (2 * xtal) / 115200;
+    }
+
     return 0;
 }
 
