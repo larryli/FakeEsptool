@@ -114,7 +114,7 @@ for (int i = 0; i < data_len; i++)
 
 ### 2.5 响应数据中的 Status
 
-大多数命令的响应包 Data 字段前 2 字节是 status：
+大多数命令的响应包 Data 字段包含 4 字节 status：
 
 | 字节 | 含义 |
 |------|------|
@@ -123,7 +123,9 @@ for (int i = 0; i < data_len; i++)
 
 客户端检查 `data[0] != 0` 则认为命令失败。
 
-**例外：** READ_REG (0x0A) 命令的响应 Data 直接返回 4 字节寄存器值，无 status 前缀。
+**注意：** 真实设备返回 4 字节 status（含 padding），而非 PROTOCOL.md 早期版本描述的 2 字节。
+
+**例外：** READ_REG (0x0A) 命令的响应 Data 返回 4 字节 status，寄存器值在 Val 字段。
 
 ---
 

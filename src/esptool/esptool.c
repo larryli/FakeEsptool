@@ -168,6 +168,15 @@ static BOOL ParsePacket(const BYTE *frame, int frame_len, ESP_PACKET *pkt)
         memcpy(pkt->data, &frame[8], pkt->size);
     }
 
+    if (pkt->direction == ESP_DIR_REQUEST && pkt->size > 0) {
+        BYTE chk = Esptool_CalcChecksum(pkt->data, pkt->size);
+        BYTE req_chk = (BYTE)(pkt->value & 0xFF);
+        if (chk != req_chk) {
+            TRACE_FW(TAG, "Checksum mismatch: expected=0x%02X got=0x%02X", chk, req_chk);
+            return FALSE;
+        }
+    }
+
     return TRUE;
 }
 
@@ -201,8 +210,8 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX -> 0x%08lX", addr, val);
 
     /* Real device returns register value in Value field (bytes 4-7),
-       Data field is empty */
-    Esptool_SendResponse(ctx, ESP_CMD_READ_REG, val, ESP_OK, NULL, 0);
+       with 4-byte status in Data field */
+    Esptool_SendResponse(ctx, ESP_CMD_READ_REG, val, ESP_OK, NULL, 4);
 }
 
 static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -216,7 +225,7 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX val=0x%08lX", addr, val);
     Chip_WriteReg(&ctx->chip, addr, val);
     if (ctx->onModified) ctx->onModified();
-    Esptool_SendResponse(ctx, ESP_CMD_WRITE_REG, pkt->value, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_WRITE_REG, pkt->value, ESP_OK, NULL, 4);
 }
 
 static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -232,8 +241,8 @@ static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG, "CHANGE_BAUDRATE old=%lu new=%lu", old_baud, new_baud);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  old=%lu new=%lu", old_baud, new_baud);
 
-    /* Send response at old baud rate first (standard status response, 2 bytes) */
-    Esptool_SendResponse(ctx, ESP_CMD_CHANGE_BAUDRATE, pkt->value, ESP_OK, NULL, 0);
+    /* Send response at old baud rate first */
+    Esptool_SendResponse(ctx, ESP_CMD_CHANGE_BAUDRATE, pkt->value, ESP_OK, NULL, 4);
 
     /* Then switch to new baud rate */
     if (ctx->onBaudRate) {
@@ -259,7 +268,7 @@ static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
                     total, blocks, bsize, offset);
 
-    Esptool_SendResponse(ctx, ESP_CMD_MEM_BEGIN, pkt->value, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_MEM_BEGIN, pkt->value, ESP_OK, NULL, 4);
 }
 
 static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -270,7 +279,7 @@ static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "MEM_DATA seq=%lu len=%u", seq, pkt->size);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%u", seq, pkt->size);
-    Esptool_SendResponse(ctx, ESP_CMD_MEM_DATA, pkt->value, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_MEM_DATA, pkt->value, ESP_OK, NULL, 4);
 }
 
 static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -281,7 +290,7 @@ static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "MEM_END entry=0x%08lX", entry);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  entry=0x%08lX", entry);
-    Esptool_SendResponse(ctx, ESP_CMD_MEM_END, pkt->value, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_MEM_END, pkt->value, ESP_OK, NULL, 4);
 }
 
 static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -295,31 +304,43 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD offset = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
                    ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
 
+    ctx->flash_offset = offset;
+    ctx->flash_seq = 0;
+
     TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
                 total, blocks, bsize, offset);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
                     total, blocks, bsize, offset);
 
-    Esptool_SendResponse(ctx, ESP_CMD_FLASH_DEFL_BEGIN, pkt->value, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_FLASH_DEFL_BEGIN, pkt->value, ESP_OK, NULL, 4);
 }
 
 static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
-    DWORD seq = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
+    DWORD data_len = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
+                     ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
+    DWORD seq = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
+                ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
 
-    TRACE_PROTO(TAG, "FLASH_DEFL_DATA seq=%lu len=%u", seq, pkt->size);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%u", seq, pkt->size);
+    TRACE_PROTO(TAG, "FLASH_DEFL_DATA seq=%lu len=%lu", seq, data_len);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%lu", seq, data_len);
+
+    if (pkt->size >= 16 + data_len) {
+        const BYTE *payload = &pkt->data[16];
+        Flash_Write(&ctx->flash, ctx->flash_offset, payload, data_len);
+        ctx->flash_offset += data_len;
+        ctx->flash_seq = seq + 1;
+    }
 
     if (ctx->onModified) ctx->onModified();
-    Esptool_SendResponse(ctx, ESP_CMD_FLASH_DEFL_DATA, pkt->value, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_FLASH_DEFL_DATA, pkt->value, ESP_OK, NULL, 4);
 }
 
 static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     TRACE_PROTO(TAG, "FLASH_DEFL_END");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  End compressed flash download");
-    Esptool_SendResponse(ctx, ESP_CMD_FLASH_DEFL_END, pkt->value, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_FLASH_DEFL_END, pkt->value, ESP_OK, NULL, 4);
 }
 
 static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -336,14 +357,17 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG, "READ_FLASH addr=0x%08lX len=%lu", addr, len);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX len=%lu", addr, len);
 
-    if (len > 4096)
-        len = 4096;
+    if (len > 4094)
+        len = 4094;
 
     BYTE buf[4096];
-    if (Flash_Read(&ctx->flash, addr, buf, len)) {
-        Esptool_SendResponse(ctx, ESP_CMD_READ_FLASH, pkt->value, ESP_OK, buf, (WORD)len);
+    buf[0] = 0x00;
+    buf[1] = 0x00;
+    if (Flash_Read(&ctx->flash, addr, buf + 2, len)) {
+        Esptool_SendResponse(ctx, ESP_CMD_READ_FLASH, pkt->value, ESP_OK, buf, (WORD)(len + 2));
     } else {
-        Esptool_SendResponse(ctx, ESP_CMD_READ_FLASH, pkt->value, ESP_FAIL, NULL, 0);
+        buf[0] = 0x01;
+        Esptool_SendResponse(ctx, ESP_CMD_READ_FLASH, pkt->value, ESP_OK, buf, (WORD)(len + 2));
     }
 }
 
@@ -354,7 +378,7 @@ static void HandleEraseFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     Flash_EraseAll(&ctx->flash);
     if (ctx->onModified) ctx->onModified();
-    Esptool_SendResponse(ctx, ESP_CMD_ERASE_FLASH, pkt->value, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_ERASE_FLASH, pkt->value, ESP_OK, NULL, 4);
 }
 
 static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -369,9 +393,9 @@ static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     if (Flash_Erase(&ctx->flash, offset, len)) {
         if (ctx->onModified) ctx->onModified();
-        Esptool_SendResponse(ctx, ESP_CMD_ERASE_REGION, pkt->value, ESP_OK, NULL, 0);
+        Esptool_SendResponse(ctx, ESP_CMD_ERASE_REGION, pkt->value, ESP_OK, NULL, 4);
     } else {
-        Esptool_SendResponse(ctx, ESP_CMD_ERASE_REGION, pkt->value, ESP_FAIL, NULL, 0);
+        Esptool_SendResponse(ctx, ESP_CMD_ERASE_REGION, pkt->value, ESP_FAIL, NULL, 4);
     }
 }
 
@@ -388,13 +412,15 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     BYTE md5[16];
     Flash_CalcMd5(&ctx->flash, addr, len, md5);
 
-    char md5str[33];
+    char md5str[35];
+    md5str[0] = 0x00;
+    md5str[1] = 0x00;
     for (int i = 0; i < 16; i++)
-        sprintf(&md5str[i * 2], "%02x", md5[i]);
+        sprintf(&md5str[2 + i * 2], "%02x", md5[i]);
 
-    TRACE_PROTO(TAG, "  MD5=%s", md5str);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  MD5=%hs", md5str);
-    Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_MD5, pkt->value, ESP_OK, (const BYTE *)md5str, 32);
+    TRACE_PROTO(TAG, "  MD5=%s", &md5str[2]);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  MD5=%hs", &md5str[2]);
+    Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_MD5, pkt->value, ESP_OK, (const BYTE *)md5str, 34);
 }
 
 static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -408,12 +434,15 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD offset = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
                    ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
 
+    ctx->flash_offset = offset;
+    ctx->flash_seq = 0;
+
     TRACE_PROTO(TAG, "FLASH_BEGIN erase=%lu blocks=%lu bsize=%lu offset=0x%08lX",
                 erase_size, num_blocks, block_size, offset);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  erase=%lu blocks=%lu bsize=%lu offset=0x%08lX",
                     erase_size, num_blocks, block_size, offset);
 
-    Esptool_SendResponse(ctx, ESP_CMD_FLASH_BEGIN, pkt->value, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_FLASH_BEGIN, pkt->value, ESP_OK, NULL, 4);
 }
 
 static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -426,8 +455,15 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG, "FLASH_DATA seq=%lu len=%lu", seq, data_len);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%lu", seq, data_len);
 
+    if (pkt->size >= 16 + data_len) {
+        const BYTE *payload = &pkt->data[16];
+        Flash_Write(&ctx->flash, ctx->flash_offset, payload, data_len);
+        ctx->flash_offset += data_len;
+        ctx->flash_seq = seq + 1;
+    }
+
     if (ctx->onModified) ctx->onModified();
-    Esptool_SendResponse(ctx, ESP_CMD_FLASH_DATA, pkt->value, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_FLASH_DATA, pkt->value, ESP_OK, NULL, 4);
 }
 
 static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -437,7 +473,18 @@ static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "FLASH_END reboot=%lu", reboot);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  reboot=%lu", reboot);
-    Esptool_SendResponse(ctx, ESP_CMD_FLASH_END, pkt->value, ESP_OK, NULL, 0);
+    Esptool_SendResponse(ctx, ESP_CMD_FLASH_END, pkt->value, ESP_OK, NULL, 4);
+}
+
+static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+{
+    TRACE_PROTO(TAG, "GET_SECURITY_INFO");
+    Serial_PostLog(ctx->hNotify, L"ESP", L"  Get security info");
+
+    BYTE sec_data[12] = {0};
+    sec_data[0] = 0x00;
+    sec_data[1] = 0x00;
+    Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, pkt->value, ESP_OK, sec_data, 12);
 }
 
 BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
@@ -486,10 +533,11 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
     case ESP_CMD_ERASE_FLASH:       HandleEraseFlash(ctx, &pkt); break;
     case ESP_CMD_ERASE_REGION:      HandleEraseBlock(ctx, &pkt); break;
     case ESP_CMD_READ_FLASH:        HandleReadFlash(ctx, &pkt); break;
+    case ESP_CMD_GET_SECURITY_INFO: HandleGetSecurityInfo(ctx, &pkt); break;
     default:
         TRACE_FW(TAG, "Unknown cmd: 0x%02X", pkt.command);
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  Unknown command: 0x%02X", pkt.command);
-        Esptool_SendResponse(ctx, pkt.command, pkt.value, ESP_FAIL, NULL, 0);
+        Esptool_SendResponse(ctx, pkt.command, pkt.value, ESP_FAIL, NULL, 4);
         return FALSE;
     }
 

@@ -58,17 +58,25 @@ BOOL Device_Save(DEVICE_CTX *ctx, const WCHAR *filename)
     DWORD chipType = (DWORD)ctx->chip.type;
     DWORD efuseSize = (DWORD)ctx->chip.efuse_size;
     DWORD flashSize = ctx->flash.size;
+    BOOL ok = TRUE;
 
-    WriteFile(hFile, &magic, 4, &written, NULL);
-    WriteFile(hFile, &version, 4, &written, NULL);
-    WriteFile(hFile, &chipType, 4, &written, NULL);
-    WriteFile(hFile, ctx->chip.mac, 6, &written, NULL);
-    WriteFile(hFile, &efuseSize, 4, &written, NULL);
-    WriteFile(hFile, ctx->chip.efuse, efuseSize, &written, NULL);
-    WriteFile(hFile, &flashSize, 4, &written, NULL);
-    WriteFile(hFile, ctx->flash.data, flashSize, &written, NULL);
+    ok = ok && WriteFile(hFile, &magic, 4, &written, NULL) && written == 4;
+    ok = ok && WriteFile(hFile, &version, 4, &written, NULL) && written == 4;
+    ok = ok && WriteFile(hFile, &chipType, 4, &written, NULL) && written == 4;
+    ok = ok && WriteFile(hFile, ctx->chip.mac, 6, &written, NULL) && written == 6;
+    ok = ok && WriteFile(hFile, &efuseSize, 4, &written, NULL) && written == 4;
+    if (ctx->chip.efuse)
+        ok = ok && WriteFile(hFile, ctx->chip.efuse, efuseSize, &written, NULL) && written == efuseSize;
+    ok = ok && WriteFile(hFile, &flashSize, 4, &written, NULL) && written == 4;
+    if (ctx->flash.data)
+        ok = ok && WriteFile(hFile, ctx->flash.data, flashSize, &written, NULL) && written == flashSize;
 
     CloseHandle(hFile);
+
+    if (!ok) {
+        TRACE_FW(TAG, "Device save failed: write error");
+        return FALSE;
+    }
 
     lstrcpyW(ctx->filename, filename);
     ctx->modified = FALSE;
@@ -91,21 +99,21 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     BYTE mac[6];
 
     ReadFile(hFile, &magic, 4, &read, NULL);
-    if (magic != DEVICE_MAGIC) {
+    if (read != 4 || magic != DEVICE_MAGIC) {
         CloseHandle(hFile);
         TRACE_FW(TAG, "Invalid magic");
         return FALSE;
     }
 
     ReadFile(hFile, &version, 4, &read, NULL);
-    if (version != DEVICE_VERSION) {
+    if (read != 4 || version != DEVICE_VERSION) {
         CloseHandle(hFile);
         TRACE_FW(TAG, "Unsupported version: %lu", version);
         return FALSE;
     }
 
     ReadFile(hFile, &chipType, 4, &read, NULL);
-    if (chipType >= CHIP_COUNT) {
+    if (read != 4 || chipType >= CHIP_COUNT) {
         CloseHandle(hFile);
         TRACE_FW(TAG, "Invalid chip type: %lu", chipType);
         return FALSE;

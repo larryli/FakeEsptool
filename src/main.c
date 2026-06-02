@@ -499,6 +499,23 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
 
                 Device_Close(&g_device);
                 if (Device_Init(&g_device, selectedChip, selectedFlash, mac)) {
+                    /* Load initial flash from file if selected */
+                    if (IsDlgButtonChecked(hDlg, IDC_INIT_FILE) == BST_CHECKED) {
+                        WCHAR filePath[MAX_PATH] = {0};
+                        GetDlgItemTextW(hDlg, IDC_INIT_FILE_PATH, filePath, MAX_PATH);
+                        if (filePath[0]) {
+                            HANDLE hFile = CreateFileW(filePath, GENERIC_READ, 0, NULL,
+                                                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                            if (hFile != INVALID_HANDLE_VALUE) {
+                                DWORD fileSize = GetFileSize(hFile, NULL);
+                                if (fileSize <= selectedFlash) {
+                                    DWORD bytesRead;
+                                    ReadFile(hFile, g_device.flash.data, fileSize, &bytesRead, NULL);
+                                }
+                                CloseHandle(hFile);
+                            }
+                        }
+                    }
                     EndDialog(hDlg, IDOK);
                 } else {
                     MessageBoxW(hDlg, L"Failed to create device", L"Error", MB_OK | MB_ICONERROR);
@@ -638,7 +655,8 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
 
                 if (changed) {
                     /* Reinitialize device with new settings */
-                    FLASH_CTX oldFlash = g_device.flash;
+                    DWORD oldFlashSize = g_device.flash.size;
+                    BYTE *oldFlashData = g_device.flash.data;
                     g_device.flash.data = NULL;
                     g_device.flash.allocated = FALSE;
 
@@ -648,17 +666,19 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
                         g_device.chip.flash_freq = flashFreq;
 
                         /* Copy old flash data if same size or larger */
-                        if (oldFlash.data && oldFlash.size <= selectedFlash) {
-                            memcpy(g_device.flash.data, oldFlash.data, oldFlash.size);
+                        if (oldFlashData && oldFlashSize <= selectedFlash) {
+                            memcpy(g_device.flash.data, oldFlashData, oldFlashSize);
                         }
-                        Flash_Close(&oldFlash);
+                        if (oldFlashData)
+                            HeapFree(GetProcessHeap(), 0, oldFlashData);
 
                         SyncDeviceToEsptool();
                         Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                         Device_SetModified(&g_device, TRUE);
                         EndDialog(hDlg, IDOK);
                     } else {
-                        Flash_Close(&oldFlash);
+                        if (oldFlashData)
+                            HeapFree(GetProcessHeap(), 0, oldFlashData);
                         MessageBoxW(hDlg, L"Failed to update device", L"Error", MB_OK | MB_ICONERROR);
                     }
                 } else {

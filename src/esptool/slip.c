@@ -96,7 +96,7 @@ int Slip_Encode(const BYTE *data, int len, BYTE *out, int out_max)
 {
     int pos = 0;
 
-    if (out_max < 1)
+    if (out_max < 3)
         return 0;
     out[pos++] = SLIP_END;
 

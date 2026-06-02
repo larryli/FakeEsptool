@@ -86,6 +86,8 @@ typedef struct {
     ESP_MODIFIED_CB onModified; /* Device modification callback */
     ESP_WRITE_CB onWrite;     /* Serial write callback */
     ESP_BAUDRATE_CB onBaudRate; /* Baud rate change callback */
+    DWORD     flash_offset;   /* Current flash write offset */
+    DWORD     flash_seq;      /* Current flash write sequence */
 } ESPTOOL_CTX;
 
 /* ESP protocol packet */
@@ -124,7 +126,7 @@ BOOL Esptool_Feed(ESPTOOL_CTX *ctx, const BYTE *data, int len);
 /* Process a complete SLIP frame */
 BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len);
 
-/* Send response packet with status in data (2 bytes) */
+/* Send response packet with 4-byte status in data */
 void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD status, const BYTE *data, WORD data_len);
 
 /* Calculate XOR checksum */

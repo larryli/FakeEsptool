@@ -60,7 +60,8 @@ FakeEsptool/
 ├── res/                        # 资源文件（图标、位图、清单）
 ├── docs/                       # 文档
 │   ├── REQUIREMENTS.md         # 需求规格
-│   └── DEVELOPMENT.md          # 开发文档
+│   ├── DEVELOPMENT.md          # 开发文档
+│   └── PROTOCOL.md             # 协议规范
 ├── LICENSE                     # MIT 许可证
 └── README.md
 ```
@@ -69,6 +70,7 @@ FakeEsptool/
 
 - [需求规格说明](docs/REQUIREMENTS.md)
 - [开发文档](docs/DEVELOPMENT.md)
+- [协议规范](docs/PROTOCOL.md)
 
 ## 许可证
 

@@ -378,24 +378,24 @@ ESP 芯片通过 DTR/RTS 信号控制 GPIO0 和 EN 引脚进入下载模式：
 
 | 码 | 名称 | 说明 |
 |----|------|------|
+| 0x02 | FLASH_BEGIN | Flash 写入开始 |
+| 0x03 | FLASH_DATA | Flash 写入数据 |
+| 0x04 | FLASH_END | Flash 写入结束 |
 | 0x05 | MEM_BEGIN | 内存写入开始 |
 | 0x06 | MEM_END | 内存写入结束 |
 | 0x07 | MEM_DATA | 内存写入数据 |
 | 0x08 | SYNC | 同步握手 |
-| 0x09 | SPI_SET_PARAMS | 设置 Flash 参数 |
+| 0x09 | WRITE_REG | 写寄存器 |
 | 0x0A | READ_REG | 读寄存器 |
-| 0x0B | WRITE_REG | 写寄存器（eFuse） |
-| 0x0D | SPI_ATTACH | 附加 SPI |
 | 0x0F | CHANGE_BAUDRATE | 修改波特率 |
+| 0x10 | FLASH_DEFL_BEGIN | 压缩写入开始 |
+| 0x11 | FLASH_DEFL_DATA | 压缩写入数据 |
+| 0x12 | FLASH_DEFL_END | 压缩写入结束 |
 | 0x13 | SPI_FLASH_MD5 | 计算 Flash MD5 |
-| 0x14 | SPI_FLASH_DATA | 写入 Flash 数据 |
-| 0x15 | SPI_READ_FLASH | 读取 Flash |
-| 0x16 | SPI_ERASE_FLASH | 擦除 Flash |
-| 0x17 | SPI_ERASE_BLOCK | 擦除块 |
-| 0x20 | FLASH_DEFL_BEGIN | 压缩写入开始 |
-| 0x21 | FLASH_DEFL_DATA | 压缩写入数据 |
-| 0x22 | FLASH_DEFL_END | 压缩写入结束 |
-| 0x23 | FLASH_DEFL_MD5 | 压缩写入 MD5 |
+| 0x14 | GET_SECURITY_INFO | 获取安全信息 |
+| 0xD0 | ERASE_FLASH | 擦除整个 Flash |
+| 0xD1 | ERASE_REGION | 擦除 Flash 区域 |
+| 0xD2 | READ_FLASH | 读取 Flash |
 
 ### 芯片支持
 
