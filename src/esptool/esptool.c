@@ -168,15 +168,6 @@ static BOOL ParsePacket(const BYTE *frame, int frame_len, ESP_PACKET *pkt)
         memcpy(pkt->data, &frame[8], pkt->size);
     }
 
-    if (pkt->direction == ESP_DIR_REQUEST && pkt->size > 0) {
-        BYTE chk = Esptool_CalcChecksum(pkt->data, pkt->size);
-        BYTE req_chk = (BYTE)(pkt->value & 0xFF);
-        if (chk != req_chk) {
-            TRACE_FW(TAG, "Checksum mismatch: expected=0x%02X got=0x%02X", chk, req_chk);
-            return FALSE;
-        }
-    }
-
     return TRUE;
 }
 
