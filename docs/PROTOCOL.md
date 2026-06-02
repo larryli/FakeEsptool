@@ -86,8 +86,10 @@ payload 为转义后的数据。
 ```
 
 **注意：**
-- 响应包的 bytes 4-7 是 val 字段，应返回请求包的 checksum 值
-- Val 字段为小端序 32 位整数，低字节为 checksum 值，高 3 字节固定填充 `0x00`，与 2.1 节严格对称
+- 响应包的 bytes 4-7 是 val 字段，含义因命令而异：
+  - SYNC (0x08)：返回同步序列头 `07 07 12 20`（小端序 `0x20120707`）
+  - READ_REG (0x0A)：返回寄存器值
+  - 其他命令：返回请求的 checksum / value
 
 ### 2.3 字段说明
 
@@ -168,9 +170,13 @@ Data:      0x07 0x07 0x12 0x20 55 55 55 ... 55 (36 bytes)
 Direction: 0x01
 Command:   0x08
 Size:      0x04 0x00 (4 bytes)
-Val:       <返回请求的 checksum>
+Val:       0x07 0x07 0x12 0x20 (同步序列头 4 字节，小端序 0x20120707)
 Data:      0x00 0x00 0x00 0x00 (status=成功)
 ```
+
+**注意：** 真实设备在 Val 字段返回同步序列前 4 字节 `07 07 12 20`（小端序），而非请求的 checksum。esptool 客户端对此字段不做强校验。
+
+**重复响应：** 真实设备收到 1 个 SYNC 请求后，连续发送 8 次相同的响应。
 
 **兼容性说明：** 部分早期 Bootloader 仅返回 2 字节 `00 00`。若需兼容极老固件，可动态判断响应长度，>=4 字节时截取前 4 字节。
 
@@ -192,11 +198,11 @@ Data:      addr[3:0] (寄存器地址，小端序)
 Direction: 0x01
 Command:   0x0A
 Size:      0x04 0x00 (4 bytes)
-Val:       <返回请求的 checksum>
-Data:      val[3:0] (寄存器值，小端序)
+Val:       寄存器值（小端序）
+Data:      (空)
 ```
 
-**注意：** READ_REG 是特例，响应 Data 直接返回 4 字节寄存器值，无 status 前缀。
+**注意：** READ_REG 是特例，寄存器值直接放在 Val 字段（bytes 4-7），Data 字段为空。与 PROTOCOL.md 原始描述不同，真实设备行为如此。
 
 ---
 

@@ -110,6 +110,12 @@ void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD statu
     BYTE resp[ESP_RESP_BUF_SIZE];
     int pos = 0;
 
+    TRACE_PROTO(TAG, "SendResponse cmd=0x%02X req_val=0x%08lX status=0x%08lX data_len=%u buf_size=%u",
+                cmd, req_val, status, data_len, (unsigned)sizeof(resp));
+
+    Serial_PostLogF(ctx->hNotify, L"DBG", L"SendResponse cmd=0x%02X data_len=%u pos=%d",
+                    cmd, data_len, pos);
+
     resp[pos++] = ESP_DIR_RESPONSE;
     resp[pos++] = cmd;
     resp[pos++] = (BYTE)(data_len & 0xFF);
@@ -171,8 +177,18 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Sync handshake");
     ctx->synced = TRUE;
 
-    BYTE sync_resp[4] = {0x00, 0x00, 0x00, 0x00};
-    Esptool_SendResponse(ctx, ESP_CMD_SYNC, pkt->value, ESP_OK, sync_resp, 4);
+    /* Real device returns sync sequence header {0x07,0x07,0x12,0x20}
+       as the Value field (little-endian DWORD 0x20120707) */
+    DWORD sync_val = ((DWORD)sync_response[0]) |
+                     ((DWORD)sync_response[1] << 8) |
+                     ((DWORD)sync_response[2] << 16) |
+                     ((DWORD)sync_response[3] << 24);
+    BYTE sync_data[4] = {0x00, 0x00, 0x00, 0x00};
+
+    /* Real device sends 8 consecutive responses per SYNC request */
+    for (int i = 0; i < 8; i++) {
+        Esptool_SendResponse(ctx, ESP_CMD_SYNC, sync_val, ESP_OK, sync_data, 4);
+    }
 }
 
 static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -183,7 +199,10 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "READ_REG addr=0x%08lX val=0x%08lX", addr, val);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX -> 0x%08lX", addr, val);
-    Esptool_SendResponse(ctx, ESP_CMD_READ_REG, pkt->value, ESP_OK, (const BYTE *)&val, 4);
+
+    /* Real device returns register value in Value field (bytes 4-7),
+       Data field is empty */
+    Esptool_SendResponse(ctx, ESP_CMD_READ_REG, val, ESP_OK, NULL, 0);
 }
 
 static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
