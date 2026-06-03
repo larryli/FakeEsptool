@@ -49,6 +49,49 @@ static const char *TAG = "GUI";
 /* Message size limit */
 #define MAX_MSG_SIZE        65536
 
+/* Flash size definitions per chip family */
+static const WCHAR *esp8266_flash_names[] = { L"256KB", L"512KB", L"1MB", L"2MB", L"4MB", L"8MB", L"16MB" };
+static const DWORD  esp8266_flash_sizes[] = { 256*1024, 512*1024, 1024*1024, 2*1024*1024, 4*1024*1024, 8*1024*1024, 16*1024*1024 };
+#define ESP8266_FLASH_COUNT 7
+#define ESP8266_FLASH_DEFAULT 4  /* 4MB */
+
+static const WCHAR *esp32_flash_names[] = { L"1MB", L"2MB", L"4MB", L"8MB", L"16MB", L"32MB", L"64MB", L"128MB" };
+static const DWORD  esp32_flash_sizes[] = { 1024*1024, 2*1024*1024, 4*1024*1024, 8*1024*1024, 16*1024*1024, 32*1024*1024, 64*1024*1024, 128*1024*1024 };
+#define ESP32_FLASH_COUNT 8
+#define ESP32_FLASH_DEFAULT 2  /* 4MB */
+
+/* Populate flash size combo box based on chip selection */
+static void PopulateFlashSizes(HWND hFlash, CHIP_TYPE chip, DWORD currentSize)
+{
+    SendMessageW(hFlash, CB_RESETCONTENT, 0, 0);
+
+    BOOL isEsp8266 = (chip == CHIP_ESP8266);
+    const WCHAR **names = isEsp8266 ? esp8266_flash_names : esp32_flash_names;
+    const DWORD  *sizes = isEsp8266 ? esp8266_flash_sizes : esp32_flash_sizes;
+    int count = isEsp8266 ? ESP8266_FLASH_COUNT : ESP32_FLASH_COUNT;
+    int defaultIdx = isEsp8266 ? ESP8266_FLASH_DEFAULT : ESP32_FLASH_DEFAULT;
+
+    int selectIdx = defaultIdx;
+    for (int i = 0; i < count; i++) {
+        SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)names[i]);
+        if (sizes[i] == currentSize)
+            selectIdx = i;
+    }
+    SendMessageW(hFlash, CB_SETCURSEL, selectIdx, 0);
+}
+
+/* Get flash size from combo box selection */
+static DWORD GetFlashSizeFromCombo(HWND hFlash, CHIP_TYPE chip)
+{
+    int sel = (int)SendMessageW(hFlash, CB_GETCURSEL, 0, 0);
+    if (sel < 0) sel = 0;
+    BOOL isEsp8266 = (chip == CHIP_ESP8266);
+    const DWORD *sizes = isEsp8266 ? esp8266_flash_sizes : esp32_flash_sizes;
+    int count = isEsp8266 ? ESP8266_FLASH_COUNT : ESP32_FLASH_COUNT;
+    if (sel >= count) sel = count - 1;
+    return sizes[sel];
+}
+
 /* Global state */
 static SERIAL_CTX g_serial = { .hPort = NULL, .hThread = NULL, .hStartEvent = NULL, .hNotify = NULL, .bRunning = FALSE };
 static DEVICE_CTX g_device = {0};
@@ -399,14 +442,7 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
             SendMessageW(hChip, CB_SETCURSEL, 0, 0);
 
             HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"256KB");
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"512KB");
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"1MB");
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"2MB");
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"4MB");
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"8MB");
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"16MB");
-            SendMessageW(hFlash, CB_SETCURSEL, 4, 0);
+            PopulateFlashSizes(hFlash, CHIP_ESP8266, 4*1024*1024);
 
             HWND hMode = GetDlgItem(hDlg, IDC_FLASH_MODE_COMBO);
             SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"QIO");
@@ -437,6 +473,15 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
 
     case WM_COMMAND:
         switch (LOWORD(wParam)) {
+        case IDC_CHIP_COMBO:
+            if (HIWORD(wParam) == CBN_SELCHANGE) {
+                HWND hChip = GetDlgItem(hDlg, IDC_CHIP_COMBO);
+                int chipSel = (int)SendMessageW(hChip, CB_GETCURSEL, 0, 0);
+                HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
+                PopulateFlashSizes(hFlash, (CHIP_TYPE)chipSel, 4*1024*1024);
+            }
+            return TRUE;
+
         case IDC_RANDOM_MAC:
             {
                 mac[0] = 0xAA;
@@ -485,10 +530,7 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
                 selectedChip = (CHIP_TYPE)chipSel;
 
                 HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
-                int flashSel = (int)SendMessageW(hFlash, CB_GETCURSEL, 0, 0);
-                DWORD flashSizes[] = {256*1024, 512*1024, 1024*1024, 2*1024*1024, 
-                                      4*1024*1024, 8*1024*1024, 16*1024*1024};
-                selectedFlash = flashSizes[flashSel];
+                selectedFlash = GetFlashSizeFromCombo(hFlash, selectedChip);
 
                 WCHAR macStr[32];
                 GetDlgItemTextW(hDlg, IDC_MAC_EDIT, macStr, 32);
@@ -557,24 +599,7 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
             SendMessageW(hChip, CB_SETCURSEL, (WPARAM)selectedChip, 0);
 
             HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"256KB");
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"512KB");
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"1MB");
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"2MB");
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"4MB");
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"8MB");
-            SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)L"16MB");
-            /* Select current flash size */
-            DWORD flashSizes[] = {256*1024, 512*1024, 1024*1024, 2*1024*1024,
-                                  4*1024*1024, 8*1024*1024, 16*1024*1024};
-            int flashIdx = 4;
-            for (int i = 0; i < 7; i++) {
-                if (flashSizes[i] == selectedFlash) {
-                    flashIdx = i;
-                    break;
-                }
-            }
-            SendMessageW(hFlash, CB_SETCURSEL, flashIdx, 0);
+            PopulateFlashSizes(hFlash, selectedChip, selectedFlash);
 
             HWND hMode = GetDlgItem(hDlg, IDC_FLASH_MODE_COMBO);
             SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"QIO");
@@ -601,6 +626,15 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
 
     case WM_COMMAND:
         switch (LOWORD(wParam)) {
+        case IDC_CHIP_COMBO:
+            if (HIWORD(wParam) == CBN_SELCHANGE) {
+                HWND hChip = GetDlgItem(hDlg, IDC_CHIP_COMBO);
+                int chipSel = (int)SendMessageW(hChip, CB_GETCURSEL, 0, 0);
+                HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
+                PopulateFlashSizes(hFlash, (CHIP_TYPE)chipSel, g_device.flash.size);
+            }
+            return TRUE;
+
         case IDC_RANDOM_MAC:
             {
                 mac[0] = 0xAA;
@@ -623,10 +657,7 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
                 selectedChip = (CHIP_TYPE)chipSel;
 
                 HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
-                int flashSel = (int)SendMessageW(hFlash, CB_GETCURSEL, 0, 0);
-                DWORD flashSizes[] = {256*1024, 512*1024, 1024*1024, 2*1024*1024,
-                                      4*1024*1024, 8*1024*1024, 16*1024*1024};
-                selectedFlash = flashSizes[flashSel];
+                selectedFlash = GetFlashSizeFromCombo(hFlash, selectedChip);
 
                 WCHAR macStr[32];
                 GetDlgItemTextW(hDlg, IDC_MAC_EDIT, macStr, 32);
