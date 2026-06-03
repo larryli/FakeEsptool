@@ -23,6 +23,7 @@
 #include <winver.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <wchar.h>
 
@@ -182,6 +183,41 @@ static void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
         /* Detect download mode entry: DSR=OFF, CTS=OFF after reset */
         else if (reset_pending && !dsr && !cts) {
             Serial_PostLog(hNotify, L"SIG", L"Download mode entered");
+
+            DWORD bootBaud = Chip_GetBootBaudRate(&g_device.chip);
+            if (bootBaud != 115200) {
+                Serial_SetBaudRate(ctx, bootBaud);
+                Serial_PostLogF(hNotify, L"CFG", L"Baud rate: %lu", bootBaud);
+            }
+
+            const char *msg = Chip_GetBootMessage(&g_device.chip, 0x01);
+            if (msg[0]) {
+                Serial_WriteData(ctx, (const BYTE *)msg, (DWORD)strlen(msg), hNotify);
+
+                const char *line = msg;
+                while (*line) {
+                    const char *end = strchr(line, '\r');
+                    if (!end) end = line + strlen(line);
+                    int wlen = MultiByteToWideChar(CP_UTF8, 0, line, (int)(end - line), NULL, 0);
+                    if (wlen > 0) {
+                        WCHAR *wline = (WCHAR *)HeapAlloc(GetProcessHeap(), 0, (wlen + 1) * sizeof(WCHAR));
+                        if (wline) {
+                            MultiByteToWideChar(CP_UTF8, 0, line, (int)(end - line), wline, wlen);
+                            wline[wlen] = L'\0';
+                            Serial_PostLog(hNotify, L"BOOT", wline);
+                            HeapFree(GetProcessHeap(), 0, wline);
+                        }
+                    }
+                    line = end;
+                    while (*line == '\r' || *line == '\n') line++;
+                }
+            }
+
+            if (bootBaud != 115200) {
+                Serial_SetBaudRate(ctx, 115200);
+                Serial_PostLogF(hNotify, L"CFG", L"Baud rate: 115200");
+            }
+
             reset_pending = FALSE;
         }
         /* Any other state cancels pending reset */

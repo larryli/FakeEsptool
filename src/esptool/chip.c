@@ -6,6 +6,7 @@
 
 #include "chip.h"
 #include "../utils/trace.h"
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -561,4 +562,93 @@ const BYTE *Chip_GetEfuse(const CHIP_CTX *ctx)
 int Chip_GetEfuseSize(const CHIP_CTX *ctx)
 {
     return ctx->efuse_size;
+}
+
+DWORD Chip_GetBootBaudRate(const CHIP_CTX *ctx)
+{
+    if (ctx->type == CHIP_ESP8266)
+        return 74880;
+    if (ctx->type == CHIP_ESP32C2 && ctx->xtal_freq == XTAL_FREQ_26M)
+        return 74880;
+    return 115200;
+}
+
+static const char *ResetCauseStr(BYTE cause)
+{
+    switch (cause) {
+    case 0x01: return "POWERON";
+    case 0x02: return "EXT";
+    case 0x03: return "WDT";
+    default:   return "UNKNOWN";
+    }
+}
+
+const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BYTE reset_cause)
+{
+    const char *rst = ResetCauseStr(reset_cause);
+    static char buf[512];
+
+    switch (ctx->type) {
+    case CHIP_ESP8266:
+        snprintf(buf, sizeof(buf),
+            "ets_main.c 542 \r\n"
+            "ets_main.c 543 \r\n"
+            "rst:0x%02X (%s),boot:0x3 (DOWNLOAD(UART0/1/2))\r\n"
+            "waiting for download\r\n",
+            reset_cause, rst);
+        break;
+    case CHIP_ESP32:
+        snprintf(buf, sizeof(buf),
+            "ESP-ROM:esp32-20210719\r\n"
+            "Build:Jul 19 2021\r\n"
+            "rst:0x%02X (%s),boot:0x3 (DOWNLOAD(UART0/1/2))\r\n"
+            "waiting for download\r\n",
+            reset_cause, rst);
+        break;
+    case CHIP_ESP32S2:
+        snprintf(buf, sizeof(buf),
+            "ESP-ROM:esp32s2-20210719\r\n"
+            "Build:Jul 19 2021\r\n"
+            "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+            "waiting for download\r\n",
+            reset_cause, rst);
+        break;
+    case CHIP_ESP32S3:
+        snprintf(buf, sizeof(buf),
+            "ESP-ROM:esp32s3-20210719\r\n"
+            "Build:Jul 19 2021\r\n"
+            "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+            "waiting for download\r\n",
+            reset_cause, rst);
+        break;
+    case CHIP_ESP32C2:
+        snprintf(buf, sizeof(buf),
+            "ESP-ROM:esp8684-api2-20220127\r\n"
+            "Build:Jan 27 2022\r\n"
+            "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+            "waiting for download\r\n",
+            reset_cause, rst);
+        break;
+    case CHIP_ESP32C3:
+        snprintf(buf, sizeof(buf),
+            "ESP-ROM:esp32c3-20210719\r\n"
+            "Build:Jul 19 2021\r\n"
+            "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+            "waiting for download\r\n",
+            reset_cause, rst);
+        break;
+    case CHIP_ESP32C6:
+        snprintf(buf, sizeof(buf),
+            "ESP-ROM:esp32c6-20210719\r\n"
+            "Build:Jul 19 2021\r\n"
+            "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+            "waiting for download\r\n",
+            reset_cause, rst);
+        break;
+    default:
+        buf[0] = '\0';
+        break;
+    }
+
+    return buf;
 }

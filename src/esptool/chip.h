@@ -126,4 +126,12 @@ const BYTE *Chip_GetEfuse(const CHIP_CTX *ctx);
 /* Get eFuse size in bytes */
 int Chip_GetEfuseSize(const CHIP_CTX *ctx);
 
+/* Get boot message baud rate (depends on chip type and crystal frequency) */
+DWORD Chip_GetBootBaudRate(const CHIP_CTX *ctx);
+
+/* Get boot message text for download mode entry.
+   Returns multi-line ASCII string with \r\n line endings.
+   reset_cause: 0x01=POWERON, 0x02=EXT, 0x03=WDT */
+const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BYTE reset_cause);
+
 #endif
