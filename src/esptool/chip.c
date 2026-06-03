@@ -330,13 +330,24 @@ const BYTE *Chip_GetMac(const CHIP_CTX *ctx)
 
 DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
 {
-    /* ESP32 EFUSE: 0x3FF00000 + offset */
+    /* ESP32 EFUSE: 0x3FF00000 + offset (ROM direct access) */
     if (addr >= 0x3FF00000 && addr < 0x3FF00000 + (DWORD)ctx->efuse_size) {
         int offset = (int)(addr - 0x3FF00000);
         if (offset + 3 < ctx->efuse_size) {
             return ctx->efuse[offset] | 
                    ((DWORD)ctx->efuse[offset + 1] << 8) |
                    ((DWORD)ctx->efuse[offset + 2] << 16) | 
+                   ((DWORD)ctx->efuse[offset + 3] << 24);
+        }
+    }
+
+    /* ESP32 EFUSE_RD_REG_BASE: 0x3FF5A000 (esptool readEfuse) */
+    if (addr >= 0x3FF5A000 && addr < 0x3FF5A100) {
+        int offset = (int)(addr - 0x3FF5A000);
+        if (ctx->efuse && offset + 3 < ctx->efuse_size) {
+            return ctx->efuse[offset] |
+                   ((DWORD)ctx->efuse[offset + 1] << 8) |
+                   ((DWORD)ctx->efuse[offset + 2] << 16) |
                    ((DWORD)ctx->efuse[offset + 3] << 24);
         }
     }
@@ -408,10 +419,10 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
     if (addr == 0x40001000)
         return ctx->chip_id;
 
-    /* UART clock divider register (0x60000014) - used by ESP8266 for crystal detection.
+    /* UART clock divider register - used for crystal frequency detection.
        Divisor = APB_CLK / baud_rate, where APB_CLK = 2 * crystal_freq.
        flash_freq: 0=40M, 1=26M, 2=20M, 3=80M */
-    if (addr == 0x60000014) {
+    if (addr == 0x60000014 || addr == 0x3FF40014) {
         DWORD xtal;
         switch (ctx->flash_freq) {
         case 1:  xtal = 26000000; break;

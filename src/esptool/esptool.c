@@ -67,6 +67,7 @@ void Esptool_Init(ESPTOOL_CTX *ctx)
     Chip_Init(&ctx->chip, CHIP_ESP32);
     Flash_Init(&ctx->flash, 4 * 1024 * 1024);
     ctx->synced = FALSE;
+    ctx->stub_mode = FALSE;
     ctx->hNotify = NULL;
 }
 
@@ -176,6 +177,7 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG, "SYNC received");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Sync handshake");
     ctx->synced = TRUE;
+    ctx->stub_mode = FALSE;
 
     /* Real device returns sync sequence header {0x07,0x07,0x12,0x20}
        as the Value field (little-endian DWORD 0x20120707) */
@@ -275,13 +277,23 @@ static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
 static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
-    (void)ctx;
-    DWORD entry = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                  ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
+    DWORD execute = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
+                    ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
 
-    TRACE_PROTO(TAG, "MEM_END entry=0x%08lX", entry);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  entry=0x%08lX", entry);
+    TRACE_PROTO(TAG, "MEM_END execute=%lu", execute);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  execute=%lu", execute);
     Esptool_SendResponse(ctx, ESP_CMD_MEM_END, pkt->value, ESP_OK, NULL, 4);
+
+    /* Stub mode: send "OHAI" handshake after MEM_END with execute=1 */
+    if (execute) {
+        BYTE ohai[] = { 0xC0, 'O', 'H', 'A', 'I', 0xC0 };
+        if (ctx->onWrite) {
+            ctx->onWrite(ohai, sizeof(ohai));
+        }
+        ctx->stub_mode = TRUE;
+        Serial_PostLog(ctx->hNotify, L"ESP", L"  Stub mode: OHAI sent");
+        TRACE_PROTO(TAG, "Stub mode activated, OHAI sent");
+    }
 }
 
 static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)

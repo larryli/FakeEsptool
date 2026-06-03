@@ -82,6 +82,7 @@ typedef struct {
     CHIP_CTX  chip;           /* Chip characteristics */
     FLASH_CTX flash;          /* Flash storage */
     BOOL      synced;         /* SYNC handshake completed */
+    BOOL      stub_mode;      /* Stub is running (OHAI received) */
     HWND      hNotify;        /* Window for UI notifications */
     ESP_MODIFIED_CB onModified; /* Device modification callback */
     ESP_WRITE_CB onWrite;     /* Serial write callback */
