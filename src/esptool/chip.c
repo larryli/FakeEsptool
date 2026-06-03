@@ -39,15 +39,17 @@ static void InitEsp8266(CHIP_CTX *ctx)
 
     ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
 
-    /* readEfuse(0)=0x3FF00050: mac[5],mac[4],mac[3],0x00 */
-    ctx->efuse[0x50] = ctx->mac[5];
-    ctx->efuse[0x51] = ctx->mac[4];
-    ctx->efuse[0x52] = ctx->mac[3];
-    /* readEfuse(1)=0x3FF00054: 0x00,mac[2],mac[1],mac[0] */
-    ctx->efuse[0x55] = ctx->mac[2];
-    ctx->efuse[0x56] = ctx->mac[1];
-    ctx->efuse[0x57] = ctx->mac[0];
-    /* readEfuse(3)=0x3FF0005C: 0 (use default OUI) */
+    /* ESP8266 MAC eFuse layout (esptool-js compatible):
+       word0 (0x3FF00050): NIC[2]=MAC[5] at byte[3], rest unused
+       word1 (0x3FF00054): NIC[0]=MAC[3] at byte[1], NIC[1]=MAC[4] at byte[0]
+       word3 (0x3FF0005C): OUI source (0 = use default, else custom OUI) */
+    ctx->efuse[0x53] = ctx->mac[5];  /* byte[3] of word0: (mac0 >> 24) = MAC[5] */
+    ctx->efuse[0x54] = ctx->mac[4];  /* byte[0] of word1: mac1 & 0xFF = MAC[4] */
+    ctx->efuse[0x55] = ctx->mac[3];  /* byte[1] of word1: (mac1 >> 8) = MAC[3] */
+    /* word3 for custom OUI: [mac[2], mac[1], mac[0]] in little-endian */
+    ctx->efuse[0x5C] = ctx->mac[2];  /* byte[0] of word3: OUI byte 2 */
+    ctx->efuse[0x5D] = ctx->mac[1];  /* byte[1] of word3: OUI byte 1 */
+    ctx->efuse[0x5E] = ctx->mac[0];  /* byte[2] of word3: OUI byte 0 */
 }
 
 static void InitEsp32(CHIP_CTX *ctx)
@@ -283,14 +285,17 @@ BOOL Chip_SetMac(CHIP_CTX *ctx, const BYTE mac[6])
     /* Update MAC in eFuse at the correct offset for each chip type */
     switch (ctx->type) {
     case CHIP_ESP8266:
-        /* readEfuse(0)=0x3FF00050: mac[5],mac[4],mac[3],0x00 */
-        ctx->efuse[0x50] = mac[5];
-        ctx->efuse[0x51] = mac[4];
-        ctx->efuse[0x52] = mac[3];
-        /* readEfuse(1)=0x3FF00054: 0x00,mac[2],mac[1],mac[0] */
-        ctx->efuse[0x55] = mac[2];
-        ctx->efuse[0x56] = mac[1];
-        ctx->efuse[0x57] = mac[0];
+        /* ESP8266 MAC eFuse layout (esptool-js compatible):
+           word0 (0x3FF00050): NIC[2]=MAC[5] at byte[3]
+           word1 (0x3FF00054): NIC[0]=MAC[3] at byte[1], NIC[1]=MAC[4] at byte[0]
+           word3 (0x3FF0005C): OUI source */
+        ctx->efuse[0x53] = mac[5];  /* byte[3] of word0: (mac0 >> 24) = MAC[5] */
+        ctx->efuse[0x54] = mac[4];  /* byte[0] of word1: mac1 & 0xFF = MAC[4] */
+        ctx->efuse[0x55] = mac[3];  /* byte[1] of word1: (mac1 >> 8) = MAC[3] */
+        /* word3 for custom OUI */
+        ctx->efuse[0x5C] = mac[2];  /* byte[0] of word3: OUI byte 2 */
+        ctx->efuse[0x5D] = mac[1];  /* byte[1] of word3: OUI byte 1 */
+        ctx->efuse[0x5E] = mac[0];  /* byte[2] of word3: OUI byte 0 */
         break;
     case CHIP_ESP32:
         /* readEfuse(1)=0x3FF5A004: mac[5],mac[4],mac[3],mac[2] */

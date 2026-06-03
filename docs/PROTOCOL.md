@@ -1298,6 +1298,27 @@ if (mac3 != 0) {
 NIC = [(mac1 >> 8) & 0xFF, mac1 & 0xFF, (mac0 >> 24) & 0xFF];
 ```
 
+**eFuse 字节存储（小端序）：**
+```
+word0 (0x3FF00050): [unused][unused][unused][MAC[5]]
+                     byte[0] byte[1] byte[2] byte[3]
+
+word1 (0x3FF00054): [MAC[4]][MAC[3]][0x00][0x00]
+                     byte[0]  byte[1] byte[2] byte[3]
+
+word3 (0x3FF0005C): [OUI[2]][OUI[1]][OUI[0]][0x00]
+                     byte[0]  byte[1]  byte[2]  byte[3]
+```
+
+**设备端模拟要点：**
+- `efuse[0x53] = mac[5]` → `(mac0 >> 24) & 0xFF = MAC[5]`
+- `efuse[0x54] = mac[4]` → `mac1 & 0xFF = MAC[4]`
+- `efuse[0x55] = mac[3]` → `(mac1 >> 8) & 0xFF = MAC[3]`
+- `efuse[0x56] = 0x00` → `(mac1 >> 16) & 0xFF = 0`（使用默认 OUI）
+- `efuse[0x5C] = mac[2]` → OUI byte 2
+- `efuse[0x5D] = mac[1]` → OUI byte 1
+- `efuse[0x5E] = mac[0]` → OUI byte 0
+
 ---
 
 ## 附录 C：芯片版本检测
