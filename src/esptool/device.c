@@ -58,6 +58,7 @@ BOOL Device_Save(DEVICE_CTX *ctx, const WCHAR *filename)
     DWORD chipType = (DWORD)ctx->chip.type;
     DWORD efuseSize = (DWORD)ctx->chip.efuse_size;
     DWORD flashSize = ctx->flash.size;
+    BYTE xtalFreq = ctx->chip.xtal_freq;
     BOOL ok = TRUE;
 
     ok = ok && WriteFile(hFile, &magic, 4, &written, NULL) && written == 4;
@@ -68,6 +69,7 @@ BOOL Device_Save(DEVICE_CTX *ctx, const WCHAR *filename)
     if (ctx->chip.efuse)
         ok = ok && WriteFile(hFile, ctx->chip.efuse, efuseSize, &written, NULL) && written == efuseSize;
     ok = ok && WriteFile(hFile, &flashSize, 4, &written, NULL) && written == 4;
+    ok = ok && WriteFile(hFile, &xtalFreq, 1, &written, NULL) && written == 1;
     if (ctx->flash.data)
         ok = ok && WriteFile(hFile, ctx->flash.data, flashSize, &written, NULL) && written == flashSize;
 
@@ -106,7 +108,7 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     }
 
     ReadFile(hFile, &version, 4, &read, NULL);
-    if (read != 4 || version != DEVICE_VERSION) {
+    if (read != 4 || (version != 1 && version != 2)) {
         CloseHandle(hFile);
         TRACE_FW(TAG, "Unsupported version: %lu", version);
         return FALSE;
@@ -135,6 +137,13 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     }
 
     ReadFile(hFile, &flashSize, 4, &read, NULL);
+
+    /* Read xtal_freq (version 2+) */
+    if (version >= 2) {
+        BYTE xtalFreq;
+        ReadFile(hFile, &xtalFreq, 1, &read, NULL);
+        ctx->chip.xtal_freq = xtalFreq;
+    }
 
     if (!Flash_Init(&ctx->flash, flashSize)) {
         Chip_Close(&ctx->chip);

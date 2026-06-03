@@ -15,7 +15,7 @@
 #define DEVICE_MAGIC    0x45535000
 
 /* Device file format version */
-#define DEVICE_VERSION  1
+#define DEVICE_VERSION  2
 
 /* Device context */
 typedef struct {

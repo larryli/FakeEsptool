@@ -24,6 +24,10 @@
 #define FLASH_FREQ_20M  2
 #define FLASH_FREQ_80M  3
 
+/* Crystal frequency constants */
+#define XTAL_FREQ_40M   0
+#define XTAL_FREQ_26M   1
+
 /* SPI register count (enough for SPI_CMD through SPI_W15) */
 #define SPI_REG_COUNT   64
 
@@ -72,8 +76,7 @@ typedef struct {
 
     DWORD flash_size;           /* Flash size in bytes */
     DWORD flash_id;             /* Flash JEDEC ID */
-    BYTE flash_mode;            /* Flash SPI mode */
-    BYTE flash_freq;            /* Flash SPI frequency */
+    BYTE xtal_freq;             /* Crystal frequency */
 
     DWORD sector_size;          /* Flash sector size */
     DWORD block_size;           /* Flash block size */

@@ -35,7 +35,6 @@ static void InitEsp8266(CHIP_CTX *ctx)
     ctx->block_size = 65536;
     ctx->page_size = 256;
     ctx->has_usb = FALSE;
-    ctx->flash_id = 0x1640EF;
 
     ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
 
@@ -62,7 +61,6 @@ static void InitEsp32(CHIP_CTX *ctx)
     ctx->block_size = 65536;
     ctx->page_size = 256;
     ctx->has_usb = FALSE;
-    ctx->flash_id = 0x1640EF;
 
     ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
 
@@ -94,7 +92,6 @@ static void InitEsp32S2(CHIP_CTX *ctx)
     ctx->block_size = 65536;
     ctx->page_size = 256;
     ctx->has_usb = TRUE;
-    ctx->flash_id = 0x1640EF;
 
     ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
     
@@ -116,7 +113,6 @@ static void InitEsp32S3(CHIP_CTX *ctx)
     ctx->block_size = 65536;
     ctx->page_size = 256;
     ctx->has_usb = TRUE;
-    ctx->flash_id = 0x1640EF;
 
     ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
     
@@ -138,7 +134,6 @@ static void InitEsp32C2(CHIP_CTX *ctx)
     ctx->block_size = 65536;
     ctx->page_size = 256;
     ctx->has_usb = FALSE;
-    ctx->flash_id = 0x1640EF;
 
     ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
     
@@ -168,7 +163,6 @@ static void InitEsp32C3(CHIP_CTX *ctx)
     ctx->block_size = 65536;
     ctx->page_size = 256;
     ctx->has_usb = TRUE;
-    ctx->flash_id = 0x1640EF;
 
     ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
     
@@ -198,7 +192,6 @@ static void InitEsp32C6(CHIP_CTX *ctx)
     ctx->block_size = 65536;
     ctx->page_size = 256;
     ctx->has_usb = TRUE;
-    ctx->flash_id = 0x1640EF;
 
     ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
     
@@ -222,9 +215,7 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
 {
     memset(ctx, 0, sizeof(CHIP_CTX));
     ctx->type = type;
-    ctx->flash_size = 4 * 1024 * 1024;
-    ctx->flash_mode = FLASH_MODE_DIO;
-    ctx->flash_freq = FLASH_FREQ_40M;
+    ctx->xtal_freq = XTAL_FREQ_40M;
 
     ctx->mac[0] = 0xAA;
     ctx->mac[1] = 0xBB;
@@ -253,6 +244,9 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
         TRACE_FW(TAG, "Unknown chip type: %d", type);
         return FALSE;
     }
+
+    /* Set default flash size and ID */
+    Chip_SetFlashSize(ctx, 4 * 1024 * 1024);
 
     /* Initialize SPI register defaults */
     ctx->spi_regs[SPI_CMD_OFFS / 4] = 0;
@@ -439,13 +433,18 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
        esptool-js calculates: etsXtal = (baudrate * uartDiv) / 1000000 / XTAL_CLK_DIVIDER
        For ESP8266: XTAL_CLK_DIVIDER=2, so uartDiv = APB_CLK / baudrate = (2*xtal) / baudrate
        For other chips: XTAL_CLK_DIVIDER=1, so uartDiv = xtal / baudrate */
-    if (addr == 0x60000014 || addr == 0x3FF40014) {
+    if (addr == 0x60000014 || addr == 0x3FF40014 || addr == 0x3F400014) {
         DWORD xtal;
-        switch (ctx->flash_freq) {
-        case 1:  xtal = 26000000; break;
-        case 2:  xtal = 20000000; break;
-        case 3:  xtal = 80000000; break;
-        default: xtal = 40000000; break;
+        /* Fixed 40MHz for C3/C6/S2/S3 */
+        if (ctx->type == CHIP_ESP32C3 || ctx->type == CHIP_ESP32C6 ||
+            ctx->type == CHIP_ESP32S2 || ctx->type == CHIP_ESP32S3) {
+            xtal = 40000000;
+        } else {
+            /* Dynamic detection for ESP32/C2/ESP8266 */
+            switch (ctx->xtal_freq) {
+            case XTAL_FREQ_26M: xtal = 26000000; break;
+            default:            xtal = 40000000; break;
+            }
         }
         if (ctx->type == CHIP_ESP8266)
             return (2 * xtal) / 115200;
@@ -515,6 +514,33 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
 void Chip_SetFlashSize(CHIP_CTX *ctx, DWORD size)
 {
     ctx->flash_size = size;
+
+    /* Update flash_id capacity byte based on size.
+       Flash ID format: 0xCCDDMM
+         MM = Manufacturer ID
+         DD = Device ID high byte (0x40)
+         CC = Capacity identifier */
+    BYTE cap_id;
+    switch (size) {
+    case 256 * 1024:      cap_id = 0x12; break;
+    case 512 * 1024:      cap_id = 0x13; break;
+    case 1 * 1024 * 1024: cap_id = 0x14; break;
+    case 2 * 1024 * 1024: cap_id = 0x15; break;
+    case 4 * 1024 * 1024: cap_id = 0x16; break;
+    case 8 * 1024 * 1024: cap_id = 0x17; break;
+    case 16 * 1024 * 1024: cap_id = 0x18; break;
+    case 32 * 1024 * 1024: cap_id = 0x19; break;
+    default:              cap_id = 0x16; break; /* Default 4MB */
+    }
+
+    /* Default manufacturer: Winbond (0xEF)
+       Other known manufacturers:
+         0xEF = Winbond
+         0xC8 = GigaDevice
+         0x20 = XMC
+         0xC2 = Macronix
+         0xE0 = Espressif */
+    ctx->flash_id = ((DWORD)cap_id << 16) | 0x40EF;
 }
 
 DWORD Chip_GetFlashSize(const CHIP_CTX *ctx)

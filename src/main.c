@@ -144,8 +144,7 @@ static void SyncDeviceToEsptool(void)
     Chip_SetMac(&g_esptool.chip, g_device.chip.mac);
     if (g_device.chip.efuse && g_esptool.chip.efuse)
         memcpy(g_esptool.chip.efuse, g_device.chip.efuse, g_device.chip.efuse_size);
-    g_esptool.chip.flash_mode = g_device.chip.flash_mode;
-    g_esptool.chip.flash_freq = g_device.chip.flash_freq;
+    g_esptool.chip.xtal_freq = g_device.chip.xtal_freq;
     Flash_Init(&g_esptool.flash, g_device.flash.size);
     if (g_device.flash.data)
         memcpy(g_esptool.flash.data, g_device.flash.data, g_device.flash.size);
@@ -444,19 +443,10 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
             HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
             PopulateFlashSizes(hFlash, CHIP_ESP8266, 4*1024*1024);
 
-            HWND hMode = GetDlgItem(hDlg, IDC_FLASH_MODE_COMBO);
-            SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"QIO");
-            SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"QOUT");
-            SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"DIO");
-            SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"DOUT");
-            SendMessageW(hMode, CB_SETCURSEL, 2, 0);
-
-            HWND hFreq = GetDlgItem(hDlg, IDC_FLASH_FREQ_COMBO);
-            SendMessageW(hFreq, CB_ADDSTRING, 0, (LPARAM)L"40MHz");
-            SendMessageW(hFreq, CB_ADDSTRING, 0, (LPARAM)L"26MHz");
-            SendMessageW(hFreq, CB_ADDSTRING, 0, (LPARAM)L"20MHz");
-            SendMessageW(hFreq, CB_ADDSTRING, 0, (LPARAM)L"80MHz");
-            SendMessageW(hFreq, CB_SETCURSEL, 0, 0);
+            HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
+            SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"40MHz");
+            SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"26MHz");
+            SendMessageW(hXtal, CB_SETCURSEL, 0, 0);
 
             CheckDlgButton(hDlg, IDC_INIT_BLANK, BST_CHECKED);
             EnableWindow(GetDlgItem(hDlg, IDC_INIT_FILE_PATH), FALSE);
@@ -479,6 +469,11 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
                 int chipSel = (int)SendMessageW(hChip, CB_GETCURSEL, 0, 0);
                 HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
                 PopulateFlashSizes(hFlash, (CHIP_TYPE)chipSel, 4*1024*1024);
+                /* Enable/disable XTAL freq combo based on chip type */
+                BOOL xtalEditable = (chipSel == CHIP_ESP8266 ||
+                                     chipSel == CHIP_ESP32 ||
+                                     chipSel == CHIP_ESP32C2);
+                EnableWindow(GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO), xtalEditable);
             }
             return TRUE;
 
@@ -537,8 +532,13 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
                 swscanf(macStr, L"%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
                         &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
 
+                HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
+                BYTE xtalFreq = (BYTE)SendMessageW(hXtal, CB_GETCURSEL, 0, 0);
+
                 Device_Close(&g_device);
                 if (Device_Init(&g_device, selectedChip, selectedFlash, mac)) {
+                    g_device.chip.xtal_freq = xtalFreq;
+
                     /* Load initial flash from file if selected */
                     if (IsDlgButtonChecked(hDlg, IDC_INIT_FILE) == BST_CHECKED) {
                         WCHAR filePath[MAX_PATH] = {0};
@@ -601,19 +601,15 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
             HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
             PopulateFlashSizes(hFlash, selectedChip, selectedFlash);
 
-            HWND hMode = GetDlgItem(hDlg, IDC_FLASH_MODE_COMBO);
-            SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"QIO");
-            SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"QOUT");
-            SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"DIO");
-            SendMessageW(hMode, CB_ADDSTRING, 0, (LPARAM)L"DOUT");
-            SendMessageW(hMode, CB_SETCURSEL, g_device.chip.flash_mode, 0);
-
-            HWND hFreq = GetDlgItem(hDlg, IDC_FLASH_FREQ_COMBO);
-            SendMessageW(hFreq, CB_ADDSTRING, 0, (LPARAM)L"40MHz");
-            SendMessageW(hFreq, CB_ADDSTRING, 0, (LPARAM)L"26MHz");
-            SendMessageW(hFreq, CB_ADDSTRING, 0, (LPARAM)L"20MHz");
-            SendMessageW(hFreq, CB_ADDSTRING, 0, (LPARAM)L"80MHz");
-            SendMessageW(hFreq, CB_SETCURSEL, g_device.chip.flash_freq, 0);
+            HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
+            SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"40MHz");
+            SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"26MHz");
+            SendMessageW(hXtal, CB_SETCURSEL, g_device.chip.xtal_freq, 0);
+            /* Disable XTAL freq for fixed-xtal chips */
+            if (selectedChip == CHIP_ESP32C3 || selectedChip == CHIP_ESP32C6 ||
+                selectedChip == CHIP_ESP32S2 || selectedChip == CHIP_ESP32S3) {
+                EnableWindow(hXtal, FALSE);
+            }
 
             WCHAR macStr[32];
             wsprintfW(macStr, L"%02X:%02X:%02X:%02X:%02X:%02X",
@@ -632,6 +628,11 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
                 int chipSel = (int)SendMessageW(hChip, CB_GETCURSEL, 0, 0);
                 HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
                 PopulateFlashSizes(hFlash, (CHIP_TYPE)chipSel, g_device.flash.size);
+                /* Enable/disable XTAL freq combo based on chip type */
+                BOOL xtalEditable = (chipSel == CHIP_ESP8266 ||
+                                     chipSel == CHIP_ESP32 ||
+                                     chipSel == CHIP_ESP32C2);
+                EnableWindow(GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO), xtalEditable);
             }
             return TRUE;
 
@@ -667,18 +668,14 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
                 for (int j = 0; j < 6; j++)
                     mac[j] = (BYTE)tmp[j];
 
-                HWND hMode = GetDlgItem(hDlg, IDC_FLASH_MODE_COMBO);
-                BYTE flashMode = (BYTE)SendMessageW(hMode, CB_GETCURSEL, 0, 0);
-
-                HWND hFreq = GetDlgItem(hDlg, IDC_FLASH_FREQ_COMBO);
-                BYTE flashFreq = (BYTE)SendMessageW(hFreq, CB_GETCURSEL, 0, 0);
+                HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
+                BYTE xtalFreq = (BYTE)SendMessageW(hXtal, CB_GETCURSEL, 0, 0);
 
                 /* Check if anything changed */
                 BOOL changed = (selectedChip != g_device.chip.type) ||
                                (selectedFlash != g_device.flash.size) ||
                                (memcmp(mac, g_device.chip.mac, 6) != 0) ||
-                               (flashMode != g_device.chip.flash_mode) ||
-                               (flashFreq != g_device.chip.flash_freq);
+                               (xtalFreq != g_device.chip.xtal_freq);
 
                 if (changed) {
                     /* Reinitialize device with new settings */
@@ -689,8 +686,7 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
 
                     Device_Close(&g_device);
                     if (Device_Init(&g_device, selectedChip, selectedFlash, mac)) {
-                        g_device.chip.flash_mode = flashMode;
-                        g_device.chip.flash_freq = flashFreq;
+                        g_device.chip.xtal_freq = xtalFreq;
 
                         /* Copy old flash data if same size or larger */
                         if (oldFlashData && oldFlashSize <= selectedFlash) {
