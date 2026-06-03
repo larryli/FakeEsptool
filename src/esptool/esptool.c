@@ -55,7 +55,7 @@ static const BYTE sync_response[ESP_SYNC_SEQ_LEN] = {
 
 BYTE Esptool_CalcChecksum(const BYTE *data, int len)
 {
-    BYTE sum = 0xEF;
+    BYTE sum = 0x00;
     for (int i = 0; i < len; i++)
         sum ^= data[i];
     return sum;
@@ -288,6 +288,22 @@ static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "MEM_DATA seq=%lu len=%u", seq, pkt->size);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%u", seq, pkt->size);
+
+    /* Verify checksum: payload starts at offset 16 */
+    if (pkt->size > 16) {
+        const BYTE *payload = &pkt->data[16];
+        int payload_len = pkt->size - 16;
+        BYTE expected = Esptool_CalcChecksum(payload, payload_len);
+        BYTE received = (BYTE)(pkt->value & 0xFF);
+        if (expected != received) {
+            TRACE_PROTO(TAG, "MEM_DATA checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
+            Serial_PostLogF(ctx->hNotify, L"ESP", L"  Checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
+            BYTE status_len = ctx->stub_mode ? 2 : 4;
+            Esptool_SendResponseEx(ctx, ESP_CMD_MEM_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+            return;
+        }
+    }
+
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     BYTE status_len = ctx->stub_mode ? 2 : 4;
     Esptool_SendResponseEx(ctx, ESP_CMD_MEM_DATA, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
@@ -353,6 +369,18 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     if (pkt->size >= 16 + data_len) {
         const BYTE *payload = &pkt->data[16];
+
+        /* Verify checksum */
+        BYTE expected = Esptool_CalcChecksum(payload, (int)data_len);
+        BYTE received = (BYTE)(pkt->value & 0xFF);
+        if (expected != received) {
+            TRACE_PROTO(TAG, "FLASH_DEFL_DATA checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
+            Serial_PostLogF(ctx->hNotify, L"ESP", L"  Checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
+            BYTE status_len = ctx->stub_mode ? 2 : 4;
+            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+            return;
+        }
+
         Flash_Write(&ctx->flash, ctx->flash_offset, payload, data_len);
         ctx->flash_offset += data_len;
         ctx->flash_seq = seq + 1;
@@ -445,21 +473,22 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     BYTE md5[16];
     Flash_CalcMd5(&ctx->flash, addr, len, md5);
 
-    /* ROM mode: 2-byte status + 32-byte ASCII MD5 = 34 bytes
-       Stub mode: 2-byte status + 16-byte ASCII MD5 = 18 bytes */
-    char md5str[35];
-    md5str[0] = 0x00;
-    md5str[1] = 0x00;
-
+    /* ROM mode: 2-byte status + 32-byte ASCII hex MD5 = 34 bytes
+       Stub mode: 2-byte status + 16-byte binary MD5 = 18 bytes */
     if (ctx->stub_mode) {
-        /* Stub mode: return 16-byte ASCII MD5 (first 16 chars of hex) */
-        for (int i = 0; i < 8; i++)
-            sprintf(&md5str[2 + i * 2], "%02x", md5[i]);
-        TRACE_PROTO(TAG, "  MD5 (stub)=%s", &md5str[2]);
-        Serial_PostLogF(ctx->hNotify, L"ESP", L"  MD5 (stub)=%hs", &md5str[2]);
-        Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_MD5, ctx->last_read_val, ESP_OK, (const BYTE *)md5str, 18);
+        /* Stub mode: return 16-byte binary MD5 */
+        BYTE resp[18];
+        resp[0] = 0x00;  /* status byte 1 (success) */
+        resp[1] = 0x00;  /* status byte 2 (success) */
+        memcpy(&resp[2], md5, 16);
+        TRACE_PROTO(TAG, "  MD5 (stub, binary)");
+        Serial_PostLog(ctx->hNotify, L"ESP", L"  MD5 (stub, binary)");
+        Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_MD5, ctx->last_read_val, ESP_OK, resp, 18);
     } else {
-        /* ROM mode: return 32-byte ASCII MD5 */
+        /* ROM mode: return 32-byte ASCII hex MD5 */
+        char md5str[35];
+        md5str[0] = 0x00;
+        md5str[1] = 0x00;
         for (int i = 0; i < 16; i++)
             sprintf(&md5str[2 + i * 2], "%02x", md5[i]);
         TRACE_PROTO(TAG, "  MD5=%s", &md5str[2]);
@@ -479,13 +508,20 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD offset = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
                    ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
 
+    /* ROM mode sends extra 4 bytes for encrypted flag */
+    DWORD encrypted = 0;
+    if (pkt->size >= 20) {
+        encrypted = pkt->data[16] | ((DWORD)pkt->data[17] << 8) |
+                    ((DWORD)pkt->data[18] << 16) | ((DWORD)pkt->data[19] << 24);
+    }
+
     ctx->flash_offset = offset;
     ctx->flash_seq = 0;
 
-    TRACE_PROTO(TAG, "FLASH_BEGIN erase=%lu blocks=%lu bsize=%lu offset=0x%08lX",
-                erase_size, num_blocks, block_size, offset);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  erase=%lu blocks=%lu bsize=%lu offset=0x%08lX",
-                    erase_size, num_blocks, block_size, offset);
+    TRACE_PROTO(TAG, "FLASH_BEGIN erase=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
+                erase_size, num_blocks, block_size, offset, encrypted);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  erase=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
+                    erase_size, num_blocks, block_size, offset, encrypted);
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     BYTE status_len = ctx->stub_mode ? 2 : 4;
@@ -504,6 +540,18 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     if (pkt->size >= 16 + data_len) {
         const BYTE *payload = &pkt->data[16];
+
+        /* Verify checksum */
+        BYTE expected = Esptool_CalcChecksum(payload, (int)data_len);
+        BYTE received = (BYTE)(pkt->value & 0xFF);
+        if (expected != received) {
+            TRACE_PROTO(TAG, "FLASH_DATA checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
+            Serial_PostLogF(ctx->hNotify, L"ESP", L"  Checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
+            BYTE status_len = ctx->stub_mode ? 2 : 4;
+            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+            return;
+        }
+
         Flash_Write(&ctx->flash, ctx->flash_offset, payload, data_len);
         ctx->flash_offset += data_len;
         ctx->flash_seq = seq + 1;
@@ -533,14 +581,14 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Get security info");
 
     /* GET_SECURITY_INFO response format:
-       2-byte status + security_info (chip-dependent)
-       Minimum compatible return: 12 bytes total
+       2-byte status + security_info (12 bytes)
+       Total: 14 bytes
        [0x00, 0x00 (status)] + [0x00,0x00,0x00,0x00 (flags)] + [0x00 (crypt_cnt)] + [0x00 x7 (key_purposes)] */
-    BYTE sec_data[12] = {0};
+    BYTE sec_data[14] = {0};
     sec_data[0] = 0x00;  /* status byte 1 (success) */
     sec_data[1] = 0x00;  /* status byte 2 (success) */
-    /* Remaining 10 bytes: flags(4) + flash_crypt_cnt(1) + key_purposes(7) = all zeros */
-    Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, sec_data, 12);
+    /* Remaining 12 bytes: flags(4) + flash_crypt_cnt(1) + key_purposes(7) = all zeros */
+    Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, sec_data, 14);
 }
 
 BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)

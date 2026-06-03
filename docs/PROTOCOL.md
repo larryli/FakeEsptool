@@ -125,13 +125,15 @@ for (int i = 0; i < data_len; i++)
 
 **注意：** 校验和结果仅 1 字节有效，填入 checksum 字段最低字节，高 3 字节填充 `0x00`。
 
-**Checksum 计算规则（基于真实抓包数据）：**
+**Checksum 计算规则（基于真实抓包数据和 esptool-js 源码）：**
 
 | 命令 | Checksum 值 | 说明 |
 |------|-------------|------|
 | SYNC (0x08) | `0x00000000` | 固定为 0，不计算 |
 | READ_REG (0x0A) | `0x00000000` | 固定为 0，不计算 |
 | WRITE_REG (0x09) | `0x00000000` | 固定为 0，不计算 |
+| SPI_ATTACH (0x0D) | `0x00000000` | 固定为 0，不计算 |
+| CHANGE_BAUDRATE (0x0F) | `0x00000000` | 固定为 0，不计算 |
 | MEM_BEGIN (0x05) | `0x00000000` | 固定为 0，不计算 |
 | MEM_END (0x06) | `0x00000000` | 固定为 0，不计算 |
 | MEM_DATA (0x07) | **计算** | 按异或算法计算 |
@@ -141,6 +143,11 @@ for (int i = 0; i < data_len; i++)
 | FLASH_DEFL_BEGIN (0x10) | `0x00000000` | 固定为 0，不计算 |
 | FLASH_DEFL_DATA (0x11) | **计算** | 按异或算法计算 |
 | FLASH_DEFL_END (0x12) | `0x00000000` | 固定为 0，不计算 |
+| SPI_FLASH_MD5 (0x13) | `0x00000000` | 固定为 0，不计算 |
+| GET_SECURITY_INFO (0x14) | `0x00000000` | 固定为 0，不计算 |
+| ERASE_FLASH (0xD0) | `0x00000000` | 固定为 0，不计算 |
+| ERASE_REGION (0xD1) | `0x00000000` | 固定为 0，不计算 |
+| READ_FLASH (0xD2) | `0x00000000` | 固定为 0，不计算 |
 
 **结论：** 只有 MEM_DATA、FLASH_DATA、FLASH_DEFL_DATA 等包含大量数据传输的命令才计算 Checksum，其他命令的 Checksum 固定为 `0x00000000`。
 
@@ -255,7 +262,7 @@ Data:      0x00 0x00 0x00 0x00 (status=成功)
 Direction: 0x00
 Command:   0x0A
 Size:      0x04 0x00 (4 bytes)
-Checksum:  <XOR of data>
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      addr[3:0] (寄存器地址，小端序)
 ```
 
@@ -288,7 +295,7 @@ Data:      0x00 0x00 (2 字节 status)
 Direction: 0x00
 Command:   0x09
 Size:      0x10 0x00 (16 bytes)
-Checksum:  <XOR of data>
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [addr:4][value:4][mask:4][delay_us:4]
 ```
 
@@ -310,7 +317,7 @@ Data:      0x00 0x00 (2 字节 status=成功)
 Direction: 0x00
 Command:   0x0D
 Size:      0x04 0x00 (4 bytes)
-Checksum:  <XOR of data>
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [hspi_arg:4]
 ```
 
@@ -337,7 +344,7 @@ Data:      0x00 0x00 0x00 0x00 (4 字节 status) 或 0x00 0x00 (2 字节 status)
 Direction: 0x00
 Command:   0x0F
 Size:      0x08 0x00 (8 bytes)
-Checksum:  <XOR of data>
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [new_baud:4][old_baud:4]
 ```
 
@@ -378,7 +385,7 @@ Data:      [old_baud:4][new_baud:4]
 Direction: 0x00
 Command:   0x05
 Size:      0x10 0x00 (16 bytes)
-Checksum:  <XOR of data>
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [total_size:4][blocks:4][block_size:4][offset:4]
 ```
 
@@ -428,7 +435,7 @@ Data:      0x00 0x00 0x00 0x00 (4 字节 status=成功)
 Direction: 0x00
 Command:   0x06
 Size:      0x08 0x00 (8 bytes)
-Checksum:  <XOR of data>
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [execute:4][entry_point:4]
 ```
 
@@ -445,13 +452,24 @@ Data:      0x00 0x00 0x00 0x00 (4 字节 status=成功)
 
 ### 3.10 FLASH_BEGIN (0x02) - Flash 写入开始
 
-**请求：**
+**请求（Stub 模式）：**
 ```
 Direction: 0x00
 Command:   0x02
 Size:      0x10 0x00 (16 bytes)
-Checksum:  <XOR of data>
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [erase_size:4][num_blocks:4][block_size:4][offset:4]
+```
+
+**请求（ROM 模式）：**
+```
+Direction: 0x00
+Command:   0x02
+Size:      0x14 0x00 (20 bytes)
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
+Data:      [erase_size:4][num_blocks:4][block_size:4][offset:4][encrypted:4]
+                                                                  ^^^^^^^^^^^^
+                                                                  额外 4 字节
 ```
 
 **响应（ROM 模式）：**
@@ -516,7 +534,7 @@ Data:      0x00 0x00 (2 字节 status=成功)
 Direction: 0x00
 Command:   0x04
 Size:      0x04 0x00 (4 bytes)
-Checksum:  <XOR of data>
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [reboot:4] (0=不重启, 1=重启)
 ```
 
@@ -615,7 +633,7 @@ Data:      0x00 0x00 (2 字节 status=成功)
 Direction: 0x00
 Command:   0x12
 Size:      0x04 0x00 (4 bytes)
-Checksum:  <XOR of data>
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [reboot:4] (0=不重启, 1=重启)
 ```
 
@@ -698,11 +716,11 @@ for (let i = 0; i < compressedImage.length; i += FLASH_WRITE_SIZE) {
 Direction: 0x00
 Command:   0x13
 Size:      0x10 0x00 (16 bytes)
-Checksum:  <XOR of data>
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [addr:4][len:4][padding:8]
 ```
 
-**响应：**
+**响应（ROM 模式）：**
 ```
 Direction: 0x01
 Command:   0x13
@@ -711,7 +729,18 @@ Val:       <返回请求的 checksum>
 Data:      0x00 0x00 (status=成功) + md5_hex[32] (32字节 ASCII 十六进制 MD5)
 ```
 
-**工程提示：** MD5 返回的 32 字节是 ASCII 十六进制字符串（非二进制 MD5），模拟器需注意转换。
+**响应（Stub 模式）：**
+```
+Direction: 0x01
+Command:   0x13
+Size:      0x12 0x00 (18 bytes)
+Val:       <返回请求的 checksum>
+Data:      0x00 0x00 (status=成功) + md5_raw[16] (16字节二进制 MD5)
+```
+
+**工程提示：** 
+- ROM 模式返回 32 字节 ASCII 十六进制 MD5
+- Stub 模式返回 16 字节二进制 MD5
 
 ---
 
@@ -722,7 +751,7 @@ Data:      0x00 0x00 (status=成功) + md5_hex[32] (32字节 ASCII 十六进制 
 Direction: 0x00
 Command:   0xD0
 Size:      0x00 0x00 (0 bytes)
-Checksum:  0xEF
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      (无)
 ```
 
@@ -735,7 +764,7 @@ Val:       <返回请求的 checksum>
 Data:      0x00 0x00 (status=成功)
 ```
 
-**工程提示：** 当 Size=0 时，Data 为空，Checksum 必须严格为初始值 `0xEF`。
+**工程提示：** 当 Size=0 时，Data 为空，Checksum 固定为 `0x00000000`。
 
 ---
 
@@ -746,7 +775,7 @@ Data:      0x00 0x00 (status=成功)
 Direction: 0x00
 Command:   0xD1
 Size:      0x08 0x00 (8 bytes)
-Checksum:  <XOR of data>
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [offset:4][erase_len:4]
 ```
 
@@ -768,7 +797,7 @@ Data:      0x00 0x00 (status=成功)
 Direction: 0x00
 Command:   0xD2
 Size:      0x10 0x00 (16 bytes)
-Checksum:  <XOR of data>
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [flash_offset:4][read_len:4][block_size:4][packet_size:4]
 ```
 
@@ -800,11 +829,11 @@ Data:      0x00 0x00 (status=成功) + flash_data[read_len]
 Direction: 0x00
 Command:   0x14
 Size:      0x00 0x00 (0 bytes)
-Checksum:  0xEF
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      (无)
 ```
 
-**响应：**
+**响应（ROM 模式）：**
 ```
 Direction: 0x01
 Command:   0x14
@@ -825,13 +854,15 @@ ESP32-C3/S3 等（20 字节）：
 [flags:4][flash_crypt_cnt:1][key_purposes:7][chip_id:4][api_version:4]
 ```
 
-**最小兼容返回示例（12 字节）：**
+**最小兼容返回示例：**
 ```
-Size: 0x0C 0x00
+Size: 0x0E 0x00 (14 bytes)
 Data: 00 00 (status) + 00 00 00 00 (flags) + 00 (crypt_cnt) + 00 00 00 00 00 00 00 (key_purposes)
 ```
 
-**工程提示：** 若仅需通过 esptool 基础检测，可固定返回上述 12 字节，避免客户端因长度不足抛出 `struct.error`。
+**说明：** security_info 为 12 字节，加上 2 字节 status，总共 14 字节。
+
+**工程提示：** 若仅需通过 esptool 基础检测，可固定返回上述 14 字节，避免客户端因长度不足抛出 `struct.error`。
 
 ---
 
@@ -988,7 +1019,7 @@ Stub 上传后可获得更高效的 Flash 操作和额外功能。
 
 **注意：**
 - ROM 模式返回 32 字节 ASCII 十六进制 MD5
-- Stub 模式返回 16 字节 ASCII 十六进制 MD5
+- Stub 模式返回 16 字节二进制 MD5
 
 ### 4.8 重置与重启
 
@@ -1895,7 +1926,7 @@ Data: [erase_size:4][num_blocks:4][block_size:4][offset:4]
 
 #### J.2.2 flashDeflBegin (0x10)
 
-**ROM 模式**（ESP32-S2/S3/C3/C2/C6）：
+**ROM 模式**（ESP32-S2/S3/C3/C2）：
 ```
 Data: [uncompressed_size:4][num_blocks:4][block_size:4][offset:4][encrypted:4]
                                                                   ^^^^^^^^^^^^
@@ -1910,7 +1941,7 @@ Data: [uncompressed_size:4][num_blocks:4][block_size:4][offset:4]
 #### J.2.3 SPI_FLASH_MD5 (0x13)
 
 **ROM 模式**：返回 32 字节 ASCII 十六进制 MD5
-**Stub 模式**：返回 16 字节 ASCII 十六进制 MD5
+**Stub 模式**：返回 16 字节二进制 MD5
 
 #### J.2.4 CHANGE_BAUDRATE (0x0F)
 
