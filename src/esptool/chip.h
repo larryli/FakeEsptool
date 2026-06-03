@@ -24,6 +24,30 @@
 #define FLASH_FREQ_20M  2
 #define FLASH_FREQ_80M  3
 
+/* SPI register count (enough for SPI_CMD through SPI_W15) */
+#define SPI_REG_COUNT   64
+
+/* SPI register offsets (common layout for ESP32-S2/S3, C2/C3/C6) */
+#define SPI_CMD_OFFS        0x00
+#define SPI_ADDR_OFFS       0x04
+#define SPI_USR_OFFS        0x18
+#define SPI_USR1_OFFS       0x1C
+#define SPI_USR2_OFFS       0x20
+#define SPI_MOSI_DLEN_OFFS  0x24
+#define SPI_MISO_DLEN_OFFS  0x28
+#define SPI_W0_OFFS         0x58
+
+/* SPI register bit definitions */
+#define SPI_CMD_USR         (1 << 18)
+#define SPI_USR_COMMAND     (1 << 31)
+#define SPI_USR_ADDR        (1 << 30)
+#define SPI_USR_DUMMY       (1 << 29)
+#define SPI_USR_MISO        (1 << 28)
+#define SPI_USR_MOSI        (1 << 27)
+
+/* SPI flash commands */
+#define SPIFLASH_RDID       0x9F    /* Read JEDEC ID */
+
 /* Supported chip types */
 typedef enum {
     CHIP_ESP8266,   /* ESP8266 WiFi chip */
@@ -58,6 +82,9 @@ typedef struct {
     DWORD chip_id;              /* Chip ID register value */
     DWORD pkg_version;          /* Package version */
     BOOL has_usb;               /* USB support flag */
+
+    DWORD spi_reg_base;         /* SPI register base address */
+    DWORD spi_regs[SPI_REG_COUNT]; /* SPI register file */
 } CHIP_CTX;
 
 /* Initialize chip context with type-specific defaults */

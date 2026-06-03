@@ -231,6 +231,14 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
     ctx->mac[4] = 0xEE;
     ctx->mac[5] = 0x01;
 
+    /* Set SPI register base address by chip type */
+    switch (type) {
+    case CHIP_ESP8266: ctx->spi_reg_base = 0x60000200; break;
+    case CHIP_ESP32:   ctx->spi_reg_base = 0x3FF42000; break;
+    case CHIP_ESP32S2: ctx->spi_reg_base = 0x3F402000; break;
+    default:           ctx->spi_reg_base = 0x60002000; break; /* S3, C2, C3, C6 */
+    }
+
     switch (type) {
     case CHIP_ESP8266: InitEsp8266(ctx); break;
     case CHIP_ESP32:   InitEsp32(ctx);   break;
@@ -244,8 +252,11 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
         return FALSE;
     }
 
-    TRACE_FW(TAG, "Chip: %s, eFuse: %d bytes, Flash: %lu KB", 
-             ctx->name, ctx->efuse_size, ctx->flash_size / 1024);
+    /* Initialize SPI register defaults */
+    ctx->spi_regs[SPI_CMD_OFFS / 4] = 0;
+
+    TRACE_FW(TAG, "Chip: %s, eFuse: %d bytes, Flash: %lu KB, SPI_BASE: 0x%08lX", 
+             ctx->name, ctx->efuse_size, ctx->flash_size / 1024, ctx->spi_reg_base);
     return TRUE;
 }
 
@@ -433,6 +444,17 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
         return (2 * xtal) / 115200;
     }
 
+    /* SPI register read */
+    if (ctx->spi_reg_base != 0 &&
+        addr >= ctx->spi_reg_base &&
+        addr < ctx->spi_reg_base + SPI_REG_COUNT * 4) {
+        int offset = (int)(addr - ctx->spi_reg_base);
+        int idx = offset / 4;
+        if (idx >= 0 && idx < SPI_REG_COUNT) {
+            return ctx->spi_regs[idx];
+        }
+    }
+
     return 0;
 }
 
@@ -448,7 +470,36 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
             ctx->efuse[offset + 3] |= (BYTE)((val >> 24) & 0xFF);
             TRACE_FW(TAG, "eFuse write: offset=0x%X val=0x%08lX", offset, val);
         }
+        return TRUE;
     }
+
+    /* SPI register write */
+    if (ctx->spi_reg_base != 0 &&
+        addr >= ctx->spi_reg_base &&
+        addr < ctx->spi_reg_base + SPI_REG_COUNT * 4) {
+        int offset = (int)(addr - ctx->spi_reg_base);
+        int idx = offset / 4;
+        if (idx >= 0 && idx < SPI_REG_COUNT) {
+            ctx->spi_regs[idx] = val;
+
+            /* Simulate SPI command execution when SPI_CMD_USR bit is set */
+            if (offset == SPI_CMD_OFFS && (val & SPI_CMD_USR)) {
+                DWORD usr2 = ctx->spi_regs[SPI_USR2_OFFS / 4];
+                DWORD cmd = usr2 & 0xFFFF;
+
+                /* Flash ID read command (0x9F) */
+                if (cmd == SPIFLASH_RDID) {
+                    ctx->spi_regs[SPI_W0_OFFS / 4] = ctx->flash_id;
+                    TRACE_FW(TAG, "SPI RDID: flash_id=0x%08lX", ctx->flash_id);
+                }
+
+                /* Clear SPI_CMD_USR bit to indicate command complete */
+                ctx->spi_regs[SPI_CMD_OFFS / 4] &= ~SPI_CMD_USR;
+            }
+        }
+        return TRUE;
+    }
+
     return TRUE;
 }
 
