@@ -15,8 +15,8 @@
 #define SLIP_ESC_END    0xDC    /* Escaped 0xC0 */
 #define SLIP_ESC_ESC    0xDD    /* Escaped 0xDB */
 
-/* Maximum SLIP frame size */
-#define SLIP_MAX_FRAME  4096
+/* Maximum SLIP frame size (must accommodate largest packet: block_size + 16 + 8 header) */
+#define SLIP_MAX_FRAME  32768
 
 /* SLIP decoder context */
 typedef struct {

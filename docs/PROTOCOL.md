@@ -102,6 +102,7 @@ SLIP 协议本身不提供校验机制，校验由上层协议（数据包结构
   - SYNC (0x08)：返回同步序列头 `07 07 12 20`（小端序 `0x20120707`）
   - READ_REG (0x0A)：返回寄存器值
   - 其他命令：返回请求的 checksum / value
+- **真实设备行为**：真实设备在非 SYNC/READ_REG 命令的响应中，Val 字段返回最后一次 READ_REG 读取的寄存器值（而非请求的 checksum）。esptool 客户端对此字段不做校验。
 
 ### 2.3 字段说明
 
@@ -111,7 +112,7 @@ SLIP 协议本身不提供校验机制，校验由上层协议（数据包结构
 | Command | 命令码 |
 | Size | Data 字段的字节数（小端序） |
 | Checksum | 请求包的校验和（仅请求包有） |
-| Val | 响应包的值字段（返回请求的 checksum） |
+| Val | 响应包的值字段。SYNC 返回同步序列，READ_REG 返回寄存器值，其他命令真实设备返回上次 READ_REG 的值（客户端不校验） |
 | Data | 变长数据载荷 |
 
 ### 2.4 校验和计算
@@ -928,13 +929,15 @@ Stub 上传后可获得更高效的 Flash 操作和额外功能。
 
 **步骤 3：执行 Stub**
 ```
-烧录器 → 设备: MEM_END (0x06) [isEntry=1, entry_point]
+烧录器 → 设备: MEM_END (0x06) [isEntry=0 或 1, entry_point]
 设备 → 烧录器: MEM_END Response
 
 设备 → 烧录器: C0 4F 48 41 49 C0 ("OHAI" 作为 SLIP 帧发送，内容为裸 ASCII)
 ```
 
-**注意：** OHAI 作为 SLIP 帧发送（`C0` 包裹），但帧内容是裸 ASCII 字符，不是标准协议包格式。
+**注意：**
+- OHAI 作为 SLIP 帧发送（`C0` 包裹），但帧内容是裸 ASCII 字符，不是标准协议包格式。
+- **真实设备行为**：无论 MEM_END 请求的 isEntry/execute 字段值如何，设备都会发送 OHAI。esptool-js 在 `memFinish()` 后用 `transport.read()` 读取原始 SLIP 帧并检查是否为 "OHAI"。
 
 ### 4.5 修改波特率（可选）
 

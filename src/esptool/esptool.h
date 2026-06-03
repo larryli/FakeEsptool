@@ -41,6 +41,8 @@
 #define ESP_CMD_WRITE_REG       0x09
 #define ESP_CMD_READ_REG        0x0A
 
+/* 0x0D: SPI_ATTACH - Not implemented (deprecated, replaced by SPI_ATTACH_CMD) */
+
 /* Baud rate change */
 #define ESP_CMD_CHANGE_BAUDRATE 0x0F
 
@@ -89,6 +91,7 @@ typedef struct {
     ESP_BAUDRATE_CB onBaudRate; /* Baud rate change callback */
     DWORD     flash_offset;   /* Current flash write offset */
     DWORD     flash_seq;      /* Current flash write sequence */
+    DWORD     last_read_val;  /* Cached value from last READ_REG */
 } ESPTOOL_CTX;
 
 /* ESP protocol packet */
@@ -97,7 +100,7 @@ typedef struct {
     BYTE  command;            /* Command code */
     WORD  size;               /* Data payload size */
     DWORD value;              /* Command-specific value */
-    BYTE  data[2048];         /* Data payload */
+    BYTE  data[32760];        /* Data payload (matches SLIP_MAX_FRAME - 8 header bytes) */
 } ESP_PACKET;
 
 /* Initialize ESP protocol context */
@@ -127,8 +130,11 @@ BOOL Esptool_Feed(ESPTOOL_CTX *ctx, const BYTE *data, int len);
 /* Process a complete SLIP frame */
 BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len);
 
-/* Send response packet with 4-byte status in data */
+/* Send response packet with status in data */
 void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD status, const BYTE *data, WORD data_len);
+
+/* Send response with configurable status length (2 or 4 bytes) */
+void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD status, BYTE status_len, const BYTE *data, WORD data_len);
 
 /* Calculate XOR checksum */
 BYTE Esptool_CalcChecksum(const BYTE *data, int len);

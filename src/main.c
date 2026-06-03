@@ -1318,6 +1318,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
     case WM_CREATE:
         {
             g_hWnd = hWnd;
+            Esptool_SetNotify(&g_esptool, g_hWnd);
             HINSTANCE hInst = ((CREATESTRUCT *)lParam)->hInstance;
 
             /* Create toolbar */
