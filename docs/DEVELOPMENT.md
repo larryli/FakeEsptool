@@ -111,8 +111,6 @@ cmake --build build
 | CHIP_ESP32C2 | ESP32-C2 |
 | CHIP_ESP32C3 | ESP32-C3 |
 | CHIP_ESP32C6 | ESP32-C6 |
-| CHIP_ESP32C61 | ESP32-C61 |
-| CHIP_ESP32H2 | ESP32-H2 |
 
 ## 使用示例
 

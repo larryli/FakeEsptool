@@ -396,8 +396,6 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
             SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C2");
             SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C3");
             SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C6");
-            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C61");
-            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-H2");
             SendMessageW(hChip, CB_SETCURSEL, 0, 0);
 
             HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
@@ -556,8 +554,6 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
             SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C2");
             SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C3");
             SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C6");
-            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C61");
-            SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-H2");
             SendMessageW(hChip, CB_SETCURSEL, (WPARAM)selectedChip, 0);
 
             HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
