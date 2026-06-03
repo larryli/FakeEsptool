@@ -30,7 +30,7 @@ static void InitEsp8266(CHIP_CTX *ctx)
     strcpy(ctx->name, "ESP8266");
     ctx->chip_id = 0xFFF0C101;
     ctx->pkg_version = 0;
-    ctx->efuse_size = 32;
+    ctx->efuse_size = 96;
     ctx->sector_size = 4096;
     ctx->block_size = 65536;
     ctx->page_size = 256;
@@ -38,11 +38,16 @@ static void InitEsp8266(CHIP_CTX *ctx)
     ctx->flash_id = 0x1640EF;
 
     ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
-    
-    ctx->efuse[0] = 0x01;
-    ctx->efuse[1] = 0xC1;
-    ctx->efuse[2] = 0xF0;
-    ctx->efuse[3] = 0xFF;
+
+    /* readEfuse(0)=0x3FF00050: mac[5],mac[4],mac[3],0x00 */
+    ctx->efuse[0x50] = ctx->mac[5];
+    ctx->efuse[0x51] = ctx->mac[4];
+    ctx->efuse[0x52] = ctx->mac[3];
+    /* readEfuse(1)=0x3FF00054: 0x00,mac[2],mac[1],mac[0] */
+    ctx->efuse[0x55] = ctx->mac[2];
+    ctx->efuse[0x56] = ctx->mac[1];
+    ctx->efuse[0x57] = ctx->mac[0];
+    /* readEfuse(3)=0x3FF0005C: 0 (use default OUI) */
 }
 
 static void InitEsp32(CHIP_CTX *ctx)
@@ -58,18 +63,21 @@ static void InitEsp32(CHIP_CTX *ctx)
     ctx->flash_id = 0x1640EF;
 
     ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
-    
+
+    /* chip_id at EFUSE_RD_REG_BASE(0x3FF5A000) + 0x000 */
     ctx->efuse[0] = 0x83;
     ctx->efuse[1] = 0x1D;
     ctx->efuse[2] = 0xF0;
     ctx->efuse[3] = 0x00;
 
-    ctx->efuse[16] = ctx->mac[5];
-    ctx->efuse[17] = ctx->mac[4];
-    ctx->efuse[18] = ctx->mac[3];
-    ctx->efuse[19] = ctx->mac[2];
-    ctx->efuse[20] = ctx->mac[1];
-    ctx->efuse[21] = ctx->mac[0];
+    /* MAC at EFUSE_RD_REG_BASE + 4 (word1): mac[5],mac[4],mac[3],mac[2] */
+    ctx->efuse[4] = ctx->mac[5];
+    ctx->efuse[5] = ctx->mac[4];
+    ctx->efuse[6] = ctx->mac[3];
+    ctx->efuse[7] = ctx->mac[2];
+    /* MAC at EFUSE_RD_REG_BASE + 8 (word2): 0x00,0x00,mac[1],mac[0] */
+    ctx->efuse[10] = ctx->mac[1];
+    ctx->efuse[11] = ctx->mac[0];
 
     WriteChipIdToEfuse(ctx);
 }
@@ -264,16 +272,24 @@ BOOL Chip_SetMac(CHIP_CTX *ctx, const BYTE mac[6])
     /* Update MAC in eFuse at the correct offset for each chip type */
     switch (ctx->type) {
     case CHIP_ESP8266:
-        /* No MAC in eFuse for ESP8266 */
+        /* readEfuse(0)=0x3FF00050: mac[5],mac[4],mac[3],0x00 */
+        ctx->efuse[0x50] = mac[5];
+        ctx->efuse[0x51] = mac[4];
+        ctx->efuse[0x52] = mac[3];
+        /* readEfuse(1)=0x3FF00054: 0x00,mac[2],mac[1],mac[0] */
+        ctx->efuse[0x55] = mac[2];
+        ctx->efuse[0x56] = mac[1];
+        ctx->efuse[0x57] = mac[0];
         break;
     case CHIP_ESP32:
-        /* MAC at eFuse offset 16-21 */
-        ctx->efuse[16] = mac[5];
-        ctx->efuse[17] = mac[4];
-        ctx->efuse[18] = mac[3];
-        ctx->efuse[19] = mac[2];
-        ctx->efuse[20] = mac[1];
-        ctx->efuse[21] = mac[0];
+        /* readEfuse(1)=0x3FF5A004: mac[5],mac[4],mac[3],mac[2] */
+        ctx->efuse[4] = mac[5];
+        ctx->efuse[5] = mac[4];
+        ctx->efuse[6] = mac[3];
+        ctx->efuse[7] = mac[2];
+        /* readEfuse(2)=0x3FF5A008: 0x00,0x00,mac[1],mac[0] */
+        ctx->efuse[10] = mac[1];
+        ctx->efuse[11] = mac[0];
         break;
     case CHIP_ESP32S2:
         /* MAC at EFUSE_BASE(0x3F41A000) + 0x044 */
