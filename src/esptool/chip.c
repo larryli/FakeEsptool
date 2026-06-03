@@ -431,8 +431,9 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
         return ctx->chip_id;
 
     /* UART clock divider register - used for crystal frequency detection.
-       Divisor = APB_CLK / baud_rate, where APB_CLK = 2 * crystal_freq.
-       flash_freq: 0=40M, 1=26M, 2=20M, 3=80M */
+       esptool-js calculates: etsXtal = (baudrate * uartDiv) / 1000000 / XTAL_CLK_DIVIDER
+       For ESP8266: XTAL_CLK_DIVIDER=2, so uartDiv = APB_CLK / baudrate = (2*xtal) / baudrate
+       For other chips: XTAL_CLK_DIVIDER=1, so uartDiv = xtal / baudrate */
     if (addr == 0x60000014 || addr == 0x3FF40014) {
         DWORD xtal;
         switch (ctx->flash_freq) {
@@ -441,7 +442,10 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
         case 3:  xtal = 80000000; break;
         default: xtal = 40000000; break;
         }
-        return (2 * xtal) / 115200;
+        if (ctx->type == CHIP_ESP8266)
+            return (2 * xtal) / 115200;
+        else
+            return xtal / 115200;
     }
 
     /* SPI register read */
