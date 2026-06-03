@@ -192,7 +192,7 @@ FILESUBTYPE VFT2_UNKNOWN
     {
       VALUE "FileDescription", "ESP Chip Device Simulator\0"
       VALUE "FileVersion", "1.0.0.0\0"
-      VALUE "LegalCopyright", "Copyright (c) 2026 Larry Li\0"
+      VALUE "LegalCopyright", "Copyright (c) 2025 - 2026 Larry Li\0"
       VALUE "ProductName", "FakeEsptool\0"
       VALUE "ProductVersion", "1.0.0.0\0"
     }

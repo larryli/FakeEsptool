@@ -163,6 +163,8 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 | `Chip_GetChipId(ctx)` | 获取芯片ID |
 | `Chip_GetEfuse(ctx)` | 获取efuse数据 |
 | `Chip_GetEfuseSize(ctx)` | 获取efuse大小 |
+| `Chip_GetBootBaudRate(ctx)` | 获取启动日志波特率 |
+| `Chip_GetBootMessage(ctx, reset_cause)` | 获取启动日志文本 |
 
 ### flash.h
 

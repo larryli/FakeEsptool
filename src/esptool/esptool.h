@@ -41,7 +41,8 @@
 #define ESP_CMD_WRITE_REG       0x09
 #define ESP_CMD_READ_REG        0x0A
 
-/* 0x0D: SPI_ATTACH - Not implemented (deprecated, replaced by SPI_ATTACH_CMD) */
+/* SPI flash attach */
+#define ESP_CMD_SPI_ATTACH      0x0D
 
 /* Baud rate change */
 #define ESP_CMD_CHANGE_BAUDRATE 0x0F
@@ -61,6 +62,7 @@
 #define ESP_CMD_ERASE_FLASH     0xD0
 #define ESP_CMD_ERASE_REGION    0xD1
 #define ESP_CMD_READ_FLASH      0xD2
+#define ESP_CMD_RUN_USER_CODE   0xD3
 
 /* SYNC sequence length */
 #define ESP_SYNC_SEQ_LEN    36

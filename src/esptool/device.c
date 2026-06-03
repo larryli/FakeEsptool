@@ -77,6 +77,7 @@ BOOL Device_Save(DEVICE_CTX *ctx, const WCHAR *filename)
 
     if (!ok) {
         TRACE_FW(TAG, "Device save failed: write error");
+        DeleteFileW(filename);
         return FALSE;
     }
 
@@ -122,7 +123,17 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     }
 
     ReadFile(hFile, mac, 6, &read, NULL);
+    if (read != 6) {
+        CloseHandle(hFile);
+        TRACE_FW(TAG, "Failed to read MAC");
+        return FALSE;
+    }
     ReadFile(hFile, &efuseSize, 4, &read, NULL);
+    if (read != 4) {
+        CloseHandle(hFile);
+        TRACE_FW(TAG, "Failed to read efuse size");
+        return FALSE;
+    }
 
     Device_Close(ctx);
 
@@ -134,15 +145,28 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
 
     if (efuseSize > 0 && efuseSize <= (DWORD)ctx->chip.efuse_size) {
         ReadFile(hFile, ctx->chip.efuse, efuseSize, &read, NULL);
+        if (read != efuseSize) {
+            CloseHandle(hFile);
+            TRACE_FW(TAG, "Failed to read efuse data");
+            Chip_Close(&ctx->chip);
+            return FALSE;
+        }
     }
 
     ReadFile(hFile, &flashSize, 4, &read, NULL);
+    if (read != 4) {
+        CloseHandle(hFile);
+        TRACE_FW(TAG, "Failed to read flash size");
+        Chip_Close(&ctx->chip);
+        return FALSE;
+    }
 
     /* Read xtal_freq (version 2+) */
     if (version >= 2) {
         BYTE xtalFreq;
         ReadFile(hFile, &xtalFreq, 1, &read, NULL);
-        ctx->chip.xtal_freq = xtalFreq;
+        if (read == 1)
+            ctx->chip.xtal_freq = xtalFreq;
     }
 
     if (!Flash_Init(&ctx->flash, flashSize)) {
@@ -153,6 +177,9 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
 
     if (flashSize > 0) {
         ReadFile(hFile, ctx->flash.data, flashSize, &read, NULL);
+        if (read != flashSize) {
+            TRACE_FW(TAG, "Failed to read flash data (expected %lu, got %lu)", flashSize, read);
+        }
     }
 
     CloseHandle(hFile);

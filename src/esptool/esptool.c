@@ -31,7 +31,7 @@ static const ESP_CMD_INFO commandTable[256] = {
     [0x08] = {"SYNC", "Sync handshake"},
     [0x09] = {"WRITE_REG", "Write register"},
     [0x0A] = {"READ_REG", "Read register"},
-    /* 0x0D: SPI_ATTACH - Not implemented (deprecated, replaced by SPI_ATTACH_CMD) */
+    [0x0D] = {"SPI_ATTACH", "Attach SPI flash"},
     [0x0F] = {"CHANGE_BAUDRATE", "Change baud rate"},
     [0x10] = {"FLASH_DEFL_BEGIN", "Begin compressed flash download"},
     [0x11] = {"FLASH_DEFL_DATA", "Compressed flash download data"},
@@ -41,6 +41,7 @@ static const ESP_CMD_INFO commandTable[256] = {
     [0xD0] = {"ERASE_FLASH", "Erase entire flash"},
     [0xD1] = {"ERASE_REGION", "Erase flash region"},
     [0xD2] = {"READ_FLASH", "Read flash"},
+    [0xD3] = {"RUN_USER_CODE", "Run user code (soft reset)"},
 };
 
 #define ESP_RESP_BUF_SIZE  8192
@@ -55,7 +56,7 @@ static const BYTE sync_response[ESP_SYNC_SEQ_LEN] = {
 
 BYTE Esptool_CalcChecksum(const BYTE *data, int len)
 {
-    BYTE sum = 0x00;
+    BYTE sum = 0xEF;
     for (int i = 0; i < len; i++)
         sum ^= data[i];
     return sum;
@@ -591,6 +592,29 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, sec_data, 14);
 }
 
+static void HandleSpiAttach(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+{
+    TRACE_PROTO(TAG, "SPI_ATTACH");
+    Serial_PostLog(ctx->hNotify, L"ESP", L"  Attach SPI flash");
+
+    /* SPI_ATTACH: ROM mode 4-byte status, stub mode 2-byte status */
+    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    Esptool_SendResponseEx(ctx, ESP_CMD_SPI_ATTACH, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
+}
+
+static void HandleRunUserCode(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+{
+    TRACE_PROTO(TAG, "RUN_USER_CODE");
+    Serial_PostLog(ctx->hNotify, L"ESP", L"  Run user code (soft reset)");
+
+    /* RUN_USER_CODE: stub-only, fire-and-forget (client does not wait for response) */
+    Esptool_SendResponseEx(ctx, ESP_CMD_RUN_USER_CODE, ctx->last_read_val, ESP_OK, 2, NULL, 2);
+
+    /* Reset protocol state for next connection */
+    ctx->synced = FALSE;
+    ctx->stub_mode = FALSE;
+}
+
 BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
 {
     static ESP_PACKET pkt;
@@ -623,6 +647,7 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
     case ESP_CMD_SYNC:              HandleSync(ctx, &pkt); break;
     case ESP_CMD_READ_REG:          HandleReadReg(ctx, &pkt); break;
     case ESP_CMD_WRITE_REG:         HandleWriteReg(ctx, &pkt); break;
+    case ESP_CMD_SPI_ATTACH:        HandleSpiAttach(ctx, &pkt); break;
     case ESP_CMD_CHANGE_BAUDRATE:   HandleChangeBaudrate(ctx, &pkt); break;
     case ESP_CMD_FLASH_BEGIN:       HandleFlashBegin(ctx, &pkt); break;
     case ESP_CMD_FLASH_DATA:        HandleFlashData(ctx, &pkt); break;
@@ -638,6 +663,7 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
     case ESP_CMD_ERASE_REGION:      HandleEraseBlock(ctx, &pkt); break;
     case ESP_CMD_READ_FLASH:        HandleReadFlash(ctx, &pkt); break;
     case ESP_CMD_GET_SECURITY_INFO: HandleGetSecurityInfo(ctx, &pkt); break;
+    case ESP_CMD_RUN_USER_CODE:     HandleRunUserCode(ctx, &pkt); break;
     default:
         TRACE_FW(TAG, "Unknown cmd: 0x%02X", pkt.command);
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  Unknown command: 0x%02X", pkt.command);

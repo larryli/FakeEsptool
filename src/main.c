@@ -160,11 +160,10 @@ static void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, H
     Esptool_Feed(&g_esptool, data, (int)len);
 }
 
-/* esptool protocol signal change callback */
+/* esptool protocol signal change callback
+   Note: Called only from the serial listener thread (single-threaded access) */
 static void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
 {
-    (void)ctx;
-
     static BOOL prev_dsr = FALSE;
     static BOOL prev_cts = FALSE;
     static BOOL reset_pending = FALSE;
@@ -565,8 +564,11 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
 
                 WCHAR macStr[32];
                 GetDlgItemTextW(hDlg, IDC_MAC_EDIT, macStr, 32);
-                swscanf(macStr, L"%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
-                        &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
+                unsigned int tmp[6] = {0};
+                swscanf(macStr, L"%x:%x:%x:%x:%x:%x",
+                        &tmp[0], &tmp[1], &tmp[2], &tmp[3], &tmp[4], &tmp[5]);
+                for (int j = 0; j < 6; j++)
+                    mac[j] = (BYTE)tmp[j];
 
                 HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
                 BYTE xtalFreq = (BYTE)SendMessageW(hXtal, CB_GETCURSEL, 0, 0);
@@ -1125,7 +1127,11 @@ static void Main_OnFlashImport(HWND hMainWnd)
     }
 
     DWORD bytesRead;
-    ReadFile(hFile, g_device.flash.data, fileSize, &bytesRead, NULL);
+    if (!ReadFile(hFile, g_device.flash.data, fileSize, &bytesRead, NULL) || bytesRead != fileSize) {
+        CloseHandle(hFile);
+        MessageBoxW(hMainWnd, L"Failed to read file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
     CloseHandle(hFile);
 
     Device_SetModified(&g_device, TRUE);
@@ -1318,8 +1324,7 @@ static INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM 
                         /* Copyright */
                         swprintf(szBuf, MAX_PATH, L"\\StringFileInfo\\%04X%04X\\%ls", *pLang, *(pLang + 1), L"LegalCopyright");
                         if (VerQueryValue(pInfo, szBuf, &ptr, &size)) {
-                            swprintf(szBuf, MAX_PATH, L"Copyright %ls", (LPTSTR)ptr);
-                            SetDlgItemText(hDlg, IDD_COPYRIGHT, szBuf);
+                            SetDlgItemText(hDlg, IDD_COPYRIGHT, (LPTSTR)ptr);
                         }
                     }
                 }
