@@ -75,9 +75,9 @@ static void InitEsp32(CHIP_CTX *ctx)
     ctx->efuse[5] = ctx->mac[4];
     ctx->efuse[6] = ctx->mac[3];
     ctx->efuse[7] = ctx->mac[2];
-    /* MAC at EFUSE_RD_REG_BASE + 8 (word2): 0x00,0x00,mac[1],mac[0] */
-    ctx->efuse[10] = ctx->mac[1];
-    ctx->efuse[11] = ctx->mac[0];
+    /* MAC at EFUSE_RD_REG_BASE + 8 (word2): mac[1],mac[0],0x00,0x00 */
+    ctx->efuse[8] = ctx->mac[1];
+    ctx->efuse[9] = ctx->mac[0];
 
     WriteChipIdToEfuse(ctx);
 }
@@ -298,9 +298,9 @@ BOOL Chip_SetMac(CHIP_CTX *ctx, const BYTE mac[6])
         ctx->efuse[5] = mac[4];
         ctx->efuse[6] = mac[3];
         ctx->efuse[7] = mac[2];
-        /* readEfuse(2)=0x3FF5A008: 0x00,0x00,mac[1],mac[0] */
-        ctx->efuse[10] = mac[1];
-        ctx->efuse[11] = mac[0];
+        /* readEfuse(2)=0x3FF5A008: mac[1],mac[0],0x00,0x00 */
+        ctx->efuse[8] = mac[1];
+        ctx->efuse[9] = mac[0];
         break;
     case CHIP_ESP32S2:
         /* MAC at EFUSE_BASE(0x3F41A000) + 0x044 */

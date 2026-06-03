@@ -1225,6 +1225,16 @@ MAC[4] = (mac0 >> 8) & 0xFF   // NIC byte 1
 MAC[5] = mac0 & 0xFF          // NIC byte 2
 ```
 
+**eFuse 字节存储（小端序）：**
+```
+EFUSE_RD_REG_BASE + 4 (word1): [offset+0=byte5][offset+1=byte4][offset+2=byte3][offset+3=byte2]
+EFUSE_RD_REG_BASE + 8 (word2): [offset+0=byte1][offset+1=byte0][offset+2=0x00][offset+3=0x00]
+```
+
+**设备端模拟要点：**
+- word1 的 mac[5] 存储在 eFuse 偏移 4，mac[2] 存储在偏移 7
+- word2 的 mac[1] 存储在 eFuse 偏移 8，mac[0] 存储在偏移 9
+
 **代码示例：**
 ```typescript
 // 读取 ESP32 MAC
@@ -1559,6 +1569,28 @@ SPI_USR2 寄存器位：
   bits[15:0]:  SPI_USR2_COMMAND_VALUE - 命令值
 ```
 
+### E.4 SPI Flash 命令执行流程
+
+Stub 通过 SPI 寄存器与 Flash 芯片通信。以读取 Flash ID（JEDEC RDID 0x9F）为例：
+
+| 步骤 | 操作 | 寄存器 | 值 | 说明 |
+|------|------|--------|-----|------|
+| 1 | READ_REG | SPI_USR_REG | (保存) | 保存当前 SPI_USR |
+| 2 | READ_REG | SPI_USR2_REG | (保存) | 保存当前 SPI_USR2 |
+| 3 | WRITE_REG | SPI_MISO_DLEN_REG | `0x17` | MISO 长度 = 24-1 |
+| 4 | WRITE_REG | SPI_USR_REG | `0x90000000` | CMD + MISO 启用 |
+| 5 | WRITE_REG | SPI_USR2_REG | `0x7000009F` | CMD_LEN=7, CMD=0x9F |
+| 6 | WRITE_REG | SPI_W0_REG | `0x00000000` | 清空数据寄存器 |
+| 7 | WRITE_REG | SPI_CMD_REG | `0x00040000` | 触发 USR 命令 (bit18) |
+| 8 | READ_REG | SPI_CMD_REG | `0x00000000` | 轮询 bit18 清零表示完成 |
+| 9 | READ_REG | SPI_W0_REG | Flash ID | 读取结果 |
+
+**设备端模拟要点：**
+- 拦截 `SPI_CMD_REG` 写入，检测 `SPI_CMD_USR` (bit18) 位
+- 解析 `SPI_USR2_REG` 获取 SPI 命令码
+- 若命令为 `0x9F`（RDID），将配置的 `flash_id` 写入 `SPI_W0_REG`
+- 清除 `SPI_CMD_USR` 位表示命令完成
+
 ---
 
 ## 附录 F：UART 寄存器
@@ -1574,6 +1606,34 @@ SPI_USR2 寄存器位：
 | ESP32-C3 | `0x3FF40014` | `0xFFFFF` |
 | ESP32-C6 | `0x3FF40014` | `0xFFFFF` |
 | ESP8266 | `0x60000014` | `0xFFFFF` |
+
+**晶振频率检测：**
+
+esptool 通过读取 `UART_CLKDIV_REG` 反推晶振频率。ROM Bootloader 根据晶振频率计算 UART 分频值并写入该寄存器。
+
+**计算公式：**
+```
+uartDiv = readReg(UART_CLKDIV_REG) & UART_CLKDIV_MASK
+etsXtal = (baudrate * uartDiv) / 1000000 / XTAL_CLK_DIVIDER
+```
+
+**XTAL_CLK_DIVIDER 值：**
+
+| 芯片 | XTAL_CLK_DIVIDER | uartDiv 计算 |
+|------|------------------|--------------|
+| ESP32 | 1 | `xtal / baudrate` |
+| ESP32-C2 | 1 | `xtal / baudrate` |
+| ESP8266 | 2 | `(2 * xtal) / baudrate` |
+
+**示例（ESP32-C2, 40MHz 晶振, 115200 波特率）：**
+```
+uartDiv = 40000000 / 115200 = 347
+etsXtal = (115200 * 347) / 1000000 / 1 = 39.97 MHz ≈ 40 MHz
+```
+
+**设备端模拟要点：**
+- ESP8266：返回 `(2 * xtal) / baudrate`
+- 其他芯片：返回 `xtal / baudrate`
 
 ### F.2 UART 日期寄存器
 
