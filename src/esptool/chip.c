@@ -14,6 +14,36 @@
 static const char *TAG = "CHIP";
 #endif
 
+/* SPI register offsets for ESP32-S2/S3, ESP32-C2/C3/C6 (common layout) */
+static const SPI_OFFSETS spi_offs_esp32s2 = {
+    .usr       = 0x18,  /* SPI_USR */
+    .usr1      = 0x1C,  /* SPI_USR1 */
+    .usr2      = 0x20,  /* SPI_USR2 */
+    .w0        = 0x58,  /* SPI_W0 */
+    .mosi_dlen = 0x24,  /* SPI_MOSI_DLEN */
+    .miso_dlen = 0x28,  /* SPI_MISO_DLEN */
+};
+
+/* SPI register offsets for ESP32 */
+static const SPI_OFFSETS spi_offs_esp32 = {
+    .usr       = 0x1C,  /* SPI_USR */
+    .usr1      = 0x20,  /* SPI_USR1 */
+    .usr2      = 0x24,  /* SPI_USR2 */
+    .w0        = 0x80,  /* SPI_W0 */
+    .mosi_dlen = 0x28,  /* SPI_MOSI_DLEN */
+    .miso_dlen = 0x2C,  /* SPI_MISO_DLEN */
+};
+
+/* SPI register offsets for ESP8266 */
+static const SPI_OFFSETS spi_offs_esp8266 = {
+    .usr       = 0x1C,  /* SPI_USR */
+    .usr1      = 0x20,  /* SPI_USR1 */
+    .usr2      = 0x24,  /* SPI_USR2 */
+    .w0        = 0x40,  /* SPI_W0 */
+    .mosi_dlen = 0x00,  /* Not supported on ESP8266 */
+    .miso_dlen = 0x00,  /* Not supported on ESP8266 */
+};
+
 /* Write chip_id as little-endian bytes at eFuse offset 0x4C
    (where esptool reads EFUSE_RD_REG for chip detection) */
 static void WriteChipIdToEfuse(CHIP_CTX *ctx)
@@ -225,12 +255,25 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
     ctx->mac[4] = 0xEE;
     ctx->mac[5] = 0x01;
 
-    /* Set SPI register base address by chip type */
+    /* Set SPI register base address and offsets by chip type */
     switch (type) {
-    case CHIP_ESP8266: ctx->spi_reg_base = 0x60000200; break;
-    case CHIP_ESP32:   ctx->spi_reg_base = 0x3FF42000; break;
-    case CHIP_ESP32S2: ctx->spi_reg_base = 0x3F402000; break;
-    default:           ctx->spi_reg_base = 0x60002000; break; /* S3, C2, C3, C6 */
+    case CHIP_ESP8266:
+        ctx->spi_reg_base = 0x60000200;
+        ctx->spi_offs = &spi_offs_esp8266;
+        break;
+    case CHIP_ESP32:
+        ctx->spi_reg_base = 0x3FF42000;
+        ctx->spi_offs = &spi_offs_esp32;
+        break;
+    case CHIP_ESP32S2:
+        ctx->spi_reg_base = 0x3F402000;
+        ctx->spi_offs = &spi_offs_esp32s2;
+        break;
+    default:
+        /* S3, C2, C3, C6 */
+        ctx->spi_reg_base = 0x60002000;
+        ctx->spi_offs = &spi_offs_esp32s2;
+        break;
     }
 
     switch (type) {
@@ -252,8 +295,8 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
     /* Initialize SPI register defaults */
     ctx->spi_regs[SPI_CMD_OFFS / 4] = 0;
 
-    TRACE_FW(TAG, "Chip: %s, eFuse: %d bytes, Flash: %lu KB, SPI_BASE: 0x%08lX", 
-             ctx->name, ctx->efuse_size, ctx->flash_size / 1024, ctx->spi_reg_base);
+    TRACE_FW(TAG, "Chip: %s, eFuse: %d bytes, Flash: %lu KB, SPI_BASE: 0x%08lX, SPI_W0: 0x%02X", 
+             ctx->name, ctx->efuse_size, ctx->flash_size / 1024, ctx->spi_reg_base, ctx->spi_offs->w0);
     return TRUE;
 }
 
@@ -363,10 +406,6 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
         }
     }
 
-    /* ESP32 chip ID register */
-    if (addr == 0x3FF5A000)
-        return ctx->chip_id;
-
     /* ESP32 flash size register */
     if (addr == 0x3F400010)
         return (ctx->flash_size >> 16) & 0xFFFF;
@@ -407,17 +446,6 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
     /* ESP32-C6 EFUSE: 0x600B0800 */
     if (addr >= 0x600B0800 && addr < 0x600B0900) {
         int offset = (int)(addr - 0x600B0800);
-        if (ctx->efuse && offset + 3 < ctx->efuse_size) {
-            return ctx->efuse[offset] |
-                   ((DWORD)ctx->efuse[offset + 1] << 8) |
-                   ((DWORD)ctx->efuse[offset + 2] << 16) |
-                   ((DWORD)ctx->efuse[offset + 3] << 24);
-        }
-    }
-
-    /* ESP32-P4 EFUSE: 0x5012D000 */
-    if (addr >= 0x5012D000 && addr < 0x5012D100) {
-        int offset = (int)(addr - 0x5012D000);
         if (ctx->efuse && offset + 3 < ctx->efuse_size) {
             return ctx->efuse[offset] |
                    ((DWORD)ctx->efuse[offset + 1] << 8) |
@@ -493,12 +521,12 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
 
             /* Simulate SPI command execution when SPI_CMD_USR bit is set */
             if (offset == SPI_CMD_OFFS && (val & SPI_CMD_USR)) {
-                DWORD usr2 = ctx->spi_regs[SPI_USR2_OFFS / 4];
+                DWORD usr2 = ctx->spi_regs[ctx->spi_offs->usr2 / 4];
                 DWORD cmd = usr2 & 0xFFFF;
 
                 /* Flash ID read command (0x9F) */
                 if (cmd == SPIFLASH_RDID) {
-                    ctx->spi_regs[SPI_W0_OFFS / 4] = ctx->flash_id;
+                    ctx->spi_regs[ctx->spi_offs->w0 / 4] = ctx->flash_id;
                     TRACE_FW(TAG, "SPI RDID: flash_id=0x%08lX", ctx->flash_id);
                 }
 

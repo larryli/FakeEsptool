@@ -617,57 +617,57 @@ static void HandleRunUserCode(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
 BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
 {
-    static ESP_PACKET pkt;
+    ESP_PACKET *pkt = &ctx->pkt;
 
     TRACE_PROTO(TAG, "RX frame len=%d", frame_len);
 
-    if (!ParsePacket(frame, frame_len, &pkt)) {
+    if (!ParsePacket(frame, frame_len, pkt)) {
         TRACE_FW(TAG, "Invalid packet");
         return FALSE;
     }
 
     /* Get command name */
-    const char *cmdName = commandTable[pkt.command].name;
+    const char *cmdName = commandTable[pkt->command].name;
     if (!cmdName)
         cmdName = "UNKNOWN";
 
     /* Get direction string */
-    const WCHAR *dirStr = (pkt.direction == ESP_DIR_REQUEST) ? L"REQ" : L"RES";
+    const WCHAR *dirStr = (pkt->direction == ESP_DIR_REQUEST) ? L"REQ" : L"RES";
 
     /* Log packet summary */
     Serial_PostLogF(ctx->hNotify, L"ESP", L"[%s] %hs size=%u val=0x%08lX",
-                    dirStr, cmdName, pkt.size, pkt.value);
+                    dirStr, cmdName, pkt->size, pkt->value);
 
-    if (pkt.direction != ESP_DIR_REQUEST) {
-        TRACE_FW(TAG, "Not a request: 0x%02X", pkt.direction);
+    if (pkt->direction != ESP_DIR_REQUEST) {
+        TRACE_FW(TAG, "Not a request: 0x%02X", pkt->direction);
         return FALSE;
     }
 
-    switch (pkt.command) {
-    case ESP_CMD_SYNC:              HandleSync(ctx, &pkt); break;
-    case ESP_CMD_READ_REG:          HandleReadReg(ctx, &pkt); break;
-    case ESP_CMD_WRITE_REG:         HandleWriteReg(ctx, &pkt); break;
-    case ESP_CMD_SPI_ATTACH:        HandleSpiAttach(ctx, &pkt); break;
-    case ESP_CMD_CHANGE_BAUDRATE:   HandleChangeBaudrate(ctx, &pkt); break;
-    case ESP_CMD_FLASH_BEGIN:       HandleFlashBegin(ctx, &pkt); break;
-    case ESP_CMD_FLASH_DATA:        HandleFlashData(ctx, &pkt); break;
-    case ESP_CMD_FLASH_END:         HandleFlashEnd(ctx, &pkt); break;
-    case ESP_CMD_MEM_BEGIN:         HandleMemBegin(ctx, &pkt); break;
-    case ESP_CMD_MEM_DATA:          HandleMemData(ctx, &pkt); break;
-    case ESP_CMD_MEM_END:           HandleMemEnd(ctx, &pkt); break;
-    case ESP_CMD_FLASH_DEFL_BEGIN:  HandleFlashDeflBegin(ctx, &pkt); break;
-    case ESP_CMD_FLASH_DEFL_DATA:   HandleFlashDeflData(ctx, &pkt); break;
-    case ESP_CMD_FLASH_DEFL_END:    HandleFlashDeflEnd(ctx, &pkt); break;
-    case ESP_CMD_SPI_FLASH_MD5:     HandleFlashMd5(ctx, &pkt); break;
-    case ESP_CMD_ERASE_FLASH:       HandleEraseFlash(ctx, &pkt); break;
-    case ESP_CMD_ERASE_REGION:      HandleEraseBlock(ctx, &pkt); break;
-    case ESP_CMD_READ_FLASH:        HandleReadFlash(ctx, &pkt); break;
-    case ESP_CMD_GET_SECURITY_INFO: HandleGetSecurityInfo(ctx, &pkt); break;
-    case ESP_CMD_RUN_USER_CODE:     HandleRunUserCode(ctx, &pkt); break;
+    switch (pkt->command) {
+    case ESP_CMD_SYNC:              HandleSync(ctx, pkt); break;
+    case ESP_CMD_READ_REG:          HandleReadReg(ctx, pkt); break;
+    case ESP_CMD_WRITE_REG:         HandleWriteReg(ctx, pkt); break;
+    case ESP_CMD_SPI_ATTACH:        HandleSpiAttach(ctx, pkt); break;
+    case ESP_CMD_CHANGE_BAUDRATE:   HandleChangeBaudrate(ctx, pkt); break;
+    case ESP_CMD_FLASH_BEGIN:       HandleFlashBegin(ctx, pkt); break;
+    case ESP_CMD_FLASH_DATA:        HandleFlashData(ctx, pkt); break;
+    case ESP_CMD_FLASH_END:         HandleFlashEnd(ctx, pkt); break;
+    case ESP_CMD_MEM_BEGIN:         HandleMemBegin(ctx, pkt); break;
+    case ESP_CMD_MEM_DATA:          HandleMemData(ctx, pkt); break;
+    case ESP_CMD_MEM_END:           HandleMemEnd(ctx, pkt); break;
+    case ESP_CMD_FLASH_DEFL_BEGIN:  HandleFlashDeflBegin(ctx, pkt); break;
+    case ESP_CMD_FLASH_DEFL_DATA:   HandleFlashDeflData(ctx, pkt); break;
+    case ESP_CMD_FLASH_DEFL_END:    HandleFlashDeflEnd(ctx, pkt); break;
+    case ESP_CMD_SPI_FLASH_MD5:     HandleFlashMd5(ctx, pkt); break;
+    case ESP_CMD_ERASE_FLASH:       HandleEraseFlash(ctx, pkt); break;
+    case ESP_CMD_ERASE_REGION:      HandleEraseBlock(ctx, pkt); break;
+    case ESP_CMD_READ_FLASH:        HandleReadFlash(ctx, pkt); break;
+    case ESP_CMD_GET_SECURITY_INFO: HandleGetSecurityInfo(ctx, pkt); break;
+    case ESP_CMD_RUN_USER_CODE:     HandleRunUserCode(ctx, pkt); break;
     default:
-        TRACE_FW(TAG, "Unknown cmd: 0x%02X", pkt.command);
-        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Unknown command: 0x%02X", pkt.command);
-        Esptool_SendResponse(ctx, pkt.command, pkt.value, ESP_FAIL, NULL, 4);
+        TRACE_FW(TAG, "Unknown cmd: 0x%02X", pkt->command);
+        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Unknown command: 0x%02X", pkt->command);
+        Esptool_SendResponse(ctx, pkt->command, pkt->value, ESP_FAIL, NULL, 4);
         return FALSE;
     }
 

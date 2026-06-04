@@ -19,17 +19,6 @@
 
 构建环境：
 
-本项目使用 MSVC + CMake 构建，需要通过 vcvarsall.bat 初始化环境。
-
-由于 PowerShell 无法正确继承 vcvarsall.bat 设置的环境变量，必须创建临时批处理文件执行构建：
-
-```bat
-@echo off
-cd /d %~dp0build
-call "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" x64
-nmakeC
-```
-
-执行方式：将上述内容写入项目根目录的临时 .bat 文件，然后运行该批处理文件。
+本项目使用 MSVC + CMake 构建，需要通过 vcvars64.bat 初始化环境。
 
 构建产物：build\FakeEsptool.exe

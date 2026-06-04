@@ -133,6 +133,43 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 
 ### esptool.h
 
+**数据结构：**
+
+| 结构体 | 说明 |
+|--------|------|
+| `ESP_PACKET` | 协议数据包（约 32KB） |
+| `ESPTOOL_CTX` | 协议上下文（包含 ESP_PACKET 预分配缓冲区） |
+
+**ESP_PACKET 字段：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `direction` | BYTE | 请求 (0x00) 或响应 (0x01) |
+| `command` | BYTE | 命令码 |
+| `size` | WORD | 数据载荷大小 |
+| `value` | DWORD | 命令相关值 |
+| `data[32760]` | BYTE | 数据载荷 |
+
+**ESPTOOL_CTX 字段：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `slip` | SLIP_CTX | SLIP 解码器上下文 |
+| `chip` | CHIP_CTX | 芯片特性 |
+| `flash` | FLASH_CTX | Flash 存储 |
+| `pkt` | ESP_PACKET | 预分配数据包缓冲区（避免栈溢出） |
+| `synced` | BOOL | SYNC 握手完成标志 |
+| `stub_mode` | BOOL | Stub 运行标志 |
+| `hNotify` | HWND | UI 通知窗口 |
+| `onModified` | ESP_MODIFIED_CB | 设备修改回调 |
+| `onWrite` | ESP_WRITE_CB | 串口写回调 |
+| `onBaudRate` | ESP_BAUDRATE_CB | 波特率修改回调 |
+| `flash_offset` | DWORD | 当前 Flash 写入偏移 |
+| `flash_seq` | DWORD | 当前 Flash 写入序列号 |
+| `last_read_val` | DWORD | 上次 READ_REG 的值 |
+
+**函数：**
+
 | 函数 | 说明 |
 |------|------|
 | `Esptool_Init(ctx)` | 初始化上下文 |
@@ -148,6 +185,26 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 | `Esptool_CalcChecksum(data, len)` | 计算校验和 |
 
 ### chip.h
+
+**数据结构：**
+
+| 结构体 | 说明 |
+|--------|------|
+| `SPI_OFFSETS` | SPI 寄存器偏移（按芯片族区分） |
+| `CHIP_CTX` | 芯片上下文（包含 SPI_OFFSETS 指针） |
+
+**SPI_OFFSETS 字段：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `usr` | BYTE | SPI_USR 偏移 |
+| `usr1` | BYTE | SPI_USR1 偏移 |
+| `usr2` | BYTE | SPI_USR2 偏移 |
+| `w0` | BYTE | SPI_W0 偏移 |
+| `mosi_dlen` | BYTE | SPI_MOSI_DLEN 偏移（0=不支持） |
+| `miso_dlen` | BYTE | SPI_MISO_DLEN 偏移（0=不支持） |
+
+**函数：**
 
 | 函数 | 说明 |
 |------|------|
@@ -168,15 +225,36 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 
 ### flash.h
 
+**数据结构：**
+
+| 结构体 | 说明 |
+|--------|------|
+| `FLASH_CTX` | Flash 存储上下文 |
+
+**FLASH_CTX 字段：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `data` | BYTE* | Flash 数据缓冲区 |
+| `size` | DWORD | Flash 大小（字节） |
+| `allocated` | BOOL | 缓冲区已分配标志 |
+
+**函数：**
+
 | 函数 | 说明 |
 |------|------|
-| `Flash_Init(ctx, size)` | 初始化Flash |
-| `Flash_Close(ctx)` | 释放Flash |
+| `Flash_Init(ctx, size)` | 初始化 Flash |
+| `Flash_Close(ctx)` | 释放 Flash |
 | `Flash_Read(ctx, addr, buf, len)` | 读取数据 |
-| `Flash_Write(ctx, addr, data, len)` | 写入数据 |
-| `Flash_Erase(ctx, addr, len)` | 擦除区域 |
+| `Flash_Write(ctx, addr, data, len)` | 写入数据（AND 操作，模拟真实 Flash 行为） |
+| `Flash_Erase(ctx, addr, len)` | 擦除区域（设为 0xFF） |
 | `Flash_EraseAll(ctx)` | 擦除全部 |
-| `Flash_CalcMd5(ctx, addr, len, md5)` | 计算MD5 |
+| `Flash_CalcMd5(ctx, addr, len, md5)` | 计算 MD5 |
+
+**Flash_Write 行为说明：**
+- 真实 Flash 存储器只能将位从 1 改为 0，不能从 0 改为 1
+- 要将 0 改为 1，必须先擦除扇区（设为 0xFF）
+- 此函数执行：`flash[i] &= data[i]`
 
 ### slip.h
 

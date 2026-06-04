@@ -31,15 +31,28 @@
 /* SPI register count (enough for SPI_CMD through SPI_W15) */
 #define SPI_REG_COUNT   64
 
-/* SPI register offsets (common layout for ESP32-S2/S3, C2/C3/C6) */
+/* SPI register offsets (common to all chips) */
 #define SPI_CMD_OFFS        0x00
 #define SPI_ADDR_OFFS       0x04
-#define SPI_USR_OFFS        0x18
-#define SPI_USR1_OFFS       0x1C
-#define SPI_USR2_OFFS       0x20
-#define SPI_MOSI_DLEN_OFFS  0x24
-#define SPI_MISO_DLEN_OFFS  0x28
-#define SPI_W0_OFFS         0x58
+
+/* SPI register offsets per chip family.
+   Different chip families use different register layouts:
+   | Register   | ESP32-S2/S3/C2/C3/C6 | ESP32 | ESP8266 |
+   |------------|----------------------|-------|---------|
+   | SPI_USR    | 0x18                 | 0x1C  | 0x1C    |
+   | SPI_USR1   | 0x1C                 | 0x20  | 0x20    |
+   | SPI_USR2   | 0x20                 | 0x24  | 0x24    |
+   | SPI_W0     | 0x58                 | 0x80  | 0x40    |
+   | SPI_MOSI_DLEN | 0x24              | 0x28  | N/A     |
+   | SPI_MISO_DLEN | 0x28              | 0x2C  | N/A     | */
+typedef struct {
+    BYTE usr;           /* SPI_USR offset */
+    BYTE usr1;          /* SPI_USR1 offset */
+    BYTE usr2;          /* SPI_USR2 offset */
+    BYTE w0;            /* SPI_W0 offset */
+    BYTE mosi_dlen;     /* SPI_MOSI_DLEN offset (0 if not supported) */
+    BYTE miso_dlen;     /* SPI_MISO_DLEN offset (0 if not supported) */
+} SPI_OFFSETS;
 
 /* SPI register bit definitions */
 #define SPI_CMD_USR         (1 << 18)
@@ -87,6 +100,7 @@ typedef struct {
     BOOL has_usb;               /* USB support flag */
 
     DWORD spi_reg_base;         /* SPI register base address */
+    const SPI_OFFSETS *spi_offs; /* SPI register offsets for this chip family */
     DWORD spi_regs[SPI_REG_COUNT]; /* SPI register file */
 } CHIP_CTX;
 

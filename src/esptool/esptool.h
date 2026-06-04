@@ -80,11 +80,21 @@ typedef DWORD (*ESP_WRITE_CB)(const BYTE *data, DWORD len);
 /* Callback type for changing baud rate */
 typedef BOOL (*ESP_BAUDRATE_CB)(DWORD baudRate);
 
+/* ESP protocol packet */
+typedef struct {
+    BYTE  direction;          /* Request (0x00) or Response (0x01) */
+    BYTE  command;            /* Command code */
+    WORD  size;               /* Data payload size */
+    DWORD value;              /* Command-specific value */
+    BYTE  data[32760];        /* Data payload (matches SLIP_MAX_FRAME - 8 header bytes) */
+} ESP_PACKET;
+
 /* ESP protocol context */
 typedef struct {
     SLIP_CTX  slip;           /* SLIP decoder context */
     CHIP_CTX  chip;           /* Chip characteristics */
     FLASH_CTX flash;          /* Flash storage */
+    ESP_PACKET pkt;           /* Pre-allocated packet buffer (avoids stack overflow) */
     BOOL      synced;         /* SYNC handshake completed */
     BOOL      stub_mode;      /* Stub is running (OHAI received) */
     HWND      hNotify;        /* Window for UI notifications */
@@ -95,15 +105,6 @@ typedef struct {
     DWORD     flash_seq;      /* Current flash write sequence */
     DWORD     last_read_val;  /* Cached value from last READ_REG */
 } ESPTOOL_CTX;
-
-/* ESP protocol packet */
-typedef struct {
-    BYTE  direction;          /* Request (0x00) or Response (0x01) */
-    BYTE  command;            /* Command code */
-    WORD  size;               /* Data payload size */
-    DWORD value;              /* Command-specific value */
-    BYTE  data[32760];        /* Data payload (matches SLIP_MAX_FRAME - 8 header bytes) */
-} ESP_PACKET;
 
 /* Initialize ESP protocol context */
 void Esptool_Init(ESPTOOL_CTX *ctx);

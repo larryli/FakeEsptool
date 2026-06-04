@@ -28,7 +28,10 @@ void Flash_Close(FLASH_CTX *ctx);
 /* Read data from flash */
 BOOL Flash_Read(const FLASH_CTX *ctx, DWORD addr, BYTE *buf, DWORD len);
 
-/* Write data to flash (AND operation) */
+/* Write data to flash (AND operation - simulates real Flash behavior)
+ * Flash memory can only change bits from 1 to 0, not 0 to 1.
+ * To change 0 to 1, the sector must be erased first (set to 0xFF).
+ * This function performs: flash[i] &= data[i] */
 BOOL Flash_Write(FLASH_CTX *ctx, DWORD addr, const BYTE *data, DWORD len);
 
 /* Erase flash region (set to 0xFF) */
