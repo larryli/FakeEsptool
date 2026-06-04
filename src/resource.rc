@@ -9,9 +9,9 @@
 #include "resource.h"
 
 /* Shared resources (language independent) */
-IDI_APP ICON "../res/app.ico"
-IDB_TOOLBAR BITMAP "../res/toolbar.bmp"
-1 RT_MANIFEST "../res/res1.xml"
+IDI_APP ICON "res/app.ico"
+IDB_TOOLBAR BITMAP "res/toolbar.bmp"
+1 RT_MANIFEST "res/res1.xml"
 
 /* ============================================================ */
 /* English (US)                                                 */

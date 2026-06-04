@@ -52,16 +52,17 @@ FakeEsptool/
 │   │   ├── flash.c / flash.h   # Flash 存储模拟
 │   │   ├── device.c / device.h # 设备文件管理
 │   │   └── esptool.c / esptool.h # 命令解析与响应
-│   └── utils/                  # 辅助模块
-│       ├── config.c / config.h # 配置持久化
-│       ├── lang.c / lang.h     # 国际化辅助
-│       ├── timer.c / timer.h   # 定时器工具
-│       └── trace.c / trace.h   # 调试日志
-├── res/                        # 资源文件（图标、位图、清单）
+│   ├── utils/                  # 辅助模块
+│   │   ├── config.c / config.h # 配置持久化
+│   │   ├── lang.c / lang.h     # 国际化辅助
+│   │   ├── timer.c / timer.h   # 定时器工具
+│   │   └── trace.c / trace.h   # 调试日志
+│   └── res/                    # 资源文件（图标、位图、清单）
 ├── docs/                       # 文档
 │   ├── REQUIREMENTS.md         # 需求规格
 │   ├── DEVELOPMENT.md          # 开发文档
-│   └── PROTOCOL.md             # 协议规范
+│   ├── PROTOCOL.md             # 协议规范
+│   └── TODO.md                 # 待办改进项
 ├── LICENSE                     # MIT 许可证
 └── README.md
 ```
