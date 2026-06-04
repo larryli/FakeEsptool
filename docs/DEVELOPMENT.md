@@ -270,15 +270,30 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 
 ### device.h
 
+**数据结构：**
+
+| 结构体 | 说明 |
+|--------|------|
+| `DEVICE_CTX` | 设备上下文（包含芯片、Flash、文件名、修改标记） |
+
+**常量：**
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `DEVICE_MAGIC` | `0x45535000` | 文件魔数 ("ESP\0") |
+| `DEVICE_VERSION` | `1` | 文件格式版本 |
+
+**函数：**
+
 | 函数 | 说明 |
 |------|------|
 | `Device_Init(ctx, chipType, flashSize, mac)` | 初始化设备 |
-| `Device_Close(ctx)` | 关闭设备 |
-| `Device_Save(ctx, filename)` | 保存设备文件 |
-| `Device_Load(ctx, filename)` | 加载设备文件 |
+| `Device_Close(ctx)` | 释放设备资源 |
+| `Device_Save(ctx, filename)` | 保存设备到 .esp 文件 |
+| `Device_Load(ctx, filename)` | 从 .esp 文件加载设备 |
 | `Device_IsModified(ctx)` | 检查是否已修改 |
 | `Device_SetModified(ctx, modified)` | 设置修改标记 |
-| `Device_GetFilename(ctx)` | 获取文件名 |
+| `Device_GetFilename(ctx)` | 获取当前文件路径 |
 
 ### serial.h
 

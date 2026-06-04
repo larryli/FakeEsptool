@@ -15,7 +15,32 @@
 #define DEVICE_MAGIC    0x45535000
 
 /* Device file format version */
-#define DEVICE_VERSION  2
+#define DEVICE_VERSION  1
+
+/*
+ * Device file format v1 layout:
+ *
+ * [Header] 16 bytes
+ *   0x00  magic        4B   Magic number (0x45535000)
+ *   0x04  version      4B   Format version (1)
+ *   0x08  chipType     4B   Chip type enum
+ *   0x0C  xtalFreq     1B   Crystal frequency enum
+ *   0x0D  reserved     3B   Reserved (zero fill)
+ *
+ * [MAC] 8 bytes
+ *   0x10  mac          6B   MAC address
+ *   0x16  reserved     2B   Reserved (zero fill)
+ *
+ * [Flash Config] 4 bytes
+ *   0x18  flashSize    4B   Flash size in bytes
+ *
+ * [eFuse] variable
+ *   0x1C  efuseSize    4B   eFuse data size
+ *   0x20  efuse        N    eFuse data
+ *
+ * [Flash Data] variable
+ *         flash        M    Flash data (flashSize bytes)
+ */
 
 /* Device context */
 typedef struct {

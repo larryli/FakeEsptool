@@ -56,22 +56,41 @@ BOOL Device_Save(DEVICE_CTX *ctx, const WCHAR *filename)
     DWORD magic = DEVICE_MAGIC;
     DWORD version = DEVICE_VERSION;
     DWORD chipType = (DWORD)ctx->chip.type;
-    DWORD efuseSize = (DWORD)ctx->chip.efuse_size;
-    DWORD flashSize = ctx->flash.size;
     BYTE xtalFreq = ctx->chip.xtal_freq;
+    BYTE reserved3[3] = {0};
+    DWORD flashSize = ctx->flash.size;
+    DWORD efuseSize = (DWORD)ctx->chip.efuse_size;
     BOOL ok = TRUE;
 
+    /* Header (16 bytes) */
     ok = ok && WriteFile(hFile, &magic, 4, &written, NULL) && written == 4;
     ok = ok && WriteFile(hFile, &version, 4, &written, NULL) && written == 4;
     ok = ok && WriteFile(hFile, &chipType, 4, &written, NULL) && written == 4;
-    ok = ok && WriteFile(hFile, ctx->chip.mac, 6, &written, NULL) && written == 6;
-    ok = ok && WriteFile(hFile, &efuseSize, 4, &written, NULL) && written == 4;
-    if (ctx->chip.efuse)
-        ok = ok && WriteFile(hFile, ctx->chip.efuse, efuseSize, &written, NULL) && written == efuseSize;
-    ok = ok && WriteFile(hFile, &flashSize, 4, &written, NULL) && written == 4;
     ok = ok && WriteFile(hFile, &xtalFreq, 1, &written, NULL) && written == 1;
-    if (ctx->flash.data)
+    ok = ok && WriteFile(hFile, reserved3, 3, &written, NULL) && written == 3;
+
+    /* MAC (8 bytes) */
+    ok = ok && WriteFile(hFile, ctx->chip.mac, 6, &written, NULL) && written == 6;
+    ok = ok && WriteFile(hFile, reserved3, 2, &written, NULL) && written == 2;
+
+    /* Flash config (4 bytes) */
+    ok = ok && WriteFile(hFile, &flashSize, 4, &written, NULL) && written == 4;
+
+    /* eFuse (variable) */
+    ok = ok && WriteFile(hFile, &efuseSize, 4, &written, NULL) && written == 4;
+    if (efuseSize > 0 && ctx->chip.efuse)
+        ok = ok && WriteFile(hFile, ctx->chip.efuse, efuseSize, &written, NULL) && written == efuseSize;
+
+    /* Flash data (variable) */
+    if (flashSize > 0) {
+        if (!ctx->flash.data) {
+            TRACE_FW(TAG, "Device save failed: flash data is NULL");
+            CloseHandle(hFile);
+            DeleteFileW(filename);
+            return FALSE;
+        }
         ok = ok && WriteFile(hFile, ctx->flash.data, flashSize, &written, NULL) && written == flashSize;
+    }
 
     CloseHandle(hFile);
 
@@ -98,40 +117,47 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     }
 
     DWORD read;
-    DWORD magic, version, chipType, efuseSize, flashSize;
+    DWORD magic, version, chipType, flashSize, efuseSize;
+    BYTE xtalFreq;
+    BYTE reserved[3];
     BYTE mac[6];
+    BOOL ok = TRUE;
 
-    ReadFile(hFile, &magic, 4, &read, NULL);
-    if (read != 4 || magic != DEVICE_MAGIC) {
+    /* Header (16 bytes) */
+    ok = ok && ReadFile(hFile, &magic, 4, &read, NULL) && read == 4;
+    if (!ok || magic != DEVICE_MAGIC) {
         CloseHandle(hFile);
         TRACE_FW(TAG, "Invalid magic");
         return FALSE;
     }
 
-    ReadFile(hFile, &version, 4, &read, NULL);
-    if (read != 4 || (version != 1 && version != 2)) {
+    ok = ok && ReadFile(hFile, &version, 4, &read, NULL) && read == 4;
+    if (!ok || version != DEVICE_VERSION) {
         CloseHandle(hFile);
         TRACE_FW(TAG, "Unsupported version: %lu", version);
         return FALSE;
     }
 
-    ReadFile(hFile, &chipType, 4, &read, NULL);
-    if (read != 4 || chipType >= CHIP_COUNT) {
+    ok = ok && ReadFile(hFile, &chipType, 4, &read, NULL) && read == 4;
+    if (!ok || chipType >= CHIP_COUNT) {
         CloseHandle(hFile);
         TRACE_FW(TAG, "Invalid chip type: %lu", chipType);
         return FALSE;
     }
 
-    ReadFile(hFile, mac, 6, &read, NULL);
-    if (read != 6) {
+    ok = ok && ReadFile(hFile, &xtalFreq, 1, &read, NULL) && read == 1;
+    ok = ok && ReadFile(hFile, reserved, 3, &read, NULL) && read == 3;
+
+    /* MAC (8 bytes) */
+    ok = ok && ReadFile(hFile, mac, 6, &read, NULL) && read == 6;
+    ok = ok && ReadFile(hFile, reserved, 2, &read, NULL) && read == 2;
+
+    /* Flash config (4 bytes) */
+    ok = ok && ReadFile(hFile, &flashSize, 4, &read, NULL) && read == 4;
+
+    if (!ok) {
         CloseHandle(hFile);
-        TRACE_FW(TAG, "Failed to read MAC");
-        return FALSE;
-    }
-    ReadFile(hFile, &efuseSize, 4, &read, NULL);
-    if (read != 4) {
-        CloseHandle(hFile);
-        TRACE_FW(TAG, "Failed to read efuse size");
+        TRACE_FW(TAG, "Failed to read header");
         return FALSE;
     }
 
@@ -142,33 +168,34 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
         return FALSE;
     }
     Chip_SetMac(&ctx->chip, mac);
+    ctx->chip.xtal_freq = xtalFreq;
 
-    if (efuseSize > 0 && efuseSize <= (DWORD)ctx->chip.efuse_size) {
-        ReadFile(hFile, ctx->chip.efuse, efuseSize, &read, NULL);
-        if (read != efuseSize) {
-            CloseHandle(hFile);
-            TRACE_FW(TAG, "Failed to read efuse data");
-            Chip_Close(&ctx->chip);
-            return FALSE;
-        }
-    }
-
-    ReadFile(hFile, &flashSize, 4, &read, NULL);
-    if (read != 4) {
+    /* eFuse (variable) */
+    ok = ReadFile(hFile, &efuseSize, 4, &read, NULL) && read == 4;
+    if (!ok) {
         CloseHandle(hFile);
-        TRACE_FW(TAG, "Failed to read flash size");
+        TRACE_FW(TAG, "Failed to read efuse size");
         Chip_Close(&ctx->chip);
         return FALSE;
     }
 
-    /* Read xtal_freq (version 2+) */
-    if (version >= 2) {
-        BYTE xtalFreq;
-        ReadFile(hFile, &xtalFreq, 1, &read, NULL);
-        if (read == 1)
-            ctx->chip.xtal_freq = xtalFreq;
+    if (efuseSize > 0) {
+        if (efuseSize <= (DWORD)ctx->chip.efuse_size) {
+            ok = ReadFile(hFile, ctx->chip.efuse, efuseSize, &read, NULL) && read == efuseSize;
+            if (!ok) {
+                CloseHandle(hFile);
+                TRACE_FW(TAG, "Failed to read efuse data");
+                Chip_Close(&ctx->chip);
+                return FALSE;
+            }
+        } else {
+            /* Skip excess eFuse data */
+            SetFilePointer(hFile, efuseSize, NULL, FILE_CURRENT);
+            TRACE_FW(TAG, "Warning: efuse size mismatch (file=%lu, chip=%d)", efuseSize, ctx->chip.efuse_size);
+        }
     }
 
+    /* Flash init and data */
     if (!Flash_Init(&ctx->flash, flashSize)) {
         Chip_Close(&ctx->chip);
         CloseHandle(hFile);
@@ -176,9 +203,13 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     }
 
     if (flashSize > 0) {
-        ReadFile(hFile, ctx->flash.data, flashSize, &read, NULL);
-        if (read != flashSize) {
+        ok = ReadFile(hFile, ctx->flash.data, flashSize, &read, NULL) && read == flashSize;
+        if (!ok) {
             TRACE_FW(TAG, "Failed to read flash data (expected %lu, got %lu)", flashSize, read);
+            CloseHandle(hFile);
+            Flash_Close(&ctx->flash);
+            Chip_Close(&ctx->chip);
+            return FALSE;
         }
     }
 
@@ -187,7 +218,7 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     lstrcpyW(ctx->filename, filename);
     ctx->modified = FALSE;
 
-    TRACE_FW(TAG, "Device loaded: %S", filename);
+    TRACE_FW(TAG, "Device loaded: %s, %lu MB", ctx->chip.name, flashSize / (1024*1024));
     return TRUE;
 }
 

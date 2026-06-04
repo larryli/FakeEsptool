@@ -497,18 +497,36 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
 
 BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
 {
-    /* ESP32 EFUSE write */
-    if (addr >= 0x3FF00000 && addr < 0x3FF00000 + (DWORD)ctx->efuse_size) {
-        int offset = (int)(addr - 0x3FF00000);
-        if (offset + 3 < ctx->efuse_size) {
-            ctx->efuse[offset] |= (BYTE)(val & 0xFF);
-            ctx->efuse[offset + 1] |= (BYTE)((val >> 8) & 0xFF);
-            ctx->efuse[offset + 2] |= (BYTE)((val >> 16) & 0xFF);
-            ctx->efuse[offset + 3] |= (BYTE)((val >> 24) & 0xFF);
-            TRACE_FW(TAG, "eFuse write: offset=0x%X val=0x%08lX", offset, val);
+    /* Helper macro for eFuse write at a given base address */
+    #define EFUSE_WRITE_AT(base) \
+        if (addr >= (base) && addr < (base) + (DWORD)ctx->efuse_size) { \
+            int offset = (int)(addr - (base)); \
+            if (offset + 3 < ctx->efuse_size) { \
+                ctx->efuse[offset] |= (BYTE)(val & 0xFF); \
+                ctx->efuse[offset + 1] |= (BYTE)((val >> 8) & 0xFF); \
+                ctx->efuse[offset + 2] |= (BYTE)((val >> 16) & 0xFF); \
+                ctx->efuse[offset + 3] |= (BYTE)((val >> 24) & 0xFF); \
+                TRACE_FW(TAG, "eFuse write: base=0x%08lX offset=0x%X val=0x%08lX", (DWORD)(base), offset, val); \
+            } \
+            return TRUE; \
         }
-        return TRUE;
-    }
+
+    /* ESP32 EFUSE: 0x3FF00000 */
+    EFUSE_WRITE_AT(0x3FF00000)
+
+    /* ESP32-S2 EFUSE: 0x3F41A000 */
+    EFUSE_WRITE_AT(0x3F41A000)
+
+    /* ESP32-S3 EFUSE: 0x60007000 */
+    EFUSE_WRITE_AT(0x60007000)
+
+    /* ESP32-C2/C3 EFUSE: 0x60008800 */
+    EFUSE_WRITE_AT(0x60008800)
+
+    /* ESP32-C6 EFUSE: 0x600B0800 */
+    EFUSE_WRITE_AT(0x600B0800)
+
+    #undef EFUSE_WRITE_AT
 
     /* SPI register write */
     if (ctx->spi_reg_base != 0 &&
