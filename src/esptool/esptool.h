@@ -24,6 +24,15 @@
 #define ESP_OK              0x00
 #define ESP_FAIL            0x01
 
+/* Protocol state machine */
+typedef enum {
+    ESP_STATE_IDLE,            /* Initial state, waiting for SYNC */
+    ESP_STATE_SYNCED,          /* SYNC received, waiting for chip detection */
+    ESP_STATE_READY,           /* Chip detected, ready for commands */
+    ESP_STATE_FLASH_WRITING,   /* FLASH_BEGIN received, waiting for data */
+    ESP_STATE_MEM_WRITING,     /* MEM_BEGIN received, waiting for data */
+} ESP_STATE;
+
 /* Flash commands (ESP8266/ESP32 ROM) */
 #define ESP_CMD_FLASH_BEGIN     0x02
 #define ESP_CMD_FLASH_DATA      0x03
@@ -95,6 +104,7 @@ typedef struct {
     CHIP_CTX  chip;           /* Chip characteristics */
     FLASH_CTX flash;          /* Flash storage */
     ESP_PACKET pkt;           /* Pre-allocated packet buffer (avoids stack overflow) */
+    ESP_STATE state;          /* Protocol state machine */
     BOOL      synced;         /* SYNC handshake completed */
     BOOL      stub_mode;      /* Stub is running (OHAI received) */
     HWND      hNotify;        /* Window for UI notifications */
@@ -109,6 +119,9 @@ typedef struct {
 
 /* Initialize ESP protocol context */
 void Esptool_Init(ESPTOOL_CTX *ctx);
+
+/* Reset protocol state (called on download mode entry) */
+void Esptool_ResetState(ESPTOOL_CTX *ctx);
 
 /* Set notification window for TX data */
 void Esptool_SetNotify(ESPTOOL_CTX *ctx, HWND hNotify);

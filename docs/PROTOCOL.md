@@ -1152,8 +1152,43 @@ esptool 客户端对 SYNC 采用多次短脉冲重试（默认 7 次，间隔 10
 | 命令未实现 | 返回 Status != 0 |
 | 数据长度不匹配 | 丢弃请求，不响应 |
 | 帧格式错误 | 丢弃请求，等待下一帧 |
+| 命令状态无效 | 返回 Status != 0 |
 
-### 6.4 SLIP 帧处理细节
+### 6.4 命令状态机
+
+FakeEsptool 实现了命令状态机来验证命令序列的合法性。
+
+**状态定义：**
+
+```
+IDLE → SYNCED → READY → FLASH_WRITING / MEM_WRITING
+```
+
+| 状态 | 说明 | 接受的命令 |
+|------|------|-----------|
+| IDLE | 初始状态，等待 SYNC | SYNC |
+| SYNCED | 已同步，等待芯片检测 | READ_REG, WRITE_REG, SPI_ATTACH, CHANGE_BAUDRATE, GET_SECURITY_INFO |
+| READY | 芯片已检测，可接受命令 | 所有命令 |
+| FLASH_WRITING | FLASH_BEGIN 已发送 | FLASH_DATA, FLASH_END, FLASH_DEFL_DATA, FLASH_DEFL_END |
+| MEM_WRITING | MEM_BEGIN 已发送 | MEM_DATA, MEM_END |
+
+**状态转换：**
+
+| 命令 | 转换 |
+|------|------|
+| SYNC | → SYNCED |
+| READ_REG (0x40001000) | SYNCED → READY |
+| FLASH_BEGIN / FLASH_DEFL_BEGIN | → FLASH_WRITING |
+| FLASH_END / FLASH_DEFL_END | → READY |
+| MEM_BEGIN | → MEM_WRITING |
+| MEM_END | → READY |
+| RUN_USER_CODE | → IDLE |
+
+**重置触发：**
+- DTR/RTS 复位信号（进入下载模式）
+- RUN_USER_CODE 命令
+
+### 6.5 SLIP 帧处理细节
 
 **帧解析状态机：**
 ```
@@ -1172,7 +1207,7 @@ IDLE → WAIT_START → IN_PACKET → ESCAPING → PACKET_COMPLETE
 - 帧中间的 0xC0：视为结束符，开始新帧
 - 转义序列错误：丢弃当前帧
 
-### 6.5 Stub 模式行为
+### 6.6 Stub 模式行为
 
 Stub 上传成功后，设备行为发生变化：
 

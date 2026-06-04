@@ -69,9 +69,24 @@ void Esptool_Init(ESPTOOL_CTX *ctx)
     Slip_Init(&ctx->slip);
     Chip_Init(&ctx->chip, CHIP_ESP32);
     Flash_Init(&ctx->flash, 4 * 1024 * 1024);
+    ctx->state = ESP_STATE_IDLE;
     ctx->synced = FALSE;
     ctx->stub_mode = FALSE;
     ctx->hNotify = NULL;
+}
+
+void Esptool_ResetState(ESPTOOL_CTX *ctx)
+{
+    ctx->state = ESP_STATE_IDLE;
+    ctx->synced = FALSE;
+    ctx->stub_mode = FALSE;
+    ctx->flash_offset = 0;
+    ctx->flash_seq = 0;
+    ctx->last_read_val = 0;
+    ctx->flash_uncompressed_size = 0;
+    Slip_Reset(&ctx->slip);
+    TRACE_PROTO(TAG, "Protocol state reset to IDLE");
+    Serial_PostLog(ctx->hNotify, L"ESP", L"  Protocol state reset");
 }
 
 void Esptool_SetNotify(ESPTOOL_CTX *ctx, HWND hNotify)
@@ -192,6 +207,7 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     TRACE_PROTO(TAG, "SYNC received");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Sync handshake");
+    ctx->state = ESP_STATE_SYNCED;
     ctx->synced = TRUE;
     ctx->stub_mode = FALSE;
 
@@ -220,6 +236,12 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     /* Cache the register value for use in subsequent responses */
     ctx->last_read_val = val;
+
+    /* Transition to READY state when chip detection register is read */
+    if (addr == 0x40001000 && ctx->state == ESP_STATE_SYNCED) {
+        ctx->state = ESP_STATE_READY;
+        Serial_PostLog(ctx->hNotify, L"ESP", L"  Chip detected, ready for commands");
+    }
 
     /* Real device returns register value in Value field (bytes 4-7),
        with status in Data field */
@@ -301,6 +323,8 @@ static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
                     total, blocks, bsize, offset);
 
+    ctx->state = ESP_STATE_MEM_WRITING;
+
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     BYTE status_len = ctx->stub_mode ? 2 : 4;
     Esptool_SendResponseEx(ctx, ESP_CMD_MEM_BEGIN, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
@@ -341,6 +365,9 @@ static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "MEM_END execute=%lu", execute);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  execute=%lu", execute);
+
+    ctx->state = ESP_STATE_READY;
+
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     BYTE status_len = ctx->stub_mode ? 2 : 4;
     Esptool_SendResponseEx(ctx, ESP_CMD_MEM_END, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
@@ -374,6 +401,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     ctx->flash_offset = offset;
     ctx->flash_seq = 0;
     ctx->flash_uncompressed_size = uncompressed_size;
+    ctx->state = ESP_STATE_FLASH_WRITING;
 
     TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN uncompressed=%lu blocks=%lu bsize=%lu offset=0x%08lX",
                 uncompressed_size, blocks, bsize, offset);
@@ -401,6 +429,15 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "FLASH_DEFL_DATA seq=%lu len=%lu", seq, data_len);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%lu", seq, data_len);
+
+    /* Verify sequence number */
+    if (seq != ctx->flash_seq) {
+        TRACE_PROTO(TAG, "FLASH_DEFL_DATA seq mismatch: expected=%lu received=%lu", ctx->flash_seq, seq);
+        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Seq mismatch: expected=%lu received=%lu", ctx->flash_seq, seq);
+        BYTE status_len = ctx->stub_mode ? 2 : 4;
+        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+        return;
+    }
 
     if (pkt->size >= 16 + data_len) {
         const BYTE *payload = &pkt->data[16];
@@ -472,6 +509,9 @@ static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     TRACE_PROTO(TAG, "FLASH_DEFL_END");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  End compressed flash download");
+
+    ctx->state = ESP_STATE_READY;
+
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     BYTE status_len = ctx->stub_mode ? 2 : 4;
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_END, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
@@ -593,6 +633,7 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     ctx->flash_offset = offset;
     ctx->flash_seq = 0;
+    ctx->state = ESP_STATE_FLASH_WRITING;
 
     TRACE_PROTO(TAG, "FLASH_BEGIN erase=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
                 erase_size, num_blocks, block_size, offset, encrypted);
@@ -620,6 +661,15 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "FLASH_DATA seq=%lu len=%lu", seq, data_len);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%lu", seq, data_len);
+
+    /* Verify sequence number */
+    if (seq != ctx->flash_seq) {
+        TRACE_PROTO(TAG, "FLASH_DATA seq mismatch: expected=%lu received=%lu", ctx->flash_seq, seq);
+        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Seq mismatch: expected=%lu received=%lu", ctx->flash_seq, seq);
+        BYTE status_len = ctx->stub_mode ? 2 : 4;
+        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+        return;
+    }
 
     if (pkt->size >= 16 + data_len) {
         const BYTE *payload = &pkt->data[16];
@@ -653,6 +703,9 @@ static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "FLASH_END reboot=%lu", reboot);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  reboot=%lu", reboot);
+
+    ctx->state = ESP_STATE_READY;
+
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     BYTE status_len = ctx->stub_mode ? 2 : 4;
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_END, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
@@ -693,8 +746,7 @@ static void HandleRunUserCode(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_RUN_USER_CODE, ctx->last_read_val, ESP_OK, 2, NULL, 2);
 
     /* Reset protocol state for next connection */
-    ctx->synced = FALSE;
-    ctx->stub_mode = FALSE;
+    Esptool_ResetState(ctx);
 }
 
 BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
@@ -722,6 +774,70 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
 
     if (pkt->direction != ESP_DIR_REQUEST) {
         TRACE_FW(TAG, "Not a request: 0x%02X", pkt->direction);
+        return FALSE;
+    }
+
+    /* State validation: check if command is allowed in current state */
+    BOOL valid = TRUE;
+    switch (pkt->command) {
+    /* SYNC is always allowed (resets to SYNCED) */
+    case ESP_CMD_SYNC:
+        break;
+
+    /* Commands allowed in IDLE state (before SYNC) - none except SYNC */
+    /* Commands allowed in SYNCED state (after SYNC, before chip detection) */
+    case ESP_CMD_READ_REG:
+    case ESP_CMD_WRITE_REG:
+    case ESP_CMD_SPI_ATTACH:
+    case ESP_CMD_CHANGE_BAUDRATE:
+    case ESP_CMD_GET_SECURITY_INFO:
+        if (ctx->state < ESP_STATE_SYNCED) {
+            valid = FALSE;
+        }
+        break;
+
+    /* Commands allowed in READY state (after chip detection) */
+    case ESP_CMD_FLASH_BEGIN:
+    case ESP_CMD_FLASH_DEFL_BEGIN:
+    case ESP_CMD_MEM_BEGIN:
+    case ESP_CMD_SPI_FLASH_MD5:
+    case ESP_CMD_ERASE_FLASH:
+    case ESP_CMD_ERASE_REGION:
+    case ESP_CMD_READ_FLASH:
+    case ESP_CMD_RUN_USER_CODE:
+        if (ctx->state < ESP_STATE_READY) {
+            valid = FALSE;
+        }
+        break;
+
+    /* Flash data commands require FLASH_WRITING state */
+    case ESP_CMD_FLASH_DATA:
+    case ESP_CMD_FLASH_END:
+    case ESP_CMD_FLASH_DEFL_DATA:
+    case ESP_CMD_FLASH_DEFL_END:
+        if (ctx->state != ESP_STATE_FLASH_WRITING) {
+            valid = FALSE;
+        }
+        break;
+
+    /* Memory data commands require MEM_WRITING state */
+    case ESP_CMD_MEM_DATA:
+    case ESP_CMD_MEM_END:
+        if (ctx->state != ESP_STATE_MEM_WRITING) {
+            valid = FALSE;
+        }
+        break;
+
+    default:
+        valid = FALSE;
+        break;
+    }
+
+    if (!valid) {
+        TRACE_PROTO(TAG, "Command 0x%02X not allowed in state %d", pkt->command, ctx->state);
+        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Command 0x%02X rejected (state=%d)",
+                        pkt->command, ctx->state);
+        Esptool_SendResponse(ctx, pkt->command, pkt->value, ESP_FAIL, NULL, 4);
         return FALSE;
     }
 

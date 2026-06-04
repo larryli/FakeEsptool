@@ -65,7 +65,7 @@ BOOL Flash_Write(FLASH_CTX *ctx, DWORD addr, const BYTE *data, DWORD len)
 
 BOOL Flash_Erase(FLASH_CTX *ctx, DWORD addr, DWORD len)
 {
-    if (!ctx->data || len == 0)
+    if (!ctx->data || len == 0 || addr >= ctx->size)
         return FALSE;
 
     /* Align to sector boundaries (4KB) */

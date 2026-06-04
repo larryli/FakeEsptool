@@ -145,6 +145,14 @@ static BOOL InitEsp32S2(CHIP_CTX *ctx)
     ctx->efuse[2] = 0x00;
     ctx->efuse[3] = 0x00;
 
+    /* MAC at EFUSE_BASE(0x3F41A000) + 0x044 */
+    ctx->efuse[0x44] = ctx->mac[5];
+    ctx->efuse[0x45] = ctx->mac[4];
+    ctx->efuse[0x46] = ctx->mac[3];
+    ctx->efuse[0x47] = ctx->mac[2];
+    ctx->efuse[0x48] = ctx->mac[1];
+    ctx->efuse[0x49] = ctx->mac[0];
+
     WriteChipIdToEfuse(ctx);
     return TRUE;
 }
@@ -170,6 +178,14 @@ static BOOL InitEsp32S3(CHIP_CTX *ctx)
     ctx->efuse[1] = 0x00;
     ctx->efuse[2] = 0x00;
     ctx->efuse[3] = 0x00;
+
+    /* MAC at EFUSE_BASE(0x60007000) + 0x044 */
+    ctx->efuse[0x44] = ctx->mac[5];
+    ctx->efuse[0x45] = ctx->mac[4];
+    ctx->efuse[0x46] = ctx->mac[3];
+    ctx->efuse[0x47] = ctx->mac[2];
+    ctx->efuse[0x48] = ctx->mac[1];
+    ctx->efuse[0x49] = ctx->mac[0];
 
     WriteChipIdToEfuse(ctx);
     return TRUE;

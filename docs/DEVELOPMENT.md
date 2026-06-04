@@ -159,6 +159,7 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 | `chip` | CHIP_CTX | 芯片特性 |
 | `flash` | FLASH_CTX | Flash 存储 |
 | `pkt` | ESP_PACKET | 预分配数据包缓冲区（避免栈溢出） |
+| `state` | ESP_STATE | 协议状态机 |
 | `synced` | BOOL | SYNC 握手完成标志 |
 | `stub_mode` | BOOL | Stub 运行标志 |
 | `hNotify` | HWND | UI 通知窗口 |
@@ -170,11 +171,34 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 | `last_read_val` | DWORD | 上次 READ_REG 的值 |
 | `flash_uncompressed_size` | DWORD | DEFLATE 解压大小 |
 
+**ESP_STATE 枚举：**
+
+| 值 | 说明 |
+|------|------|
+| `ESP_STATE_IDLE` | 初始状态，等待 SYNC |
+| `ESP_STATE_SYNCED` | 已同步，等待芯片检测 |
+| `ESP_STATE_READY` | 芯片已检测，可接受命令 |
+| `ESP_STATE_FLASH_WRITING` | FLASH_BEGIN 已发送，等待数据 |
+| `ESP_STATE_MEM_WRITING` | MEM_BEGIN 已发送，等待数据 |
+
+**状态转换规则：**
+
+| 命令 | 转换 |
+|------|------|
+| SYNC | → SYNCED |
+| READ_REG (0x40001000) | SYNCED → READY |
+| FLASH_BEGIN / FLASH_DEFL_BEGIN | → FLASH_WRITING |
+| FLASH_END / FLASH_DEFL_END | → READY |
+| MEM_BEGIN | → MEM_WRITING |
+| MEM_END | → READY |
+| RUN_USER_CODE | → IDLE |
+
 **函数：**
 
 | 函数 | 说明 |
 |------|------|
 | `Esptool_Init(ctx)` | 初始化上下文 |
+| `Esptool_ResetState(ctx)` | 重置协议状态（进入下载模式时调用） |
 | `Esptool_SetNotify(ctx, hNotify)` | 设置通知窗口 |
 | `Esptool_SetModifiedCallback(ctx, cb)` | 设置修改回调 |
 | `Esptool_SetWriteCallback(ctx, cb)` | 设置串口写回调 |

@@ -194,6 +194,9 @@ static void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
         else if (g_reset_pending && !dsr && !cts) {
             Serial_PostLog(hNotify, L"SIG", L"Download mode entered");
 
+            /* Reset protocol state for new connection */
+            Esptool_ResetState(&g_esptool);
+
             DWORD bootBaud = Chip_GetBootBaudRate(&g_device.chip);
             if (bootBaud != 115200) {
                 Serial_SetBaudRate(ctx, bootBaud);
@@ -502,8 +505,6 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
             wsprintfW(macStr, L"%02X:%02X:%02X:%02X:%02X:%02X",
                       mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
             SetDlgItemTextW(hDlg, IDC_MAC_EDIT, macStr);
-
-            srand((unsigned)time(NULL));
         }
         return TRUE;
 
@@ -664,8 +665,6 @@ static INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
             wsprintfW(macStr, L"%02X:%02X:%02X:%02X:%02X:%02X",
                       mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
             SetDlgItemTextW(hDlg, IDC_MAC_EDIT, macStr);
-
-            srand((unsigned)time(NULL));
         }
         return TRUE;
 
@@ -1175,7 +1174,13 @@ static void Main_OnFlashExport(HWND hMainWnd)
     }
 
     DWORD bytesWritten;
-    WriteFile(hFile, g_device.flash.data, g_device.flash.size, &bytesWritten, NULL);
+    if (!WriteFile(hFile, g_device.flash.data, g_device.flash.size, &bytesWritten, NULL) ||
+        bytesWritten != g_device.flash.size) {
+        CloseHandle(hFile);
+        DeleteFileW(szFile);
+        MessageBoxW(hMainWnd, L"Failed to write file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
     CloseHandle(hFile);
 
     Serial_PostLog(hMainWnd, L"FLASH", L"Flash exported to file");
@@ -1931,6 +1936,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     (void)hPrevInstance;
     (void)lpCmdLine;
     (void)nCmdShow;
+
+    srand((unsigned)time(NULL));
 
     TRACE_INIT();
     TRACE_FW(TAG, "=== FakeEsptool Started ===");
