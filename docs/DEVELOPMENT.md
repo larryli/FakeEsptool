@@ -36,6 +36,7 @@ FakeEsptool 是一个 ESP 芯片设备端模拟器，用于模拟 ESP8266/ESP32 
 | `esptool/flash.c/h` | Flash 存储模拟 |
 | `esptool/device.c/h` | 设备文件管理 |
 | `esptool/esptool.c/h` | esptool 命令解析与响应 |
+| `utils/deflate.c/h` | DEFLATE 解压（用于压缩模式烧录） |
 
 ## 编译
 
@@ -167,6 +168,7 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 | `flash_offset` | DWORD | 当前 Flash 写入偏移 |
 | `flash_seq` | DWORD | 当前 Flash 写入序列号 |
 | `last_read_val` | DWORD | 上次 READ_REG 的值 |
+| `flash_uncompressed_size` | DWORD | DEFLATE 解压大小 |
 
 **函数：**
 
@@ -255,6 +257,71 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 - 真实 Flash 存储器只能将位从 1 改为 0，不能从 0 改为 1
 - 要将 0 改为 1，必须先擦除扇区（设为 0xFF）
 - 此函数执行：`flash[i] &= data[i]`
+
+### deflate.h
+
+**数据结构：**
+
+| 结构体 | 说明 |
+|--------|------|
+| `DEFLATE_HUFF` | 霍夫曼编码表 |
+| `DEFLATE_CTX` | 解压器上下文 |
+
+**DEFLATE_HUFF 字段：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `counts` | WORD* | 每个长度的编码数量 |
+| `symbols` | WORD* | 按编码排序的符号表 |
+| `max_length` | int | 最大编码长度 |
+
+**DEFLATE_CTX 字段：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `in_buf` | const BYTE* | 输入缓冲区（压缩数据） |
+| `in_len` | size_t | 输入数据长度 |
+| `in_pos` | size_t | 当前输入位置 |
+| `out_buf` | BYTE* | 输出缓冲区（解压数据） |
+| `out_len` | size_t | 输出缓冲区大小 |
+| `out_pos` | size_t | 当前输出位置 |
+| `bit_buf` | DWORD | 位缓冲区 |
+| `bit_count` | int | 位缓冲区中的有效位数 |
+| `lit_huff` | DEFLATE_HUFF | 字面量/长度霍夫曼编码 |
+| `dist_huff` | DEFLATE_HUFF | 距离霍夫曼编码 |
+
+**常量：**
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `DEFLATE_OK` | 0 | 成功 |
+| `DEFLATE_ERROR` | -1 | 通用错误 |
+| `DEFLATE_BAD_INPUT` | -2 | 输入数据无效 |
+| `DEFLATE_NO_MEMORY` | -3 | 内存分配失败 |
+
+**函数：**
+
+| 函数 | 说明 |
+|------|------|
+| `deflate_init(ctx, in_buf, in_len, out_buf, out_len)` | 初始化解压器上下文 |
+| `deflate_decompress(ctx)` | 执行 DEFLATE 解压 |
+
+**使用示例：**
+
+```c
+#include "utils/deflate.h"
+
+BYTE compressed[] = { /* ... */ };
+BYTE decompressed[4096];
+DEFLATE_CTX ctx;
+
+deflate_init(&ctx, compressed, sizeof(compressed), decompressed, sizeof(decompressed));
+int ret = deflate_decompress(&ctx);
+if (ret == DEFLATE_OK) {
+    // ctx.out_pos 包含解压后的数据长度
+    // decompressed[0..ctx.out_pos-1] 包含解压后的数据
+}
+```
 
 ### slip.h
 

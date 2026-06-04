@@ -9,7 +9,7 @@ POC_PROJECT_MODE = Release#
 POC_PROJECT_RESULTDIR = .#
 POC_PROJECT_OUTPUTDIR = output#
 !if "$(POC_PROJECT_MODE)" == "Release"
-CCFLAGS = -Tx64-coff -std:C11 -MT -Ot -Ox -Ob1 -fp:precise -W1 -Gz -Ze -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -D_CRT_SECURE_NO_WARNINGS#
+CCFLAGS = -Tx64-coff -arch:AVX2 -std:C11 -MD -Ot -Ox -Ob1 -fp:precise -W1 -Gz -Ze -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -D_CRT_SECURE_NO_WARNINGS#
 ASFLAGS = -AAMD64 -Gz#
 RCFLAGS = #
 LINKFLAGS = -machine:x64 -subsystem:windows kernel32.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib setupapi.lib uuid.lib Shell32.lib Version.lib#
@@ -50,18 +50,19 @@ POC_PROJECT_ZIPEXTRA = #
 # Build FakeEsptool.exe.
 # 
 FakeEsptool.exe: \
-	output\main.obj \
-	output\serial.obj \
-	output\config.obj \
-	output\lang.obj \
-	output\trace.obj \
-	output\timer.obj \
-	output\slip.obj \
 	output\chip.obj \
-	output\flash.obj \
-	output\esptool.obj \
+	output\config.obj \
+	output\deflate.obj \
 	output\device.obj \
-	output\main.res
+	output\esptool.obj \
+	output\flash.obj \
+	output\lang.obj \
+	output\main.obj \
+	output\main.res \
+	output\serial.obj \
+	output\slip.obj \
+	output\timer.obj \
+	output\trace.obj
 	$(LINK) $(LINKFLAGS) -out:"$@" $**
 
 # 
@@ -69,11 +70,11 @@ FakeEsptool.exe: \
 # 
 output\main.obj: \
 	src\main.c \
-	src\main.h \
-	src\serial.h \
-	src\esptool\esptool.h \
 	src\esptool\device.h \
+	src\esptool\esptool.h \
+	src\main.h \
 	src\resource.h \
+	src\serial.h \
 	src\utils\config.h \
 	src\utils\lang.h \
 	src\utils\trace.h
@@ -159,6 +160,7 @@ output\esptool.obj: \
 	src\esptool\flash.h \
 	src\esptool\slip.h \
 	src\serial.h \
+	src\utils\deflate.h \
 	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
@@ -178,11 +180,19 @@ output\device.obj: \
 # 
 output\main.res: \
 	src\resource.rc \
-	res\app.ico \
-	res\res1.xml \
-	res\toolbar.bmp \
+	src\res\app.ico \
+	src\res\res1.xml \
+	src\res\toolbar.bmp \
 	src\resource.h
 	$(RC) $(RCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build deflate.obj.
+# 
+output\deflate.obj: \
+	src\utils\deflate.c \
+	src\utils\deflate.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 .SILENT:
 

@@ -104,6 +104,7 @@ typedef struct {
     DWORD     flash_offset;   /* Current flash write offset */
     DWORD     flash_seq;      /* Current flash write sequence */
     DWORD     last_read_val;  /* Cached value from last READ_REG */
+    DWORD     flash_uncompressed_size; /* Uncompressed size for DEFLATE */
 } ESPTOOL_CTX;
 
 /* Initialize ESP protocol context */

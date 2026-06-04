@@ -7,6 +7,7 @@
 #include "esptool.h"
 #include "../serial.h"
 #include "../utils/trace.h"
+#include "../utils/deflate.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -372,6 +373,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     ctx->flash_offset = offset;
     ctx->flash_seq = 0;
+    ctx->flash_uncompressed_size = uncompressed_size;
 
     TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN uncompressed=%lu blocks=%lu bsize=%lu offset=0x%08lX",
                 uncompressed_size, blocks, bsize, offset);
@@ -414,9 +416,50 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             return;
         }
 
-        Flash_Write(&ctx->flash, ctx->flash_offset, payload, data_len);
-        ctx->flash_offset += data_len;
-        ctx->flash_seq = seq + 1;
+        /* Decompress data */
+        if (ctx->flash_uncompressed_size > 0) {
+            /* Allocate decompression buffer */
+            BYTE *decomp_buf = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ctx->flash_uncompressed_size);
+            if (!decomp_buf) {
+                TRACE_FW(TAG, "Failed to allocate decompression buffer");
+                Serial_PostLog(ctx->hNotify, L"ERR", L"  Failed to allocate decompression buffer");
+                BYTE status_len = ctx->stub_mode ? 2 : 4;
+                Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+                return;
+            }
+
+            /* Initialize decompressor */
+            DEFLATE_CTX deflate_ctx;
+            deflate_init(&deflate_ctx, payload, data_len, decomp_buf, ctx->flash_uncompressed_size);
+
+            /* Decompress */
+            int ret = deflate_decompress(&deflate_ctx);
+            if (ret != DEFLATE_OK) {
+                TRACE_FW(TAG, "Decompression failed: %d", ret);
+                Serial_PostLogF(ctx->hNotify, L"ERR", L"  Decompression failed: %d", ret);
+                HeapFree(GetProcessHeap(), 0, decomp_buf);
+                BYTE status_len = ctx->stub_mode ? 2 : 4;
+                Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+                return;
+            }
+
+            /* Write decompressed data to flash */
+            DWORD decomp_size = (DWORD)deflate_ctx.out_pos;
+            TRACE_PROTO(TAG, "FLASH_DEFL_DATA decompressed %lu -> %lu bytes", data_len, decomp_size);
+            Serial_PostLogF(ctx->hNotify, L"ESP", L"  Decompressed %lu -> %lu bytes", data_len, decomp_size);
+
+            Flash_Write(&ctx->flash, ctx->flash_offset, decomp_buf, decomp_size);
+            ctx->flash_offset += decomp_size;
+            ctx->flash_seq = seq + 1;
+
+            /* Free decompression buffer */
+            HeapFree(GetProcessHeap(), 0, decomp_buf);
+        } else {
+            /* No decompression needed (uncompressed_size is 0) */
+            Flash_Write(&ctx->flash, ctx->flash_offset, payload, data_len);
+            ctx->flash_offset += data_len;
+            ctx->flash_seq = seq + 1;
+        }
     }
 
     if (ctx->onModified) ctx->onModified();

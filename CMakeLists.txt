@@ -24,6 +24,7 @@ add_executable(FakeEsptool WIN32
     src/utils/lang.c
     src/utils/trace.c
     src/utils/timer.c
+    src/utils/deflate.c
     src/resource.rc
 )
 
