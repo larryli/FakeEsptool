@@ -122,6 +122,13 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD sta
     Serial_PostLogF(ctx->hNotify, L"DBG", L"SendResponse cmd=0x%02X status_len=%u data_len=%u",
                     cmd, status_len, data_len);
 
+    /* Check if data fits in response buffer */
+    if (data_len > sizeof(resp) - 8) {
+        TRACE_FW(TAG, "Response too large: cmd=0x%02X data_len=%u max=%zu", cmd, data_len, sizeof(resp) - 8);
+        Serial_PostLogF(ctx->hNotify, L"ERR", L"Response too large: cmd=0x%02X size=%u", cmd, data_len);
+        return;
+    }
+
     resp[pos++] = ESP_DIR_RESPONSE;
     resp[pos++] = cmd;
     resp[pos++] = (BYTE)(total_data_len & 0xFF);
@@ -132,8 +139,6 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD sta
     resp[pos++] = (BYTE)((req_val >> 24) & 0xFF);
 
     if (data && data_len > 0) {
-        if (data_len > sizeof(resp) - pos)
-            return;
         memcpy(&resp[pos], data, data_len);
     }
     pos += data_len;
@@ -224,14 +229,32 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
 static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    /* WRITE_REG request format (16 bytes = 4 x 32-bit words):
+       [addr:4][value:4][mask:4][delay_us:4] */
     DWORD addr = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                  ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
     DWORD val = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
                 ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
+    DWORD mask = 0xFFFFFFFF;
+    DWORD delayUs = 0;
 
-    TRACE_PROTO(TAG, "WRITE_REG addr=0x%08lX val=0x%08lX", addr, val);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX val=0x%08lX", addr, val);
-    Chip_WriteReg(&ctx->chip, addr, val);
+    if (pkt->size >= 12) {
+        mask = pkt->data[8] | ((DWORD)pkt->data[9] << 8) |
+               ((DWORD)pkt->data[10] << 16) | ((DWORD)pkt->data[11] << 24);
+    }
+    if (pkt->size >= 16) {
+        delayUs = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
+                  ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
+    }
+
+    TRACE_PROTO(TAG, "WRITE_REG addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr, val, mask, delayUs);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr, val, mask, delayUs);
+
+    /* Apply mask: only bits set in mask are written */
+    DWORD currentVal = Chip_ReadReg(&ctx->chip, addr);
+    DWORD newVal = (currentVal & ~mask) | (val & mask);
+    Chip_WriteReg(&ctx->chip, addr, newVal);
+
     if (ctx->onModified) ctx->onModified();
     /* WRITE_REG always returns 2-byte status */
     Esptool_SendResponseEx(ctx, ESP_CMD_WRITE_REG, ctx->last_read_val, ESP_OK, 2, NULL, 2);
@@ -336,8 +359,10 @@ static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
 static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
-    DWORD total = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                  ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
+    /* FLASH_DEFL_BEGIN format:
+       [uncompressed_size:4][num_blocks:4][block_size:4][offset:4] */
+    DWORD uncompressed_size = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
+                              ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
     DWORD blocks = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
                    ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
     DWORD bsize = pkt->data[8] | ((DWORD)pkt->data[9] << 8) |
@@ -348,10 +373,17 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     ctx->flash_offset = offset;
     ctx->flash_seq = 0;
 
-    TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
-                total, blocks, bsize, offset);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
-                    total, blocks, bsize, offset);
+    TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN uncompressed=%lu blocks=%lu bsize=%lu offset=0x%08lX",
+                uncompressed_size, blocks, bsize, offset);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  uncompressed=%lu blocks=%lu bsize=%lu offset=0x%08lX",
+                    uncompressed_size, blocks, bsize, offset);
+
+    /* Erase the flash region (use uncompressed_size for erase calculation) */
+    if (uncompressed_size > 0) {
+        Flash_Erase(&ctx->flash, offset, uncompressed_size);
+        if (ctx->onModified) ctx->onModified();
+        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Flash erased: offset=0x%08lX size=%lu", offset, uncompressed_size);
+    }
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     BYTE status_len = ctx->stub_mode ? 2 : 4;
@@ -523,6 +555,13 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
                 erase_size, num_blocks, block_size, offset, encrypted);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  erase=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
                     erase_size, num_blocks, block_size, offset, encrypted);
+
+    /* Erase the flash region as requested by the host */
+    if (erase_size > 0) {
+        Flash_Erase(&ctx->flash, offset, erase_size);
+        if (ctx->onModified) ctx->onModified();
+        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Flash erased: offset=0x%08lX size=%lu", offset, erase_size);
+    }
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     BYTE status_len = ctx->stub_mode ? 2 : 4;

@@ -56,7 +56,7 @@ static void WriteChipIdToEfuse(CHIP_CTX *ctx)
     ctx->efuse[0x4F] = (BYTE)((ctx->chip_id >> 24) & 0xFF);
 }
 
-static void InitEsp8266(CHIP_CTX *ctx)
+static BOOL InitEsp8266(CHIP_CTX *ctx)
 {
     strcpy(ctx->name, "ESP8266");
     ctx->chip_id = 0xFFF0C101;
@@ -67,7 +67,11 @@ static void InitEsp8266(CHIP_CTX *ctx)
     ctx->page_size = 256;
     ctx->has_usb = FALSE;
 
-    ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
+    ctx->efuse = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ctx->efuse_size);
+    if (!ctx->efuse) {
+        TRACE_FW(TAG, "Failed to allocate eFuse for ESP8266");
+        return FALSE;
+    }
 
     /* ESP8266 MAC eFuse layout (esptool-js compatible):
        word0 (0x3FF00050): NIC[2]=MAC[5] at byte[3], rest unused
@@ -80,9 +84,10 @@ static void InitEsp8266(CHIP_CTX *ctx)
     ctx->efuse[0x5C] = ctx->mac[2];  /* byte[0] of word3: OUI byte 2 */
     ctx->efuse[0x5D] = ctx->mac[1];  /* byte[1] of word3: OUI byte 1 */
     ctx->efuse[0x5E] = ctx->mac[0];  /* byte[2] of word3: OUI byte 0 */
+    return TRUE;
 }
 
-static void InitEsp32(CHIP_CTX *ctx)
+static BOOL InitEsp32(CHIP_CTX *ctx)
 {
     strcpy(ctx->name, "ESP32");
     ctx->chip_id = 0x00F01D83;
@@ -93,7 +98,11 @@ static void InitEsp32(CHIP_CTX *ctx)
     ctx->page_size = 256;
     ctx->has_usb = FALSE;
 
-    ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
+    ctx->efuse = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ctx->efuse_size);
+    if (!ctx->efuse) {
+        TRACE_FW(TAG, "Failed to allocate eFuse for ESP32");
+        return FALSE;
+    }
 
     /* chip_id at EFUSE_RD_REG_BASE(0x3FF5A000) + 0x000 */
     ctx->efuse[0] = 0x83;
@@ -111,9 +120,10 @@ static void InitEsp32(CHIP_CTX *ctx)
     ctx->efuse[9] = ctx->mac[0];
 
     WriteChipIdToEfuse(ctx);
+    return TRUE;
 }
 
-static void InitEsp32S2(CHIP_CTX *ctx)
+static BOOL InitEsp32S2(CHIP_CTX *ctx)
 {
     strcpy(ctx->name, "ESP32-S2");
     ctx->chip_id = 0x000007C6;
@@ -124,7 +134,11 @@ static void InitEsp32S2(CHIP_CTX *ctx)
     ctx->page_size = 256;
     ctx->has_usb = TRUE;
 
-    ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
+    ctx->efuse = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ctx->efuse_size);
+    if (!ctx->efuse) {
+        TRACE_FW(TAG, "Failed to allocate eFuse for ESP32-S2");
+        return FALSE;
+    }
     
     ctx->efuse[0] = 0xC6;
     ctx->efuse[1] = 0x07;
@@ -132,9 +146,10 @@ static void InitEsp32S2(CHIP_CTX *ctx)
     ctx->efuse[3] = 0x00;
 
     WriteChipIdToEfuse(ctx);
+    return TRUE;
 }
 
-static void InitEsp32S3(CHIP_CTX *ctx)
+static BOOL InitEsp32S3(CHIP_CTX *ctx)
 {
     strcpy(ctx->name, "ESP32-S3");
     ctx->chip_id = 0x00000009;
@@ -145,7 +160,11 @@ static void InitEsp32S3(CHIP_CTX *ctx)
     ctx->page_size = 256;
     ctx->has_usb = TRUE;
 
-    ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
+    ctx->efuse = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ctx->efuse_size);
+    if (!ctx->efuse) {
+        TRACE_FW(TAG, "Failed to allocate eFuse for ESP32-S3");
+        return FALSE;
+    }
     
     ctx->efuse[0] = 0x09;
     ctx->efuse[1] = 0x00;
@@ -153,9 +172,10 @@ static void InitEsp32S3(CHIP_CTX *ctx)
     ctx->efuse[3] = 0x00;
 
     WriteChipIdToEfuse(ctx);
+    return TRUE;
 }
 
-static void InitEsp32C2(CHIP_CTX *ctx)
+static BOOL InitEsp32C2(CHIP_CTX *ctx)
 {
     strcpy(ctx->name, "ESP32-C2");
     ctx->chip_id = 0x7C41A06F;
@@ -166,7 +186,11 @@ static void InitEsp32C2(CHIP_CTX *ctx)
     ctx->page_size = 256;
     ctx->has_usb = FALSE;
 
-    ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
+    ctx->efuse = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ctx->efuse_size);
+    if (!ctx->efuse) {
+        TRACE_FW(TAG, "Failed to allocate eFuse for ESP32-C2");
+        return FALSE;
+    }
     
     ctx->efuse[0] = 0x6F;
     ctx->efuse[1] = 0xA0;
@@ -182,9 +206,10 @@ static void InitEsp32C2(CHIP_CTX *ctx)
     ctx->efuse[0x45] = ctx->mac[0];
 
     WriteChipIdToEfuse(ctx);
+    return TRUE;
 }
 
-static void InitEsp32C3(CHIP_CTX *ctx)
+static BOOL InitEsp32C3(CHIP_CTX *ctx)
 {
     strcpy(ctx->name, "ESP32-C3");
     ctx->chip_id = 0x6921506F;
@@ -195,7 +220,11 @@ static void InitEsp32C3(CHIP_CTX *ctx)
     ctx->page_size = 256;
     ctx->has_usb = TRUE;
 
-    ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
+    ctx->efuse = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ctx->efuse_size);
+    if (!ctx->efuse) {
+        TRACE_FW(TAG, "Failed to allocate eFuse for ESP32-C3");
+        return FALSE;
+    }
     
     ctx->efuse[0] = 0x6F;
     ctx->efuse[1] = 0x50;
@@ -211,9 +240,10 @@ static void InitEsp32C3(CHIP_CTX *ctx)
     ctx->efuse[0x49] = ctx->mac[0];
 
     WriteChipIdToEfuse(ctx);
+    return TRUE;
 }
 
-static void InitEsp32C6(CHIP_CTX *ctx)
+static BOOL InitEsp32C6(CHIP_CTX *ctx)
 {
     strcpy(ctx->name, "ESP32-C6");
     ctx->chip_id = 0x2CE0806F;
@@ -224,7 +254,11 @@ static void InitEsp32C6(CHIP_CTX *ctx)
     ctx->page_size = 256;
     ctx->has_usb = TRUE;
 
-    ctx->efuse = (BYTE *)calloc(1, ctx->efuse_size);
+    ctx->efuse = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ctx->efuse_size);
+    if (!ctx->efuse) {
+        TRACE_FW(TAG, "Failed to allocate eFuse for ESP32-C6");
+        return FALSE;
+    }
     
     ctx->efuse[0] = 0x6F;
     ctx->efuse[1] = 0x80;
@@ -240,6 +274,7 @@ static void InitEsp32C6(CHIP_CTX *ctx)
     ctx->efuse[0x49] = ctx->mac[0];
 
     WriteChipIdToEfuse(ctx);
+    return TRUE;
 }
 
 BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
@@ -277,13 +312,13 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
     }
 
     switch (type) {
-    case CHIP_ESP8266: InitEsp8266(ctx); break;
-    case CHIP_ESP32:   InitEsp32(ctx);   break;
-    case CHIP_ESP32S2: InitEsp32S2(ctx); break;
-    case CHIP_ESP32S3: InitEsp32S3(ctx); break;
-    case CHIP_ESP32C2: InitEsp32C2(ctx); break;
-    case CHIP_ESP32C3: InitEsp32C3(ctx); break;
-    case CHIP_ESP32C6: InitEsp32C6(ctx); break;
+    case CHIP_ESP8266: if (!InitEsp8266(ctx)) return FALSE; break;
+    case CHIP_ESP32:   if (!InitEsp32(ctx))   return FALSE; break;
+    case CHIP_ESP32S2: if (!InitEsp32S2(ctx)) return FALSE; break;
+    case CHIP_ESP32S3: if (!InitEsp32S3(ctx)) return FALSE; break;
+    case CHIP_ESP32C2: if (!InitEsp32C2(ctx)) return FALSE; break;
+    case CHIP_ESP32C3: if (!InitEsp32C3(ctx)) return FALSE; break;
+    case CHIP_ESP32C6: if (!InitEsp32C6(ctx)) return FALSE; break;
     default:
         TRACE_FW(TAG, "Unknown chip type: %d", type);
         return FALSE;
@@ -303,7 +338,7 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
 void Chip_Close(CHIP_CTX *ctx)
 {
     if (ctx->efuse) {
-        free(ctx->efuse);
+        HeapFree(GetProcessHeap(), 0, ctx->efuse);
         ctx->efuse = NULL;
     }
 }

@@ -409,11 +409,11 @@ Data:      0x00 0x00 0x00 0x00 (4 字节 status=成功)
 Direction: 0x00
 Command:   0x07
 Size:      data_len + 16
-Checksum:  <XOR of 完整 Data 字段>
+Checksum:  <XOR of payload only>
 Data:      [data_len:4][seq:4][padding:4][padding:4][payload:data_len]
 ```
 
-**校验范围：** 覆盖 Size 声明的全部字节（含 4+4+4+4 字节头部及实际数据）。
+**校验范围：** 仅计算数据负载部分（payload），不包含 16 字节头部。
 
 **响应：**
 ```
@@ -452,6 +452,8 @@ Data:      0x00 0x00 0x00 0x00 (4 字节 status=成功)
 
 ### 3.10 FLASH_BEGIN (0x02) - Flash 写入开始
 
+**功能：** 进入 Flash 下载模式，**擦除指定区域**，准备接收数据。
+
 **请求（Stub 模式）：**
 ```
 Direction: 0x00
@@ -471,6 +473,18 @@ Data:      [erase_size:4][num_blocks:4][block_size:4][offset:4][encrypted:4]
                                                                   ^^^^^^^^^^^^
                                                                   额外 4 字节
 ```
+
+**字段说明：**
+| 字段 | 说明 |
+|------|------|
+| erase_size | 要擦除的字节数（设备端据此执行擦除） |
+| num_blocks | 要写入的数据块数量 |
+| block_size | 每个数据块的大小 |
+| offset | Flash 起始偏移地址 |
+
+**设备端行为：**
+1. 根据 `erase_size` 和 `offset` 擦除 Flash 区域
+2. 返回成功响应
 
 **响应（ROM 模式）：**
 ```
@@ -499,11 +513,11 @@ Data:      0x00 0x00 (2 字节 status=成功)
 Direction: 0x00
 Command:   0x03
 Size:      data_len + 16
-Checksum:  <XOR of 完整 Data 字段>
+Checksum:  <XOR of payload only>
 Data:      [data_len:4][seq:4][padding:4][padding:4][payload:data_len]
 ```
 
-**校验范围：** 覆盖 Size 声明的全部字节（含 4+4+4+4 字节头部及实际数据）。
+**校验范围：** 仅计算数据负载部分（payload），不包含 16 字节头部。
 
 **响应（ROM 模式）：**
 ```
@@ -560,6 +574,8 @@ Data:      0x00 0x00 (2 字节 status=成功)
 
 ### 3.13 FLASH_DEFL_BEGIN (0x10) - 压缩写入开始
 
+**功能：** 进入压缩 Flash 下载模式，**擦除指定区域**，准备接收压缩数据。
+
 **请求：**
 ```
 Direction: 0x00
@@ -568,6 +584,18 @@ Size:      0x10 0x00 (16 bytes)
 Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [uncompressed_size:4][num_blocks:4][block_size:4][offset:4]
 ```
+
+**字段说明：**
+| 字段 | 说明 |
+|------|------|
+| uncompressed_size | 未压缩数据大小（设备端据此执行擦除） |
+| num_blocks | 要写入的压缩数据块数量 |
+| block_size | 每个数据块的大小 |
+| offset | Flash 起始偏移地址 |
+
+**设备端行为：**
+1. 根据 `uncompressed_size` 和 `offset` 擦除 Flash 区域
+2. 返回成功响应
 
 **响应（ROM 模式）：**
 ```
@@ -596,11 +624,11 @@ Data:      0x00 0x00 (2 字节 status=成功)
 Direction: 0x00
 Command:   0x11
 Size:      data_len + 16
-Checksum:  <XOR of 完整 Data 字段> (按异或算法计算)
+Checksum:  <XOR of payload only>
 Data:      [data_len:4][seq:4][padding:4][padding:4][compressed_data:data_len]
 ```
 
-**校验范围：** 覆盖 Size 声明的全部字节（含 4+4+4+4 字节头部及实际数据）。
+**校验范围：** 仅计算数据负载部分（payload），不包含 16 字节头部。
 
 **响应（ROM 模式）：**
 ```
@@ -1164,12 +1192,9 @@ Stub 上传成功后，设备行为发生变化：
 
 | 命令码 | 名称 | 说明 |
 |--------|------|------|
-| 0x0D | SPI_ATTACH | SPI Flash 附加（已废弃，被 SPI_ATTACH_CMD 替代） |
 | 0x0E | READ_FLASH_SLOW | 慢速读取 Flash（已废弃） |
 
 **兼容性处理：** 若收到未实现的命令，可返回 Status != 0 或直接忽略，esptool 会 fallback。
-
-**注意：** 0xD3 (RUN_USER_CODE) 虽然是 Stub 专属命令，但已在 esptool-js 中实现，用于软复位。
 
 ---
 

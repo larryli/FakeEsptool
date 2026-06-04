@@ -65,10 +65,24 @@ BOOL Flash_Write(FLASH_CTX *ctx, DWORD addr, const BYTE *data, DWORD len)
 
 BOOL Flash_Erase(FLASH_CTX *ctx, DWORD addr, DWORD len)
 {
-    if (!ctx->data || addr + len > ctx->size)
+    if (!ctx->data || len == 0)
         return FALSE;
 
-    memset(ctx->data + addr, FLASH_ERASE_PATTERN, len);
+    /* Align to sector boundaries (4KB) */
+    DWORD start_sector = (addr / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE;
+    DWORD end_addr = addr + len;
+    DWORD end_sector = ((end_addr + FLASH_SECTOR_SIZE - 1) / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE;
+
+    /* Clamp to flash size */
+    if (end_sector > ctx->size)
+        end_sector = ctx->size;
+
+    DWORD aligned_len = end_sector - start_sector;
+
+    TRACE_FW(TAG, "Erase: addr=0x%08lX len=%lu -> aligned: 0x%08lX len=%lu",
+             addr, len, start_sector, aligned_len);
+
+    memset(ctx->data + start_sector, FLASH_ERASE_PATTERN, aligned_len);
     return TRUE;
 }
 

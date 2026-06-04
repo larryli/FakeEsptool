@@ -12,6 +12,9 @@
 /* Erase pattern (all ones) */
 #define FLASH_ERASE_PATTERN 0xFF
 
+/* Flash sector size (4KB) - all erase operations are sector-aligned */
+#define FLASH_SECTOR_SIZE 4096
+
 /* Flash storage context */
 typedef struct {
     BYTE *data;             /* Flash data buffer */

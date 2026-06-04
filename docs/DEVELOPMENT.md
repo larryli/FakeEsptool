@@ -81,7 +81,7 @@ cmake --build build
 
 | 码 | 名称 | 说明 |
 |----|------|------|
-| 0x02 | FLASH_BEGIN | Flash 写入开始 |
+| 0x02 | FLASH_BEGIN | Flash 写入开始（擦除指定区域） |
 | 0x03 | FLASH_DATA | Flash 写入数据 |
 | 0x04 | FLASH_END | Flash 写入结束 |
 | 0x05 | MEM_BEGIN | 内存写入开始 |
@@ -91,7 +91,7 @@ cmake --build build
 | 0x09 | WRITE_REG | 写寄存器 |
 | 0x0A | READ_REG | 读寄存器 |
 | 0x0F | CHANGE_BAUDRATE | 修改波特率 |
-| 0x10 | FLASH_DEFL_BEGIN | 压缩写入开始 |
+| 0x10 | FLASH_DEFL_BEGIN | 压缩写入开始（擦除指定区域） |
 | 0x11 | FLASH_DEFL_DATA | 压缩写入数据 |
 | 0x12 | FLASH_DEFL_END | 压缩写入结束 |
 | 0x13 | SPI_FLASH_MD5 | 计算Flash MD5 |
@@ -247,7 +247,7 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 | `Flash_Close(ctx)` | 释放 Flash |
 | `Flash_Read(ctx, addr, buf, len)` | 读取数据 |
 | `Flash_Write(ctx, addr, data, len)` | 写入数据（AND 操作，模拟真实 Flash 行为） |
-| `Flash_Erase(ctx, addr, len)` | 擦除区域（设为 0xFF） |
+| `Flash_Erase(ctx, addr, len)` | 擦除区域（自动 4KB 扇区对齐，设为 0xFF） |
 | `Flash_EraseAll(ctx)` | 擦除全部 |
 | `Flash_CalcMd5(ctx, addr, len, md5)` | 计算 MD5 |
 
@@ -317,6 +317,51 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 | `Serial_GetPortName(index, portName, maxLen)` | 获取端口名 |
 | `Serial_PostLog(hNotify, tag, text)` | 发送日志 |
 | `Serial_PostLogF(hNotify, tag, fmt, ...)` | 格式化日志 |
+
+## 编码规范
+
+### 内存管理
+
+本项目使用 Windows Heap API 进行动态内存管理，**禁止**使用 C 标准库的 `malloc`/`calloc`/`realloc`/`free`。
+
+**原因：**
+- 统一使用 Windows 堆管理，便于调试和内存泄漏检测
+- `HeapAlloc`/`HeapFree` 支持 `HEAP_ZERO_MEMORY` 标志替代 `calloc`
+- 与项目中已有的 `HeapAlloc`/`HeapFree` 用法保持一致
+
+**规范：**
+
+```c
+// ✗ 错误 - 使用 C 标准库
+void *ptr = malloc(size);
+void *ptr = calloc(count, size);
+free(ptr);
+
+// ✓ 正确 - 使用 Windows Heap API
+void *ptr = HeapAlloc(GetProcessHeap(), 0, size);           // 未初始化
+void *ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);  // 零初始化（替代 calloc）
+HeapFree(GetProcessHeap(), 0, ptr);
+```
+
+**示例：**
+
+```c
+BYTE *efuse = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, efuse_size);
+if (!efuse) {
+    TRACE_FW(TAG, "Failed to allocate eFuse");
+    return FALSE;
+}
+
+// 使用 efuse...
+
+HeapFree(GetProcessHeap(), 0, efuse);
+```
+
+**注意事项：**
+- 始终检查 `HeapAlloc` 返回值，失败时返回 `NULL`
+- 使用 `HEAP_ZERO_MEMORY` 替代 `calloc` 的零初始化行为
+- 使用 `GetProcessHeap()` 获取进程默认堆句柄
+- 释放后将指针置为 `NULL`，防止悬挂指针
 
 ## 调试
 

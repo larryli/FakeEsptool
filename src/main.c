@@ -162,27 +162,36 @@ static void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, H
     Esptool_Feed(&g_esptool, data, (int)len);
 }
 
+/* Signal state for download mode detection */
+static BOOL g_prev_dsr = FALSE;
+static BOOL g_prev_cts = FALSE;
+static BOOL g_reset_pending = FALSE;
+
+/* Reset signal state (call when serial connection is established) */
+static void ResetSignalState(void)
+{
+    g_prev_dsr = FALSE;
+    g_prev_cts = FALSE;
+    g_reset_pending = FALSE;
+}
+
 /* esptool protocol signal change callback
    Note: Called only from the serial listener thread (single-threaded access) */
 static void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
 {
-    static BOOL prev_dsr = FALSE;
-    static BOOL prev_cts = FALSE;
-    static BOOL reset_pending = FALSE;
-
     BOOL dsr = (modemStatus & MS_DSR_ON) != 0;
     BOOL cts = (modemStatus & MS_CTS_ON) != 0;
 
-    if (dsr != prev_dsr || cts != prev_cts) {
+    if (dsr != g_prev_dsr || cts != g_prev_cts) {
         Serial_PostLogF(hNotify, L"SIG", L"DSR:%s CTS:%s",
                         dsr ? L"ON" : L"OFF", cts ? L"ON" : L"OFF");
 
         /* Detect reset: DSR=ON, CTS=OFF (DTR high, RTS low) */
         if (dsr && !cts) {
-            reset_pending = TRUE;
+            g_reset_pending = TRUE;
         }
         /* Detect download mode entry: DSR=OFF, CTS=OFF after reset */
-        else if (reset_pending && !dsr && !cts) {
+        else if (g_reset_pending && !dsr && !cts) {
             Serial_PostLog(hNotify, L"SIG", L"Download mode entered");
 
             DWORD bootBaud = Chip_GetBootBaudRate(&g_device.chip);
@@ -219,15 +228,15 @@ static void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
                 Serial_PostLogF(hNotify, L"CFG", L"Baud rate: 115200");
             }
 
-            reset_pending = FALSE;
+            g_reset_pending = FALSE;
         }
         /* Any other state cancels pending reset */
         else {
-            reset_pending = FALSE;
+            g_reset_pending = FALSE;
         }
 
-        prev_dsr = dsr;
-        prev_cts = cts;
+        g_prev_dsr = dsr;
+        g_prev_cts = cts;
     }
 }
 
@@ -1016,6 +1025,7 @@ static void Main_OnConnect(HWND hMainWnd)
 
     Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)OnEsptoolProcessData);
     Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
+    ResetSignalState();
 
     TRACE_FW(TAG, "Serial_Open succeeded");
 
@@ -1064,6 +1074,7 @@ static void Main_OnReconnect(HWND hMainWnd)
     /* Register esptool protocol callbacks */
     Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)OnEsptoolProcessData);
     Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
+    ResetSignalState();
 
     TRACE_FW(TAG, "Serial_Open succeeded");
 
