@@ -43,7 +43,7 @@
  */
 
 /* Device context */
-typedef struct {
+typedef struct DEVICE_CTX_TAG {
     CHIP_CTX  chip;             /* Chip characteristics */
     FLASH_CTX flash;            /* Flash storage */
     WCHAR     filename[MAX_PATH]; /* Current file path */

@@ -28,7 +28,6 @@ BOOL Flash_Init(FLASH_CTX *ctx, DWORD size)
 
     memset(ctx->data, FLASH_ERASE_PATTERN, size);
     ctx->size = size;
-    ctx->allocated = TRUE;
 
     TRACE_FW(TAG, "Initialized %lu KB flash", size / 1024);
     return TRUE;
@@ -36,10 +35,9 @@ BOOL Flash_Init(FLASH_CTX *ctx, DWORD size)
 
 void Flash_Close(FLASH_CTX *ctx)
 {
-    if (ctx->allocated && ctx->data) {
+    if (ctx->data) {
         HeapFree(GetProcessHeap(), 0, ctx->data);
         ctx->data = NULL;
-        ctx->allocated = FALSE;
     }
 }
 

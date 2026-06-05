@@ -137,23 +137,6 @@ static BOOL OnBaudRateChange(DWORD baudRate)
     return Serial_SetBaudRate(&g_serial, baudRate);
 }
 
-/* Sync g_device chip/flash state to g_esptool protocol context.
-   Copies: chip type, MAC, eFuse, xtal_freq, flash size, flash data */
-void SyncDeviceToEsptool(void)
-{
-    Flash_Close(&g_esptool.flash);
-    Chip_Close(&g_esptool.chip);
-    Chip_Init(&g_esptool.chip, g_device.chip.type);
-    Chip_SetMac(&g_esptool.chip, g_device.chip.mac);
-    Chip_SetFlashSize(&g_esptool.chip, g_device.flash.size);
-    if (g_device.chip.efuse && g_esptool.chip.efuse)
-        memcpy(g_esptool.chip.efuse, g_device.chip.efuse, g_device.chip.efuse_size);
-    g_esptool.chip.xtal_freq = g_device.chip.xtal_freq;
-    Flash_Init(&g_esptool.flash, g_device.flash.size);
-    if (g_device.flash.data)
-        memcpy(g_esptool.flash.data, g_device.flash.data, g_device.flash.size);
-}
-
 /* esptool protocol data receive callback */
 void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify)
 {
@@ -653,7 +636,6 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
             int ret = MessageBoxW(hWnd, msg, L"Open Device", MB_YESNO | MB_ICONQUESTION);
             if (ret == IDYES) {
                 if (Device_Load(&g_device, lastFile)) {
-                    SyncDeviceToEsptool();
                     Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                     UpdateStatusBar();
                     UpdateTitle(hWnd);
@@ -668,7 +650,6 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
         /* User cancelled - exit */
         DestroyWindow(hWnd);
     } else {
-        SyncDeviceToEsptool();
         Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
         UpdateStatusBar();
         UpdateTitle(hWnd);
@@ -700,8 +681,8 @@ static BOOL Main_Init(HINSTANCE hInstance)
     INITCOMMONCONTROLSEX icex = { .dwSize = sizeof(icex), .dwICC = ICC_BAR_CLASSES };
     InitCommonControlsEx(&icex);
 
-    /* Initialize esptool protocol */
-    Esptool_Init(&g_esptool);
+    /* Initialize esptool protocol with pointers to device data */
+    Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
     Esptool_SetWriteCallback(&g_esptool, OnSerialWrite);
     Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 

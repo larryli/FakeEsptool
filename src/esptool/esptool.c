@@ -63,12 +63,12 @@ BYTE Esptool_CalcChecksum(const BYTE *data, int len)
     return sum;
 }
 
-void Esptool_Init(ESPTOOL_CTX *ctx)
+void Esptool_Init(ESPTOOL_CTX *ctx, CHIP_CTX *chip, FLASH_CTX *flash)
 {
     memset(ctx, 0, sizeof(ESPTOOL_CTX));
     Slip_Init(&ctx->slip);
-    Chip_Init(&ctx->chip, CHIP_ESP32);
-    Flash_Init(&ctx->flash, 4 * 1024 * 1024);
+    ctx->chip = chip;
+    ctx->flash = flash;
     ctx->state = ESP_STATE_IDLE;
     ctx->synced = FALSE;
     ctx->stub_mode = FALSE;
@@ -107,21 +107,6 @@ void Esptool_SetWriteCallback(ESPTOOL_CTX *ctx, ESP_WRITE_CB cb)
 void Esptool_SetBaudRateCallback(ESPTOOL_CTX *ctx, ESP_BAUDRATE_CB cb)
 {
     ctx->onBaudRate = cb;
-}
-
-void Esptool_SetChipType(ESPTOOL_CTX *ctx, CHIP_TYPE type)
-{
-    Flash_Close(&ctx->flash);
-    Chip_Close(&ctx->chip);
-    Chip_Init(&ctx->chip, type);
-    Flash_Init(&ctx->flash, ctx->chip.flash_size);
-}
-
-void Esptool_SetFlashSize(ESPTOOL_CTX *ctx, DWORD size)
-{
-    Flash_Close(&ctx->flash);
-    Chip_SetFlashSize(&ctx->chip, size);
-    Flash_Init(&ctx->flash, size);
 }
 
 void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD status, BYTE status_len, const BYTE *data, WORD data_len)
@@ -230,7 +215,7 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     DWORD addr = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                  ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-    DWORD val = Chip_ReadReg(&ctx->chip, addr);
+    DWORD val = Chip_ReadReg(ctx->chip, addr);
 
     TRACE_PROTO(TAG, "READ_REG addr=0x%08lX val=0x%08lX", addr, val);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX -> 0x%08lX", addr, val);
@@ -275,9 +260,9 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr, val, mask, delayUs);
 
     /* Apply mask: only bits set in mask are written */
-    DWORD currentVal = Chip_ReadReg(&ctx->chip, addr);
+    DWORD currentVal = Chip_ReadReg(ctx->chip, addr);
     DWORD newVal = (currentVal & ~mask) | (val & mask);
-    Chip_WriteReg(&ctx->chip, addr, newVal);
+    Chip_WriteReg(ctx->chip, addr, newVal);
 
     if (ctx->onModified) ctx->onModified();
     /* WRITE_REG always returns 2-byte status, Val field is 0x00000000 */
@@ -411,7 +396,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     /* Erase the flash region (use uncompressed_size for erase calculation) */
     if (uncompressed_size > 0) {
-        Flash_Erase(&ctx->flash, offset, uncompressed_size);
+        Flash_Erase(ctx->flash, offset, uncompressed_size);
         if (ctx->onModified) ctx->onModified();
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  Flash erased: offset=0x%08lX size=%lu", offset, uncompressed_size);
     }
@@ -486,7 +471,7 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             TRACE_PROTO(TAG, "FLASH_DEFL_DATA decompressed %lu -> %lu bytes", data_len, decomp_size);
             Serial_PostLogF(ctx->hNotify, L"ESP", L"  Decompressed %lu -> %lu bytes", data_len, decomp_size);
 
-            Flash_Write(&ctx->flash, ctx->flash_offset, decomp_buf, decomp_size);
+            Flash_Write(ctx->flash, ctx->flash_offset, decomp_buf, decomp_size);
             ctx->flash_offset += decomp_size;
             ctx->flash_seq = seq + 1;
 
@@ -494,7 +479,7 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             HeapFree(GetProcessHeap(), 0, decomp_buf);
         } else {
             /* No decompression needed (uncompressed_size is 0) */
-            Flash_Write(&ctx->flash, ctx->flash_offset, payload, data_len);
+            Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
             ctx->flash_offset += data_len;
             ctx->flash_seq = seq + 1;
         }
@@ -539,7 +524,7 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* READ_FLASH is stub-only, 2-byte status prefix */
     buf[0] = 0x00;
     buf[1] = 0x00;
-    if (Flash_Read(&ctx->flash, addr, buf + 2, len)) {
+    if (Flash_Read(ctx->flash, addr, buf + 2, len)) {
         Esptool_SendResponse(ctx, ESP_CMD_READ_FLASH, ctx->last_read_val, ESP_OK, buf, (WORD)(len + 2));
     } else {
         buf[0] = 0x01;
@@ -552,7 +537,7 @@ static void HandleEraseFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG, "ERASE_FLASH");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Erase entire flash");
 
-    Flash_EraseAll(&ctx->flash);
+    Flash_EraseAll(ctx->flash);
     if (ctx->onModified) ctx->onModified();
     /* ERASE_FLASH is stub-only, always returns 2-byte status */
     Esptool_SendResponseEx(ctx, ESP_CMD_ERASE_FLASH, ctx->last_read_val, ESP_OK, 2, NULL, 2);
@@ -569,7 +554,7 @@ static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  offset=0x%08lX len=%lu", offset, len);
 
     /* ERASE_REGION is stub-only, always returns 2-byte status */
-    if (Flash_Erase(&ctx->flash, offset, len)) {
+    if (Flash_Erase(ctx->flash, offset, len)) {
         if (ctx->onModified) ctx->onModified();
         Esptool_SendResponseEx(ctx, ESP_CMD_ERASE_REGION, ctx->last_read_val, ESP_OK, 2, NULL, 2);
     } else {
@@ -588,16 +573,16 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX len=%lu", addr, len);
 
     BYTE md5[16];
-    Flash_CalcMd5(&ctx->flash, addr, len, md5);
+    Flash_CalcMd5(ctx->flash, addr, len, md5);
 
     /* ROM mode: 2-byte status + 32-byte ASCII hex MD5 = 34 bytes
-       Stub mode: 2-byte status + 16-byte binary MD5 = 18 bytes */
+       Stub mode: 16-byte binary MD5 + 2-byte status = 18 bytes */
     if (ctx->stub_mode) {
         /* Stub mode: return 16-byte binary MD5 */
         BYTE resp[18];
-        resp[0] = 0x00;  /* status byte 1 (success) */
-        resp[1] = 0x00;  /* status byte 2 (success) */
-        memcpy(&resp[2], md5, 16);
+        memcpy(&resp[0], md5, 16);
+        resp[16] = 0x00;  /* status byte 1 (success) */
+        resp[17] = 0x00;  /* status byte 2 (success) */
         TRACE_PROTO(TAG, "  MD5 (stub, binary)");
         Serial_PostLog(ctx->hNotify, L"ESP", L"  MD5 (stub, binary)");
         Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_MD5, ctx->last_read_val, ESP_OK, resp, 18);
@@ -643,7 +628,7 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     /* Erase the flash region as requested by the host */
     if (erase_size > 0) {
-        Flash_Erase(&ctx->flash, offset, erase_size);
+        Flash_Erase(ctx->flash, offset, erase_size);
         if (ctx->onModified) ctx->onModified();
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  Flash erased: offset=0x%08lX size=%lu", offset, erase_size);
     }
@@ -686,7 +671,7 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             return;
         }
 
-        Flash_Write(&ctx->flash, ctx->flash_offset, payload, data_len);
+        Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
         ctx->flash_offset += data_len;
         ctx->flash_seq = seq + 1;
     }
@@ -733,7 +718,7 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     sec_data[1] = 0x00;  /* status byte 2 (success) */
     /* flags(4) + flash_crypt_cnt(1) + key_purposes(7) = all zeros */
     /* chip_id at offset 12 (little-endian) */
-    DWORD chip_id = ctx->chip.chip_id;
+    DWORD chip_id = ctx->chip->chip_id;
     sec_data[12] = (BYTE)(chip_id & 0xFF);
     sec_data[13] = (BYTE)((chip_id >> 8) & 0xFF);
     sec_data[14] = (BYTE)((chip_id >> 16) & 0xFF);

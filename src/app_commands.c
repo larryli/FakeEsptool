@@ -284,7 +284,6 @@ void Main_CmdNewDevice(HWND hWnd)
     if (!PromptSaveIfNeeded(hWnd))
         return;
     if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_NEW_DEVICE), hWnd, NewDeviceDlgProc) == IDOK) {
-        SyncDeviceToEsptool();
         Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
         Config_SetLastDeviceFile(NULL);
         UpdateStatusBar();
@@ -311,7 +310,6 @@ void Main_CmdOpenDevice(HWND hWnd)
     if (GetOpenFileNameW(&ofn)) {
         Device_Close(&g_device);
         if (Device_Load(&g_device, szFile)) {
-            SyncDeviceToEsptool();
             Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
             Config_SetLastDeviceFile(szFile);
             UpdateStatusBar();

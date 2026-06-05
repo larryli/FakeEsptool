@@ -98,11 +98,14 @@ typedef struct {
     BYTE  data[32760];        /* Data payload (matches SLIP_MAX_FRAME - 8 header bytes) */
 } ESP_PACKET;
 
+/* Forward declaration */
+typedef struct DEVICE_CTX_TAG DEVICE_CTX;
+
 /* ESP protocol context */
 typedef struct {
     SLIP_CTX  slip;           /* SLIP decoder context */
-    CHIP_CTX  chip;           /* Chip characteristics */
-    FLASH_CTX flash;          /* Flash storage */
+    CHIP_CTX  *chip;          /* Pointer to device chip (not owned) */
+    FLASH_CTX *flash;         /* Pointer to device flash (not owned) */
     ESP_PACKET pkt;           /* Pre-allocated packet buffer (avoids stack overflow) */
     ESP_STATE state;          /* Protocol state machine */
     BOOL      synced;         /* SYNC handshake completed */
@@ -117,8 +120,8 @@ typedef struct {
     DWORD     flash_uncompressed_size; /* Uncompressed size for DEFLATE */
 } ESPTOOL_CTX;
 
-/* Initialize ESP protocol context */
-void Esptool_Init(ESPTOOL_CTX *ctx);
+/* Initialize ESP protocol context with device data */
+void Esptool_Init(ESPTOOL_CTX *ctx, CHIP_CTX *chip, FLASH_CTX *flash);
 
 /* Reset protocol state (called on download mode entry) */
 void Esptool_ResetState(ESPTOOL_CTX *ctx);
@@ -128,12 +131,6 @@ void Esptool_SetNotify(ESPTOOL_CTX *ctx, HWND hNotify);
 
 /* Set callback for device modification */
 void Esptool_SetModifiedCallback(ESPTOOL_CTX *ctx, ESP_MODIFIED_CB cb);
-
-/* Set chip type and reinitialize */
-void Esptool_SetChipType(ESPTOOL_CTX *ctx, CHIP_TYPE type);
-
-/* Set flash size and reinitialize */
-void Esptool_SetFlashSize(ESPTOOL_CTX *ctx, DWORD size);
 
 /* Set write callback for sending data to serial port */
 void Esptool_SetWriteCallback(ESPTOOL_CTX *ctx, ESP_WRITE_CB cb);

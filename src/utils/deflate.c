@@ -491,6 +491,16 @@ void deflate_init(DEFLATE_CTX *ctx, const BYTE *in_buf, size_t in_len,
     ctx->in_len = in_len;
     ctx->in_pos = 0;
 
+    /* Skip zlib header (2 bytes) if present */
+    if (in_len >= 2 && in_buf[0] == 0x78) {
+        BYTE cmf = in_buf[0];
+        BYTE flg = in_buf[1];
+        /* Verify zlib header: CMF*256+FLG must be divisible by 31 */
+        if (((cmf << 8) | flg) % 31 == 0) {
+            ctx->in_pos = 2;
+        }
+    }
+
     ctx->out_buf = out_buf;
     ctx->out_len = out_len;
     ctx->out_pos = 0;

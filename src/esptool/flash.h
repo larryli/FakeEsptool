@@ -19,7 +19,6 @@
 typedef struct {
     BYTE *data;             /* Flash data buffer */
     DWORD size;             /* Flash size in bytes */
-    BOOL  allocated;        /* TRUE if data buffer was allocated */
 } FLASH_CTX;
 
 /* Initialize flash with specified size */

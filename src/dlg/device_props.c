@@ -10,9 +10,6 @@
 #include <wchar.h>
 #include <stdlib.h>
 
-/* External: SyncDeviceToEsptool defined in main.c */
-extern void SyncDeviceToEsptool(void);
-
 /* Device Properties dialog procedure */
 INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -120,8 +117,7 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM l
                     /* Reinitialize device with new settings */
                     DWORD oldFlashSize = g_device.flash.size;
                     BYTE *oldFlashData = g_device.flash.data;
-                    g_device.flash.data = NULL;
-                    g_device.flash.allocated = FALSE;
+                    g_device.flash.data = NULL;  /* Prevent double-free */
 
                     Device_Close(&g_device);
                     if (Device_Init(&g_device, selectedChip, selectedFlash, mac)) {
@@ -134,7 +130,6 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM l
                         if (oldFlashData)
                             HeapFree(GetProcessHeap(), 0, oldFlashData);
 
-                        SyncDeviceToEsptool();
                         Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                         Device_SetModified(&g_device, TRUE);
                         EndDialog(hDlg, IDOK);

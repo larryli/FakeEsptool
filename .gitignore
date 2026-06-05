@@ -45,7 +45,10 @@ Makefile
 
 # Windows
 Thumbs.db
-Desktop.ini
 
 # Application config (optional, uncomment to track)
-FakeEsptool.ini
+*.ini
+
+# Binary and text files (optional, uncomment to ignore)
+*.bin
+*.txt

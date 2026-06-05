@@ -27,9 +27,28 @@ FakeEsptool 是一个 ESP 芯片设备端模拟器，用于模拟 ESP8266/ESP32 
                └──────────┘   └──────────┘
 ```
 
+### 数据共享机制
+
+协议层（`ESPTOOL_CTX`）通过指针直接引用设备层（`DEVICE_CTX`）的数据，无需数据复制或同步：
+
+```
+g_device.chip  ◄─── g_esptool.chip   (同一块内存)
+g_device.flash ◄─── g_esptool.flash  (同一块内存)
+```
+
+**初始化**：
+```c
+Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
+```
+
+**数据流**：
+- esptool 协议层读写 `g_esptool.chip` / `g_esptool.flash` 时，直接修改 `g_device` 的数据
+- 设备保存、导出等操作直接读取 `g_device` 的数据
+- 无需额外的同步函数
+
 | 模块 | 职责 |
 |------|------|
-| `main.c` | 用户界面，菜单、工具栏、日志显示，esptool 回调注册与设备同步 |
+| `main.c` | 用户界面，菜单、工具栏、日志显示，esptool 回调注册 |
 | `serial.c` | 串口通信，数据收发，信号控制 |
 | `esptool/slip.c/h` | SLIP 协议编解码 |
 | `esptool/chip.c/h` | 芯片特性模拟（efuse、MAC等） |
@@ -118,16 +137,12 @@ cmake --build build
 ```c
 #include "esptool/esptool.h"
 
-// 初始化
-Esptool_Init(&g_esptool);
-
-// 设置芯片
-Esptool_SetChipType(&g_esptool, CHIP_ESP32);
-Esptool_SetFlashSize(&g_esptool, 4 * 1024 * 1024);
+// 初始化（协议层直接引用设备数据）
+Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
 
 // 注册回调
-Serial_SetReceiveCallback(&g_serial, (SERIAL_RX_CB)OnEsptoolProcessData);
-Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
+Esptool_SetWriteCallback(&g_esptool, OnSerialWrite);
+Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 ```
 
 ## API 参考
@@ -156,8 +171,8 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `slip` | SLIP_CTX | SLIP 解码器上下文 |
-| `chip` | CHIP_CTX | 芯片特性 |
-| `flash` | FLASH_CTX | Flash 存储 |
+| `chip` | CHIP_CTX* | 指向设备芯片数据（不拥有） |
+| `flash` | FLASH_CTX* | 指向设备 Flash 数据（不拥有） |
 | `pkt` | ESP_PACKET | 预分配数据包缓冲区（避免栈溢出） |
 | `state` | ESP_STATE | 协议状态机 |
 | `synced` | BOOL | SYNC 握手完成标志 |
@@ -197,12 +212,10 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 
 | 函数 | 说明 |
 |------|------|
-| `Esptool_Init(ctx)` | 初始化上下文 |
+| `Esptool_Init(ctx, chip, flash)` | 初始化上下文，绑定设备数据指针 |
 | `Esptool_ResetState(ctx)` | 重置协议状态（进入下载模式时调用） |
 | `Esptool_SetNotify(ctx, hNotify)` | 设置通知窗口 |
 | `Esptool_SetModifiedCallback(ctx, cb)` | 设置修改回调 |
-| `Esptool_SetChipType(ctx, type)` | 设置芯片类型 |
-| `Esptool_SetFlashSize(ctx, size)` | 设置Flash大小 |
 | `Esptool_SetWriteCallback(ctx, cb)` | 设置串口写回调 |
 | `Esptool_SetBaudRateCallback(ctx, cb)` | 设置波特率修改回调 |
 | `Esptool_Feed(ctx, data, len)` | 喂入串口数据 |
@@ -264,7 +277,6 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 |------|------|------|
 | `data` | BYTE* | Flash 数据缓冲区 |
 | `size` | DWORD | Flash 大小（字节） |
-| `allocated` | BOOL | 缓冲区已分配标志 |
 
 **函数：**
 

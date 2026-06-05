@@ -44,8 +44,7 @@ void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNo
 void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify);
 void ResetSignalState(void);
 
-/* Device sync (defined in main.c) */
-void SyncDeviceToEsptool(void);
+/* Device modification callback (defined in main.c) */
 void OnDeviceModified(void);
 
 /* Helper functions (defined in app_commands.c, used by main.c) */

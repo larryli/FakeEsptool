@@ -9,11 +9,9 @@ import zlib
 import struct
 
 def compress_data(data, level=9):
-    """Compress data using DEFLATE (raw deflate, no zlib header)"""
-    # Use raw deflate (wbits=-15) to get pure DEFLATE stream
-    compressor = zlib.compressobj(level, zlib.DEFLATED, -15)
-    compressed = compressor.compress(data) + compressor.flush()
-    return compressed
+    """Compress data using zlib format (RFC 1950, with zlib header)"""
+    # Use zlib.compress to get zlib format (same as esptool/esptool-js)
+    return zlib.compress(data, level)
 
 def to_c_array(name, data):
     """Convert bytes to C array definition"""
