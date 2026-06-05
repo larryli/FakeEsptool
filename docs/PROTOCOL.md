@@ -246,11 +246,11 @@ Data:      0x07 0x07 0x12 0x20 55 55 55 ... 55 (36 bytes)
 Direction: 0x01
 Command:   0x08
 Size:      0x04 0x00 (4 bytes)
-Val:       0x07 0x07 0x12 0x55 (同步序列前 3 字节 + 填充字节)
+Val:       0x07 0x07 0x12 0x55 (同步序列前 3 字节 + 请求的第一个填充字节 0x55)
 Data:      0x00 0x00 0x00 0x00 (status=成功)
 ```
 
-**注意：** 真实设备在 Val 字段返回同步序列前 3 字节 `07 07 12` 加上请求 Data 的第 4 个填充字节（通常是 `0x55`），而非完整的 `07 07 12 20`。esptool 客户端对此字段不做强校验。
+**注意：** 真实设备在 Val 字段返回同步序列前 3 字节 `07 07 12` 加上请求 Data 的第一个填充字节（通常是 `0x55`），形成小端序 DWORD `0x55120707`。
 
 **重复响应：** 真实设备收到 1 个 SYNC 请求后，连续发送 8 次相同的响应。
 
@@ -875,25 +875,31 @@ Data:      0x00 0x00 (status=成功) + security_info[N]
 
 **security_info 结构（因芯片而异）：**
 
-ESP32-S2（12 字节）：
+ESP32-S2（10 字节数据 + 2 字节状态 = 12 字节）：
 ```
 [flags:4][flash_crypt_cnt:1][key_purposes:7]
 ```
 
-ESP32-C3/S3 等（20 字节）：
+ESP32-C3/S3 等（18 字节数据 + 2 字节状态 = 20 字节）：
 ```
 [flags:4][flash_crypt_cnt:1][key_purposes:7][chip_id:4][api_version:4]
 ```
 
-**最小兼容返回示例：**
+**FakeEsptool 返回格式（20 字节）：**
 ```
-Size: 0x0E 0x00 (14 bytes)
-Data: 00 00 (status) + 00 00 00 00 (flags) + 00 (crypt_cnt) + 00 00 00 00 00 00 00 (key_purposes)
+Size: 0x14 0x00 (20 bytes)
+Data: 00 00 (status) + 00 00 00 00 (flags) + 00 (crypt_cnt) + 00 00 00 00 00 00 00 (key_purposes) + chip_id (4 bytes, little-endian) + api_version (4 bytes, little-endian)
 ```
 
-**说明：** security_info 为 12 字节，加上 2 字节 status，总共 14 字节。
+**说明：**
+- esptool 客户端先尝试 `resp_data_len=20`，失败后回退到 `resp_data_len=12`
+- chip_id 字段用于芯片检测（ESP32-S3 及之后的芯片）
+- api_version 字段通常为 0
 
-**工程提示：** 若仅需通过 esptool 基础检测，可固定返回上述 14 字节，避免客户端因长度不足抛出 `struct.error`。
+**芯片检测流程：**
+1. 客户端首先尝试 GET_SECURITY_INFO 获取 chip_id
+2. 如果成功，遍历芯片列表匹配 IMAGE_CHIP_ID
+3. 如果失败（UnsupportedCommandError），回退到 READ_REG (0x40001000) 读取 magic value
 
 ---
 
@@ -950,6 +956,13 @@ Data: 00 00 (status) + 00 00 00 00 (flags) + 00 (crypt_cnt) + 00 00 00 00 00 00 
 
 ### 4.3 芯片检测
 
+**方式一：GET_SECURITY_INFO（推荐）**
+```
+烧录器 → 设备: GET_SECURITY_INFO (0x14)
+设备 → 烧录器: GET_SECURITY_INFO Response [flags, crypt_cnt, key_purposes, chip_id, api_version]
+```
+
+**方式二：READ_REG（回退）**
 ```
 烧录器 → 设备: READ_REG (0x0A) [data=0x40001000]
 设备 → 烧录器: READ_REG Response [val=魔数, data=status]
@@ -957,8 +970,10 @@ Data: 00 00 (status) + 00 00 00 00 (flags) + 00 (crypt_cnt) + 00 00 00 00 00 00 
 
 **魔数示例：**
 - ESP32: `0x00F01D83`
+- ESP32-S2: `0x000007C6`
 - ESP32-S3: `0x00000009`
 - ESP32-C3: `0x6921506F`
+- ESP32-C6: `0x2CE0806F`
 
 ### 4.4 Stub 上传（可选但推荐）
 
@@ -1104,11 +1119,11 @@ Stub 上传后可获得更高效的 Flash 操作和额外功能。
 
 当 ROM 收到不支持的命令时，返回特殊错误码：
 
-| Data[1] | 含义 |
-|---------|------|
-| `0x05` | ROM_INVALID_RECV_MSG - 不支持的命令 |
+| Data[0] | Data[1] | 含义 |
+|---------|---------|------|
+| `0x01` | `0x05` | ROM_INVALID_RECV_MSG - 不支持的命令 |
 
-**触发条件：** 调用 Stub 专属命令（0xD0-0xD3）时
+**触发条件：** 调用 Stub 专属命令（0xD0-0xD3）或未实现的命令时
 
 **客户端处理：**
 ```typescript
@@ -1116,6 +1131,8 @@ if (data[0] != 0 && data[1] == 0x05) {
     throw new ESPError("unsupported command error");
 }
 ```
+
+**FakeEsptool 实现：** 收到未知命令时返回 `[0x01, 0x05, 0x00, 0x00]`（4 字节 data）
 
 ### 5.3 常见失败原因
 
@@ -1249,7 +1266,19 @@ Stub 上传成功后，设备行为发生变化：
 
 ### A.1 识别机制
 
-芯片通过读取地址 `0x40001000`（`CHIP_DETECT_MAGIC_REG_ADDR`）的魔数进行识别。该地址位于 DRAM 区域，上电后由硬件填充固定值。
+芯片通过两种方式识别：
+
+**方式一：GET_SECURITY_INFO（ESP32-S3 及之后）**
+1. 客户端发送 GET_SECURITY_INFO 命令
+2. 设备返回包含 chip_id 的响应（20 字节）
+3. 客户端根据 chip_id 匹配芯片类型
+
+**方式二：Magic Value（ESP8266/ESP32/ESP32-S2）**
+1. 客户端发送 READ_REG 请求，地址 = 0x40001000
+2. 设备返回寄存器值（4 字节，小端序）
+3. 主机根据魔数查表确定芯片类型
+
+**优先级：** 客户端优先尝试方式一，失败后回退到方式二
 
 ### A.2 魔数映射表
 

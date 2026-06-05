@@ -211,12 +211,13 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     ctx->synced = TRUE;
     ctx->stub_mode = FALSE;
 
-    /* Real device returns sync sequence header {0x07,0x07,0x12,0x20}
-       as the Value field (little-endian DWORD 0x20120707) */
+    /* Real device returns sync sequence in Value field:
+       {0x07, 0x07, 0x12, 0x55} as little-endian DWORD 0x55120707
+       Note: The 4th byte is 0x55 (first padding byte from request), not 0x20 */
     DWORD sync_val = ((DWORD)sync_response[0]) |
                      ((DWORD)sync_response[1] << 8) |
                      ((DWORD)sync_response[2] << 16) |
-                     ((DWORD)sync_response[3] << 24);
+                     ((DWORD)0x55 << 24);
     BYTE sync_data[4] = {0x00, 0x00, 0x00, 0x00};
 
     /* Real device sends 8 consecutive responses per SYNC request */
@@ -279,8 +280,8 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Chip_WriteReg(&ctx->chip, addr, newVal);
 
     if (ctx->onModified) ctx->onModified();
-    /* WRITE_REG always returns 2-byte status */
-    Esptool_SendResponseEx(ctx, ESP_CMD_WRITE_REG, ctx->last_read_val, ESP_OK, 2, NULL, 2);
+    /* WRITE_REG always returns 2-byte status, Val field is 0x00000000 */
+    Esptool_SendResponseEx(ctx, ESP_CMD_WRITE_REG, 0x00000000, ESP_OK, 2, NULL, 2);
 }
 
 static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -716,15 +717,43 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG, "GET_SECURITY_INFO");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Get security info");
 
-    /* GET_SECURITY_INFO response format:
-       2-byte status + security_info (12 bytes)
-       Total: 14 bytes
-       [0x00, 0x00 (status)] + [0x00,0x00,0x00,0x00 (flags)] + [0x00 (crypt_cnt)] + [0x00 x7 (key_purposes)] */
-    BYTE sec_data[14] = {0};
+    /* GET_SECURITY_INFO response format (ESP32-S3 and later):
+       2-byte status + security_info (18 bytes) = 20 bytes total
+       [0x00, 0x00 (status)]
+       [0x00,0x00,0x00,0x00 (flags)]
+       [0x00 (flash_crypt_cnt)]
+       [0x00 x7 (key_purposes)]
+       [chip_id:4 (little-endian)]
+       [api_version:4 (little-endian)]
+
+       For ESP32-S2: 2-byte status + 10 bytes = 12 bytes (no chip_id/api_version)
+       esptool client tries 20 bytes first, falls back to 12 bytes */
+    BYTE sec_data[20] = {0};
     sec_data[0] = 0x00;  /* status byte 1 (success) */
     sec_data[1] = 0x00;  /* status byte 2 (success) */
-    /* Remaining 12 bytes: flags(4) + flash_crypt_cnt(1) + key_purposes(7) = all zeros */
-    Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, sec_data, 14);
+    /* flags(4) + flash_crypt_cnt(1) + key_purposes(7) = all zeros */
+    /* chip_id at offset 12 (little-endian) */
+    DWORD chip_id = ctx->chip.chip_id;
+    sec_data[12] = (BYTE)(chip_id & 0xFF);
+    sec_data[13] = (BYTE)((chip_id >> 8) & 0xFF);
+    sec_data[14] = (BYTE)((chip_id >> 16) & 0xFF);
+    sec_data[15] = (BYTE)((chip_id >> 24) & 0xFF);
+    /* api_version at offset 16 = 0 */
+    sec_data[16] = 0x00;
+    sec_data[17] = 0x00;
+    sec_data[18] = 0x00;
+    sec_data[19] = 0x00;
+
+    TRACE_PROTO(TAG, "  chip_id=0x%08lX", chip_id);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  chip_id=0x%08lX", chip_id);
+
+    /* Transition to READY state when chip detection succeeds via GET_SECURITY_INFO */
+    if (ctx->state == ESP_STATE_SYNCED) {
+        ctx->state = ESP_STATE_READY;
+        Serial_PostLog(ctx->hNotify, L"ESP", L"  Chip detected via security info, ready for commands");
+    }
+
+    Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, sec_data, 20);
 }
 
 static void HandleSpiAttach(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
@@ -863,9 +892,14 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
     case ESP_CMD_GET_SECURITY_INFO: HandleGetSecurityInfo(ctx, pkt); break;
     case ESP_CMD_RUN_USER_CODE:     HandleRunUserCode(ctx, pkt); break;
     default:
+        /* ROM returns ROM_INVALID_RECV_MSG (0x05) for unsupported commands */
         TRACE_FW(TAG, "Unknown cmd: 0x%02X", pkt->command);
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  Unknown command: 0x%02X", pkt->command);
-        Esptool_SendResponse(ctx, pkt->command, pkt->value, ESP_FAIL, NULL, 4);
+        {
+            /* Response format: [status_byte_1 != 0][ROM_INVALID_RECV_MSG] + padding */
+            BYTE err_data[4] = {0x01, 0x05, 0x00, 0x00};
+            Esptool_SendResponse(ctx, pkt->command, pkt->value, ESP_OK, err_data, 4);
+        }
         return FALSE;
     }
 
