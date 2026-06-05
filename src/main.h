@@ -21,4 +21,7 @@
 /* Custom message for application initialization */
 #define WM_APP_INIT       (WM_USER + 100)
 
+/* Custom message for dump completion notification */
+#define WM_DUMP_COMPLETE  (WM_USER + 101)  /* wParam=success(BOOL), lParam=error code */
+
 #endif /* MAIN_H */

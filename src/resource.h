@@ -21,6 +21,7 @@
 #define IDM_RECONNECT       2007
 #define IDM_FLASH_IMPORT    2008
 #define IDM_FLASH_EXPORT    2009
+#define IDM_DUMP_DEVICE_AS  2015
 #define IDM_LOG_CLEAR       2010
 #define IDM_LOG_SAVEAS      2011
 #define IDM_LOG_FONT        2012

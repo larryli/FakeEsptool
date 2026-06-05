@@ -27,6 +27,7 @@ IDR_MAIN_MENU MENUEX
     MENUITEM "&Open Device...      Ctrl+O", IDM_OPEN_DEVICE, 0, 0
     MENUITEM "&Save Device         Ctrl+S", IDM_SAVE_DEVICE, 0, 0
     MENUITEM "Save Device &As...   F12", IDM_SAVE_DEVICE_AS, 0, 0
+    MENUITEM "Dump Device As...", IDM_DUMP_DEVICE_AS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "Device &Properties...", IDM_DEVICE_PROPS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0

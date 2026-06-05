@@ -201,13 +201,14 @@ Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
 | `Esptool_ResetState(ctx)` | 重置协议状态（进入下载模式时调用） |
 | `Esptool_SetNotify(ctx, hNotify)` | 设置通知窗口 |
 | `Esptool_SetModifiedCallback(ctx, cb)` | 设置修改回调 |
+| `Esptool_SetChipType(ctx, type)` | 设置芯片类型 |
+| `Esptool_SetFlashSize(ctx, size)` | 设置Flash大小 |
 | `Esptool_SetWriteCallback(ctx, cb)` | 设置串口写回调 |
 | `Esptool_SetBaudRateCallback(ctx, cb)` | 设置波特率修改回调 |
 | `Esptool_Feed(ctx, data, len)` | 喂入串口数据 |
 | `Esptool_ProcessFrame(ctx, frame, frame_len)` | 处理一帧数据 |
-| `Esptool_SetChipType(ctx, type)` | 设置芯片类型 |
-| `Esptool_SetFlashSize(ctx, size)` | 设置Flash大小 |
-| `Esptool_SendResponse(ctx, cmd, req_val, status, data, len)` | 发送响应 |
+| `Esptool_SendResponse(ctx, cmd, req_val, status, data, len)` | 发送响应（4字节状态） |
+| `Esptool_SendResponseEx(ctx, cmd, req_val, status, status_len, data, len)` | 发送响应（可配置状态长度） |
 | `Esptool_CalcChecksum(data, len)` | 计算校验和 |
 
 ### chip.h
@@ -365,7 +366,16 @@ if (ret == DEFLATE_OK) {
 
 | 结构体 | 说明 |
 |--------|------|
-| `DEVICE_CTX` | 设备上下文（包含芯片、Flash、文件名、修改标记） |
+| `DEVICE_CTX` | 设备上下文 |
+
+**DEVICE_CTX 字段：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `chip` | CHIP_CTX | 芯片特性（类型、MAC、eFuse、晶振频率） |
+| `flash` | FLASH_CTX | Flash 存储（数据缓冲区、大小） |
+| `filename` | WCHAR[MAX_PATH] | 当前文件路径 |
+| `modified` | BOOL | 数据修改标记 |
 
 **常量：**
 
@@ -390,6 +400,7 @@ if (ret == DEFLATE_OK) {
 
 | 函数 | 说明 |
 |------|------|
+| `Serial_EnumPorts(hCombo)` | 枚举可用串口到下拉框 |
 | `Serial_Open(ctx, port, hNotify)` | 打开串口 |
 | `Serial_Close(ctx)` | 关闭串口 |
 | `Serial_IsOpen(ctx)` | 检查状态 |
@@ -405,9 +416,62 @@ if (ret == DEFLATE_OK) {
 | `Serial_GetConfig(ctx, ...)` | 读取配置 |
 | `Serial_GetRxBytes(ctx)` | 获取接收字节数 |
 | `Serial_GetTxBytes(ctx)` | 获取发送字节数 |
-| `Serial_GetPortName(index, portName, maxLen)` | 获取端口名 |
+| `Serial_GetPortName(index, portName, maxLen)` | 获取端口名（返回 BOOL） |
 | `Serial_PostLog(hNotify, tag, text)` | 发送日志 |
 | `Serial_PostLogF(hNotify, tag, fmt, ...)` | 格式化日志 |
+
+## 实现说明
+
+### Dump Device As 功能
+
+**实现方式**：快照 + 后台线程
+
+**流程**：
+1. 主线程生成设备数据快照（eFuse + Flash）
+2. 创建后台线程执行文件写入
+3. 主线程显示忙碌光标并禁用窗口
+4. 后台线程完成后通过 `WM_DUMP_COMPLETE` 消息通知主线程
+5. 主线程恢复窗口状态
+
+**数据结构**：
+```c
+typedef struct {
+    DEVICE_CTX device;      /* 设备头信息 */
+    BYTE *efuse;            /* eFuse 数据快照 */
+    DWORD efuseSize;        /* eFuse 大小 */
+    BYTE *flash;            /* Flash 数据快照 */
+    DWORD flashSize;        /* Flash 大小 */
+    WCHAR filename[MAX_PATH]; /* 输出文件名 */
+    HWND hWnd;              /* 所有者窗口 */
+} DEVICE_SNAPSHOT;
+```
+
+**自定义消息**：
+- `WM_DUMP_COMPLETE` (WM_USER + 101)：后台线程完成通知
+  - wParam：成功标志 (BOOL)
+  - lParam：错误代码（失败时）
+
+### 忙碌处理模式
+
+对于耗时操作（Flash 导入/导出、设备 Dump），采用以下模式：
+
+```c
+/* 1. 生成快照（如需要） */
+BYTE *snapshot = HeapAlloc(GetProcessHeap(), 0, size);
+memcpy(snapshot, data, size);
+
+/* 2. 显示忙碌状态 */
+HCURSOR hOldCursor = SetCursor(LoadCursor(NULL, IDC_WAIT));
+EnableWindow(hWnd, FALSE);
+
+/* 3. 执行操作 */
+DoWork(snapshot);
+
+/* 4. 恢复状态 */
+EnableWindow(hWnd, TRUE);
+SetCursor(hOldCursor);
+HeapFree(GetProcessHeap(), 0, snapshot);
+```
 
 ## 编码规范
 

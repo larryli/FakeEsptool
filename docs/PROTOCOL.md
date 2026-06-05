@@ -69,19 +69,22 @@ SLIP 协议本身不提供校验机制，校验由上层协议（数据包结构
 
 ```
 +----------+--------+----------+-----------+----------+
-| Direction| Command| Size     | Checksum  | Data     |
+| Direction| Command| Size     | Value     | Data     |
 | 1 byte   | 1 byte | 2 bytes  | 4 bytes   | N bytes  |
 +----------+--------+----------+-----------+----------+
-| 0x00     | cmd    | size_lo  | chk[0]    | data[0]  |
-|          |        | size_hi  | chk[1]    | data[1]  |
-|          |        |          | chk[2]=0  | ...      |
-|          |        |          | chk[3]=0  | data[N-1]|
+| 0x00     | cmd    | size_lo  | val[0]    | data[0]  |
+|          |        | size_hi  | val[1]    | data[1]  |
+|          |        |          | val[2]    | ...      |
+|          |        |          | val[3]    | data[N-1]|
 +----------+--------+----------+-----------+----------+
 ```
 
 **注意：**
-- bytes 4-7 是 checksum（异或校验），由调用方计算并填入
-- 仅最低 1 字节有效（XOR 校验结果），高 3 字节保留，填充 `0x00`
+- bytes 4-7 是 Value 字段，含义因命令而异：
+  - 大多数命令：保留值（通常为 0）
+  - FLASH_DATA / FLASH_DEFL_DATA / MEM_DATA：用作 Checksum（异或校验）
+  - WRITE_REG：用作寄存器值
+- 代码中统一解析为 `value` 字段，由各命令处理器自行解释
 
 ### 2.2 响应包（设备 → 烧录器）
 
@@ -111,7 +114,7 @@ SLIP 协议本身不提供校验机制，校验由上层协议（数据包结构
 | Direction | `0x00` = 请求（烧录器→设备），`0x01` = 响应（设备→烧录器） |
 | Command | 命令码 |
 | Size | Data 字段的字节数（小端序） |
-| Checksum | 请求包的校验和（仅请求包有） |
+| Value | 请求包的值字段，含义因命令而异（详见 2.1 节） |
 | Val | 响应包的值字段。SYNC 返回同步序列，READ_REG 返回寄存器值，其他命令真实设备返回上次 READ_REG 的值（客户端不校验） |
 | Data | 变长数据载荷 |
 

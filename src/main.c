@@ -594,6 +594,10 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
                         WCHAR filePath[MAX_PATH] = {0};
                         GetDlgItemTextW(hDlg, IDC_INIT_FILE_PATH, filePath, MAX_PATH);
                         if (filePath[0]) {
+                            /* Show busy cursor and disable dialog */
+                            HCURSOR hOldCursor = SetCursor(LoadCursor(NULL, IDC_WAIT));
+                            EnableWindow(hDlg, FALSE);
+
                             HANDLE hFile = CreateFileW(filePath, GENERIC_READ, 0, NULL,
                                                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
                             if (hFile != INVALID_HANDLE_VALUE) {
@@ -604,6 +608,10 @@ static INT_PTR CALLBACK NewDeviceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
                                 }
                                 CloseHandle(hFile);
                             }
+
+                            /* Restore dialog state */
+                            EnableWindow(hDlg, TRUE);
+                            SetCursor(hOldCursor);
                         }
                     }
                     EndDialog(hDlg, IDOK);
@@ -1138,17 +1146,25 @@ static void Main_OnFlashImport(HWND hMainWnd)
         return;
     }
 
+    /* Show busy cursor and disable window */
+    HCURSOR hOldCursor = SetCursor(LoadCursor(NULL, IDC_WAIT));
+    EnableWindow(hMainWnd, FALSE);
+
     DWORD bytesRead;
-    if (!ReadFile(hFile, g_device.flash.data, fileSize, &bytesRead, NULL) || bytesRead != fileSize) {
-        CloseHandle(hFile);
+    BOOL ok = ReadFile(hFile, g_device.flash.data, fileSize, &bytesRead, NULL) && bytesRead == fileSize;
+    CloseHandle(hFile);
+
+    /* Restore window state */
+    EnableWindow(hMainWnd, TRUE);
+    SetCursor(hOldCursor);
+
+    if (!ok) {
         MessageBoxW(hMainWnd, L"Failed to read file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
-    CloseHandle(hFile);
 
     Device_SetModified(&g_device, TRUE);
     UpdateTitle(hMainWnd);
-    Serial_PostLog(hMainWnd, L"FLASH", L"Flash imported from file");
 }
 
 /* Handle Flash > Export command */
@@ -1167,23 +1183,263 @@ static void Main_OnFlashExport(HWND hMainWnd)
     if (!GetSaveFileNameW(&ofn))
         return;
 
+    /* Create snapshot of flash data */
+    DWORD flashSize = g_device.flash.size;
+    BYTE *flashSnapshot = NULL;
+    if (flashSize > 0 && g_device.flash.data) {
+        flashSnapshot = (BYTE *)HeapAlloc(GetProcessHeap(), 0, flashSize);
+        if (!flashSnapshot) {
+            MessageBoxW(hMainWnd, L"Failed to allocate memory for snapshot", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            return;
+        }
+        memcpy(flashSnapshot, g_device.flash.data, flashSize);
+    }
+
+    /* Show busy cursor and disable window */
+    HCURSOR hOldCursor = SetCursor(LoadCursor(NULL, IDC_WAIT));
+    EnableWindow(hMainWnd, FALSE);
+
+    /* Write snapshot to file */
     HANDLE hFile = CreateFileW(szFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
+        EnableWindow(hMainWnd, TRUE);
+        SetCursor(hOldCursor);
+        HeapFree(GetProcessHeap(), 0, flashSnapshot);
         MessageBoxW(hMainWnd, L"Failed to create file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
     DWORD bytesWritten;
-    if (!WriteFile(hFile, g_device.flash.data, g_device.flash.size, &bytesWritten, NULL) ||
-        bytesWritten != g_device.flash.size) {
-        CloseHandle(hFile);
-        DeleteFileW(szFile);
-        MessageBoxW(hMainWnd, L"Failed to write file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
-        return;
+    BOOL ok = TRUE;
+    if (flashSnapshot && flashSize > 0) {
+        ok = WriteFile(hFile, flashSnapshot, flashSize, &bytesWritten, NULL) && bytesWritten == flashSize;
     }
     CloseHandle(hFile);
 
-    Serial_PostLog(hMainWnd, L"FLASH", L"Flash exported to file");
+    /* Restore window state */
+    EnableWindow(hMainWnd, TRUE);
+    SetCursor(hOldCursor);
+
+    if (!ok) {
+        DeleteFileW(szFile);
+        HeapFree(GetProcessHeap(), 0, flashSnapshot);
+        MessageBoxW(hMainWnd, L"Failed to write file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    HeapFree(GetProcessHeap(), 0, flashSnapshot);
+}
+
+/* Device snapshot structure for Dump Device As */
+typedef struct {
+    DEVICE_CTX device;      /* Device header info */
+    BYTE *efuse;            /* eFuse data snapshot */
+    DWORD efuseSize;        /* eFuse size */
+    BYTE *flash;            /* Flash data snapshot */
+    DWORD flashSize;        /* Flash size */
+    WCHAR filename[MAX_PATH]; /* Output filename */
+    HWND hWnd;              /* Owner window */
+} DEVICE_SNAPSHOT;
+
+/* Dump thread procedure */
+static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
+{
+    DEVICE_SNAPSHOT *snap = (DEVICE_SNAPSHOT *)lpParam;
+    BOOL ok = TRUE;
+    FILE *f = NULL;
+
+    /* Open output file with UTF-8 encoding */
+    f = _wfopen(snap->filename, L"w, ccs=UTF-8");
+    if (!f) {
+        ok = FALSE;
+        goto cleanup;
+    }
+
+    /* Get current time */
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+
+    /* Write header */
+    fwprintf(f, L"=== FakeEsptool Device Dump ===\n");
+    fwprintf(f, L"File: %ls\n", snap->device.filename[0] ? snap->device.filename : L"Untitled");
+    fwprintf(f, L"Date: %04d-%02d-%02d %02d:%02d:%02d\n\n",
+             st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+
+    /* Write header info */
+    fwprintf(f, L"[Header]\n");
+    fwprintf(f, L"Magic:      0x%08X (\"ESP\\0\")\n", DEVICE_MAGIC);
+    fwprintf(f, L"Version:    %d\n", DEVICE_VERSION);
+
+    /* Get chip name */
+    WCHAR chipName[32] = {0};
+    MultiByteToWideChar(CP_UTF8, 0, snap->device.chip.name, -1, chipName, 32);
+    fwprintf(f, L"Chip Type:  %ls\n", chipName);
+
+    /* Get xtal freq */
+    const WCHAR *xtalStr = (snap->device.chip.xtal_freq == 0) ? L"40MHz" : L"26MHz";
+    fwprintf(f, L"XTAL Freq:  %ls\n\n", xtalStr);
+
+    /* Write MAC address */
+    fwprintf(f, L"[MAC Address]\n");
+    const BYTE *mac = snap->device.chip.mac;
+    fwprintf(f, L"%02X:%02X:%02X:%02X:%02X:%02X\n\n",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    /* Write Flash config */
+    fwprintf(f, L"[Flash Config]\n");
+    if (snap->flashSize >= 1024 * 1024)
+        fwprintf(f, L"Size:       %luMB (%lu bytes)\n\n", snap->flashSize / (1024 * 1024), snap->flashSize);
+    else
+        fwprintf(f, L"Size:       %luKB (%lu bytes)\n\n", snap->flashSize / 1024, snap->flashSize);
+
+    /* Write eFuse data */
+    fwprintf(f, L"[eFuse] (%lu bytes)\n", snap->efuseSize);
+    fwprintf(f, L"Offset    00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F  ASCII\n");
+    fwprintf(f, L"--------  -----------------------  -----------------------  ----------------\n");
+
+    for (DWORD i = 0; i < snap->efuseSize; i += 16) {
+        fwprintf(f, L"%08X  ", i);
+        /* Hex bytes */
+        for (DWORD j = 0; j < 16; j++) {
+            if (i + j < snap->efuseSize)
+                fwprintf(f, L"%02X ", snap->efuse[i + j]);
+            else
+                fwprintf(f, L"   ");
+            if (j == 7) fwprintf(f, L" ");
+        }
+        fwprintf(f, L" ");
+        /* ASCII */
+        for (DWORD j = 0; j < 16 && (i + j) < snap->efuseSize; j++) {
+            BYTE ch = snap->efuse[i + j];
+            fwprintf(f, L"%c", (ch >= 32 && ch < 127) ? (WCHAR)ch : L'.');
+        }
+        fwprintf(f, L"\n");
+    }
+    fwprintf(f, L"\n");
+
+    /* Write Flash data */
+    fwprintf(f, L"[Flash Data] (%lu bytes)\n", snap->flashSize);
+    fwprintf(f, L"Offset    00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F  ASCII\n");
+    fwprintf(f, L"--------  -----------------------  -----------------------  ----------------\n");
+
+    for (DWORD i = 0; i < snap->flashSize; i += 16) {
+        fwprintf(f, L"%08X  ", i);
+        /* Hex bytes */
+        for (DWORD j = 0; j < 16; j++) {
+            if (i + j < snap->flashSize)
+                fwprintf(f, L"%02X ", snap->flash[i + j]);
+            else
+                fwprintf(f, L"   ");
+            if (j == 7) fwprintf(f, L" ");
+        }
+        fwprintf(f, L" ");
+        /* ASCII */
+        for (DWORD j = 0; j < 16 && (i + j) < snap->flashSize; j++) {
+            BYTE ch = snap->flash[i + j];
+            fwprintf(f, L"%c", (ch >= 32 && ch < 127) ? (WCHAR)ch : L'.');
+        }
+        fwprintf(f, L"\n");
+    }
+
+cleanup:
+    if (f) fclose(f);
+
+    /* Notify main window */
+    PostMessage(snap->hWnd, WM_DUMP_COMPLETE, ok ? TRUE : FALSE, ok ? 0 : GetLastError());
+
+    /* Free snapshot data */
+    if (snap->efuse) HeapFree(GetProcessHeap(), 0, snap->efuse);
+    if (snap->flash) HeapFree(GetProcessHeap(), 0, snap->flash);
+    HeapFree(GetProcessHeap(), 0, snap);
+
+    return ok ? 0 : 1;
+}
+
+/* Handle File > Dump Device As command */
+static void Main_OnDumpDeviceAs(HWND hMainWnd)
+{
+    OPENFILENAMEW ofn = {0};
+    WCHAR szFile[MAX_PATH] = {0};
+
+    /* Generate default filename */
+    const WCHAR *devName = Device_GetFilename(&g_device);
+    if (devName[0]) {
+        /* Extract name without path and extension */
+        const WCHAR *name = wcsrchr(devName, L'\\');
+        name = name ? name + 1 : devName;
+        lstrcpyW(szFile, name);
+        /* Remove .esp extension */
+        WCHAR *ext = wcsrchr(szFile, L'.');
+        if (ext) *ext = L'\0';
+        lstrcatW(szFile, L"_dump.txt");
+    } else {
+        lstrcpyW(szFile, L"device_dump.txt");
+    }
+
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hMainWnd;
+    ofn.lpstrFilter = L"Text Files (*.txt)\0*.txt\0All Files (*.*)\0*.*\0";
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+    ofn.lpstrDefExt = L"txt";
+
+    if (!GetSaveFileNameW(&ofn))
+        return;
+
+    /* Create snapshot */
+    DEVICE_SNAPSHOT *snap = (DEVICE_SNAPSHOT *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(DEVICE_SNAPSHOT));
+    if (!snap) {
+        MessageBoxW(hMainWnd, L"Failed to allocate memory", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    /* Copy device info */
+    snap->device = g_device;
+    snap->hWnd = hMainWnd;
+    lstrcpyW(snap->filename, szFile);
+
+    /* Snapshot eFuse data */
+    snap->efuseSize = g_device.chip.efuse_size;
+    if (snap->efuseSize > 0 && g_device.chip.efuse) {
+        snap->efuse = (BYTE *)HeapAlloc(GetProcessHeap(), 0, snap->efuseSize);
+        if (!snap->efuse) {
+            HeapFree(GetProcessHeap(), 0, snap);
+            MessageBoxW(hMainWnd, L"Failed to allocate eFuse snapshot", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            return;
+        }
+        memcpy(snap->efuse, g_device.chip.efuse, snap->efuseSize);
+    }
+
+    /* Snapshot Flash data */
+    snap->flashSize = g_device.flash.size;
+    if (snap->flashSize > 0 && g_device.flash.data) {
+        snap->flash = (BYTE *)HeapAlloc(GetProcessHeap(), 0, snap->flashSize);
+        if (!snap->flash) {
+            if (snap->efuse) HeapFree(GetProcessHeap(), 0, snap->efuse);
+            HeapFree(GetProcessHeap(), 0, snap);
+            MessageBoxW(hMainWnd, L"Failed to allocate Flash snapshot", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            return;
+        }
+        memcpy(snap->flash, g_device.flash.data, snap->flashSize);
+    }
+
+    /* Show busy cursor and disable window */
+    SetCursor(LoadCursor(NULL, IDC_WAIT));
+    EnableWindow(hMainWnd, FALSE);
+
+    /* Start dump thread */
+    HANDLE hThread = CreateThread(NULL, 0, DumpThreadProc, snap, 0, NULL);
+    if (!hThread) {
+        EnableWindow(hMainWnd, TRUE);
+        SetCursor(LoadCursor(NULL, IDC_ARROW));
+        if (snap->efuse) HeapFree(GetProcessHeap(), 0, snap->efuse);
+        if (snap->flash) HeapFree(GetProcessHeap(), 0, snap->flash);
+        HeapFree(GetProcessHeap(), 0, snap);
+        MessageBoxW(hMainWnd, L"Failed to create dump thread", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
+    CloseHandle(hThread); /* Thread will run independently */
 }
 
 /* Handle Log > Clear command */
@@ -1648,6 +1904,10 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             Main_OnFlashExport(hWnd);
             SetFocus(g_hEdit);
             return 0;
+        case IDM_DUMP_DEVICE_AS:
+            Main_OnDumpDeviceAs(hWnd);
+            SetFocus(g_hEdit);
+            return 0;
         case IDM_LOG_CLEAR:
             Main_OnLogClear(hWnd);
             return 0;
@@ -1800,6 +2060,25 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 Main_AppendSignalLog(L"CFG", buf, COLOR_CONFIG);
             }
             UpdateStatusBar();
+        }
+        return 0;
+
+    case WM_DUMP_COMPLETE:
+        /* Dump thread completion notification */
+        {
+            BOOL success = (BOOL)wParam;
+            DWORD errorCode = (DWORD)lParam;
+
+            /* Restore window state */
+            EnableWindow(hWnd, TRUE);
+            SetCursor(LoadCursor(NULL, IDC_ARROW));
+            SetFocus(g_hEdit);
+
+            if (!success) {
+                WCHAR msg[128];
+                wsprintfW(msg, L"Failed to dump device (error: %lu)", errorCode);
+                MessageBoxW(hWnd, msg, LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            }
         }
         return 0;
 

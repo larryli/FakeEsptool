@@ -61,7 +61,6 @@ FakeEsptool.exe: \
 	output\main.res \
 	output\serial.obj \
 	output\slip.obj \
-	output\timer.obj \
 	output\trace.obj
 	$(LINK) $(LINKFLAGS) -out:"$@" $**
 
@@ -112,15 +111,6 @@ output\lang.obj: \
 # 
 output\trace.obj: \
 	src\utils\trace.c
-	$(CC) $(CCFLAGS) "$!" -Fo"$@"
-
-# 
-# Build timer.obj.
-# 
-output\timer.obj: \
-	src\utils\timer.c \
-	src\utils\timer.h \
-	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
