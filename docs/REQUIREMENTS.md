@@ -498,3 +498,17 @@ ESP 芯片通过 DTR/RTS 信号控制 GPIO0 和 EN 引脚进入下载模式：
 | ESP32-C2 | 低成本 WiFi |
 | ESP32-C3 | RISC-V WiFi+BT |
 | ESP32-C6 | WiFi 6+BLE 5 |
+
+---
+
+## 已知问题
+
+### FLASH_DEFL_DATA 分包解压 Bug
+
+**现象：** 压缩烧录大文件时，第二个及后续 `FLASH_DEFL_DATA` 包解压失败，导致烧录数据不完整。
+
+**原因：** esptool 客户端将整个镜像压缩为一个 deflate 流后按 `FLASH_WRITE_SIZE` 切分发送。当前自定义 `deflate.c` 不支持流式输入，无法处理跨包的 deflate block 边界。
+
+**修复计划：** 集成 miniz 库替换自定义 deflate 实现，使用其流式 `mz_inflate()` API。
+
+**状态：** 待修复。详见 `TODO.md` 高优先级待办项。

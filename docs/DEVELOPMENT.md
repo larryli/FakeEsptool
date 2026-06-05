@@ -574,3 +574,17 @@ esptool.py --port COM10 write_flash 0 firmware.bin
 # 擦除Flash
 esptool.py --port COM10 erase_flash
 ```
+
+---
+
+## 已知问题
+
+### FLASH_DEFL_DATA 分包解压 Bug
+
+**现象：** 压缩烧录大文件时，第二个及后续 `FLASH_DEFL_DATA` 包解压失败，导致烧录数据不完整。
+
+**原因：** 自定义 `deflate.c` 不支持流式输入。当 deflate block 边界跨越两个包时，解压器无法跨包保持状态。
+
+**修复计划：** 集成 miniz 库替换自定义 deflate 实现，使用其流式 `mz_inflate()` API。
+
+**状态：** 待修复。详见 `TODO.md` 高优先级待办项。
