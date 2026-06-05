@@ -141,6 +141,8 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD sta
 
     if (data && data_len > 0) {
         memcpy(&resp[pos], data, data_len);
+    } else if (data_len > 0) {
+        memset(&resp[pos], 0, data_len);
     }
     pos += data_len;
 
