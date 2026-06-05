@@ -24,6 +24,12 @@ add_executable(FakeEsptool WIN32
     src/utils/lang.c
     src/utils/trace.c
     src/utils/deflate.c
+    src/app_logview.c
+    src/app_commands.c
+    src/dlg/new_device.c
+    src/dlg/device_props.c
+    src/dlg/port_select.c
+    src/dlg/about.c
     src/resource.rc
 )
 

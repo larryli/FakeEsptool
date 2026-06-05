@@ -50,15 +50,21 @@ POC_PROJECT_ZIPEXTRA = #
 # Build FakeEsptool.exe.
 # 
 FakeEsptool.exe: \
+	output\about.obj \
+	output\app_commands.obj \
+	output\app_logview.obj \
 	output\chip.obj \
 	output\config.obj \
 	output\deflate.obj \
 	output\device.obj \
+	output\device_props.obj \
 	output\esptool.obj \
 	output\flash.obj \
 	output\lang.obj \
 	output\main.obj \
 	output\main.res \
+	output\new_device.obj \
+	output\port_select.obj \
 	output\serial.obj \
 	output\slip.obj \
 	output\trace.obj
@@ -182,6 +188,90 @@ output\main.res: \
 output\deflate.obj: \
 	src\utils\deflate.c \
 	src\utils\deflate.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build app_logview.obj.
+# 
+output\app_logview.obj: \
+	src\app_logview.c \
+	src\app_logview.h \
+	src\serial.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build about.obj.
+# 
+output\about.obj: \
+	src\dlg\about.c \
+	src\resource.h \
+	src\utils\lang.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build device_props.obj.
+# 
+output\device_props.obj: \
+	src\dlg\device_props.c \
+	src\dlg\dlg.h \
+	src\esptool\chip.h \
+	src\esptool\device.h \
+	src\esptool\esptool.h \
+	src\esptool\flash.h \
+	src\esptool\slip.h \
+	src\resource.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build new_device.obj.
+# 
+output\new_device.obj: \
+	src\dlg\new_device.c \
+	src\dlg\dlg.h \
+	src\esptool\chip.h \
+	src\esptool\device.h \
+	src\esptool\esptool.h \
+	src\esptool\flash.h \
+	src\esptool\slip.h \
+	src\resource.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build port_select.obj.
+# 
+output\port_select.obj: \
+	src\dlg\port_select.c \
+	src\dlg\dlg.h \
+	src\esptool\chip.h \
+	src\esptool\device.h \
+	src\esptool\esptool.h \
+	src\esptool\flash.h \
+	src\esptool\slip.h \
+	src\resource.h \
+	src\serial.h \
+	src\utils\config.h \
+	src\utils\lang.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build app_commands.obj.
+# 
+output\app_commands.obj: \
+	src\app_commands.c \
+	src\app_commands.h \
+	src\app_logview.h \
+	src\dlg\dlg.h \
+	src\esptool\chip.h \
+	src\esptool\device.h \
+	src\esptool\esptool.h \
+	src\esptool\flash.h \
+	src\esptool\slip.h \
+	src\main.h \
+	src\resource.h \
+	src\serial.h \
+	src\utils\config.h \
+	src\utils\lang.h \
+	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 .SILENT:
