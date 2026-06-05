@@ -111,6 +111,26 @@ static LOGFONTW g_logFont = {0};  /* Current font */
 static void UpdateMenuState(HWND hWnd);
 static void UpdateTitle(HWND hWnd);
 static void UpdateStatusBar(void);
+static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnSize(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnCommand(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnSerialRx(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnSerialTx(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnSerialError(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnSerialLog(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnSerialSignal(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnSerialConfig(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnDumpComplete(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnDeviceChange(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnClose(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static void Main_CmdNewDevice(HWND hWnd);
+static void Main_CmdOpenDevice(HWND hWnd);
+static void Main_CmdSaveDevice(HWND hWnd);
+static void Main_CmdSaveDeviceAs(HWND hWnd);
+static void Main_CmdDeviceProps(HWND hWnd);
 
 /* Callback when device data is modified by protocol */
 static void OnDeviceModified(void)
@@ -1626,541 +1646,546 @@ static INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM 
 static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg) {
-    case WM_CREATE:
-        {
-            g_hWnd = hWnd;
-            Esptool_SetNotify(&g_esptool, g_hWnd);
-            HINSTANCE hInst = ((CREATESTRUCT *)lParam)->hInstance;
+    case WM_CREATE:         return Main_OnCreate(hWnd, wParam, lParam);
+    case WM_SIZE:           return Main_OnSize(hWnd, wParam, lParam);
+    case WM_COMMAND:        return Main_OnCommand(hWnd, wParam, lParam);
+    case WM_NOTIFY:         return Main_OnNotify(hWnd, wParam, lParam);
+    case WM_SERIAL_RX:      return Main_OnSerialRx(hWnd, wParam, lParam);
+    case WM_SERIAL_TX:      return Main_OnSerialTx(hWnd, wParam, lParam);
+    case WM_SERIAL_ERROR:   return Main_OnSerialError(hWnd, wParam, lParam);
+    case WM_SERIAL_LOG:     return Main_OnSerialLog(hWnd, wParam, lParam);
+    case WM_SERIAL_SIGNAL:  return Main_OnSerialSignal(hWnd, wParam, lParam);
+    case WM_SERIAL_CONFIG:  return Main_OnSerialConfig(hWnd, wParam, lParam);
+    case WM_DUMP_COMPLETE:  return Main_OnDumpComplete(hWnd, wParam, lParam);
+    case WM_DEVICECHANGE:   return Main_OnDeviceChange(hWnd, wParam, lParam);
+    case WM_CLOSE:          return Main_OnClose(hWnd, wParam, lParam);
+    case WM_APP_INIT:       return Main_OnAppInit(hWnd, wParam, lParam);
+    case WM_DESTROY:        return Main_OnDestroy(hWnd, wParam, lParam);
+    }
+    return DefWindowProcW(hWnd, msg, wParam, lParam);
+}
 
-            /* Create toolbar */
-            g_hToolbar = CreateWindowExW(0, TOOLBARCLASSNAMEW, NULL,
-                WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | CCS_TOP | TBSTYLE_TOOLTIPS,
-                0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_TOOLBAR, hInst, NULL);
+/* Handle WM_CREATE - create toolbar, status bar, and edit control */
+static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    g_hWnd = hWnd;
+    Esptool_SetNotify(&g_esptool, g_hWnd);
+    HINSTANCE hInst = ((CREATESTRUCT *)lParam)->hInstance;
 
-            SendMessageW(g_hToolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
-            SendMessageW(g_hToolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(16, 16));
+    /* Create toolbar */
+    g_hToolbar = CreateWindowExW(0, TOOLBARCLASSNAMEW, NULL,
+        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | CCS_TOP | TBSTYLE_TOOLTIPS,
+        0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_TOOLBAR, hInst, NULL);
 
-            /* Load merged toolbar bitmap (10 icons) */
-            TBADDBITMAP tbab = {0};
-            tbab.hInst = hInst;
-            tbab.nID = IDB_TOOLBAR;
-            int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 10, (LPARAM)&tbab);
+    SendMessageW(g_hToolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
+    SendMessageW(g_hToolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(16, 16));
 
-            /* Toolbar buttons: New, Open, Save | Connect, Reconnect, Disconnect | Import, Export | Clear, SaveLog */
-            TBBUTTON buttons[14] = {0};
-            int btn = 0;
+    /* Load merged toolbar bitmap (10 icons) */
+    TBADDBITMAP tbab = {0};
+    tbab.hInst = hInst;
+    tbab.nID = IDB_TOOLBAR;
+    int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 10, (LPARAM)&tbab);
 
-            /* File group */
-            buttons[btn].iBitmap = iBase + 0;  /* New */
-            buttons[btn].idCommand = IDM_NEW_DEVICE;
-            buttons[btn].fsState = TBSTATE_ENABLED;
-            buttons[btn].fsStyle = BTNS_BUTTON;
-            btn++;
+    /* Toolbar buttons: New, Open, Save | Connect, Reconnect, Disconnect | Import, Export | Clear, SaveLog */
+    TBBUTTON buttons[14] = {0};
+    int btn = 0;
 
-            buttons[btn].iBitmap = iBase + 1;  /* Open */
-            buttons[btn].idCommand = IDM_OPEN_DEVICE;
-            buttons[btn].fsState = TBSTATE_ENABLED;
-            buttons[btn].fsStyle = BTNS_BUTTON;
-            btn++;
+    /* File group */
+    buttons[btn].iBitmap = iBase + 0;  /* New */
+    buttons[btn].idCommand = IDM_NEW_DEVICE;
+    buttons[btn].fsState = TBSTATE_ENABLED;
+    buttons[btn].fsStyle = BTNS_BUTTON;
+    btn++;
 
-            buttons[btn].iBitmap = iBase + 2;  /* Save */
-            buttons[btn].idCommand = IDM_SAVE_DEVICE;
-            buttons[btn].fsState = TBSTATE_ENABLED;
-            buttons[btn].fsStyle = BTNS_BUTTON;
-            btn++;
+    buttons[btn].iBitmap = iBase + 1;  /* Open */
+    buttons[btn].idCommand = IDM_OPEN_DEVICE;
+    buttons[btn].fsState = TBSTATE_ENABLED;
+    buttons[btn].fsStyle = BTNS_BUTTON;
+    btn++;
 
-            /* Separator */
-            buttons[btn].fsStyle = BTNS_SEP;
-            btn++;
+    buttons[btn].iBitmap = iBase + 2;  /* Save */
+    buttons[btn].idCommand = IDM_SAVE_DEVICE;
+    buttons[btn].fsState = TBSTATE_ENABLED;
+    buttons[btn].fsStyle = BTNS_BUTTON;
+    btn++;
 
-            /* Serial group */
-            buttons[btn].iBitmap = iBase + 3;  /* Connect */
-            buttons[btn].idCommand = IDM_CONNECT;
-            buttons[btn].fsState = TBSTATE_ENABLED;
-            buttons[btn].fsStyle = BTNS_BUTTON;
-            btn++;
+    /* Separator */
+    buttons[btn].fsStyle = BTNS_SEP;
+    btn++;
 
-            buttons[btn].iBitmap = iBase + 4;  /* Reconnect */
-            buttons[btn].idCommand = IDM_RECONNECT;
-            buttons[btn].fsState = 0;  /* Disabled initially */
-            buttons[btn].fsStyle = BTNS_BUTTON;
-            btn++;
+    /* Serial group */
+    buttons[btn].iBitmap = iBase + 3;  /* Connect */
+    buttons[btn].idCommand = IDM_CONNECT;
+    buttons[btn].fsState = TBSTATE_ENABLED;
+    buttons[btn].fsStyle = BTNS_BUTTON;
+    btn++;
 
-            buttons[btn].iBitmap = iBase + 5;  /* Disconnect */
-            buttons[btn].idCommand = IDM_DISCONNECT;
-            buttons[btn].fsState = 0;  /* Disabled initially */
-            buttons[btn].fsStyle = BTNS_BUTTON;
-            btn++;
+    buttons[btn].iBitmap = iBase + 4;  /* Reconnect */
+    buttons[btn].idCommand = IDM_RECONNECT;
+    buttons[btn].fsState = 0;  /* Disabled initially */
+    buttons[btn].fsStyle = BTNS_BUTTON;
+    btn++;
 
-            /* Separator */
-            buttons[btn].fsStyle = BTNS_SEP;
-            btn++;
+    buttons[btn].iBitmap = iBase + 5;  /* Disconnect */
+    buttons[btn].idCommand = IDM_DISCONNECT;
+    buttons[btn].fsState = 0;  /* Disabled initially */
+    buttons[btn].fsStyle = BTNS_BUTTON;
+    btn++;
 
-            /* Flash group */
-            buttons[btn].iBitmap = iBase + 6;  /* Import */
-            buttons[btn].idCommand = IDM_FLASH_IMPORT;
-            buttons[btn].fsState = TBSTATE_ENABLED;
-            buttons[btn].fsStyle = BTNS_BUTTON;
-            btn++;
+    /* Separator */
+    buttons[btn].fsStyle = BTNS_SEP;
+    btn++;
 
-            buttons[btn].iBitmap = iBase + 7;  /* Export */
-            buttons[btn].idCommand = IDM_FLASH_EXPORT;
-            buttons[btn].fsState = TBSTATE_ENABLED;
-            buttons[btn].fsStyle = BTNS_BUTTON;
-            btn++;
+    /* Flash group */
+    buttons[btn].iBitmap = iBase + 6;  /* Import */
+    buttons[btn].idCommand = IDM_FLASH_IMPORT;
+    buttons[btn].fsState = TBSTATE_ENABLED;
+    buttons[btn].fsStyle = BTNS_BUTTON;
+    btn++;
 
-            /* Separator */
-            buttons[btn].fsStyle = BTNS_SEP;
-            btn++;
+    buttons[btn].iBitmap = iBase + 7;  /* Export */
+    buttons[btn].idCommand = IDM_FLASH_EXPORT;
+    buttons[btn].fsState = TBSTATE_ENABLED;
+    buttons[btn].fsStyle = BTNS_BUTTON;
+    btn++;
 
-            /* Log group */
-            buttons[btn].iBitmap = iBase + 8;  /* Clear */
-            buttons[btn].idCommand = IDM_LOG_CLEAR;
-            buttons[btn].fsState = TBSTATE_ENABLED;
-            buttons[btn].fsStyle = BTNS_BUTTON;
-            btn++;
+    /* Separator */
+    buttons[btn].fsStyle = BTNS_SEP;
+    btn++;
 
-            buttons[btn].iBitmap = iBase + 9;  /* Save Log */
-            buttons[btn].idCommand = IDM_LOG_SAVEAS;
-            buttons[btn].fsState = TBSTATE_ENABLED;
-            buttons[btn].fsStyle = BTNS_BUTTON;
-            btn++;
+    /* Log group */
+    buttons[btn].iBitmap = iBase + 8;  /* Clear */
+    buttons[btn].idCommand = IDM_LOG_CLEAR;
+    buttons[btn].fsState = TBSTATE_ENABLED;
+    buttons[btn].fsStyle = BTNS_BUTTON;
+    btn++;
 
-            SendMessageW(g_hToolbar, TB_ADDBUTTONS, btn, (LPARAM)buttons);
+    buttons[btn].iBitmap = iBase + 9;  /* Save Log */
+    buttons[btn].idCommand = IDM_LOG_SAVEAS;
+    buttons[btn].fsState = TBSTATE_ENABLED;
+    buttons[btn].fsStyle = BTNS_BUTTON;
+    btn++;
 
-            /* Create status bar */
-            g_hStatusbar = CreateWindowExW(0, STATUSCLASSNAMEW, NULL,
-                WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
-                0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_STATUSBAR, hInst, NULL);
+    SendMessageW(g_hToolbar, TB_ADDBUTTONS, btn, (LPARAM)buttons);
 
-            /* Create RichEdit log display */
-            g_hRichEdit = LoadLibraryW(L"riched20.dll");
-            g_hEdit = CreateWindowExW(0, RICHEDIT_CLASSW, NULL,
-                WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-                0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_EDIT, hInst, NULL);
+    /* Create status bar */
+    g_hStatusbar = CreateWindowExW(0, STATUSCLASSNAMEW, NULL,
+        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
+        0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_STATUSBAR, hInst, NULL);
 
-            /* Configure RichEdit: unlimited text, light gray background */
-            SendMessageW(g_hEdit, EM_SETLIMITTEXT, 0, 0);
-            SendMessageW(g_hEdit, EM_SETBKGNDCOLOR, 0, COLOR_BG);
+    /* Create RichEdit log display */
+    g_hRichEdit = LoadLibraryW(L"riched20.dll");
+    g_hEdit = CreateWindowExW(0, RICHEDIT_CLASSW, NULL,
+        WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
+        0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_EDIT, hInst, NULL);
 
-            /* Initialize and apply default font */
-            InitDefaultFont();
-            ApplyFontToEdit(g_hEdit, &g_logFont);
+    /* Configure RichEdit: unlimited text, light gray background */
+    SendMessageW(g_hEdit, EM_SETLIMITTEXT, 0, 0);
+    SendMessageW(g_hEdit, EM_SETBKGNDCOLOR, 0, COLOR_BG);
 
-            /* Register for device change notifications */
-            DEV_BROADCAST_DEVICEINTERFACE dbi = {0};
-            dbi.dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE);
-            dbi.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
-            dbi.dbcc_classguid = GUID_DEVCLASS_PORTS;
-            g_hDevNotify = RegisterDeviceNotificationW(hWnd, &dbi, DEVICE_NOTIFY_WINDOW_HANDLE);
+    /* Initialize and apply default font */
+    InitDefaultFont();
+    ApplyFontToEdit(g_hEdit, &g_logFont);
 
+    /* Register for device change notifications */
+    DEV_BROADCAST_DEVICEINTERFACE dbi = {0};
+    dbi.dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE);
+    dbi.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+    dbi.dbcc_classguid = GUID_DEVCLASS_PORTS;
+    g_hDevNotify = RegisterDeviceNotificationW(hWnd, &dbi, DEVICE_NOTIFY_WINDOW_HANDLE);
+
+    UpdateTitle(hWnd);
+    UpdateMenuState(hWnd);
+    UpdateStatusBar();
+    return 0;
+}
+
+/* Handle WM_SIZE - resize toolbar, status bar, and edit control */
+static LRESULT Main_OnSize(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    RECT rcClient;
+    GetClientRect(hWnd, &rcClient);
+
+    SendMessageW(g_hToolbar, WM_SIZE, 0, 0);
+    SendMessageW(g_hStatusbar, WM_SIZE, 0, 0);
+
+    RECT rcToolbar, rcStatus;
+    GetWindowRect(g_hToolbar, &rcToolbar);
+    GetWindowRect(g_hStatusbar, &rcStatus);
+
+    int toolbarH = rcToolbar.bottom - rcToolbar.top;
+    int statusH = rcStatus.bottom - rcStatus.top;
+
+    SetWindowPos(g_hEdit, NULL, 0, toolbarH,
+                rcClient.right, rcClient.bottom - toolbarH - statusH,
+                SWP_NOZORDER);
+
+    UpdateStatusBar();
+    return 0;
+}
+
+/* Handle WM_COMMAND - menu and toolbar commands */
+/* Handle IDM_NEW_DEVICE command */
+static void Main_CmdNewDevice(HWND hWnd)
+{
+    if (!PromptDisconnectIfNeeded(hWnd))
+        return;
+    if (!PromptSaveIfNeeded(hWnd))
+        return;
+    if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_NEW_DEVICE), hWnd, NewDeviceDlgProc) == IDOK) {
+        SyncDeviceToEsptool();
+        Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+        Config_SetLastDeviceFile(NULL);
+        UpdateStatusBar();
+        UpdateTitle(hWnd);
+        SetWindowTextW(g_hEdit, L"");
+    }
+}
+
+/* Handle IDM_OPEN_DEVICE command */
+static void Main_CmdOpenDevice(HWND hWnd)
+{
+    if (!PromptDisconnectIfNeeded(hWnd))
+        return;
+    if (!PromptSaveIfNeeded(hWnd))
+        return;
+    OPENFILENAMEW ofn = {0};
+    WCHAR szFile[MAX_PATH] = {0};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hWnd;
+    ofn.lpstrFilter = LoadStr(IDS_DEVICE_FILTER);
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_FILEMUSTEXIST;
+    if (GetOpenFileNameW(&ofn)) {
+        Device_Close(&g_device);
+        if (Device_Load(&g_device, szFile)) {
+            SyncDeviceToEsptool();
+            Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+            Config_SetLastDeviceFile(szFile);
+            UpdateStatusBar();
+            UpdateTitle(hWnd);
+            SetWindowTextW(g_hEdit, L"");
+        } else {
+            MessageBoxW(hWnd, L"Failed to load device file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        }
+    }
+}
+
+/* Handle IDM_SAVE_DEVICE command */
+static void Main_CmdSaveDevice(HWND hWnd)
+{
+    const WCHAR *filename = Device_GetFilename(&g_device);
+    if (filename[0]) {
+        if (Device_Save(&g_device, filename)) {
+            Config_SetLastDeviceFile(filename);
+        }
+    } else {
+        /* No filename, do Save As */
+        Main_CmdSaveDeviceAs(hWnd);
+    }
+}
+
+/* Handle IDM_SAVE_DEVICE_AS command */
+static void Main_CmdSaveDeviceAs(HWND hWnd)
+{
+    OPENFILENAMEW ofn = {0};
+    WCHAR szFile[MAX_PATH] = {0};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hWnd;
+    ofn.lpstrFilter = LoadStr(IDS_DEVICE_SAVE_FILTER);
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+    ofn.lpstrDefExt = L"esp";
+    if (GetSaveFileNameW(&ofn)) {
+        if (Device_Save(&g_device, szFile)) {
+            Config_SetLastDeviceFile(szFile);
+        } else {
+            MessageBoxW(hWnd, L"Failed to save device file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        }
+    }
+}
+
+/* Handle IDM_DEVICE_PROPS command */
+static void Main_CmdDeviceProps(HWND hWnd)
+{
+    if (Serial_IsOpen(&g_serial)) {
+        MessageBoxW(hWnd, L"Disconnect serial port before modifying device properties", LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+    } else {
+        if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_DEVICE_PROPS), hWnd, DevicePropsDlgProc) == IDOK) {
+            UpdateStatusBar();
+            UpdateTitle(hWnd);
+        }
+    }
+}
+
+/* Handle WM_COMMAND - menu and toolbar commands */
+static LRESULT Main_OnCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    switch (LOWORD(wParam)) {
+    case IDM_NEW_DEVICE:     Main_CmdNewDevice(hWnd); break;
+    case IDM_OPEN_DEVICE:    Main_CmdOpenDevice(hWnd); break;
+    case IDM_SAVE_DEVICE:    Main_CmdSaveDevice(hWnd); break;
+    case IDM_SAVE_DEVICE_AS: Main_CmdSaveDeviceAs(hWnd); break;
+    case IDM_DEVICE_PROPS:   Main_CmdDeviceProps(hWnd); break;
+    case IDM_CONNECT:        Main_OnConnect(hWnd); break;
+    case IDM_DISCONNECT:     Main_OnDisconnect(hWnd); break;
+    case IDM_RECONNECT:      Main_OnReconnect(hWnd); break;
+    case IDM_FLASH_IMPORT:   Main_OnFlashImport(hWnd); break;
+    case IDM_FLASH_EXPORT:   Main_OnFlashExport(hWnd); break;
+    case IDM_DUMP_DEVICE_AS: Main_OnDumpDeviceAs(hWnd); break;
+    case IDM_LOG_CLEAR:      Main_OnLogClear(hWnd); break;
+    case IDM_LOG_SAVEAS:     Main_OnLogSaveAs(hWnd); break;
+    case IDM_LOG_FONT:       Main_OnLogFont(hWnd); break;
+    case IDM_EXIT:           Main_OnExit(hWnd); break;
+    case IDM_ABOUT:
+        DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_ABOUT), hWnd, AboutDlgProc);
+        break;
+    }
+    SetFocus(g_hEdit);
+    return 0;
+}
+
+/* Handle WM_NOTIFY - toolbar tooltip requests */
+static LRESULT Main_OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    if (((NMHDR *)lParam)->code == TTN_GETDISPINFOW) {
+        NMTTDISPINFOW *ttt = (NMTTDISPINFOW *)lParam;
+        ttt->hinst = GetModuleHandleW(NULL);
+        switch (ttt->hdr.idFrom) {
+        case IDM_CONNECT:
+            ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_CONNECT);
+            return 0;
+        case IDM_DISCONNECT:
+            ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_DISCONNECT);
+            return 0;
+        case IDM_RECONNECT:
+            ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_RECONNECT);
+            return 0;
+        case IDM_LOG_CLEAR:
+            ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_CLEAR);
+            return 0;
+        case IDM_LOG_SAVEAS:
+            ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_SAVEAS);
+            return 0;
+        }
+    }
+    return 0;
+}
+
+/* Handle WM_SERIAL_RX - RX data received from serial port */
+static LRESULT Main_OnSerialRx(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    DWORD len = (DWORD)wParam;
+    BYTE *data = (BYTE *)lParam;
+    if (data != NULL && len > 0 && len < MAX_MSG_SIZE) {
+        Main_AppendLog(hWnd, data, len, DIR_RX);
+    }
+    if (data != NULL) {
+        HeapFree(GetProcessHeap(), 0, data);
+    }
+    return 0;
+}
+
+/* Handle WM_SERIAL_TX - TX data sent to serial port */
+static LRESULT Main_OnSerialTx(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    DWORD len = (DWORD)wParam;
+    BYTE *data = (BYTE *)lParam;
+    if (data != NULL && len > 0 && len < MAX_MSG_SIZE) {
+        Main_AppendLog(hWnd, data, len, DIR_TX);
+    }
+    if (data != NULL) {
+        HeapFree(GetProcessHeap(), 0, data);
+    }
+    return 0;
+}
+
+/* Handle WM_SERIAL_ERROR - connection lost notification */
+static LRESULT Main_OnSerialError(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    TRACE_FW(TAG, "Connection lost, error code: %lu", (DWORD)wParam);
+    Serial_Close(&g_serial);
+    UpdateTitle(hWnd);
+    UpdateMenuState(hWnd);
+    UpdateStatusBar();
+    MessageBoxW(hWnd, LoadStr(IDS_MSG_CONN_LOST), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+    return 0;
+}
+
+/* Handle WM_SERIAL_LOG - custom log message from protocol layer */
+static LRESULT Main_OnSerialLog(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    WCHAR *tag = (WCHAR *)wParam;
+    WCHAR *text = (WCHAR *)lParam;
+    if (tag && text) {
+        Main_AppendCustomLog(hWnd, tag, text);
+        HeapFree(GetProcessHeap(), 0, tag);
+        HeapFree(GetProcessHeap(), 0, text);
+    }
+    return 0;
+}
+
+/* Handle WM_SERIAL_SIGNAL - signal change notification */
+static LRESULT Main_OnSerialSignal(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    DWORD param = (DWORD)wParam;
+    if (param == 0) {
+        /* Host signal change (DSR/CTS/RI/DCD from GetCommModemStatus) */
+        DWORD modemStatus = (DWORD)lParam;
+        WCHAR buf[96];
+        wsprintfW(buf, L"DSR:%s CTS:%s RI:%s DCD:%s",
+                  (modemStatus & MS_DSR_ON) ? L"ON" : L"OFF",
+                  (modemStatus & MS_CTS_ON) ? L"ON" : L"OFF",
+                  (modemStatus & MS_RING_ON) ? L"ON" : L"OFF",
+                  (modemStatus & MS_RLSD_ON) ? L"ON" : L"OFF");
+        Main_AppendSignalLog(L"SIG", buf, COLOR_SIGNAL);
+    } else if (param == 1) {
+        /* DTR change */
+        BOOL state = (BOOL)lParam;
+        WCHAR buf[32];
+        wsprintfW(buf, L"DTR:%s", state ? L"ON" : L"OFF");
+        Main_AppendSignalLog(L"SIG", buf, COLOR_SIGNAL);
+    } else if (param == 2) {
+        /* RTS change */
+        BOOL state = (BOOL)lParam;
+        WCHAR buf[32];
+        wsprintfW(buf, L"RTS:%s", state ? L"ON" : L"OFF");
+        Main_AppendSignalLog(L"SIG", buf, COLOR_SIGNAL);
+    }
+    return 0;
+}
+
+/* Handle WM_SERIAL_CONFIG - configuration change notification */
+static LRESULT Main_OnSerialConfig(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    DWORD baudRate = 0;
+    BYTE dataBits = 0, parity = 0, stopBits = 0;
+    if (Serial_GetConfig(&g_serial, &baudRate, &dataBits, &parity, &stopBits)) {
+        const WCHAR *parityStr = L"N";
+        switch (parity) {
+        case NOPARITY: parityStr = L"N"; break;
+        case ODDPARITY: parityStr = L"O"; break;
+        case EVENPARITY: parityStr = L"E"; break;
+        case MARKPARITY: parityStr = L"M"; break;
+        case SPACEPARITY: parityStr = L"S"; break;
+        }
+        const WCHAR *stopStr = L"1";
+        switch (stopBits) {
+        case ONESTOPBIT: stopStr = L"1"; break;
+        case ONE5STOPBITS: stopStr = L"1.5"; break;
+        case TWOSTOPBITS: stopStr = L"2"; break;
+        }
+        WCHAR buf[64];
+        wsprintfW(buf, L"%lu,%d%s%s", baudRate, dataBits, parityStr, stopStr);
+        Main_AppendSignalLog(L"CFG", buf, COLOR_CONFIG);
+    }
+    UpdateStatusBar();
+    return 0;
+}
+
+/* Handle WM_DUMP_COMPLETE - dump thread completion notification */
+static LRESULT Main_OnDumpComplete(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    BOOL success = (BOOL)wParam;
+    DWORD errorCode = (DWORD)lParam;
+
+    /* Restore window state */
+    EnableWindow(hWnd, TRUE);
+    SetCursor(LoadCursor(NULL, IDC_ARROW));
+    SetFocus(g_hEdit);
+
+    if (!success) {
+        WCHAR msg[128];
+        wsprintfW(msg, L"Failed to dump device (error: %lu)", errorCode);
+        MessageBoxW(hWnd, msg, LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+    }
+    return 0;
+}
+
+/* Handle WM_DEVICECHANGE - device removal */
+static LRESULT Main_OnDeviceChange(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    if (wParam == DBT_DEVICEREMOVECOMPLETE && Serial_IsOpen(&g_serial)) {
+        PDEV_BROADCAST_HDR pHdr = (PDEV_BROADCAST_HDR)lParam;
+        if (pHdr && pHdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
+            TRACE_FW(TAG, "Device removed, disconnecting");
+            Serial_Close(&g_serial);
             UpdateTitle(hWnd);
             UpdateMenuState(hWnd);
             UpdateStatusBar();
+            MessageBoxW(hWnd, LoadStr(IDS_MSG_DEV_REMOVED),
+                        LoadStr(IDS_MSG_DEV_TITLE), MB_OK | MB_ICONWARNING);
         }
+    }
+    return 0;
+}
+
+/* Handle WM_CLOSE - close button (X) with confirmation */
+static LRESULT Main_OnClose(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    if (!PromptDisconnectIfNeeded(hWnd))
         return 0;
-
-    case WM_SIZE:
-        {
-            RECT rcClient;
-            GetClientRect(hWnd, &rcClient);
-
-            SendMessageW(g_hToolbar, WM_SIZE, 0, 0);
-            SendMessageW(g_hStatusbar, WM_SIZE, 0, 0);
-
-            RECT rcToolbar, rcStatus;
-            GetWindowRect(g_hToolbar, &rcToolbar);
-            GetWindowRect(g_hStatusbar, &rcStatus);
-
-            int toolbarH = rcToolbar.bottom - rcToolbar.top;
-            int statusH = rcStatus.bottom - rcStatus.top;
-
-            SetWindowPos(g_hEdit, NULL, 0, toolbarH,
-                        rcClient.right, rcClient.bottom - toolbarH - statusH,
-                        SWP_NOZORDER);
-
-            UpdateStatusBar();
-        }
+    if (!PromptSaveIfNeeded(hWnd))
         return 0;
+    DestroyWindow(hWnd);
+    return 0;
+}
 
-    case WM_COMMAND:
-        switch (LOWORD(wParam)) {
-        case IDM_NEW_DEVICE:
-            if (!PromptDisconnectIfNeeded(hWnd)) {
-                SetFocus(g_hEdit);
-                return 0;
-            }
-            if (!PromptSaveIfNeeded(hWnd)) {
-                SetFocus(g_hEdit);
-                return 0;
-            }
-            if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_NEW_DEVICE), hWnd, NewDeviceDlgProc) == IDOK) {
-                SyncDeviceToEsptool();
-                Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
-                Config_SetLastDeviceFile(NULL);
-                UpdateStatusBar();
-                UpdateTitle(hWnd);
-                SetWindowTextW(g_hEdit, L"");
-            }
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_OPEN_DEVICE:
-            if (!PromptDisconnectIfNeeded(hWnd)) {
-                SetFocus(g_hEdit);
-                return 0;
-            }
-            if (!PromptSaveIfNeeded(hWnd)) {
-                SetFocus(g_hEdit);
-                return 0;
-            }
-            {
-                OPENFILENAMEW ofn = {0};
-                WCHAR szFile[MAX_PATH] = {0};
-                ofn.lStructSize = sizeof(ofn);
-                ofn.hwndOwner = hWnd;
-                ofn.lpstrFilter = LoadStr(IDS_DEVICE_FILTER);
-                ofn.lpstrFile = szFile;
-                ofn.nMaxFile = MAX_PATH;
-                ofn.Flags = OFN_FILEMUSTEXIST;
-                if (GetOpenFileNameW(&ofn)) {
-                    Device_Close(&g_device);
-                    if (Device_Load(&g_device, szFile)) {
-                        SyncDeviceToEsptool();
-                        Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
-                        Config_SetLastDeviceFile(szFile);
-                        UpdateStatusBar();
-                        UpdateTitle(hWnd);
-                        SetWindowTextW(g_hEdit, L"");
-                    } else {
-                        MessageBoxW(hWnd, L"Failed to load device file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
-                    }
-                }
-            }
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_SAVE_DEVICE:
-            {
-                const WCHAR *filename = Device_GetFilename(&g_device);
-                if (filename[0]) {
-                    if (Device_Save(&g_device, filename)) {
-                        Config_SetLastDeviceFile(filename);
-                    }
-                } else {
-                    /* No filename, do Save As */
-                    SendMessageW(hWnd, WM_COMMAND, IDM_SAVE_DEVICE_AS, 0);
-                }
-            }
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_SAVE_DEVICE_AS:
-            {
-                OPENFILENAMEW ofn = {0};
-                WCHAR szFile[MAX_PATH] = {0};
-                ofn.lStructSize = sizeof(ofn);
-                ofn.hwndOwner = hWnd;
-                ofn.lpstrFilter = LoadStr(IDS_DEVICE_SAVE_FILTER);
-                ofn.lpstrFile = szFile;
-                ofn.nMaxFile = MAX_PATH;
-                ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
-                ofn.lpstrDefExt = L"esp";
-                if (GetSaveFileNameW(&ofn)) {
-                    if (Device_Save(&g_device, szFile)) {
-                        Config_SetLastDeviceFile(szFile);
-                    } else {
-                        MessageBoxW(hWnd, L"Failed to save device file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
-                    }
-                }
-            }
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_DEVICE_PROPS:
-            if (Serial_IsOpen(&g_serial)) {
-                MessageBoxW(hWnd, L"Disconnect serial port before modifying device properties", LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
-            } else {
-                if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_DEVICE_PROPS), hWnd, DevicePropsDlgProc) == IDOK) {
+/* Handle WM_APP_INIT - initialization, check for last device file */
+static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    WCHAR lastFile[MAX_PATH] = {0};
+    if (Config_GetLastDeviceFile(lastFile, MAX_PATH)) {
+        /* Check if file exists */
+        DWORD attr = GetFileAttributesW(lastFile);
+        if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
+            /* Prompt user */
+            WCHAR msg[MAX_PATH + 64];
+            wsprintfW(msg, L"Open last device file?\n%s", lastFile);
+            int ret = MessageBoxW(hWnd, msg, L"Open Device", MB_YESNO | MB_ICONQUESTION);
+            if (ret == IDYES) {
+                if (Device_Load(&g_device, lastFile)) {
+                    SyncDeviceToEsptool();
+                    Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
                     UpdateStatusBar();
                     UpdateTitle(hWnd);
+                    SetWindowTextW(g_hEdit, L"");
+                    return 0;
                 }
             }
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_CONNECT:
-            Main_OnConnect(hWnd);
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_DISCONNECT:
-            Main_OnDisconnect(hWnd);
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_RECONNECT:
-            Main_OnReconnect(hWnd);
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_FLASH_IMPORT:
-            Main_OnFlashImport(hWnd);
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_FLASH_EXPORT:
-            Main_OnFlashExport(hWnd);
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_DUMP_DEVICE_AS:
-            Main_OnDumpDeviceAs(hWnd);
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_LOG_CLEAR:
-            Main_OnLogClear(hWnd);
-            return 0;
-        case IDM_LOG_SAVEAS:
-            Main_OnLogSaveAs(hWnd);
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_LOG_FONT:
-            Main_OnLogFont(hWnd);
-            SetFocus(g_hEdit);
-            return 0;
-        case IDM_EXIT:
-            Main_OnExit(hWnd);
-            return 0;
-        case IDM_ABOUT:
-            DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_ABOUT), hWnd, AboutDlgProc);
-            SetFocus(g_hEdit);
-            return 0;
         }
-        break;
-
-    case WM_NOTIFY:
-        /* Handle toolbar tooltip requests */
-        if (((NMHDR *)lParam)->code == TTN_GETDISPINFOW) {
-            NMTTDISPINFOW *ttt = (NMTTDISPINFOW *)lParam;
-            ttt->hinst = GetModuleHandleW(NULL);
-            switch (ttt->hdr.idFrom) {
-            case IDM_CONNECT:
-                ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_CONNECT);
-                return 0;
-            case IDM_DISCONNECT:
-                ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_DISCONNECT);
-                return 0;
-            case IDM_RECONNECT:
-                ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_RECONNECT);
-                return 0;
-            case IDM_LOG_CLEAR:
-                ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_CLEAR);
-                return 0;
-            case IDM_LOG_SAVEAS:
-                ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_SAVEAS);
-                return 0;
-            }
-        }
-        break;
-
-    case WM_SERIAL_RX:
-        /* RX Data received from serial port */
-        {
-            DWORD len = (DWORD)wParam;
-            BYTE *data = (BYTE *)lParam;
-            if (data != NULL && len > 0 && len < MAX_MSG_SIZE) {
-                Main_AppendLog(hWnd, data, len, DIR_RX);
-            }
-            if (data != NULL) {
-                HeapFree(GetProcessHeap(), 0, data);
-            }
-        }
-        return 0;
-
-    case WM_SERIAL_TX:
-        /* TX Data sent to serial port */
-        {
-            DWORD len = (DWORD)wParam;
-            BYTE *data = (BYTE *)lParam;
-            if (data != NULL && len > 0 && len < MAX_MSG_SIZE) {
-                Main_AppendLog(hWnd, data, len, DIR_TX);
-            }
-            if (data != NULL) {
-                HeapFree(GetProcessHeap(), 0, data);
-            }
-        }
-        return 0;
-
-    case WM_SERIAL_ERROR:
-        /* Connection lost notification from listener thread */
-        TRACE_FW(TAG, "Connection lost, error code: %lu", (DWORD)wParam);
-        Serial_Close(&g_serial);
-        UpdateTitle(hWnd);
-        UpdateMenuState(hWnd);
-        UpdateStatusBar();
-        MessageBoxW(hWnd, LoadStr(IDS_MSG_CONN_LOST), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
-        return 0;
-
-    case WM_SERIAL_LOG:
-        /* Custom log message from protocol layer */
-        {
-            WCHAR *tag = (WCHAR *)wParam;
-            WCHAR *text = (WCHAR *)lParam;
-            if (tag && text) {
-                Main_AppendCustomLog(hWnd, tag, text);
-                HeapFree(GetProcessHeap(), 0, tag);
-                HeapFree(GetProcessHeap(), 0, text);
-            }
-        }
-        return 0;
-
-    case WM_SERIAL_SIGNAL:
-        /* Signal change notification */
-        {
-            DWORD param = (DWORD)wParam;
-            if (param == 0) {
-                /* Host signal change (DSR/CTS/RI/DCD from GetCommModemStatus) */
-                DWORD modemStatus = (DWORD)lParam;
-                WCHAR buf[96];
-                wsprintfW(buf, L"DSR:%s CTS:%s RI:%s DCD:%s",
-                          (modemStatus & MS_DSR_ON) ? L"ON" : L"OFF",
-                          (modemStatus & MS_CTS_ON) ? L"ON" : L"OFF",
-                          (modemStatus & MS_RING_ON) ? L"ON" : L"OFF",
-                          (modemStatus & MS_RLSD_ON) ? L"ON" : L"OFF");
-                Main_AppendSignalLog(L"SIG", buf, COLOR_SIGNAL);
-            } else if (param == 1) {
-                /* DTR change */
-                BOOL state = (BOOL)lParam;
-                WCHAR buf[32];
-                wsprintfW(buf, L"DTR:%s", state ? L"ON" : L"OFF");
-                Main_AppendSignalLog(L"SIG", buf, COLOR_SIGNAL);
-            } else if (param == 2) {
-                /* RTS change */
-                BOOL state = (BOOL)lParam;
-                WCHAR buf[32];
-                wsprintfW(buf, L"RTS:%s", state ? L"ON" : L"OFF");
-                Main_AppendSignalLog(L"SIG", buf, COLOR_SIGNAL);
-            }
-        }
-        return 0;
-
-    case WM_SERIAL_CONFIG:
-        /* Configuration change notification */
-        {
-            DWORD baudRate = 0;
-            BYTE dataBits = 0, parity = 0, stopBits = 0;
-            if (Serial_GetConfig(&g_serial, &baudRate, &dataBits, &parity, &stopBits)) {
-                const WCHAR *parityStr = L"N";
-                switch (parity) {
-                case NOPARITY: parityStr = L"N"; break;
-                case ODDPARITY: parityStr = L"O"; break;
-                case EVENPARITY: parityStr = L"E"; break;
-                case MARKPARITY: parityStr = L"M"; break;
-                case SPACEPARITY: parityStr = L"S"; break;
-                }
-                const WCHAR *stopStr = L"1";
-                switch (stopBits) {
-                case ONESTOPBIT: stopStr = L"1"; break;
-                case ONE5STOPBITS: stopStr = L"1.5"; break;
-                case TWOSTOPBITS: stopStr = L"2"; break;
-                }
-                WCHAR buf[64];
-                wsprintfW(buf, L"%lu,%d%s%s", baudRate, dataBits, parityStr, stopStr);
-                Main_AppendSignalLog(L"CFG", buf, COLOR_CONFIG);
-            }
-            UpdateStatusBar();
-        }
-        return 0;
-
-    case WM_DUMP_COMPLETE:
-        /* Dump thread completion notification */
-        {
-            BOOL success = (BOOL)wParam;
-            DWORD errorCode = (DWORD)lParam;
-
-            /* Restore window state */
-            EnableWindow(hWnd, TRUE);
-            SetCursor(LoadCursor(NULL, IDC_ARROW));
-            SetFocus(g_hEdit);
-
-            if (!success) {
-                WCHAR msg[128];
-                wsprintfW(msg, L"Failed to dump device (error: %lu)", errorCode);
-                MessageBoxW(hWnd, msg, LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
-            }
-        }
-        return 0;
-
-    case WM_DEVICECHANGE:
-        /* Handle device removal */
-        if (wParam == DBT_DEVICEREMOVECOMPLETE && Serial_IsOpen(&g_serial)) {
-            PDEV_BROADCAST_HDR pHdr = (PDEV_BROADCAST_HDR)lParam;
-            if (pHdr && pHdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
-                TRACE_FW(TAG, "Device removed, disconnecting");
-                Serial_Close(&g_serial);
-                UpdateTitle(hWnd);
-                UpdateMenuState(hWnd);
-                UpdateStatusBar();
-                MessageBoxW(hWnd, LoadStr(IDS_MSG_DEV_REMOVED),
-                            LoadStr(IDS_MSG_DEV_TITLE), MB_OK | MB_ICONWARNING);
-            }
-        }
-        break;
-
-    case WM_CLOSE:
-        /* Handle close button (X) with confirmation */
-        if (!PromptDisconnectIfNeeded(hWnd))
-            return 0;
-        if (!PromptSaveIfNeeded(hWnd))
-            return 0;
-        DestroyWindow(hWnd);
-        return 0;
-
-    case WM_APP_INIT:
-        /* Initialization - check for last device file */
-        {
-            WCHAR lastFile[MAX_PATH] = {0};
-            if (Config_GetLastDeviceFile(lastFile, MAX_PATH)) {
-                /* Check if file exists */
-                DWORD attr = GetFileAttributesW(lastFile);
-                if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
-                    /* Prompt user */
-                    WCHAR msg[MAX_PATH + 64];
-                    wsprintfW(msg, L"Open last device file?\n%s", lastFile);
-                    int ret = MessageBoxW(hWnd, msg, L"Open Device", MB_YESNO | MB_ICONQUESTION);
-                    if (ret == IDYES) {
-                        if (Device_Load(&g_device, lastFile)) {
-                            SyncDeviceToEsptool();
-                            Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
-                            UpdateStatusBar();
-                            UpdateTitle(hWnd);
-                            SetWindowTextW(g_hEdit, L"");
-                            return 0;
-                        }
-                    }
-                }
-            }
-            /* No last file or user declined - show New Device dialog */
-            if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_NEW_DEVICE), hWnd, NewDeviceDlgProc) != IDOK) {
-                /* User cancelled - exit */
-                DestroyWindow(hWnd);
-            } else {
-                SyncDeviceToEsptool();
-                Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
-                UpdateStatusBar();
-                UpdateTitle(hWnd);
-            }
-        }
-        return 0;
-
-    case WM_DESTROY:
-        /* Unregister device notifications */
-        if (g_hDevNotify) {
-            UnregisterDeviceNotification(g_hDevNotify);
-            g_hDevNotify = NULL;
-        }
-        Serial_Close(&g_serial);
-        Device_Close(&g_device);
-        if (g_hRichEdit) {
-            FreeLibrary(g_hRichEdit);
-            g_hRichEdit = NULL;
-        }
-        PostQuitMessage(0);
-        return 0;
     }
+    /* No last file or user declined - show New Device dialog */
+    if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_NEW_DEVICE), hWnd, NewDeviceDlgProc) != IDOK) {
+        /* User cancelled - exit */
+        DestroyWindow(hWnd);
+    } else {
+        SyncDeviceToEsptool();
+        Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+        UpdateStatusBar();
+        UpdateTitle(hWnd);
+    }
+    return 0;
+}
 
-    return DefWindowProcW(hWnd, msg, wParam, lParam);
+/* Handle WM_DESTROY - cleanup and exit */
+static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    /* Unregister device notifications */
+    if (g_hDevNotify) {
+        UnregisterDeviceNotification(g_hDevNotify);
+        g_hDevNotify = NULL;
+    }
+    Serial_Close(&g_serial);
+    Device_Close(&g_device);
+    if (g_hRichEdit) {
+        FreeLibrary(g_hRichEdit);
+        g_hRichEdit = NULL;
+    }
+    PostQuitMessage(0);
+    return 0;
 }
 
 /* Initialize GUI: register window class, init common controls */
