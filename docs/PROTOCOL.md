@@ -885,7 +885,7 @@ ESP32-C3/S3 等（18 字节数据 + 2 字节状态 = 20 字节）：
 [flags:4][flash_crypt_cnt:1][key_purposes:7][chip_id:4][api_version:4]
 ```
 
-**FakeEsptool 返回格式（20 字节）：**
+**最小兼容返回示例：**
 ```
 Size: 0x14 0x00 (20 bytes)
 Data: 00 00 (status) + 00 00 00 00 (flags) + 00 (crypt_cnt) + 00 00 00 00 00 00 00 (key_purposes) + chip_id (4 bytes, little-endian) + api_version (4 bytes, little-endian)
@@ -2636,7 +2636,7 @@ waiting for download
 - eFuse0 bit4 或 eFuse3 bit16 置位表示 ESP8285
 - ESP8285 = ESP8266 + 内置 1MB Flash
 
-### P.3 晶振频率与波特率
+### P.4 晶振频率与波特率
 
 | 芯片 | 支持的 XTAL 频率 | 默认控制台波特率 | XTAL_CLK_DIVIDER | 检测方式 |
 |------|-----------------|------------------|------------------|----------|
