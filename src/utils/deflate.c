@@ -8,6 +8,15 @@
 #include "deflate.h"
 #include <string.h>
 
+/* Memory allocation helpers */
+static inline void *deflate_malloc(size_t size) {
+    return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+}
+
+static inline void deflate_free(void *ptr) {
+    if (ptr) HeapFree(GetProcessHeap(), 0, ptr);
+}
+
 /* Static Huffman code tables for DEFLATE */
 static const WORD deflate_lit_lengths[29] = {
     3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
@@ -83,7 +92,7 @@ static int deflate_build_huffman(DEFLATE_HUFF *huff, const BYTE *lengths, int co
     }
 
     /* Allocate counts array */
-    huff->counts = (WORD *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (max_len + 1) * sizeof(WORD));
+    huff->counts = (WORD *)deflate_malloc((max_len + 1) * sizeof(WORD));
     if (!huff->counts)
         return DEFLATE_NO_MEMORY;
 
@@ -98,19 +107,19 @@ static int deflate_build_huffman(DEFLATE_HUFF *huff, const BYTE *lengths, int co
         total += huff->counts[i];
 
     /* Allocate symbols array */
-    huff->symbols = (WORD *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, total * sizeof(WORD));
+    huff->symbols = (WORD *)deflate_malloc(total * sizeof(WORD));
     if (!huff->symbols) {
-        HeapFree(GetProcessHeap(), 0, huff->counts);
+        deflate_free(huff->counts);
         huff->counts = NULL;
         return DEFLATE_NO_MEMORY;
     }
 
     /* Sort symbols by code length */
     {
-        WORD *offsets = (WORD *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (max_len + 1) * sizeof(WORD));
+        WORD *offsets = (WORD *)deflate_malloc((max_len + 1) * sizeof(WORD));
         if (!offsets) {
-            HeapFree(GetProcessHeap(), 0, huff->counts);
-            HeapFree(GetProcessHeap(), 0, huff->symbols);
+            deflate_free(huff->counts);
+            deflate_free(huff->symbols);
             huff->counts = NULL;
             huff->symbols = NULL;
             return DEFLATE_NO_MEMORY;
@@ -127,7 +136,7 @@ static int deflate_build_huffman(DEFLATE_HUFF *huff, const BYTE *lengths, int co
                 huff->symbols[offsets[lengths[i]]++] = (WORD)i;
         }
 
-        HeapFree(GetProcessHeap(), 0, offsets);
+        deflate_free(offsets);
     }
 
     huff->max_length = max_len;
@@ -138,11 +147,11 @@ static int deflate_build_huffman(DEFLATE_HUFF *huff, const BYTE *lengths, int co
 static void deflate_free_huffman(DEFLATE_HUFF *huff)
 {
     if (huff->counts) {
-        HeapFree(GetProcessHeap(), 0, huff->counts);
+        deflate_free(huff->counts);
         huff->counts = NULL;
     }
     if (huff->symbols) {
-        HeapFree(GetProcessHeap(), 0, huff->symbols);
+        deflate_free(huff->symbols);
         huff->symbols = NULL;
     }
     huff->max_length = 0;
