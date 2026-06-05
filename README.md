@@ -79,6 +79,12 @@ FakeEsptool/
 - [开发文档](docs/DEVELOPMENT.md)
 - [协议规范](docs/PROTOCOL.md)
 
+## 致谢
+
+本项目使用 AI 辅助开发，感谢以下 AI 助手的贡献：
+
+- **OpenCode** - 由 [Anomaly](https://github.com/anomalyco) 开发的交互式 CLI 工具，基于小米大模型（mimo-v2.5-pro），在代码分析、架构设计、协议实现等方面提供了重要支持。
+
 ## 许可证
 
 本项目采用 [MIT 许可证](LICENSE)。
