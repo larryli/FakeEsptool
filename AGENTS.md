@@ -1,8 +1,10 @@
 烧录器端参考代码库：
 
-1、相对项目根目录 ../esptool/esptool-js/ 对应 https://github.com/espressif/esptool-js 代码库
+1、相对项目根目录 ../esptool/esptool/ 对应 https://github.com/espressif/esptool 代码库
 
-2、相对项目根目录 ../esptool/web-esptool/ 对应 https://github.com/xingrz/web-esptool 代码库
+2、相对项目根目录 ../esptool/esptool-js/ 对应 https://github.com/espressif/esptool-js 代码库
+
+3、相对项目根目录 ../esptool/web-esptool/ 对应 https://github.com/xingrz/web-esptool 代码库
 
 协议解码器参考代码库：
 
@@ -16,7 +18,7 @@
 
 3、代码修改完成后自动构建验证修改。修改无误，结束对话前自动运行最后构建的程序。
 
-4、除了 esptool-js 官方烧录器代码实现，其他代码不一定准确。
+4、除了 esptool/esptool-js 官方烧录器代码实现，其他代码不一定准确。
 
 构建环境：
 
