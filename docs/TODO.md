@@ -68,6 +68,9 @@ esptool 客户端（esptool-js、Python esptool）在压缩烧录时，将整个
 - esptool.c: HandleFlashEnd/HandleFlashBegin 检查并释放已有解压器
 - esptool.c: Esptool_ResetState 安全清理解压器资源
 - esptool.c: 解压失败时（`MZ_DATA_ERROR`/`MZ_MEM_ERROR`）返回错误状态码，清理资源，中止写入
+- LICENSE: 追加 miniz 版权声明（MIT 许可证，Copyright (c) 2013 Rich Geldreich）
+- about.c: 添加「第三方库」静态文本控件，显示 miniz 致谢信息
+- resource.rc: 对话框模板中添加致谢控件
 - 删除: src/utils/deflate.c、src/utils/deflate.h
 - 删除: tests/test_deflate.c、tests/test_data.h、tests/generate_test_data.py
 - tests: 基于 miniz 添加分包解压测试用例

@@ -22,6 +22,8 @@
 
 构建环境：
 
-本项目使用 MSVC + CMake 构建，需要通过 vcvars64.bat 初始化环境。
+本项目使用 MSVC + CMake 构建。在 PowerShell 中通过 `Microsoft.VisualStudio.DevShell.dll` 初始化环境。
+
+首选开发环境为 Visual Studio Build Tools 2026 `C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\`。
 
 构建产物：build\FakeEsptool.exe
