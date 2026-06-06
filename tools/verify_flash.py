@@ -36,6 +36,23 @@ DEVICE_VERSION = 1
 # Header size: magic(4) + version(4) + chipType(4) + xtalFreq(1) + reserved(3) + mac(6) + reserved(2) + flashSize(4) + efuseSize(4)
 HEADER_SIZE = 32
 
+# Chip type mapping
+CHIP_TYPES = {
+    0: "ESP8266",
+    1: "ESP32",
+    2: "ESP32-S2",
+    3: "ESP32-S3",
+    4: "ESP32-C2",
+    5: "ESP32-C3",
+    6: "ESP32-C6",
+}
+
+# Crystal frequency mapping
+XTAL_FREQS = {
+    0: "40MHz",
+    1: "26MHz",
+}
+
 
 def read_device_header(f):
     """Read and parse device file header."""
@@ -115,71 +132,91 @@ def calc_md5(data):
     return hashlib.md5(data).hexdigest()
 
 
+def read_device_file(filepath):
+    """Read entire device file and return contents."""
+    with open(filepath, 'rb') as f:
+        return f.read()
+
+
 def verify_flash(flash_dir, device_file):
     """Verify flash data in device file."""
-    print(f"Flash directory: {flash_dir}")
-    print(f"Device file: {device_file}")
-    print()
-
     # Parse flash_args
     segments = parse_flash_args(flash_dir)
     if not segments:
         print("ERROR: No flash segments found in flash_args")
         return False
 
-    # Read device file
+    # Read entire device file for MD5
+    device_data = read_device_file(device_file)
+    device_file_md5 = calc_md5(device_data)
+
+    # Read device file header
     with open(device_file, 'rb') as f:
         header = read_device_header(f)
-
-        print(f"Device Info:")
-        print(f"  Chip Type: {header['chip_type']}")
-        print(f"  XTAL Freq: {header['xtal_freq']}")
-        print(f"  MAC: {':'.join(f'{b:02X}' for b in header['mac'])}")
-        print(f"  Flash Size: {header['flash_size']} bytes ({header['flash_size']/1024/1024:.1f} MB)")
-        print(f"  eFuse Size: {header['efuse_size']} bytes")
-        print()
-
-        # Read flash data from device file
         flash_data = read_flash_data(f, header['efuse_size'], header['flash_size'])
 
     # Calculate device flash MD5
-    device_md5 = calc_md5(flash_data)
-    print(f"Device Flash MD5: {device_md5}")
-    print()
+    flash_md5 = calc_md5(flash_data)
 
-    # Verify each segment
-    all_passed = True
+    # Pre-load all segment data
+    segment_info = []
     for addr, filepath in segments:
         bin_path = os.path.join(flash_dir, filepath)
-
         if not os.path.exists(bin_path):
-            print(f"[FAIL] 0x{addr:08X} {filepath} - File not found")
-            all_passed = False
+            segment_info.append((addr, filepath, None, None, "File not found"))
             continue
-
         bin_data = read_bin_file(bin_path)
         bin_size = len(bin_data)
         bin_md5 = calc_md5(bin_data)
-
-        # Check if segment fits in flash
         if addr + bin_size > header['flash_size']:
-            print(f"[FAIL] 0x{addr:08X} {filepath} ({bin_size} bytes) - Exceeds flash size")
+            segment_info.append((addr, filepath, bin_data, bin_md5, "Exceeds flash size"))
+            continue
+        segment_info.append((addr, filepath, bin_data, bin_md5, None))
+
+    # Print flash directory info
+    print(f"Flash directory: {flash_dir}")
+    for addr, filepath, bin_data, bin_md5, error in segment_info:
+        print(f"  - Offset: 0x{addr:08X}")
+        print(f"    File: {filepath}")
+        if bin_data is not None:
+            print(f"    File Size: {len(bin_data)} bytes")
+            print(f"    File MD5: {bin_md5}")
+        if error:
+            print(f"    Error: {error}")
+    print()
+
+    # Print device file info
+    chip_name = CHIP_TYPES.get(header['chip_type'], f"Unknown")
+    xtal_name = XTAL_FREQS.get(header['xtal_freq'], f"Unknown")
+    print(f"Device file: {device_file}")
+    print(f"  File MD5: {device_file_md5}")
+    print(f"  Chip Type: {chip_name} ({header['chip_type']})")
+    print(f"  XTAL Freq: {xtal_name} ({header['xtal_freq']})")
+    print(f"  MAC: {':'.join(f'{b:02X}' for b in header['mac'])}")
+    print(f"  eFuse Size: {header['efuse_size']} bytes")
+    print(f"  Flash Size: {header['flash_size']} bytes ({header['flash_size']/1024/1024:.1f} MB)")
+    print(f"  Flash MD5: {flash_md5}")
+    print()
+
+    # Verify each segment
+    print("Verify:")
+    all_passed = True
+    for addr, filepath, bin_data, bin_md5, error in segment_info:
+        if error:
+            print(f"  [FAIL] 0x{addr:08X} {filepath} - {error}")
             all_passed = False
             continue
 
-        # Extract data from flash
+        bin_size = len(bin_data)
         flash_segment = flash_data[addr:addr + bin_size]
-        segment_md5 = calc_md5(flash_segment)
 
-        # Compare
         if flash_segment == bin_data:
-            print(f"[PASS] 0x{addr:08X} {filepath} ({bin_size} bytes) md5={bin_md5}")
+            print(f"  [PASS] 0x{addr:08X} {filepath} ({bin_size} bytes)")
         else:
-            # Find first difference
             for i in range(bin_size):
                 if flash_segment[i] != bin_data[i]:
-                    print(f"[FAIL] 0x{addr:08X} {filepath} ({bin_size} bytes) md5={bin_md5}")
-                    print(f"       First diff at offset 0x{addr + i:08X}: flash=0x{flash_segment[i]:02X} expected=0x{bin_data[i]:02X}")
+                    print(f"  [FAIL] 0x{addr:08X} {filepath} ({bin_size} bytes)")
+                    print(f"         First diff at offset 0x{addr + i:08X}: flash=0x{flash_segment[i]:02X} expected=0x{bin_data[i]:02X}")
                     break
             all_passed = False
 

@@ -48,13 +48,22 @@ Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
 
 | 模块 | 职责 |
 |------|------|
-| `main.c` | 用户界面，菜单、工具栏、日志显示，esptool 回调注册 |
-| `serial.c` | 串口通信，数据收发，信号控制 |
+| `main.c` | 程序入口，窗口过程，消息分发 |
+| `app_commands.c/h` | 菜单和工具栏命令处理 |
+| `app_logview.c/h` | 日志视图和字体管理 |
+| `serial.c/h` | 串口通信，数据收发，信号控制 |
 | `esptool/slip.c/h` | SLIP 协议编解码 |
 | `esptool/chip.c/h` | 芯片特性模拟（efuse、MAC等） |
 | `esptool/flash.c/h` | Flash 存储模拟 |
 | `esptool/device.c/h` | 设备文件管理 |
 | `esptool/esptool.c/h` | esptool 命令解析与响应 |
+| `dlg/new_device.c` | 新建设备对话框 |
+| `dlg/device_props.c` | 设备属性对话框 |
+| `dlg/port_select.c` | 串口选择对话框 |
+| `dlg/about.c` | 关于对话框 |
+| `utils/config.c/h` | 配置持久化 |
+| `utils/lang.c/h` | 国际化辅助 |
+| `utils/trace.c/h` | 调试日志 |
 | `utils/deflate.c/h` | DEFLATE 解压（用于压缩模式烧录） |
 
 ## 编译
@@ -611,20 +620,32 @@ python3 tools/verify_flash.py build/my_project my_device.esp
 **输出示例**：
 ```
 Flash directory: build/my_project
+  - Offset: 0x00000000
+    File: bootloader/bootloader.bin
+    File Size: 19696 bytes
+    File MD5: f429d996716eafd005d95da5c9cb9152
+  - Offset: 0x00010000
+    File: my_app.bin
+    File Size: 107744 bytes
+    File MD5: 9d3e1314ea0274e80f2d177f821bc65f
+  - Offset: 0x00008000
+    File: partition_table/partition-table.bin
+    File Size: 3072 bytes
+    File MD5: 5d61d196adc3dba01928f264eb169be7
+
 Device file: my_device.esp
-
-Device Info:
-  Chip Type: 4
-  XTAL Freq: 1
+  File MD5: 1d96ceb1e4a9934fabacd427f10efe04
+  Chip Type: ESP32-C2 (4)
+  XTAL Freq: 26MHz (1)
   MAC: AA:BB:CC:DD:EE:01
-  Flash Size: 2097152 bytes (2.0 MB)
   eFuse Size: 128 bytes
+  Flash Size: 2097152 bytes (2.0 MB)
+  Flash MD5: 761e417679ec198ecae170a53c98863e
 
-Device Flash MD5: 761e417679ec198ecae170a53c98863e
-
-[PASS] 0x00000000 bootloader/bootloader.bin (19696 bytes) md5=f429d996716eafd005d95da5c9cb9152
-[PASS] 0x00010000 my_app.bin (107744 bytes) md5=9d3e1314ea0274e80f2d177f821bc65f
-[PASS] 0x00008000 partition_table/partition-table.bin (3072 bytes) md5=5d61d196adc3dba01928f264eb169be7
+Verify:
+  [PASS] 0x00000000 bootloader/bootloader.bin (19696 bytes)
+  [PASS] 0x00010000 my_app.bin (107744 bytes)
+  [PASS] 0x00008000 partition_table/partition-table.bin (3072 bytes)
 
 All flash segments verified successfully.
 ```

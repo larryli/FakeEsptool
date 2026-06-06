@@ -42,7 +42,9 @@ cmake --build build
 ```
 FakeEsptool/
 ├── src/                        # 源代码
-│   ├── main.c / main.h         # 程序入口和 GUI 实现
+│   ├── main.c / main.h         # 程序入口和窗口过程
+│   ├── app_commands.c / app_commands.h # 菜单和工具栏命令处理
+│   ├── app_logview.c / app_logview.h # 日志视图和字体管理
 │   ├── serial.c / serial.h     # 串口通信模块
 │   ├── resource.h              # 资源 ID
 │   ├── resource.rc             # 资源文件（菜单、对话框、字符串）
@@ -52,10 +54,15 @@ FakeEsptool/
 │   │   ├── flash.c / flash.h   # Flash 存储模拟
 │   │   ├── device.c / device.h # 设备文件管理
 │   │   └── esptool.c / esptool.h # 命令解析与响应
+│   ├── dlg/                    # 对话框
+│   │   ├── dlg.h               # 对话框公共头文件
+│   │   ├── new_device.c        # 新建设备对话框
+│   │   ├── device_props.c      # 设备属性对话框
+│   │   ├── port_select.c       # 串口选择对话框
+│   │   └── about.c             # 关于对话框
 │   ├── utils/                  # 辅助模块
 │   │   ├── config.c / config.h # 配置持久化
 │   │   ├── lang.c / lang.h     # 国际化辅助
-│   │   ├── timer.c / timer.h   # 定时器工具
 │   │   ├── trace.c / trace.h   # 调试日志
 │   │   └── deflate.c / deflate.h # DEFLATE 解压器
 │   └── res/                    # 资源文件（图标、位图、清单）
@@ -64,6 +71,8 @@ FakeEsptool/
 │   ├── test_data.h             # 测试数据（Python zlib 生成）
 │   ├── generate_test_data.py   # 测试数据生成脚本
 │   └── CMakeLists.txt          # 测试构建配置
+├── tools/                      # 工具
+│   └── verify_flash.py         # 烧录验证工具
 ├── docs/                       # 文档
 │   ├── REQUIREMENTS.md         # 需求规格
 │   ├── DEVELOPMENT.md          # 开发文档
