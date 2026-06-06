@@ -503,14 +503,12 @@ ESP 芯片通过 DTR/RTS 信号控制 GPIO0 和 EN 引脚进入下载模式：
 
 ## 已知问题
 
-### FLASH_DEFL_DATA 分包解压 Bug
+### ~~FLASH_DEFL_DATA 分包解压 Bug~~ (已修复)
 
 **现象：** 压缩烧录大文件时，第二个及后续 `FLASH_DEFL_DATA` 包解压失败，导致烧录数据不完整。
 
 **原因：** esptool 客户端将整个镜像压缩为一个 deflate 流后按 `FLASH_WRITE_SIZE` 切分发送。当前自定义 `deflate.c` 不支持流式输入，无法处理跨包的 deflate block 边界。
 
-**修复计划（两阶段）：**
-1. 高优先级：积累解压方案——在 `esptool.c` 中积累所有 `FLASH_DEFL_DATA` 包，到 `FLASH_DEFL_END` 时一次性解压
-2. 中优先级：流式解压方案——集成 miniz 库替换自定义 deflate 实现
+**修复：** 采用积累解压方案，在 `esptool.c` 中积累所有 `FLASH_DEFL_DATA` 包，到 `FLASH_DEFL_END` 时一次性解压。
 
-**状态：** 待修复。详见 `TODO.md`。
+**状态：** 已修复。详见 `DEVELOPMENT.md` 积累解压方案实现细节。

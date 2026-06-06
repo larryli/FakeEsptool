@@ -47,6 +47,10 @@ static const ESP_CMD_INFO commandTable[256] = {
 
 #define ESP_RESP_BUF_SIZE  8192
 
+/* SYNC response sequence (36 bytes).
+   First 3 bytes (0x07, 0x07, 0x12) are used in Val field.
+   The 4th byte (0x20) is NOT used - code uses 0x55 (first padding byte from request).
+   Remaining bytes are padding (not used in response). */
 static const BYTE sync_response[ESP_SYNC_SEQ_LEN] = {
     0x07, 0x07, 0x12, 0x20,
     0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
@@ -271,11 +275,11 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
                      ((DWORD)sync_response[1] << 8) |
                      ((DWORD)sync_response[2] << 16) |
                      ((DWORD)0x55 << 24);
-    BYTE sync_data[4] = {0x00, 0x00, 0x00, 0x00};
 
-    /* Real device sends 8 consecutive responses per SYNC request */
+    /* Real device sends 8 consecutive responses per SYNC request.
+       Response format: Size=4, Data=4 bytes status (0x00000000) */
     for (int i = 0; i < 8; i++) {
-        Esptool_SendResponse(ctx, ESP_CMD_SYNC, sync_val, ESP_OK, sync_data, 4);
+        Esptool_SendResponseEx(ctx, ESP_CMD_SYNC, sync_val, ESP_OK, 4, NULL, 0);
     }
 }
 
@@ -674,27 +678,28 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     BYTE md5[16];
     Flash_CalcMd5(ctx->flash, addr, len, md5);
 
-    /* ROM mode: 2-byte status + 32-byte ASCII hex MD5 = 34 bytes
-       Stub mode: 16-byte binary MD5 + 2-byte status = 18 bytes */
+    /* Response format: [data:N][status:2]
+       ROM mode:   [md5_hex:32][status:2] = 34 bytes
+       Stub mode:  [md5_bin:16][status:2] = 18 bytes */
     if (ctx->stub_mode) {
-        /* Stub mode: return 16-byte binary MD5 */
+        /* Stub mode: return 16-byte binary MD5 + 2-byte status */
         BYTE resp[18];
         memcpy(&resp[0], md5, 16);
         resp[16] = 0x00;  /* status byte 1 (success) */
         resp[17] = 0x00;  /* status byte 2 (success) */
         TRACE_PROTO(TAG, "  MD5 (stub, binary)");
         Serial_PostLog(ctx->hNotify, L"ESP", L"  MD5 (stub, binary)");
-        Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_MD5, ctx->last_read_val, ESP_OK, resp, 18);
+        Esptool_SendResponseEx(ctx, ESP_CMD_SPI_FLASH_MD5, ctx->last_read_val, ESP_OK, 2, resp, 18);
     } else {
-        /* ROM mode: return 32-byte ASCII hex MD5 */
-        char md5str[35];
-        md5str[0] = 0x00;
-        md5str[1] = 0x00;
+        /* ROM mode: return 32-byte ASCII hex MD5 + 2-byte status */
+        BYTE resp[34];
         for (int i = 0; i < 16; i++)
-            sprintf(&md5str[2 + i * 2], "%02x", md5[i]);
-        TRACE_PROTO(TAG, "  MD5=%s", &md5str[2]);
-        Serial_PostLogF(ctx->hNotify, L"ESP", L"  MD5=%hs", &md5str[2]);
-        Esptool_SendResponse(ctx, ESP_CMD_SPI_FLASH_MD5, ctx->last_read_val, ESP_OK, (const BYTE *)md5str, 34);
+            sprintf((char *)&resp[i * 2], "%02x", md5[i]);
+        resp[32] = 0x00;  /* status byte 1 (success) */
+        resp[33] = 0x00;  /* status byte 2 (success) */
+        TRACE_PROTO(TAG, "  MD5=%.*s", 32, resp);
+        Serial_PostLogF(ctx->hNotify, L"ESP", L"  MD5=%.*hs", 32, resp);
+        Esptool_SendResponseEx(ctx, ESP_CMD_SPI_FLASH_MD5, ctx->last_read_val, ESP_OK, 2, resp, 34);
     }
 }
 

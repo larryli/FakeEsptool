@@ -580,21 +580,72 @@ esptool.py --port COM10 write_flash 0 firmware.bin
 esptool.py --port COM10 erase_flash
 ```
 
+### 烧录验证工具
+
+**位置**：`tools/verify_flash.py`
+
+**功能**：验证 esp-idf 构建产物是否正确烧录到 FakeEsptool 设备文件中。
+
+**用途**：用于测试烧录功能的正确性。在 FakeEsptool 中完成烧录并保存设备文件后，使用此脚本对比原始烧录文件与设备文件中的 Flash 数据。
+
+**使用方法**：
+
+```bash
+# WSL 环境
+python3 tools/verify_flash.py <烧录目录> <设备文件>
+
+# 示例
+python3 tools/verify_flash.py build/my_project my_device.esp
+```
+
+**输入参数**：
+- `烧录目录`：esp-idf 构建产物目录，包含 `flash_args` 文件和 .bin 文件
+- `设备文件`：FakeEsptool 保存的 .esp 设备文件
+
+**工作原理**：
+1. 解析烧录目录中的 `flash_args` 文件，获取烧录地址和文件路径
+2. 读取设备文件头，获取 Flash 大小和 eFuse 大小
+3. 跳过 eFuse 数据，提取 Flash 数据
+4. 对每个烧录文件，对比其内容与设备文件中对应地址的数据
+
+**输出示例**：
+```
+Flash directory: build/my_project
+Device file: my_device.esp
+
+Device Info:
+  Chip Type: 4
+  XTAL Freq: 1
+  MAC: AA:BB:CC:DD:EE:01
+  Flash Size: 2097152 bytes (2.0 MB)
+  eFuse Size: 128 bytes
+
+Device Flash MD5: 761e417679ec198ecae170a53c98863e
+
+[PASS] 0x00000000 bootloader/bootloader.bin (19696 bytes) md5=f429d996716eafd005d95da5c9cb9152
+[PASS] 0x00010000 my_app.bin (107744 bytes) md5=9d3e1314ea0274e80f2d177f821bc65f
+[PASS] 0x00008000 partition_table/partition-table.bin (3072 bytes) md5=5d61d196adc3dba01928f264eb169be7
+
+All flash segments verified successfully.
+```
+
+**返回值**：
+- `0`：所有烧录段验证通过
+- `1`：存在验证失败的烧录段
+
 ---
 
 ## 已知问题
 
-### FLASH_DEFL_DATA 分包解压 Bug
+### ~~FLASH_DEFL_DATA 分包解压 Bug~~ (已修复)
 
 **现象：** 压缩烧录大文件时，第二个及后续 `FLASH_DEFL_DATA` 包解压失败，导致烧录数据不完整。
 
 **原因：** 自定义 `deflate.c` 不支持流式输入。当 deflate block 边界跨越两个包时，解压器无法跨包保持状态。
 
-**修复计划（两阶段）：**
-1. 高优先级：积累解压方案——在 `esptool.c` 中积累所有 `FLASH_DEFL_DATA` 包，到 `FLASH_DEFL_END` 时一次性解压
-2. 中优先级：流式解压方案——集成 miniz 库替换自定义 deflate 实现
+**修复：** 采用积累解压方案，在 `esptool.c` 中积累所有 `FLASH_DEFL_DATA` 包，到 `FLASH_DEFL_END` 时一次性解压。
 
-**状态：** 已修复（积累解压方案）。详见 `TODO.md`。
+**状态：** 已修复。详见下方"积累解压方案实现细节"。
 
 ---
 

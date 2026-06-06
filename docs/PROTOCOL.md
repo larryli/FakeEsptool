@@ -160,21 +160,23 @@ for (int i = 0; i < data_len; i++)
 
 **状态码长度因命令和模式而异：**
 
+**注意：** 官方 esptool 客户端固定检查 2 字节状态码（`STATUS_BYTES_LENGTH = 2`）。ROM 模式下设备可能返回 4 字节，但客户端只检查前 2 字节。
+
 | 命令 | ROM 模式 Status 长度 | Stub 模式 Status 长度 | 说明 |
 |------|---------------------|----------------------|------|
-| FLASH_BEGIN (0x02) | 4 字节 | 2 字节 | |
-| FLASH_DATA (0x03) | 4 字节 | 2 字节 | |
-| FLASH_END (0x04) | 4 字节 | 2 字节 | |
-| MEM_BEGIN (0x05) | 4 字节 | 2 字节 | |
-| MEM_DATA (0x07) | 4 字节 | 2 字节 | |
-| MEM_END (0x06) | 4 字节 | 2 字节 | |
+| FLASH_BEGIN (0x02) | 4 字节 | 2 字节 | 客户端只检查前 2 字节 |
+| FLASH_DATA (0x03) | 4 字节 | 2 字节 | 客户端只检查前 2 字节 |
+| FLASH_END (0x04) | 4 字节 | 2 字节 | 客户端只检查前 2 字节 |
+| MEM_BEGIN (0x05) | 4 字节 | 4 字节 | 客户端只检查前 2 字节 |
+| MEM_DATA (0x07) | 4 字节 | 4 字节 | 客户端只检查前 2 字节 |
+| MEM_END (0x06) | 4 字节 | 4 字节 | 客户端只检查前 2 字节 |
 | SYNC (0x08) | 4 字节 | 4 字节 | |
 | WRITE_REG (0x09) | 2 字节 | 2 字节 | |
 | READ_REG (0x0A) | 4 字节 | 2 字节 | 寄存器值在 Val 字段 |
 | CHANGE_BAUDRATE (0x0F) | 2 字节 | 2 字节 | |
-| FLASH_DEFL_BEGIN (0x10) | 4 字节 | 2 字节 | |
-| FLASH_DEFL_DATA (0x11) | 4 字节 | 2 字节 | |
-| FLASH_DEFL_END (0x12) | 4 字节 | 2 字节 | |
+| FLASH_DEFL_BEGIN (0x10) | 4 字节 | 2 字节 | 客户端只检查前 2 字节 |
+| FLASH_DEFL_DATA (0x11) | 4 字节 | 2 字节 | 客户端只检查前 2 字节 |
+| FLASH_DEFL_END (0x12) | 4 字节 | 2 字节 | 客户端只检查前 2 字节 |
 | SPI_FLASH_MD5 (0x13) | 2 字节 | 2 字节 | |
 | GET_SECURITY_INFO (0x14) | 2 字节 | 2 字节 | |
 | ERASE_FLASH (0xD0) | N/A | 2 字节 | 仅 Stub 支持 |
@@ -757,7 +759,7 @@ Direction: 0x01
 Command:   0x13
 Size:      0x22 0x00 (34 bytes)
 Val:       <返回请求的 checksum>
-Data:      0x00 0x00 (status=成功) + md5_hex[32] (32字节 ASCII 十六进制 MD5)
+Data:      md5_hex[32] (32字节 ASCII 十六进制 MD5) + 0x00 0x00 (status=成功)
 ```
 
 **响应（Stub 模式）：**
@@ -766,12 +768,13 @@ Direction: 0x01
 Command:   0x13
 Size:      0x12 0x00 (18 bytes)
 Val:       <返回请求的 checksum>
-Data:      0x00 0x00 (status=成功) + md5_raw[16] (16字节二进制 MD5)
+Data:      md5_raw[16] (16字节二进制 MD5) + 0x00 0x00 (status=成功)
 ```
 
 **工程提示：** 
-- ROM 模式返回 32 字节 ASCII 十六进制 MD5
-- Stub 模式返回 16 字节二进制 MD5
+- ROM 模式返回 32 字节 ASCII 十六进制 MD5 + 2 字节状态码
+- Stub 模式返回 16 字节二进制 MD5 + 2 字节状态码
+- 状态码位于 Data 字段末尾（与其他命令一致）
 
 ---
 
