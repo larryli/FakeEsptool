@@ -118,6 +118,11 @@ typedef struct {
     DWORD     flash_seq;      /* Current flash write sequence */
     DWORD     last_read_val;  /* Cached value from last READ_REG */
     DWORD     flash_uncompressed_size; /* Uncompressed size for DEFLATE */
+    BYTE      *defl_buf;      /* Compressed data accumulation buffer */
+    DWORD     defl_buf_size;  /* Current accumulated data size */
+    DWORD     defl_buf_cap;   /* Buffer capacity (flash_uncompressed_size) */
+    DWORD     defl_offset;    /* Flash offset for current deflate session */
+    DWORD     defl_unc_size;  /* Uncompressed size for current deflate session */
 } ESPTOOL_CTX;
 
 /* Initialize ESP protocol context with device data */

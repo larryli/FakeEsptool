@@ -1056,10 +1056,12 @@ Stub 上传后可获得更高效的 Flash 操作和额外功能。
 设备 → 烧录器: FLASH_DEFL_END Response
 ```
 
-**多文件烧录注意事项：**
+**多文件烧录行为（逆向分析）：**
 - Stub 模式：esptool-js 每个文件后发送 `FLASH_DEFL_END`；web-esptool 和 Python esptool 在全部文件完成后发送一次
 - ROM 模式：三个烧录器均**不发送** `FLASH_DEFL_END`，直接发送下一个文件的 `FLASH_DEFL_BEGIN`
-- 设备端实现时，`FLASH_DEFL_BEGIN` 必须检查并清理上一次可能未释放的解压器资源
+- `FLASH_DEFL_DATA` 响应只表示"数据已收到"，不保证写入 flash（Stub 模式行为）
+
+**设备端实现要点：** 详见 `DEVELOPMENT.md` 积累解压方案实现细节。
 
 ### 4.7 MD5 验证（可选）
 

@@ -509,6 +509,8 @@ ESP 芯片通过 DTR/RTS 信号控制 GPIO0 和 EN 引脚进入下载模式：
 
 **原因：** esptool 客户端将整个镜像压缩为一个 deflate 流后按 `FLASH_WRITE_SIZE` 切分发送。当前自定义 `deflate.c` 不支持流式输入，无法处理跨包的 deflate block 边界。
 
-**修复计划：** 集成 miniz 库替换自定义 deflate 实现，使用其流式 `mz_inflate()` API。
+**修复计划（两阶段）：**
+1. 高优先级：积累解压方案——在 `esptool.c` 中积累所有 `FLASH_DEFL_DATA` 包，到 `FLASH_DEFL_END` 时一次性解压
+2. 中优先级：流式解压方案——集成 miniz 库替换自定义 deflate 实现
 
-**状态：** 待修复。详见 `TODO.md` 高优先级待办项。
+**状态：** 待修复。详见 `TODO.md`。

@@ -185,6 +185,11 @@ Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 | `flash_seq` | DWORD | 当前 Flash 写入序列号 |
 | `last_read_val` | DWORD | 上次 READ_REG 的值 |
 | `flash_uncompressed_size` | DWORD | DEFLATE 解压大小 |
+| `defl_buf` | BYTE* | 压缩数据积累缓冲区 |
+| `defl_buf_size` | DWORD | 当前积累数据大小 |
+| `defl_buf_cap` | DWORD | 缓冲区容量 |
+| `defl_offset` | DWORD | 当前 deflate 会话的 Flash 偏移 |
+| `defl_unc_size` | DWORD | 当前 deflate 会话的未压缩大小 |
 
 **ESP_STATE 枚举：**
 
@@ -585,6 +590,97 @@ esptool.py --port COM10 erase_flash
 
 **原因：** 自定义 `deflate.c` 不支持流式输入。当 deflate block 边界跨越两个包时，解压器无法跨包保持状态。
 
-**修复计划：** 集成 miniz 库替换自定义 deflate 实现，使用其流式 `mz_inflate()` API。
+**修复计划（两阶段）：**
+1. 高优先级：积累解压方案——在 `esptool.c` 中积累所有 `FLASH_DEFL_DATA` 包，到 `FLASH_DEFL_END` 时一次性解压
+2. 中优先级：流式解压方案——集成 miniz 库替换自定义 deflate 实现
 
-**状态：** 待修复。详见 `TODO.md` 高优先级待办项。
+**状态：** 已修复（积累解压方案）。详见 `TODO.md`。
+
+---
+
+## 积累解压方案实现细节
+
+### 数据结构
+
+`ESPTOOL_CTX` 中新增以下字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `defl_buf` | BYTE* | 压缩数据积累缓冲区 |
+| `defl_buf_size` | DWORD | 当前积累的压缩数据大小 |
+| `defl_buf_cap` | DWORD | 缓冲区容量（等于 `uncompressed_size`） |
+| `defl_offset` | DWORD | 当前 deflate 会话的 Flash 写入偏移 |
+| `defl_unc_size` | DWORD | 当前 deflate 会话的未压缩大小 |
+
+### 辅助函数
+
+**`Defl_FreeBuffer(ctx)`**：释放积累缓冲区，不写入 flash。用于错误处理和资源清理。
+
+**`Defl_FlushBuffer(ctx)`**：解压积累数据并写入 flash，然后释放缓冲区。返回 `ESP_OK` 或 `ESP_FAIL`。
+
+### 函数修改说明
+
+| 函数 | 修改内容 |
+|------|----------|
+| `Esptool_Init` | 初始化 `defl_buf = NULL`，`defl_buf_size = 0`，`defl_buf_cap = 0` |
+| `Esptool_ResetState` | 调用 `Defl_FreeBuffer()`，重置所有 deflate 字段 |
+| `HandleFlashDeflBegin` | 检查并处理上一次积累数据，分配新缓冲区 |
+| `HandleFlashDeflData` | 积累数据到缓冲区，不立即解压 |
+| `HandleFlashDeflEnd` | 调用 `Defl_FlushBuffer()` 解压并写入 |
+| `HandleFlashBegin` | **不释放**缓冲区（等待后续 `FLASH_DEFL_END`） |
+| `HandleFlashEnd` | 调用 `Defl_FreeBuffer()` 释放缓冲区 |
+| `HandleEraseFlash` | 调用 `Defl_FreeBuffer()` 释放缓冲区 |
+| `HandleEraseBlock` | 调用 `Defl_FreeBuffer()` 释放缓冲区 |
+
+### 资源释放检查点
+
+| 检查点 | 操作 | 原因 |
+|--------|------|------|
+| `FLASH_DEFL_END` | Flush + Free | 正常结束压缩写入 |
+| `FLASH_DEFL_BEGIN`（重复） | Flush + Free | ROM 模式多文件烧录不发 END |
+| `FLASH_BEGIN` | **不释放** | 客户端可能在 `FLASH_DEFL_DATA` 后发送 `FLASH_BEGIN`，再发送 `FLASH_DEFL_END` |
+| `FLASH_END` | Free | 非压缩写入结束，释放未处理的缓冲区 |
+| `ERASE_FLASH` | Free | 擦除操作中断烧录 |
+| `ERASE_REGION` | Free | 擦除操作中断烧录 |
+| `RUN_USER_CODE` | Free | 软复位 |
+| `Esptool_ResetState` | Free | 硬件复位 |
+
+### 时序分析
+
+**正常流程（Stub 模式）：**
+```
+FLASH_DEFL_BEGIN → 分配缓冲区
+FLASH_DEFL_DATA × N → 积累数据
+FLASH_DEFL_END → 解压 → 写入 flash → 释放缓冲区
+```
+
+**多文件烧录（ROM 模式）：**
+```
+FLASH_DEFL_BEGIN (文件1) → 分配缓冲区
+FLASH_DEFL_DATA × N → 积累数据
+FLASH_DEFL_BEGIN (文件2) → 解压文件1 → 写入 flash → 释放 → 分配新缓冲区
+FLASH_DEFL_DATA × N → 积累数据
+```
+
+**客户端异常流程：**
+```
+FLASH_DEFL_BEGIN → 分配缓冲区
+FLASH_DEFL_DATA → 积累数据
+FLASH_BEGIN → 保留缓冲区
+FLASH_DEFL_END → 解压 → 写入 flash → 释放缓冲区
+```
+
+### 超时风险
+
+**场景：** ROM 模式多文件烧录时，`FLASH_DEFL_BEGIN` 需要先处理上一个文件的积累数据。
+
+**风险：** 如果上一个文件很大（如几 MB 固件），解压 + 写入 flash 可能耗时较长，导致客户端对 `FLASH_DEFL_BEGIN` 响应超时。
+
+**影响：** 仅影响 ROM 模式下的多文件烧录场景。
+
+**缓解措施：**
+- 解压和写入是同步操作，通常几 MB 数据在 1-2 秒内完成
+- 客户端对 `FLASH_DEFL_BEGIN` 的超时通常为 3-10 秒
+- 如果超时成为问题，可考虑在 `FLASH_DEFL_END` 时就处理（但 ROM 模式不发 END）
+
+**开发建议：** 实现后使用 Python esptool 的 ROM 模式进行多文件烧录测试，验证是否超时。
