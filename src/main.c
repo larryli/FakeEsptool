@@ -260,6 +260,12 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
     case WM_SIZE:           return Main_OnSize(hWnd, wParam, lParam);
     case WM_COMMAND:        return Main_OnCommand(hWnd, wParam, lParam);
     case WM_NOTIFY:         return Main_OnNotify(hWnd, wParam, lParam);
+    case WM_TIMER:
+        if (wParam == LOG_FLUSH_TIMER_ID) {
+            LogView_FlushTimer();
+            return 0;
+        }
+        break;
     case WM_SERIAL_RX:      return Main_OnSerialRx(hWnd, wParam, lParam);
     case WM_SERIAL_TX:      return Main_OnSerialTx(hWnd, wParam, lParam);
     case WM_SERIAL_ERROR:   return Main_OnSerialError(hWnd, wParam, lParam);
@@ -398,6 +404,9 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     /* Initialize and apply default font */
     InitDefaultFont();
     ApplyFontToEdit(g_hEdit, &g_logFont);
+
+    /* Initialize log view subsystem (buffered batch updates) */
+    LogView_Init(hWnd);
 
     /* Register for device change notifications */
     DEV_BROADCAST_DEVICEINTERFACE dbi = {0};
@@ -783,6 +792,9 @@ static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam)
 /* Handle WM_DESTROY - cleanup and exit */
 static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
+    /* Flush and shutdown log view subsystem */
+    LogView_Close();
+
     /* Unregister device notifications */
     if (g_hDevNotify) {
         UnregisterDeviceNotification(g_hDevNotify);
