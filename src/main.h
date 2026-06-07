@@ -24,4 +24,7 @@
 /* Custom message for dump completion notification */
 #define WM_DUMP_COMPLETE  (WM_USER + 101)  /* wParam=success(BOOL), lParam=error code */
 
+/* Single instance mutex name */
+#define SINGLE_INSTANCE_MUTEX L"FakeEsptool_SingleInstance_Mutex"
+
 #endif /* MAIN_H */

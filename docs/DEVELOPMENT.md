@@ -447,6 +447,80 @@ if (ret == DEFLATE_OK) {
 
 ## 实现说明
 
+### 单实例模式
+
+**实现方式**：互斥量 + 窗口消息
+
+**流程**：
+1. 程序启动时创建命名互斥量 `FakeEsptool_SingleInstance_Mutex`
+2. 如果互斥量已存在，说明已有实例运行
+3. 通过 `FindWindowW(L"FakeEsptoolClass", NULL)` 查找已有窗口
+4. 使用 `WM_COPYDATA` 消息传递文件路径给已有实例
+5. 已有实例处理文件打开，新实例退出
+
+**关键常量**：
+```c
+#define SINGLE_INSTANCE_MUTEX L"FakeEsptool_SingleInstance_Mutex"
+```
+
+**窗口查找**：
+```c
+HWND hExistingWnd = FindWindowW(L"FakeEsptoolClass", NULL);
+```
+
+**消息传递**：
+```c
+COPYDATASTRUCT cds = {0};
+cds.dwData = 0;
+cds.cbData = (DWORD)((wcslen(filePath) + 1) * sizeof(WCHAR));
+cds.lpData = (void *)filePath;
+SendMessageW(hExistingWnd, WM_COPYDATA, 0, (LPARAM)&cds);
+```
+
+### 命令行文件打开
+
+**实现位置**：`wWinMain` + `Main_OnAppInit`
+
+**流程**：
+1. `wWinMain` 解析 `lpCmdLine` 获取文件路径
+2. 使用 `GetFullPathNameW` 转换为绝对路径
+3. 如果检测到已有实例，通过 `WM_COPYDATA` 发送文件路径
+4. 如果是首次启动，将文件路径通过 `WM_APP_INIT` 的 lParam 传递给 `Main_OnAppInit`
+5. `Main_OnAppInit` 优先加载命令行文件，其次检查上次文件
+
+**路径解析**：
+- 支持带引号的路径：`"C:\path\to\file.esp"`
+- 支持不带引号的路径：`C:\path\to\file.esp`
+
+### 拖放文件打开
+
+**实现方式**：`WM_DROPFILES` 消息
+
+**初始化**：
+```c
+// Main_OnCreate 中启用拖放
+DragAcceptFiles(hWnd, TRUE);
+```
+
+**消息处理**：
+```c
+case WM_DROPFILES:
+    return Main_OnDropFiles(hWnd, wParam, lParam);
+```
+
+**Main_OnDropFiles 流程**：
+1. `DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0)` 获取文件数量
+2. `DragQueryFileW(hDrop, 0, filePath, MAX_PATH)` 获取第一个文件路径
+3. 检查文件扩展名是否为 `.esp`
+4. 多文件时提示用户只打开第一个
+5. 调用 `Main_OpenDeviceFile` 打开文件
+6. `DragFinish(hDrop)` 释放资源
+
+**Main_OpenDeviceFile 函数**：
+- 复用 `PromptDisconnectIfNeeded` 和 `PromptSaveIfNeeded`
+- 调用 `Device_Load` 加载设备文件
+- 更新 UI 状态和配置
+
 ### Dump Device As 功能
 
 **实现方式**：快照 + 后台线程
@@ -472,6 +546,9 @@ typedef struct {
 ```
 
 **自定义消息**：
+- `WM_APP_INIT` (WM_USER + 100)：应用初始化
+  - wParam：未使用
+  - lParam：命令行文件路径（WCHAR*），可为 NULL
 - `WM_DUMP_COMPLETE` (WM_USER + 101)：后台线程完成通知
   - wParam：成功标志 (BOOL)
   - lParam：错误代码（失败时）

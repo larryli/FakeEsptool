@@ -328,6 +328,28 @@ void Main_CmdOpenDevice(HWND hWnd)
     }
 }
 
+/* Open device file by path (used by command line and drag-drop) */
+BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath)
+{
+    if (!PromptDisconnectIfNeeded(hWnd))
+        return FALSE;
+    if (!PromptSaveIfNeeded(hWnd))
+        return FALSE;
+
+    Device_Close(&g_device);
+    if (Device_Load(&g_device, filePath)) {
+        Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+        Config_SetLastDeviceFile(filePath);
+        UpdateStatusBar();
+        UpdateTitle(hWnd);
+        SetWindowTextW(g_hEdit, L"");
+        return TRUE;
+    } else {
+        MessageBoxW(hWnd, L"Failed to load device file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return FALSE;
+    }
+}
+
 /* Handle IDM_SAVE_DEVICE command */
 void Main_CmdSaveDevice(HWND hWnd)
 {

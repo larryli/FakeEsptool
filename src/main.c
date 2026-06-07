@@ -112,6 +112,8 @@ static LRESULT Main_OnDeviceChange(HWND hWnd, WPARAM wParam, LPARAM lParam);
 static LRESULT Main_OnClose(HWND hWnd, WPARAM wParam, LPARAM lParam);
 static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam);
 static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnCopyData(HWND hWnd, WPARAM wParam, LPARAM lParam);
+static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam);
 
 /* Callback when device data is modified by protocol */
 void OnDeviceModified(void)
@@ -246,6 +248,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
     case WM_CLOSE:          return Main_OnClose(hWnd, wParam, lParam);
     case WM_APP_INIT:       return Main_OnAppInit(hWnd, wParam, lParam);
     case WM_DESTROY:        return Main_OnDestroy(hWnd, wParam, lParam);
+    case WM_COPYDATA:       return Main_OnCopyData(hWnd, wParam, lParam);
+    case WM_DROPFILES:      return Main_OnDropFiles(hWnd, wParam, lParam);
     }
     return DefWindowProcW(hWnd, msg, wParam, lParam);
 }
@@ -382,6 +386,10 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     UpdateTitle(hWnd);
     UpdateMenuState(hWnd);
     UpdateStatusBar();
+
+    /* Enable drag and drop */
+    DragAcceptFiles(hWnd, TRUE);
+
     return 0;
 }
 
@@ -622,9 +630,29 @@ static LRESULT Main_OnClose(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_APP_INIT - initialization, check for last device file */
+/* Handle WM_APP_INIT - initialization, check for command line file or last device file */
 static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
+    (void)wParam;
+
+    /* Check for command line file path */
+    const WCHAR *cmdFilePath = (const WCHAR *)lParam;
+    if (cmdFilePath && cmdFilePath[0]) {
+        TRACE_FW(TAG, "Opening command line file: %ls", cmdFilePath);
+        if (Device_Load(&g_device, cmdFilePath)) {
+            Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+            Config_SetLastDeviceFile(cmdFilePath);
+            UpdateStatusBar();
+            UpdateTitle(hWnd);
+            SetWindowTextW(g_hEdit, L"");
+            return 0;
+        } else {
+            TRACE_FW(TAG, "Failed to load command line file");
+            MessageBoxW(hWnd, L"Failed to load device file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        }
+    }
+
+    /* No command line file - check for last device file */
     WCHAR lastFile[MAX_PATH] = {0};
     if (Config_GetLastDeviceFile(lastFile, MAX_PATH)) {
         /* Check if file exists */
@@ -658,6 +686,74 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
             DestroyWindow(hWnd);
         }
     }
+    return 0;
+}
+
+/* Handle WM_COPYDATA - receive file path from another instance */
+static LRESULT Main_OnCopyData(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    PCOPYDATASTRUCT pcds = (PCOPYDATASTRUCT)lParam;
+    if (pcds && pcds->lpData && pcds->cbData >= 2 * sizeof(WCHAR)) {
+        const WCHAR *filePath = (const WCHAR *)pcds->lpData;
+        /* Ensure null termination and valid string */
+        size_t maxLen = pcds->cbData / sizeof(WCHAR);
+        if (filePath[maxLen - 1] == L'\0' || filePath[maxLen - 2] == L'\0') {
+            /* Activate window */
+            if (IsIconic(hWnd))
+                ShowWindow(hWnd, SW_RESTORE);
+            SetForegroundWindow(hWnd);
+            /* Open file */
+            Main_OpenDeviceFile(hWnd, filePath);
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/* Handle WM_DROPFILES - file drag and drop */
+static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+    HDROP hDrop = (HDROP)wParam;
+    UINT fileCount = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
+
+    if (fileCount == 0) {
+        DragFinish(hDrop);
+        return 0;
+    }
+
+    /* Get first file path */
+    WCHAR filePath[MAX_PATH] = {0};
+    DragQueryFileW(hDrop, 0, filePath, MAX_PATH);
+
+    /* Check if it's an .esp file */
+    WCHAR *ext = wcsrchr(filePath, L'.');
+    if (!ext || _wcsicmp(ext, L".esp") != 0) {
+        DragFinish(hDrop);
+        MessageBoxW(hWnd, L"Only .esp files are supported.",
+                    LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+        return 0;
+    }
+
+    /* Prompt user */
+    BOOL openFile = FALSE;
+    if (fileCount == 1) {
+        WCHAR msg[MAX_PATH + 64];
+        wsprintfW(msg, L"Open file?\n%s", filePath);
+        openFile = (MessageBoxW(hWnd, msg, L"Open Device",
+                               MB_YESNO | MB_ICONQUESTION) == IDYES);
+    } else {
+        WCHAR msg[MAX_PATH + 128];
+        wsprintfW(msg, L"Multiple files dropped. Only the first file will be opened:\n%s\n\nContinue?",
+                  filePath);
+        openFile = (MessageBoxW(hWnd, msg, L"Open Device",
+                               MB_YESNO | MB_ICONQUESTION) == IDYES);
+    }
+
+    if (openFile) {
+        Main_OpenDeviceFile(hWnd, filePath);
+    }
+
+    DragFinish(hDrop);
     return 0;
 }
 
@@ -729,13 +825,82 @@ static HWND Main_CreateWindow(HINSTANCE hInstance)
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
     (void)hPrevInstance;
-    (void)lpCmdLine;
     (void)nCmdShow;
 
     srand((unsigned)time(NULL));
 
     TRACE_INIT();
     TRACE_FW(TAG, "=== FakeEsptool Started ===");
+
+    /* Parse command line for file path */
+    WCHAR cmdFilePath[MAX_PATH] = {0};
+    if (lpCmdLine && lpCmdLine[0]) {
+        /* Remove surrounding quotes if present */
+        const WCHAR *src = lpCmdLine;
+        if (src[0] == L'"') {
+            src++;
+            const WCHAR *end = wcschr(src, L'"');
+            if (end) {
+                size_t len = end - src;
+                if (len < MAX_PATH) {
+                    wcsncpy(cmdFilePath, src, len);
+                    cmdFilePath[len] = L'\0';
+                }
+            }
+        } else {
+            /* Take first argument (until space or end) */
+            size_t len = wcslen(src);
+            if (len >= MAX_PATH) len = MAX_PATH - 1;
+            wcsncpy(cmdFilePath, src, len);
+            cmdFilePath[len] = L'\0';
+        }
+        /* Convert to full path */
+        if (cmdFilePath[0]) {
+            WCHAR fullPath[MAX_PATH] = {0};
+            if (GetFullPathNameW(cmdFilePath, MAX_PATH, fullPath, NULL)) {
+                wcscpy(cmdFilePath, fullPath);
+            }
+        }
+    }
+
+    /* Single instance check */
+    HANDLE hMutex = CreateMutexW(NULL, TRUE, SINGLE_INSTANCE_MUTEX);
+    DWORD mutexError = GetLastError();
+
+    if (mutexError == ERROR_ALREADY_EXISTS) {
+        /* Another instance is running */
+        WaitForSingleObject(hMutex, 2000);
+
+        HWND hExistingWnd = FindWindowW(L"FakeEsptoolClass", NULL);
+        if (hExistingWnd) {
+            if (cmdFilePath[0]) {
+                /* Prompt user */
+                WCHAR msg[MAX_PATH + 128];
+                wsprintfW(msg, L"FakeEsptool is already running. Open file in existing window?\n%s", cmdFilePath);
+                if (MessageBoxW(NULL, msg, L"FakeEsptool", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+                    /* Send file path to existing instance */
+                    COPYDATASTRUCT cds = {0};
+                    cds.dwData = 0;
+                    cds.cbData = (DWORD)((wcslen(cmdFilePath) + 1) * sizeof(WCHAR));
+                    cds.lpData = (void *)cmdFilePath;
+                    SendMessageW(hExistingWnd, WM_COPYDATA, 0, (LPARAM)&cds);
+                }
+            } else {
+                /* Just activate existing window */
+                if (IsIconic(hExistingWnd))
+                    ShowWindow(hExistingWnd, SW_RESTORE);
+                SetForegroundWindow(hExistingWnd);
+            }
+        }
+
+        if (hMutex) {
+            ReleaseMutex(hMutex);
+            CloseHandle(hMutex);
+        }
+        TRACE_FW(TAG, "Another instance already running, exiting");
+        TRACE_CLOSE();
+        return 0;
+    }
 
     /* Initialize configuration */
     Config_Init();
@@ -746,6 +911,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     /* Initialize GUI subsystem */
     if (!Main_Init(hInstance)) {
         TRACE_FW(TAG, "ERROR: Main_Init failed");
+        if (hMutex) {
+            ReleaseMutex(hMutex);
+            CloseHandle(hMutex);
+        }
         TRACE_CLOSE();
         return 1;
     }
@@ -754,6 +923,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     HWND hWnd = Main_CreateWindow(hInstance);
     if (!hWnd) {
         TRACE_FW(TAG, "ERROR: Main_CreateWindow failed");
+        if (hMutex) {
+            ReleaseMutex(hMutex);
+            CloseHandle(hMutex);
+        }
         TRACE_CLOSE();
         return 1;
     }
@@ -763,8 +936,21 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     /* Load accelerator table */
     HACCEL hAccel = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDR_MAIN_ACCEL));
 
-    /* Trigger initialization - check for last device file */
-    PostMessage(hWnd, WM_APP_INIT, 0, 0);
+    /* Store command line file path for WM_APP_INIT to process */
+    static WCHAR s_cmdFilePath[MAX_PATH] = {0};
+    if (cmdFilePath[0]) {
+        /* Check if file exists */
+        DWORD attr = GetFileAttributesW(cmdFilePath);
+        if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
+            wcscpy(s_cmdFilePath, cmdFilePath);
+        } else {
+            TRACE_FW(TAG, "Command line file not found: %ls", cmdFilePath);
+            MessageBoxW(NULL, L"File not found.", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        }
+    }
+
+    /* Trigger initialization - check for last device file or command line file */
+    PostMessage(hWnd, WM_APP_INIT, 0, s_cmdFilePath[0] ? (LPARAM)s_cmdFilePath : 0);
 
     /* Main message loop */
     MSG msg;
@@ -776,6 +962,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     }
 
     TRACE_FW(TAG, "=== FakeEsptool Exiting ===");
+
+    /* Cleanup mutex */
+    if (hMutex) {
+        ReleaseMutex(hMutex);
+        CloseHandle(hMutex);
+    }
+
     TRACE_CLOSE();
 
     return (int)msg.wParam;

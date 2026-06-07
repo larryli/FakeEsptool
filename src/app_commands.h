@@ -77,4 +77,7 @@ void Main_CmdSaveDevice(HWND hWnd);
 void Main_CmdSaveDeviceAs(HWND hWnd);
 void Main_CmdDeviceProps(HWND hWnd);
 
+/* Open device file by path (used by command line and drag-drop) */
+BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath);
+
 #endif /* APP_COMMANDS_H */
