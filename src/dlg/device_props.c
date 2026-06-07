@@ -65,10 +65,15 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM l
                 HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
                 PopulateFlashSizes(hFlash, (CHIP_TYPE)chipSel, g_device.flash.size);
                 /* Enable/disable XTAL freq combo based on chip type */
+                HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
                 BOOL xtalEditable = (chipSel == CHIP_ESP8266 ||
                                      chipSel == CHIP_ESP32 ||
                                      chipSel == CHIP_ESP32C2);
-                EnableWindow(GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO), xtalEditable);
+                EnableWindow(hXtal, xtalEditable);
+                /* Update XTAL freq display for fixed-xtal chips */
+                if (!xtalEditable) {
+                    SendMessageW(hXtal, CB_SETCURSEL, 0, 0); /* 40MHz */
+                }
             }
             return TRUE;
 
