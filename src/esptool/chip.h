@@ -64,7 +64,7 @@
 #define FLASH_SIZE_REG_ESP32        0x3F400010
 
 /* ============================================================================
- * Chip ID values (used for chip detection)
+ * Chip ID values (used for READ_REG chip detection via magic value)
  * ============================================================================ */
 #define CHIP_ID_ESP8266             0xFFF0C101
 #define CHIP_ID_ESP32               0x00F01D83
@@ -73,6 +73,18 @@
 #define CHIP_ID_ESP32C2             0x7C41A06F
 #define CHIP_ID_ESP32C3             0x6921506F
 #define CHIP_ID_ESP32C6             0x2CE0806F
+
+/* ============================================================================
+ * IMAGE_CHIP_ID values (used for GET_SECURITY_INFO chip detection)
+ * These are small integers returned in the security info response.
+ * ============================================================================ */
+#define IMAGE_CHIP_ID_ESP8266       0
+#define IMAGE_CHIP_ID_ESP32         0
+#define IMAGE_CHIP_ID_ESP32S2       2
+#define IMAGE_CHIP_ID_ESP32S3       9
+#define IMAGE_CHIP_ID_ESP32C2       12
+#define IMAGE_CHIP_ID_ESP32C3       5
+#define IMAGE_CHIP_ID_ESP32C6       13
 
 /* ============================================================================
  * MAC eFuse offsets per chip type
@@ -185,7 +197,8 @@ typedef struct {
     DWORD block_size;           /* Flash block size */
     DWORD page_size;            /* Flash page size */
 
-    DWORD chip_id;              /* Chip ID register value */
+    DWORD chip_id;              /* Chip ID register value (magic value for READ_REG) */
+    DWORD security_chip_id;     /* IMAGE_CHIP_ID for GET_SECURITY_INFO */
     DWORD pkg_version;          /* Package version */
     BOOL has_usb;               /* USB support flag */
 

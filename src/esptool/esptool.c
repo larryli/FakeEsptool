@@ -926,51 +926,67 @@ static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * HandleGetSecurityInfo - Handle get security info command
  *
  * GET_SECURITY_INFO (0x14) returns chip security configuration.
- * Response format varies by chip type:
- * - ESP32-S2: 2-byte status + 10 bytes security info = 12 bytes
- * - ESP32-S3/C3/C6: 2-byte status + 18 bytes security info = 20 bytes
+ * Response format depends on chip type:
  *
- * Security info includes:
- * - flags: Security feature flags
- * - flash_crypt_cnt: Flash encryption counter
- * - key_purposes: Key purpose bytes (7 bytes)
- * - chip_id: Chip ID (4 bytes, ESP32-S3+)
- * - api_version: API version (4 bytes, ESP32-S3+)
+ * - ESP8266/ESP32: Command not supported by ROM. Returns error response
+ *   so esptool falls back to magic value detection.
+ * - ESP32-S2: Returns 14-byte response (12 payload + 2 status, no chip_id).
+ *   esptool parses as ESP32-S2 (chip_id=None), falls back to magic value.
+ * - ESP32-S3/C2/C3/C6: Returns 22-byte response (20 payload + 2 status)
+ *   with IMAGE_CHIP_ID for chip detection.
+ *
+ * Response data format: [payload:N][status:2]
+ * Status bytes are at the END of the data field.
  */
 static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     TRACE_PROTO(TAG, "GET_SECURITY_INFO");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Get security info");
 
-    /* GET_SECURITY_INFO response format (ESP32-S3 and later):
-       2-byte status + security_info (18 bytes) = 20 bytes total
-       [0x00, 0x00 (status)]
-       [0x00,0x00,0x00,0x00 (flags)]
-       [0x00 (flash_crypt_cnt)]
-       [0x00 x7 (key_purposes)]
-       [chip_id:4 (little-endian)]
-       [api_version:4 (little-endian)]
+    /* ESP8266 and ESP32 ROM does not support GET_SECURITY_INFO.
+       Return ROM_INVALID_RECV_MSG error so esptool falls back to magic value. */
+    if (ctx->chip->type == CHIP_ESP8266 || ctx->chip->type == CHIP_ESP32) {
+        TRACE_PROTO(TAG, "  Not supported on %s, returning error", ctx->chip->name);
+        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Not supported on %hs", ctx->chip->name);
+        BYTE err_data[4] = {0x01, 0x05, 0x00, 0x00};
+        Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, err_data, 4);
+        return;
+    }
 
-       For ESP32-S2: 2-byte status + 10 bytes = 12 bytes (no chip_id/api_version)
-       esptool client tries 20 bytes first, falls back to 12 bytes */
-    BYTE sec_data[20] = {0};
-    sec_data[0] = 0x00;  /* status byte 1 (success) */
-    sec_data[1] = 0x00;  /* status byte 2 (success) */
-    /* flags(4) + flash_crypt_cnt(1) + key_purposes(7) = all zeros */
-    /* chip_id at offset 12 (little-endian) */
-    DWORD chip_id = ctx->chip->chip_id;
+    /* ESP32-S2: Return 14-byte response (12 payload + 2 status, no chip_id).
+       esptool tries resp_data_len=20 first (fails), then resp_data_len=12 (succeeds).
+       chip_id will be None, causing get_chip_id() to raise FatalError,
+       which triggers fallback to magic value detection. */
+    if (ctx->chip->type == CHIP_ESP32S2) {
+        TRACE_PROTO(TAG, "  ESP32-S2: returning 14-byte response (no chip_id)");
+        Serial_PostLog(ctx->hNotify, L"ESP", L"  ESP32-S2: no chip_id in response");
+        BYTE sec_data[14] = {0};
+        /* bytes 0-3:   flags (all zeros) */
+        /* byte 4:      flash_crypt_cnt (0) */
+        /* bytes 5-11:  key_purposes (all zeros) */
+        /* bytes 12-13: status = success (0x00, 0x00) */
+        Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, sec_data, 14);
+        return;
+    }
+
+    /* ESP32-S3, C2, C3, C6: Return 22-byte response with IMAGE_CHIP_ID.
+       [flags:4][flash_crypt_cnt:1][key_purposes:7][chip_id:4][api_version:4][status:2] */
+    DWORD chip_id = ctx->chip->security_chip_id;
+
+    BYTE sec_data[22] = {0};
+    /* bytes 0-3:   flags (all zeros) */
+    /* byte 4:      flash_crypt_cnt (0) */
+    /* bytes 5-11:  key_purposes (all zeros) */
+    /* bytes 12-15: chip_id (IMAGE_CHIP_ID, little-endian) */
     sec_data[12] = (BYTE)(chip_id & 0xFF);
     sec_data[13] = (BYTE)((chip_id >> 8) & 0xFF);
     sec_data[14] = (BYTE)((chip_id >> 16) & 0xFF);
     sec_data[15] = (BYTE)((chip_id >> 24) & 0xFF);
-    /* api_version at offset 16 = 0 */
-    sec_data[16] = 0x00;
-    sec_data[17] = 0x00;
-    sec_data[18] = 0x00;
-    sec_data[19] = 0x00;
+    /* bytes 16-19: api_version (0) */
+    /* bytes 20-21: status = success (0x00, 0x00) */
 
-    TRACE_PROTO(TAG, "  chip_id=0x%08lX", chip_id);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  chip_id=0x%08lX", chip_id);
+    TRACE_PROTO(TAG, "  chip_id (IMAGE_CHIP_ID)=%lu (0x%08lX)", chip_id, chip_id);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  chip_id=%lu (0x%08lX)", chip_id, chip_id);
 
     /* Transition to READY state when chip detection succeeds via GET_SECURITY_INFO */
     if (ctx->state == ESP_STATE_SYNCED) {
@@ -978,7 +994,7 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         Serial_PostLog(ctx->hNotify, L"ESP", L"  Chip detected via security info, ready for commands");
     }
 
-    Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, sec_data, 20);
+    Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, sec_data, 22);
 }
 
 /*

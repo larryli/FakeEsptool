@@ -47,20 +47,21 @@ static const SPI_OFFSETS spi_offs_esp8266 = {
 /* Chip configuration table */
 typedef struct {
     const char *name;
-    DWORD chip_id;
+    DWORD chip_id;              /* Magic value for READ_REG detection */
+    DWORD security_chip_id;     /* IMAGE_CHIP_ID for GET_SECURITY_INFO */
     int efuse_size;
     BOOL has_usb;
     BYTE chip_id_bytes[4];  /* Chip ID as little-endian bytes for eFuse */
 } CHIP_CONFIG;
 
 static const CHIP_CONFIG chip_configs[CHIP_COUNT] = {
-    [CHIP_ESP8266] = { "ESP8266",  CHIP_ID_ESP8266, 96,  FALSE, {0x01, 0xC1, 0xF0, 0xFF} },
-    [CHIP_ESP32]   = { "ESP32",    CHIP_ID_ESP32,   64,  FALSE, {0x83, 0x1D, 0xF0, 0x00} },
-    [CHIP_ESP32S2] = { "ESP32-S2", CHIP_ID_ESP32S2, 128, TRUE,  {0xC6, 0x07, 0x00, 0x00} },
-    [CHIP_ESP32S3] = { "ESP32-S3", CHIP_ID_ESP32S3, 256, TRUE,  {0x09, 0x00, 0x00, 0x00} },
-    [CHIP_ESP32C2] = { "ESP32-C2", CHIP_ID_ESP32C2, 128, FALSE, {0x6F, 0xA0, 0x41, 0x7C} },
-    [CHIP_ESP32C3] = { "ESP32-C3", CHIP_ID_ESP32C3, 128, TRUE,  {0x6F, 0x50, 0x21, 0x69} },
-    [CHIP_ESP32C6] = { "ESP32-C6", CHIP_ID_ESP32C6, 128, TRUE,  {0x6F, 0x80, 0xE0, 0x2C} },
+    [CHIP_ESP8266] = { "ESP8266",  CHIP_ID_ESP8266, IMAGE_CHIP_ID_ESP8266, 96,  FALSE, {0x01, 0xC1, 0xF0, 0xFF} },
+    [CHIP_ESP32]   = { "ESP32",    CHIP_ID_ESP32,   IMAGE_CHIP_ID_ESP32,   64,  FALSE, {0x83, 0x1D, 0xF0, 0x00} },
+    [CHIP_ESP32S2] = { "ESP32-S2", CHIP_ID_ESP32S2, IMAGE_CHIP_ID_ESP32S2, 128, TRUE,  {0xC6, 0x07, 0x00, 0x00} },
+    [CHIP_ESP32S3] = { "ESP32-S3", CHIP_ID_ESP32S3, IMAGE_CHIP_ID_ESP32S3, 256, TRUE,  {0x09, 0x00, 0x00, 0x00} },
+    [CHIP_ESP32C2] = { "ESP32-C2", CHIP_ID_ESP32C2, IMAGE_CHIP_ID_ESP32C2, 128, FALSE, {0x6F, 0xA0, 0x41, 0x7C} },
+    [CHIP_ESP32C3] = { "ESP32-C3", CHIP_ID_ESP32C3, IMAGE_CHIP_ID_ESP32C3, 128, TRUE,  {0x6F, 0x50, 0x21, 0x69} },
+    [CHIP_ESP32C6] = { "ESP32-C6", CHIP_ID_ESP32C6, IMAGE_CHIP_ID_ESP32C6, 128, TRUE,  {0x6F, 0x80, 0xE0, 0x2C} },
 };
 
 /* Write chip_id as little-endian bytes at eFuse offset 0x4C
@@ -82,6 +83,7 @@ static BOOL InitChipCommon(CHIP_CTX *ctx, CHIP_TYPE type)
     
     strcpy(ctx->name, cfg->name);
     ctx->chip_id = cfg->chip_id;
+    ctx->security_chip_id = cfg->security_chip_id;
     ctx->pkg_version = 0;
     ctx->efuse_size = cfg->efuse_size;
     ctx->sector_size = 4096;

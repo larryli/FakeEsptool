@@ -873,36 +873,65 @@ Direction: 0x01
 Command:   0x14
 Size:      可变
 Val:       <返回请求的 checksum>
-Data:      0x00 0x00 (status=成功) + security_info[N]
+Data:      security_info[N] + 0x00 0x00 (status=成功)
 ```
+
+**注意：** status 字节在 Data 字段**末尾**，不是开头。esptool 客户端使用 `check_command(resp_data_len=N)` 解析，它从 `data[N:N+2]` 读取 status。
 
 **security_info 结构（因芯片而异）：**
 
-ESP32-S2（10 字节数据 + 2 字节状态 = 12 字节）：
+ESP32-S2（12 字节数据 + 2 字节状态 = 14 字节）：
 ```
-[flags:4][flash_crypt_cnt:1][key_purposes:7]
+[flags:4][flash_crypt_cnt:1][key_purposes:7][status:2]
 ```
+esptool 使用 `resp_data_len=12`，返回 10 字节 payload + 2 字节 status。
 
-ESP32-C3/S3 等（18 字节数据 + 2 字节状态 = 20 字节）：
+ESP32-C3/S3 等（20 字节数据 + 2 字节状态 = 22 字节）：
 ```
-[flags:4][flash_crypt_cnt:1][key_purposes:7][chip_id:4][api_version:4]
+[flags:4][flash_crypt_cnt:1][key_purposes:7][chip_id:4][api_version:4][status:2]
 ```
+esptool 使用 `resp_data_len=20`，返回 20 字节 payload + 2 字节 status。
 
-**最小兼容返回示例：**
+**最小兼容返回示例（ESP32-S3/C3/C6，22 字节）：**
 ```
-Size: 0x14 0x00 (20 bytes)
-Data: 00 00 (status) + 00 00 00 00 (flags) + 00 (crypt_cnt) + 00 00 00 00 00 00 00 (key_purposes) + chip_id (4 bytes, little-endian) + api_version (4 bytes, little-endian)
+Size: 0x16 0x00 (22 bytes)
+Data: 00 00 00 00 (flags) + 00 (crypt_cnt) + 00 00 00 00 00 00 00 (key_purposes) + chip_id (4 bytes, little-endian) + api_version (4 bytes, little-endian) + 00 00 (status)
 ```
 
 **说明：**
-- esptool 客户端先尝试 `resp_data_len=20`，失败后回退到 `resp_data_len=12`
-- chip_id 字段用于芯片检测（ESP32-S3 及之后的芯片）
+- esptool 客户端先尝试 `resp_data_len=20`（22 字节 Data），失败后回退到 `resp_data_len=12`（14 字节 Data）
+- chip_id 字段是 IMAGE_CHIP_ID（小整数），用于芯片检测（ESP32-S3 及之后的芯片）
 - api_version 字段通常为 0
+- **IMAGE_CHIP_ID 与 magic value 不同**：IMAGE_CHIP_ID 是小整数（如 ESP32-C6=13），magic value 是寄存器值（如 ESP32-C6=0x2CE0806F）
+
+**IMAGE_CHIP_ID 值：**
+
+| 芯片 | IMAGE_CHIP_ID | Magic Value |
+|------|---------------|-------------|
+| ESP32 | 0 | 0x00F01D83 |
+| ESP32-S2 | 2 | 0x000007C6 |
+| ESP32-S3 | 9 | 0x00000009 |
+| ESP32-C2 | 12 | 0x7C41A06F |
+| ESP32-C3 | 5 | 0x6921506F |
+| ESP32-C6 | 13 | 0x2CE0806F |
+
+**各芯片 GET_SECURITY_INFO 行为：**
+
+| 芯片 | GET_SECURITY_INFO 行为 | 检测方式 |
+|------|------------------------|----------|
+| ESP8266 | 不支持，返回 ROM_INVALID_RECV_MSG 错误 | READ_REG magic value |
+| ESP32 | 不支持，返回 ROM_INVALID_RECV_MSG 错误 | READ_REG magic value |
+| ESP32-S2 | 返回 14 字节（无 chip_id），chip_id=None | READ_REG magic value |
+| ESP32-S3 | 返回 22 字节，chip_id=9 | IMAGE_CHIP_ID |
+| ESP32-C2 | 返回 22 字节，chip_id=12 | IMAGE_CHIP_ID |
+| ESP32-C3 | 返回 22 字节，chip_id=5 | IMAGE_CHIP_ID |
+| ESP32-C6 | 返回 22 字节，chip_id=13 | IMAGE_CHIP_ID |
 
 **芯片检测流程：**
-1. 客户端首先尝试 GET_SECURITY_INFO 获取 chip_id
-2. 如果成功，遍历芯片列表匹配 IMAGE_CHIP_ID
-3. 如果失败（UnsupportedCommandError），回退到 READ_REG (0x40001000) 读取 magic value
+1. 客户端首先尝试 GET_SECURITY_INFO 获取 chip_id（IMAGE_CHIP_ID）
+2. 如果成功且 chip_id 非 None，遍历芯片列表（跳过 USES_MAGIC_VALUE=True 的芯片）匹配 IMAGE_CHIP_ID
+3. 如果失败（UnsupportedCommandError 或 FatalError），或 chip_id 为 None（ESP32-S2），回退到 READ_REG (0x40001000) 读取 magic value
+4. 遍历芯片列表（跳过 USES_MAGIC_VALUE=False 的芯片）匹配 magic value
 
 ---
 

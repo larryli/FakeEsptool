@@ -734,6 +734,26 @@ All flash segments verified successfully.
 
 ## 已知问题
 
+### ~~GET_SECURITY_INFO 响应格式错误导致芯片检测失败~~ (已修复)
+
+**现象：** `esptool.py flash-id` 命令检测 ESP32-S3/C2/C3/C6 失败，报错 `Unexpected chip magic value`。
+
+**原因：** 三个 Bug：
+1. `GET_SECURITY_INFO` 响应 Data 字段中 status 字节放在了**开头**，应放在**末尾**。
+2. `GET_SECURITY_INFO` 返回的 `chip_id` 使用了 magic value（如 `0x2CE0806F`），应使用 IMAGE_CHIP_ID（如 `13`）。
+3. ESP8266/ESP32 不支持 `GET_SECURITY_INFO`，应返回错误；ESP32-S2 返回的响应应无 chip_id。FakeEsptool 对所有芯片统一返回了带 chip_id 的 22 字节响应。
+
+**修复：**
+1. `CHIP_CTX` 新增 `security_chip_id` 字段（IMAGE_CHIP_ID），与 `chip_id`（magic value）分离。
+2. `HandleGetSecurityInfo` 按芯片类型分别处理：
+   - ESP8266/ESP32：返回 `ROM_INVALID_RECV_MSG` 错误，触发 magic value 回退
+   - ESP32-S2：返回 14 字节响应（无 chip_id），触发 magic value 回退
+   - ESP32-S3/C2/C3/C6：返回 22 字节响应 `[payload:20][status:2]`，包含 IMAGE_CHIP_ID
+
+**状态：** 已修复。
+
+---
+
 ### ~~FLASH_DEFL_DATA 分包解压 Bug~~ (已修复)
 
 **现象：** 压缩烧录大文件时，第二个及后续 `FLASH_DEFL_DATA` 包解压失败，导致烧录数据不完整。
