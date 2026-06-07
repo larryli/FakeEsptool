@@ -21,30 +21,30 @@
 #define IDM_RECONNECT       2007
 #define IDM_FLASH_IMPORT    2008
 #define IDM_FLASH_EXPORT    2009
-#define IDM_DUMP_DEVICE_AS  2015
-#define IDM_LOG_CLEAR       2010
-#define IDM_LOG_SAVEAS      2011
-#define IDM_LOG_FONT        2012
-#define IDM_EXIT            2013
-#define IDM_ABOUT           2014
+#define IDM_DUMP_DEVICE_AS  2010
+#define IDM_LOG_CLEAR       2011
+#define IDM_LOG_SAVEAS      2012
+#define IDM_LOG_FONT        2013
+#define IDM_EXIT            2014
+#define IDM_ABOUT           2015
 
 /* Dialog IDs */
 #define IDD_PORT_SELECT     3001
 #define IDC_PORT_COMBO      3002
 #define IDD_ABOUT           3003
-#define IDD_DEVICE_PROPS    3005
+#define IDD_DEVICE_PROPS    3004
 
 /* About dialog controls */
-#define IDD_APPNAME         3020
-#define IDD_COPYRIGHT       3021
-#define IDD_WEBSITE         3022
+#define IDD_APPNAME         3101
+#define IDD_COPYRIGHT       3102
+#define IDD_WEBSITE         3103
 
-/* New Device dialog controls */
-#define IDC_CHIP_COMBO      3010
-#define IDC_FLASH_SIZE_COMBO 3011
-#define IDC_MAC_EDIT        3012
-#define IDC_RANDOM_MAC      3013
-#define IDC_XTAL_FREQ_COMBO 3023
+/* Device Properties dialog controls */
+#define IDC_CHIP_COMBO      3201
+#define IDC_FLASH_SIZE_COMBO 3202
+#define IDC_MAC_EDIT        3203
+#define IDC_RANDOM_MAC      3204
+#define IDC_XTAL_FREQ_COMBO 3205
 
 /* Icon and menu resource IDs */
 #define IDI_APP             5001
@@ -57,7 +57,7 @@
 /* String IDs */
 #define IDS_APP_NAME        10001
 #define IDS_DISCONNECTED    10002
-#define IDS_TITLE_FORMAT    10004  /* "FakeEsptool - %s" */
+#define IDS_TITLE_FORMAT    10003  /* "FakeEsptool - %s" */
 
 /* Tooltip strings */
 #define IDS_TIP_CONNECT     10030
