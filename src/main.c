@@ -645,14 +645,18 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
             }
         }
     }
-    /* No last file or user declined - show New Device dialog */
-    if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_NEW_DEVICE), hWnd, NewDeviceDlgProc) != IDOK) {
-        /* User cancelled - exit */
-        DestroyWindow(hWnd);
-    } else {
-        Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
-        UpdateStatusBar();
-        UpdateTitle(hWnd);
+    /* No last file or user declined - create default device */
+    {
+        static const BYTE defaultMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0x01};
+        if (Device_Init(&g_device, CHIP_ESP32, 4 * 1024 * 1024, defaultMac)) {
+            g_device.chip.xtal_freq = XTAL_FREQ_40M;
+            Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+            UpdateStatusBar();
+            UpdateTitle(hWnd);
+        } else {
+            MessageBoxW(hWnd, L"Failed to create device", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            DestroyWindow(hWnd);
+        }
     }
     return 0;
 }

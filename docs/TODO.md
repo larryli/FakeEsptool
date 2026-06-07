@@ -66,7 +66,7 @@
 - chip.c: 实现 InitEsp32C5、InitEsp32C61、InitEsp32H2、InitEsp32P4 初始化函数
 - chip.c: 补充 eFuse 布局、MAC 地址偏移、SPI 寄存器偏移
 - chip.c: 实现 Chip_GetBootMessage 启动日志
-- main.c: New Device/Device Properties 对话框添加新芯片选项
+- main.c: Device Properties 对话框添加新芯片选项
 - REQUIREMENTS.md、DEVELOPMENT.md: 同步更新芯片支持列表
 
 ---
@@ -87,7 +87,7 @@
 - chip.c: 实现各芯片初始化函数
 - chip.c: 补充 eFuse 布局、MAC 地址偏移、SPI 寄存器偏移
 - chip.c: 实现 Chip_GetBootMessage 启动日志
-- main.c: New Device/Device Properties 对话框添加新芯片选项
+- main.c: Device Properties 对话框添加新芯片选项
 - REQUIREMENTS.md、DEVELOPMENT.md: 同步更新芯片支持列表
 
 **注意事项：**

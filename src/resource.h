@@ -32,7 +32,6 @@
 #define IDD_PORT_SELECT     3001
 #define IDC_PORT_COMBO      3002
 #define IDD_ABOUT           3003
-#define IDD_NEW_DEVICE      3004
 #define IDD_DEVICE_PROPS    3005
 
 /* About dialog controls */
@@ -45,10 +44,6 @@
 #define IDC_FLASH_SIZE_COMBO 3011
 #define IDC_MAC_EDIT        3012
 #define IDC_RANDOM_MAC      3013
-#define IDC_INIT_BLANK      3016
-#define IDC_INIT_FILE       3017
-#define IDC_INIT_FILE_PATH  3018
-#define IDC_BROWSE_FILE     3019
 #define IDC_XTAL_FREQ_COMBO 3023
 
 /* Icon and menu resource IDs */

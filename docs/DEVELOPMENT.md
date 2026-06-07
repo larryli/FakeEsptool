@@ -57,7 +57,6 @@ Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
 | `esptool/flash.c/h` | Flash 存储模拟 |
 | `esptool/device.c/h` | 设备文件管理 |
 | `esptool/esptool.c/h` | esptool 命令解析与响应 |
-| `dlg/new_device.c` | 新建设备对话框 |
 | `dlg/device_props.c` | 设备属性对话框 |
 | `dlg/port_select.c` | 串口选择对话框 |
 | `dlg/about.c` | 关于对话框 |

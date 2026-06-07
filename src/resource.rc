@@ -27,6 +27,7 @@ IDR_MAIN_MENU MENUEX
     MENUITEM "&Open Device...      Ctrl+O", IDM_OPEN_DEVICE, 0, 0
     MENUITEM "&Save Device         Ctrl+S", IDM_SAVE_DEVICE, 0, 0
     MENUITEM "Save Device &As...   F12", IDM_SAVE_DEVICE_AS, 0, 0
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "Dump Device As...", IDM_DUMP_DEVICE_AS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "Device &Properties...", IDM_DEVICE_PROPS, 0, 0
@@ -92,34 +93,6 @@ BEGIN
     CONTROL         "Copyright (c) 2026 Larry Li", IDD_COPYRIGHT, "Static", WS_GROUP, 40, 22, 170, 10
     DEFPUSHBUTTON   "OK", IDOK, 85, 78, 50, 14
     CONTROL         "<a href=""https://github.com/larryli/FakeEsptool"">https://github.com/larryli/FakeEsptool</a>", IDD_WEBSITE, "SysLink", WS_TABSTOP, 40, 38, 170, 10
-END
-
-IDD_NEW_DEVICE DIALOGEX 0, 0, 260, 140
-STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "New Device"
-FONT 8, "MS Shell Dlg"
-BEGIN
-    LTEXT           "Chip:", -1, 10, 12, 50, 8
-    COMBOBOX        IDC_CHIP_COMBO, 65, 10, 185, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-
-    LTEXT           "XTAL:", -1, 10, 30, 50, 8
-    COMBOBOX        IDC_XTAL_FREQ_COMBO, 65, 28, 185, 80, CBS_DROPDOWNLIST | WS_TABSTOP
-
-    LTEXT           "Flash Size:", -1, 10, 48, 50, 8
-    COMBOBOX        IDC_FLASH_SIZE_COMBO, 65, 46, 185, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-
-    LTEXT           "MAC:", -1, 10, 66, 50, 8
-    EDITTEXT        IDC_MAC_EDIT, 65, 64, 120, 14, ES_AUTOHSCROLL
-    PUSHBUTTON      "Random", IDC_RANDOM_MAC, 190, 63, 60, 16
-
-    LTEXT           "Initial Flash:", -1, 10, 84, 50, 8
-    AUTORADIOBUTTON "Blank", IDC_INIT_BLANK, 65, 83, 50, 10, WS_GROUP | WS_TABSTOP
-    AUTORADIOBUTTON "From file:", IDC_INIT_FILE, 120, 83, 55, 10
-    EDITTEXT        IDC_INIT_FILE_PATH, 65, 97, 155, 12, ES_AUTOHSCROLL | WS_DISABLED
-    PUSHBUTTON      "...", IDC_BROWSE_FILE, 225, 96, 20, 14
-
-    DEFPUSHBUTTON   "OK", IDOK, 75, 118, 55, 16
-    PUSHBUTTON      "Cancel", IDCANCEL, 140, 118, 55, 16
 END
 
 IDD_DEVICE_PROPS DIALOGEX 0, 0, 260, 110

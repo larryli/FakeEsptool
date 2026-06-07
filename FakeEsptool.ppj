@@ -63,7 +63,6 @@ FakeEsptool.exe: \
 	output\lang.obj \
 	output\main.obj \
 	output\main.res \
-	output\new_device.obj \
 	output\port_select.obj \
 	output\serial.obj \
 	output\slip.obj \
@@ -213,20 +212,6 @@ output\about.obj: \
 # 
 output\device_props.obj: \
 	src\dlg\device_props.c \
-	src\dlg\dlg.h \
-	src\esptool\chip.h \
-	src\esptool\device.h \
-	src\esptool\esptool.h \
-	src\esptool\flash.h \
-	src\esptool\slip.h \
-	src\resource.h
-	$(CC) $(CCFLAGS) "$!" -Fo"$@"
-
-# 
-# Build new_device.obj.
-# 
-output\new_device.obj: \
-	src\dlg\new_device.c \
 	src\dlg\dlg.h \
 	src\esptool\chip.h \
 	src\esptool\device.h \

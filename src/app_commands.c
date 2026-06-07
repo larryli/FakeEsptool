@@ -283,12 +283,19 @@ void Main_CmdNewDevice(HWND hWnd)
         return;
     if (!PromptSaveIfNeeded(hWnd))
         return;
-    if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_NEW_DEVICE), hWnd, NewDeviceDlgProc) == IDOK) {
+
+    /* Create default device: ESP32, 40MHz, 4MB */
+    static const BYTE defaultMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0x01};
+    Device_Close(&g_device);
+    if (Device_Init(&g_device, CHIP_ESP32, 4 * 1024 * 1024, defaultMac)) {
+        g_device.chip.xtal_freq = XTAL_FREQ_40M;
         Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
         Config_SetLastDeviceFile(NULL);
         UpdateStatusBar();
         UpdateTitle(hWnd);
         SetWindowTextW(g_hEdit, L"");
+    } else {
+        MessageBoxW(hWnd, L"Failed to create device", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
     }
 }
 
