@@ -74,8 +74,14 @@ FakeEsptool.exe: \
 # 
 output\main.obj: \
 	src\main.c \
+	src\app_commands.h \
+	src\app_logview.h \
+	src\dlg\dlg.h \
+	src\esptool\chip.h \
 	src\esptool\device.h \
 	src\esptool\esptool.h \
+	src\esptool\flash.h \
+	src\esptool\slip.h \
 	src\main.h \
 	src\resource.h \
 	src\serial.h \

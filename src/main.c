@@ -232,23 +232,23 @@ void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
         Serial_PostLogF(hNotify, L"SIG", L"DSR:%s CTS:%s",
                         dsr ? L"ON" : L"OFF", cts ? L"ON" : L"OFF");
 
-        /* DSR:OFF CTS:ON = Reset start (DTR=OFF, RTS=ON → IO0=HIGH, EN=LOW) */
+        /* DSR:OFF CTS:ON = Reset start (DTR=OFF, RTS=ON -> IO0=HIGH, EN=LOW) */
         if (!dsr && cts) {
             g_reset_pending = TRUE;
             g_saw_io0_low = FALSE;
         }
-        /* DSR:ON CTS:OFF = IO0=LOW (DTR=ON, RTS=OFF → GPIO0=LOW) */
+        /* DSR:ON CTS:OFF = IO0=LOW (DTR=ON, RTS=OFF -> GPIO0=LOW) */
         else if (g_reset_pending && dsr && !cts) {
             g_saw_io0_low = TRUE;
         }
         /* DSR:OFF CTS:OFF = Reset end */
         else if (g_reset_pending && !dsr && !cts) {
             if (g_saw_io0_low) {
-                /* ClassicReset: IO0 was LOW → enter download mode */
+                /* ClassicReset: IO0 was LOW -> enter download mode */
                 Serial_PostLog(hNotify, L"SIG", L"Download mode entered");
                 OutputBootMessage(ctx, 0x01, hNotify);  /* 0x01=POWERON */
             } else {
-                /* HardReset: IO0 stayed HIGH → normal boot */
+                /* HardReset: IO0 stayed HIGH -> normal boot */
                 Serial_PostLog(hNotify, L"SIG", L"Hard reset (normal boot)");
                 OutputBootMessage(ctx, 0x02, hNotify);  /* 0x02=EXT */
             }
