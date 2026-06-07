@@ -170,6 +170,7 @@ void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNo
 static BOOL g_prev_dsr = FALSE;
 static BOOL g_prev_cts = FALSE;
 static BOOL g_reset_pending = FALSE;
+static BOOL g_saw_io0_low = FALSE;  /* DSR:ON CTS:OFF seen = IO0=LOW */
 
 /* Reset signal state (call when serial connection is established) */
 void ResetSignalState(void)
@@ -177,6 +178,47 @@ void ResetSignalState(void)
     g_prev_dsr = FALSE;
     g_prev_cts = FALSE;
     g_reset_pending = FALSE;
+    g_saw_io0_low = FALSE;
+}
+
+/* Output boot message to serial and log window (for download mode) */
+static void OutputBootMessage(SERIAL_CTX *ctx, BYTE reset_cause, HWND hNotify)
+{
+    Esptool_ResetState(&g_esptool);
+
+    DWORD bootBaud = Chip_GetBootBaudRate(&g_device.chip);
+    if (bootBaud != 115200) {
+        Serial_SetBaudRate(ctx, bootBaud);
+        Serial_PostLogF(hNotify, L"CFG", L"Baud rate: %lu", bootBaud);
+    }
+
+    const char *msg = Chip_GetBootMessage(&g_device.chip, reset_cause);
+    if (msg[0]) {
+        Serial_WriteData(ctx, (const BYTE *)msg, (DWORD)strlen(msg), hNotify);
+
+        const char *line = msg;
+        while (*line) {
+            const char *end = strchr(line, '\r');
+            if (!end) end = line + strlen(line);
+            int wlen = MultiByteToWideChar(CP_UTF8, 0, line, (int)(end - line), NULL, 0);
+            if (wlen > 0) {
+                WCHAR *wline = (WCHAR *)HeapAlloc(GetProcessHeap(), 0, (wlen + 1) * sizeof(WCHAR));
+                if (wline) {
+                    MultiByteToWideChar(CP_UTF8, 0, line, (int)(end - line), wline, wlen);
+                    wline[wlen] = L'\0';
+                    Serial_PostLog(hNotify, L"BOOT", wline);
+                    HeapFree(GetProcessHeap(), 0, wline);
+                }
+            }
+            line = end;
+            while (*line == '\r' || *line == '\n') line++;
+        }
+    }
+
+    if (bootBaud != 115200) {
+        Serial_SetBaudRate(ctx, 115200);
+        Serial_PostLogF(hNotify, L"CFG", L"Baud rate: 115200");
+    }
 }
 
 /* esptool protocol signal change callback
@@ -190,56 +232,33 @@ void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
         Serial_PostLogF(hNotify, L"SIG", L"DSR:%s CTS:%s",
                         dsr ? L"ON" : L"OFF", cts ? L"ON" : L"OFF");
 
-        /* Detect reset: DSR=ON, CTS=OFF (DTR high, RTS low) */
-        if (dsr && !cts) {
+        /* DSR:OFF CTS:ON = Reset start (DTR=OFF, RTS=ON → IO0=HIGH, EN=LOW) */
+        if (!dsr && cts) {
             g_reset_pending = TRUE;
+            g_saw_io0_low = FALSE;
         }
-        /* Detect download mode entry: DSR=OFF, CTS=OFF after reset */
+        /* DSR:ON CTS:OFF = IO0=LOW (DTR=ON, RTS=OFF → GPIO0=LOW) */
+        else if (g_reset_pending && dsr && !cts) {
+            g_saw_io0_low = TRUE;
+        }
+        /* DSR:OFF CTS:OFF = Reset end */
         else if (g_reset_pending && !dsr && !cts) {
-            Serial_PostLog(hNotify, L"SIG", L"Download mode entered");
-
-            /* Reset protocol state for new connection */
-            Esptool_ResetState(&g_esptool);
-
-            DWORD bootBaud = Chip_GetBootBaudRate(&g_device.chip);
-            if (bootBaud != 115200) {
-                Serial_SetBaudRate(ctx, bootBaud);
-                Serial_PostLogF(hNotify, L"CFG", L"Baud rate: %lu", bootBaud);
+            if (g_saw_io0_low) {
+                /* ClassicReset: IO0 was LOW → enter download mode */
+                Serial_PostLog(hNotify, L"SIG", L"Download mode entered");
+                OutputBootMessage(ctx, 0x01, hNotify);  /* 0x01=POWERON */
+            } else {
+                /* HardReset: IO0 stayed HIGH → normal boot */
+                Serial_PostLog(hNotify, L"SIG", L"Hard reset (normal boot)");
+                OutputBootMessage(ctx, 0x02, hNotify);  /* 0x02=EXT */
             }
-
-            const char *msg = Chip_GetBootMessage(&g_device.chip, 0x01);
-            if (msg[0]) {
-                Serial_WriteData(ctx, (const BYTE *)msg, (DWORD)strlen(msg), hNotify);
-
-                const char *line = msg;
-                while (*line) {
-                    const char *end = strchr(line, '\r');
-                    if (!end) end = line + strlen(line);
-                    int wlen = MultiByteToWideChar(CP_UTF8, 0, line, (int)(end - line), NULL, 0);
-                    if (wlen > 0) {
-                        WCHAR *wline = (WCHAR *)HeapAlloc(GetProcessHeap(), 0, (wlen + 1) * sizeof(WCHAR));
-                        if (wline) {
-                            MultiByteToWideChar(CP_UTF8, 0, line, (int)(end - line), wline, wlen);
-                            wline[wlen] = L'\0';
-                            Serial_PostLog(hNotify, L"BOOT", wline);
-                            HeapFree(GetProcessHeap(), 0, wline);
-                        }
-                    }
-                    line = end;
-                    while (*line == '\r' || *line == '\n') line++;
-                }
-            }
-
-            if (bootBaud != 115200) {
-                Serial_SetBaudRate(ctx, 115200);
-                Serial_PostLogF(hNotify, L"CFG", L"Baud rate: 115200");
-            }
-
             g_reset_pending = FALSE;
+            g_saw_io0_low = FALSE;
         }
         /* Any other state cancels pending reset */
         else {
             g_reset_pending = FALSE;
+            g_saw_io0_low = FALSE;
         }
 
         g_prev_dsr = dsr;

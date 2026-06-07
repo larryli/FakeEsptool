@@ -451,6 +451,18 @@ DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotif
     if (!data || len == 0)
         return 0;
 
+    /* Post TX data to UI thread for logging first (before WriteFile,
+       so log is recorded even if write fails or times out) */
+    if (hNotify && IsWindow(hNotify)) {
+        void *copy = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, len + 1);
+        if (copy) {
+            CopyMemory(copy, data, len);
+            if (!PostMessage(hNotify, WM_SERIAL_TX, (WPARAM)len, (LPARAM)copy)) {
+                HeapFree(GetProcessHeap(), 0, copy);
+            }
+        }
+    }
+
     OVERLAPPED ov = {0};
     HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
     if (!hEvent)
@@ -467,17 +479,6 @@ DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotif
 
     if (result && bytesWritten > 0) {
         ctx->dwTxBytes += bytesWritten;
-
-        /* Post TX data to UI thread for logging */
-        if (hNotify && IsWindow(hNotify)) {
-            void *copy = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesWritten + 1);
-            if (copy) {
-                CopyMemory(copy, data, bytesWritten);
-                if (!PostMessage(hNotify, WM_SERIAL_TX, (WPARAM)bytesWritten, (LPARAM)copy)) {
-                    HeapFree(GetProcessHeap(), 0, copy);
-                }
-            }
-        }
     }
 
     return bytesWritten;
