@@ -32,6 +32,7 @@ static const ESP_CMD_INFO commandTable[256] = {
     [0x08] = {"SYNC", "Sync handshake"},
     [0x09] = {"WRITE_REG", "Write register"},
     [0x0A] = {"READ_REG", "Read register"},
+    [0x0B] = {"SPI_SET_PARAMS", "Set SPI flash parameters"},
     [0x0D] = {"SPI_ATTACH", "Attach SPI flash"},
     [0x0F] = {"CHANGE_BAUDRATE", "Change baud rate"},
     [0x10] = {"FLASH_DEFL_BEGIN", "Begin compressed flash download"},
@@ -650,11 +651,14 @@ static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * HandleReadFlash - Handle flash read command (stub-only)
  *
  * READ_FLASH (0xD2) reads data from flash memory.
- * Response includes 2-byte status prefix followed by flash data.
+ *
+ * Stub protocol flow:
+ *   1. Device sends command ACK (2-byte status in command response)
+ *   2. Device sends flash data as separate SLIP frames (block_size each)
+ *   3. Host sends 4-byte acknowledgment after each frame (ignored by device)
+ *   4. Device sends 16-byte MD5 digest as final SLIP frame
  *
  * Request format: [flash_offset:4][read_len:4][block_size:4][packet_size:4]
- *
- * Note: Maximum read length is limited to 4094 bytes to fit in response buffer.
  */
 static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
@@ -664,25 +668,69 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
                 ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
     DWORD bsize = pkt->data[8] | ((DWORD)pkt->data[9] << 8) |
                   ((DWORD)pkt->data[10] << 16) | ((DWORD)pkt->data[11] << 24);
+    DWORD psize = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
+                  ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
 
-    (void)bsize;
+    (void)psize;
 
-    TRACE_PROTO(TAG, "READ_FLASH addr=0x%08lX len=%lu", addr, len);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX len=%lu", addr, len);
+    TRACE_PROTO(TAG, "READ_FLASH addr=0x%08lX len=%lu bsize=%lu psize=%lu", addr, len, bsize, psize);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX len=%lu bsize=%lu", addr, len, bsize);
 
-    if (len > 4094)
-        len = 4094;
+    /* Step 1: Send command ACK (2-byte status in command response) */
+    Esptool_SendResponseEx(ctx, ESP_CMD_READ_FLASH, ctx->last_read_val, ESP_OK, 2, NULL, 2);
 
-    BYTE buf[4096];
-    /* READ_FLASH is stub-only, 2-byte status prefix */
-    buf[0] = 0x00;
-    buf[1] = 0x00;
-    if (Flash_Read(ctx->flash, addr, buf + 2, len)) {
-        Esptool_SendResponse(ctx, ESP_CMD_READ_FLASH, ctx->last_read_val, ESP_OK, buf, (WORD)(len + 2));
-    } else {
-        buf[0] = 0x01;
-        Esptool_SendResponse(ctx, ESP_CMD_READ_FLASH, ctx->last_read_val, ESP_OK, buf, (WORD)(len + 2));
+    /* Step 2: Send flash data as separate SLIP frames */
+    DWORD offset = 0;
+    while (offset < len) {
+        DWORD chunk_size = len - offset;
+        if (chunk_size > bsize)
+            chunk_size = bsize;
+
+        /* Read flash data into temporary buffer */
+        BYTE *buf = (BYTE *)HeapAlloc(GetProcessHeap(), 0, chunk_size);
+        if (!buf) {
+            Serial_PostLogF(ctx->hNotify, L"ERR", L"  Failed to allocate read buffer: %lu", chunk_size);
+            return;
+        }
+
+        if (!Flash_Read(ctx->flash, addr + offset, buf, chunk_size)) {
+            Serial_PostLogF(ctx->hNotify, L"ERR", L"  Flash read failed at offset 0x%08lX", addr + offset);
+            HeapFree(GetProcessHeap(), 0, buf);
+            return;
+        }
+
+        /* SLIP-encode the chunk and send as raw frame (not a command response) */
+        DWORD encoded_max = (DWORD)chunk_size * 2 + 2;
+        BYTE *encoded = (BYTE *)HeapAlloc(GetProcessHeap(), 0, encoded_max);
+        if (!encoded) {
+            Serial_PostLogF(ctx->hNotify, L"ERR", L"  Failed to allocate encode buffer");
+            HeapFree(GetProcessHeap(), 0, buf);
+            return;
+        }
+
+        int enc_len = Slip_Encode(buf, (int)chunk_size, encoded, (int)encoded_max);
+        if (enc_len > 0 && ctx->onWrite) {
+            ctx->onWrite(encoded, (DWORD)enc_len);
+        }
+
+        HeapFree(GetProcessHeap(), 0, encoded);
+        HeapFree(GetProcessHeap(), 0, buf);
+
+        offset += chunk_size;
     }
+
+    /* Step 3: Calculate and send 16-byte MD5 digest as final SLIP frame */
+    BYTE md5[16];
+    Flash_CalcMd5(ctx->flash, addr, len, md5);
+
+    BYTE md5_encoded[34];  /* 16 bytes * 2 (worst case escaping) + 2 (framing) */
+    int md5_enc_len = Slip_Encode(md5, 16, md5_encoded, sizeof(md5_encoded));
+    if (md5_enc_len > 0 && ctx->onWrite) {
+        ctx->onWrite(md5_encoded, (DWORD)md5_enc_len);
+    }
+
+    TRACE_PROTO(TAG, "READ_FLASH complete: %lu bytes sent", len);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  Read complete: %lu bytes", len);
 }
 
 /*
@@ -1014,6 +1062,60 @@ static void HandleSpiAttach(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 }
 
 /*
+ * HandleSpiSetParams - Handle SPI flash parameters command
+ *
+ * SPI_SET_PARAMS (0x0B) configures flash chip parameters.
+ *
+ * Request format (24 bytes = 6 x uint32 LE):
+ *   [fl_id:4][total_size:4][block_size:4][sector_size:4][page_size:4][status_mask:4]
+ *
+ * ESP8266 ROM does not support this command (returns ROM_INVALID_RECV_MSG).
+ * ESP32+ ROM and all stubs support it (returns success).
+ *
+ * In the simulator, flash parameters are configured separately.
+ * This handler logs the parameters and returns success.
+ */
+static void HandleSpiSetParams(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+{
+    DWORD fl_id = 0, total_size = 0, block_size = 0, sector_size = 0, page_size = 0, status_mask = 0;
+
+    if (pkt->size >= 24) {
+        fl_id = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
+                ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
+        total_size = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
+                     ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
+        block_size = pkt->data[8] | ((DWORD)pkt->data[9] << 8) |
+                     ((DWORD)pkt->data[10] << 16) | ((DWORD)pkt->data[11] << 24);
+        sector_size = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
+                      ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
+        page_size = pkt->data[16] | ((DWORD)pkt->data[17] << 8) |
+                    ((DWORD)pkt->data[18] << 16) | ((DWORD)pkt->data[19] << 24);
+        status_mask = pkt->data[20] | ((DWORD)pkt->data[21] << 8) |
+                      ((DWORD)pkt->data[22] << 16) | ((DWORD)pkt->data[23] << 24);
+    }
+
+    TRACE_PROTO(TAG, "SPI_SET_PARAMS fl_id=0x%08lX total=%lu block=%lu sector=%lu page=%lu mask=0x%08lX",
+                fl_id, total_size, block_size, sector_size, page_size, status_mask);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  fl_id=0x%08lX total=%lu block=%lu sector=%lu page=%lu mask=0x%08lX",
+                    fl_id, total_size, block_size, sector_size, page_size, status_mask);
+
+    /* ESP8266 ROM does not support SPI_SET_PARAMS.
+       Return ROM_INVALID_RECV_MSG error so esptool falls back gracefully. */
+    if (ctx->chip->type == CHIP_ESP8266 && !ctx->stub_mode) {
+        TRACE_PROTO(TAG, "  Not supported on ESP8266 ROM, returning error");
+        Serial_PostLog(ctx->hNotify, L"ESP", L"  Not supported on ESP8266 ROM");
+        BYTE err_data[4] = {0x01, 0x05, 0x00, 0x00};
+        Esptool_SendResponse(ctx, ESP_CMD_SPI_SET_PARAMS, ctx->last_read_val, ESP_OK, err_data, 4);
+        return;
+    }
+
+    /* ESP32+ ROM and all stubs: return success.
+       ROM mode: 4-byte status; stub mode: 2-byte status. */
+    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    Esptool_SendResponseEx(ctx, ESP_CMD_SPI_SET_PARAMS, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
+}
+
+/*
  * HandleRunUserCode - Handle soft reset command (stub-only)
  *
  * RUN_USER_CODE (0xD3) triggers a soft reset by jumping to user code.
@@ -1094,6 +1196,7 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
     case ESP_CMD_FLASH_DEFL_BEGIN:
     case ESP_CMD_MEM_BEGIN:
     case ESP_CMD_SPI_FLASH_MD5:
+    case ESP_CMD_SPI_SET_PARAMS:
     case ESP_CMD_ERASE_FLASH:
     case ESP_CMD_ERASE_REGION:
     case ESP_CMD_READ_FLASH:
@@ -1138,6 +1241,7 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
     case ESP_CMD_SYNC:              HandleSync(ctx, pkt); break;
     case ESP_CMD_READ_REG:          HandleReadReg(ctx, pkt); break;
     case ESP_CMD_WRITE_REG:         HandleWriteReg(ctx, pkt); break;
+    case ESP_CMD_SPI_SET_PARAMS:    HandleSpiSetParams(ctx, pkt); break;
     case ESP_CMD_SPI_ATTACH:        HandleSpiAttach(ctx, pkt); break;
     case ESP_CMD_CHANGE_BAUDRATE:   HandleChangeBaudrate(ctx, pkt); break;
     case ESP_CMD_FLASH_BEGIN:       HandleFlashBegin(ctx, pkt); break;

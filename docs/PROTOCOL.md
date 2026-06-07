@@ -135,6 +135,7 @@ for (int i = 0; i < data_len; i++)
 | SYNC (0x08) | `0x00000000` | 固定为 0，不计算 |
 | READ_REG (0x0A) | `0x00000000` | 固定为 0，不计算 |
 | WRITE_REG (0x09) | `0x00000000` | 固定为 0，不计算 |
+| SPI_SET_PARAMS (0x0B) | `0x00000000` | 固定为 0，不计算 |
 | SPI_ATTACH (0x0D) | `0x00000000` | 固定为 0，不计算 |
 | CHANGE_BAUDRATE (0x0F) | `0x00000000` | 固定为 0，不计算 |
 | MEM_BEGIN (0x05) | `0x00000000` | 固定为 0，不计算 |
@@ -173,6 +174,7 @@ for (int i = 0; i < data_len; i++)
 | SYNC (0x08) | 4 字节 | 4 字节 | |
 | WRITE_REG (0x09) | 2 字节 | 2 字节 | |
 | READ_REG (0x0A) | 4 字节 | 2 字节 | 寄存器值在 Val 字段 |
+| SPI_SET_PARAMS (0x0B) | 4 字节 | 2 字节 | ESP8266 ROM 不支持 |
 | CHANGE_BAUDRATE (0x0F) | 2 字节 | 2 字节 | |
 | FLASH_DEFL_BEGIN (0x10) | 4 字节 | 2 字节 | 客户端只检查前 2 字节 |
 | FLASH_DEFL_DATA (0x11) | 4 字节 | 2 字节 | 客户端只检查前 2 字节 |
@@ -214,6 +216,7 @@ Data 字段: [...payload...][status_byte_1][status_byte_2]
 | 0x08 | SYNC | ✓ | ✓ | 同步握手 |
 | 0x09 | WRITE_REG | ✓ | ✓ | 写寄存器 |
 | 0x0A | READ_REG | ✓ | ✓ | 读寄存器 |
+| 0x0B | SPI_SET_PARAMS | ✓* | ✓ | 设置 SPI Flash 参数 |
 | 0x0D | SPI_ATTACH | ✓ | ✓ | 附加 SPI Flash |
 | 0x0F | CHANGE_BAUDRATE | ✓ | ✓ | 修改波特率 |
 | 0x10 | FLASH_DEFL_BEGIN | ✓ | ✓ | 压缩 Flash 下载开始 |
@@ -226,7 +229,7 @@ Data 字段: [...payload...][status_byte_1][status_byte_2]
 | 0xD2 | READ_FLASH | ✗ | ✓ | 读取 Flash |
 | 0xD3 | RUN_USER_CODE | ✗ | ✓ | 运行用户代码（软复位） |
 
-**注意：** 标记为 ✗ 的命令在该模式下不支持。ROM 收到不支持的命令会返回 `ROM_INVALID_RECV_MSG (0x05)`。
+**注意：** 标记为 ✗ 的命令在该模式下不支持。ROM 收到不支持的命令会返回 `ROM_INVALID_RECV_MSG (0x05)`。标记为 ✓* 的命令 ESP8266 ROM 不支持（esptool 客户端对 ESP8266 ROM 静默跳过）。
 
 ---
 
@@ -315,7 +318,65 @@ Data:      0x00 0x00 (2 字节 status=成功)
 
 ---
 
-### 3.5 SPI_ATTACH (0x0D) - 附加 SPI Flash
+### 3.5 SPI_SET_PARAMS (0x0B) - 设置 SPI Flash 参数
+
+**功能：** 配置 SPI Flash 芯片参数（总大小、块大小、扇区大小、页大小等）。
+
+**兼容性：**
+- ESP32+ ROM：支持
+- ESP8266 ROM：**不支持**（返回 `ROM_INVALID_RECV_MSG` 错误，esptool 客户端静默跳过）
+- 所有芯片 Stub：支持
+
+**请求：**
+```
+Direction: 0x00
+Command:   0x0B
+Size:      0x18 0x00 (24 bytes)
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
+Data:      [fl_id:4][total_size:4][block_size:4][sector_size:4][page_size:4][status_mask:4]
+```
+
+**字段说明：**
+
+| 字段 | 说明 | 典型值 |
+|------|------|--------|
+| fl_id | Flash 芯片 ID（通常为 0） | 0 |
+| total_size | Flash 总大小（字节） | 4194304 (4MB) |
+| block_size | 擦除块大小（字节） | 65536 (64KB) |
+| sector_size | 扇区大小（字节） | 4096 (4KB) |
+| page_size | 页大小（字节） | 256 |
+| status_mask | 状态掩码 | 0xFFFF |
+
+**响应（ESP32+ ROM）：**
+```
+Direction: 0x01
+Command:   0x0B
+Size:      0x04 0x00 (4 bytes)
+Val:       <返回请求的 checksum>
+Data:      0x00 0x00 0x00 0x00 (4 字节 status=成功)
+```
+
+**响应（Stub 模式）：**
+```
+Direction: 0x01
+Command:   0x0B
+Size:      0x02 0x00 (2 bytes)
+Val:       <返回请求的 checksum>
+Data:      0x00 0x00 (2 字节 status=成功)
+```
+
+**响应（ESP8266 ROM，不支持）：**
+```
+Direction: 0x01
+Command:   0x0B
+Size:      0x04 0x00 (4 bytes)
+Val:       <返回请求的 checksum>
+Data:      0x01 0x05 0x00 0x00 (ROM_INVALID_RECV_MSG 错误)
+```
+
+---
+
+### 3.6 SPI_ATTACH (0x0D) - 附加 SPI Flash
 
 **请求：**
 ```
@@ -342,7 +403,7 @@ Data:      0x00 0x00 0x00 0x00 (4 字节 status) 或 0x00 0x00 (2 字节 status)
 
 ---
 
-### 3.6 CHANGE_BAUDRATE (0x0F) - 修改波特率
+### 3.7 CHANGE_BAUDRATE (0x0F) - 修改波特率
 
 **请求：**
 ```
@@ -383,7 +444,7 @@ Data:      [old_baud:4][new_baud:4]
 
 ---
 
-### 3.7 MEM_BEGIN (0x05) - 内存写入开始
+### 3.8 MEM_BEGIN (0x05) - 内存写入开始
 
 **请求：**
 ```
@@ -407,7 +468,7 @@ Data:      0x00 0x00 0x00 0x00 (4 字节 status=成功)
 
 ---
 
-### 3.8 MEM_DATA (0x07) - 内存写入数据
+### 3.9 MEM_DATA (0x07) - 内存写入数据
 
 **请求：**
 ```
@@ -433,7 +494,7 @@ Data:      0x00 0x00 0x00 0x00 (4 字节 status=成功)
 
 ---
 
-### 3.9 MEM_END (0x06) - 内存写入结束
+### 3.10 MEM_END (0x06) - 内存写入结束
 
 **请求：**
 ```
@@ -455,7 +516,7 @@ Data:      0x00 0x00 0x00 0x00 (4 字节 status=成功)
 
 ---
 
-### 3.10 FLASH_BEGIN (0x02) - Flash 写入开始
+### 3.11 FLASH_BEGIN (0x02) - Flash 写入开始
 
 **功能：** 进入 Flash 下载模式，**擦除指定区域**，准备接收数据。
 
@@ -511,7 +572,7 @@ Data:      0x00 0x00 (2 字节 status=成功)
 
 ---
 
-### 3.11 FLASH_DATA (0x03) - Flash 写入数据
+### 3.12 FLASH_DATA (0x03) - Flash 写入数据
 
 **请求：**
 ```
@@ -546,7 +607,7 @@ Data:      0x00 0x00 (2 字节 status=成功)
 
 ---
 
-### 3.12 FLASH_END (0x04) - Flash 写入结束
+### 3.13 FLASH_END (0x04) - Flash 写入结束
 
 **请求：**
 ```
@@ -577,7 +638,7 @@ Data:      0x00 0x00 (2 字节 status=成功)
 
 ---
 
-### 3.13 FLASH_DEFL_BEGIN (0x10) - 压缩写入开始
+### 3.14 FLASH_DEFL_BEGIN (0x10) - 压缩写入开始
 
 **功能：** 进入压缩 Flash 下载模式，**擦除指定区域**，准备接收压缩数据。
 
@@ -622,7 +683,7 @@ Data:      0x00 0x00 (2 字节 status=成功)
 
 ---
 
-### 3.14 FLASH_DEFL_DATA (0x11) - 压缩写入数据
+### 3.15 FLASH_DEFL_DATA (0x11) - 压缩写入数据
 
 **请求：**
 ```
@@ -659,7 +720,7 @@ Data:      0x00 0x00 (2 字节 status=成功)
 
 ---
 
-### 3.15 FLASH_DEFL_END (0x12) - 压缩写入结束
+### 3.16 FLASH_DEFL_END (0x12) - 压缩写入结束
 
 **请求：**
 ```
@@ -690,7 +751,7 @@ Data:      0x00 0x00 (2 字节 status=成功)
 
 ---
 
-### 3.16 DEFL 压缩算法说明
+### 3.17 DEFL 压缩算法说明
 
 FLASH_DEFL_BEGIN/DATA/END 命令使用 DEFLATE 压缩算法（RFC 1951）传输数据。
 
@@ -742,7 +803,7 @@ for (let i = 0; i < compressedImage.length; i += FLASH_WRITE_SIZE) {
 
 ---
 
-### 3.17 SPI_FLASH_MD5 (0x13) - 计算 Flash MD5
+### 3.18 SPI_FLASH_MD5 (0x13) - 计算 Flash MD5
 
 **请求：**
 ```
@@ -778,7 +839,7 @@ Data:      md5_raw[16] (16字节二进制 MD5) + 0x00 0x00 (status=成功)
 
 ---
 
-### 3.18 ERASE_FLASH (0xD0) - 擦除整个 Flash（stub）
+### 3.19 ERASE_FLASH (0xD0) - 擦除整个 Flash（stub）
 
 **请求：**
 ```
@@ -802,7 +863,7 @@ Data:      0x00 0x00 (status=成功)
 
 ---
 
-### 3.19 ERASE_REGION (0xD1) - 擦除 Flash 区域（stub）
+### 3.20 ERASE_REGION (0xD1) - 擦除 Flash 区域（stub）
 
 **请求：**
 ```
@@ -824,7 +885,7 @@ Data:      0x00 0x00 (status=成功)
 
 ---
 
-### 3.20 READ_FLASH (0xD2) - 读取 Flash（stub）
+### 3.21 READ_FLASH (0xD2) - 读取 Flash（stub）
 
 **请求：**
 ```
@@ -840,23 +901,45 @@ Data:      [flash_offset:4][read_len:4][block_size:4][packet_size:4]
 |------|------|
 | flash_offset | Flash 偏移地址 |
 | read_len | 读取长度（字节） |
-| block_size | Flash 扇区大小（通常为 0x1000） |
-| packet_size | 读取数据包大小（通常为 1024） |
+| block_size | 每个数据块大小（通常为 0x1000 = 4096） |
+| packet_size | 数据包大小（由 stub 定义，通常为 64） |
 
-**响应：**
+**Stub 协议流程：**
+
+```
+主机 → 设备: READ_FLASH 命令请求
+设备 → 主机: 命令 ACK（2 字节 status=成功）
+设备 → 主机: 数据块 1（block_size 字节，独立 SLIP 帧）
+主机 → 设备: 确认（4 字节，已接收字节数，设备忽略）
+设备 → 主机: 数据块 2（独立 SLIP 帧）
+主机 → 设备: 确认
+...
+设备 → 主机: 数据块 N（最后一块可能小于 block_size）
+主机 → 设备: 确认
+设备 → 主机: MD5 摘要（16 字节二进制，独立 SLIP 帧）
+```
+
+**命令 ACK 响应：**
 ```
 Direction: 0x01
 Command:   0xD2
-Size:      read_len + 2
+Size:      0x02 0x00 (2 bytes)
 Val:       <返回请求的 checksum>
-Data:      0x00 0x00 (status=成功) + flash_data[read_len]
+Data:      0x00 0x00 (status=成功)
 ```
 
-**注意：** 设备端会分多个包发送数据，每个包发送后等待烧录器确认（发送已接收的字节数）。
+**数据块：** 独立 SLIP 帧，包含 `block_size` 字节原始 flash 数据（最后一块可能更小）。
+
+**MD5 摘要：** 独立 SLIP 帧，包含 16 字节二进制 MD5 哈希值。
+
+**注意：**
+- 设备发送数据块后不等待确认，直接发送下一块
+- 主机在接收每个数据块后发送 4 字节确认（已接收总字节数），设备忽略此确认
+- 最终 MD5 摘要用于数据完整性验证
 
 ---
 
-### 3.21 GET_SECURITY_INFO (0x14) - 获取安全信息
+### 3.22 GET_SECURITY_INFO (0x14) - 获取安全信息
 
 **请求：**
 ```

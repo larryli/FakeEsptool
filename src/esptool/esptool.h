@@ -50,6 +50,9 @@ typedef enum {
 #define ESP_CMD_WRITE_REG       0x09
 #define ESP_CMD_READ_REG        0x0A
 
+/* SPI flash parameters (ESP32+ ROM, all stubs) */
+#define ESP_CMD_SPI_SET_PARAMS  0x0B
+
 /* SPI flash attach */
 #define ESP_CMD_SPI_ATTACH      0x0D
 

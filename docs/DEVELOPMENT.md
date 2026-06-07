@@ -118,6 +118,7 @@ cmake --build build
 | 0x08 | SYNC | 同步握手 |
 | 0x09 | WRITE_REG | 写寄存器 |
 | 0x0A | READ_REG | 读寄存器 |
+| 0x0B | SPI_SET_PARAMS | 设置 SPI Flash 参数 |
 | 0x0F | CHANGE_BAUDRATE | 修改波特率 |
 | 0x10 | FLASH_DEFL_BEGIN | 压缩写入开始（擦除指定区域） |
 | 0x11 | FLASH_DEFL_DATA | 压缩写入数据 |
