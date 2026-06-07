@@ -183,6 +183,11 @@ static BOOL InitEsp32S2(CHIP_CTX *ctx)
         return FALSE;
     WriteMacAt0x44(ctx);
     WriteChipIdToEfuse(ctx);
+
+    /* Set chip revision to 1.0 in eFuse.
+       ESP32-S2: major at BLOCK1 word3 bits[21:20] = byte 0x52 bits[5:4] */
+    ctx->efuse[0x52] |= 0x10;  /* major=1 */
+
     return TRUE;
 }
 
@@ -193,6 +198,11 @@ static BOOL InitEsp32S3(CHIP_CTX *ctx)
         return FALSE;
     WriteMacAt0x44(ctx);
     WriteChipIdToEfuse(ctx);
+
+    /* Set chip revision to 1.0 in eFuse.
+       ESP32-S3: major at BLOCK1 word5 bits[25:24] = byte 0x5A bits[1:0] */
+    ctx->efuse[0x5A] |= 0x01;  /* major=1 */
+
     return TRUE;
 }
 
@@ -203,6 +213,14 @@ static BOOL InitEsp32C2(CHIP_CTX *ctx)
         return FALSE;
     WriteMacAt0x40(ctx);
     WriteChipIdToEfuse(ctx);
+
+    /* Set chip revision to 1.0 (major=1, minor=0) in eFuse.
+       ESP32-C2 reads revision from EFUSE_BLOCK2_ADDR + 4 (offset 0x44):
+         major = bits[21:20] = byte 0x46 bits[5:4]
+         minor = bits[19:16] = byte 0x46 bits[3:0]
+       Revision 0 (ECO0) causes esptool to disable the stub flasher. */
+    ctx->efuse[0x46] |= 0x10;  /* major=1, minor=0 */
+
     return TRUE;
 }
 
@@ -213,6 +231,11 @@ static BOOL InitEsp32C3(CHIP_CTX *ctx)
         return FALSE;
     WriteMacAt0x44(ctx);
     WriteChipIdToEfuse(ctx);
+
+    /* Set chip revision to 1.0 in eFuse.
+       ESP32-C3: major at BLOCK1 word3 bits[19:18] = byte 0x52 bits[3:2] */
+    ctx->efuse[0x52] |= 0x04;  /* major=1 */
+
     return TRUE;
 }
 
@@ -223,6 +246,11 @@ static BOOL InitEsp32C6(CHIP_CTX *ctx)
         return FALSE;
     WriteMacAt0x44(ctx);
     WriteChipIdToEfuse(ctx);
+
+    /* Set chip revision to 1.0 in eFuse.
+       ESP32-C6: major at BLOCK1 word3 bits[19:18] = byte 0x52 bits[3:2] */
+    ctx->efuse[0x52] |= 0x04;  /* major=1 */
+
     return TRUE;
 }
 
@@ -265,8 +293,12 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
         ctx->spi_reg_base = SPI_REG_BASE_ESP32S2;
         ctx->spi_offs = &spi_offs_esp32s2;
         break;
+    case CHIP_ESP32C6:
+        ctx->spi_reg_base = SPI_REG_BASE_ESP32C6;
+        ctx->spi_offs = &spi_offs_esp32s2;
+        break;
     default:
-        /* S3, C2, C3, C6 */
+        /* S3, C2, C3 */
         ctx->spi_reg_base = SPI_REG_BASE_ESP32S3;
         ctx->spi_offs = &spi_offs_esp32s2;
         break;

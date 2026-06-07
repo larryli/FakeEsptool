@@ -754,6 +754,22 @@ All flash segments verified successfully.
 
 ---
 
+### ~~ESP32-C2 芯片版本为 0 导致 Stub Flasher 被禁用~~ (已修复)
+
+**现象：** ESP32-C2 检测成功，但 esptool 输出警告 `Stub flasher has been disabled for compatibility`。
+
+**原因：** eFuse 数据初始化为全零，芯片版本（chip revision）读取为 0。esptool 对 ESP32-C2 ECO0（revision 0）禁用 stub flasher。
+
+**修复：** 在各芯片初始化函数中设置默认芯片版本到 eFuse：
+- ESP32-C2：byte 0x46 = 0x10（major=1, minor=0）
+- ESP32-S2：byte 0x52 = 0x10（major=1）
+- ESP32-S3：byte 0x5A = 0x01（major=1）
+- ESP32-C3/C6：byte 0x52 = 0x04（major=1）
+
+**状态：** 已修复。
+
+---
+
 ### ~~FLASH_DEFL_DATA 分包解压 Bug~~ (已修复)
 
 **现象：** 压缩烧录大文件时，第二个及后续 `FLASH_DEFL_DATA` 包解压失败，导致烧录数据不完整。

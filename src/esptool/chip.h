@@ -49,7 +49,8 @@
 #define SPI_REG_BASE_ESP8266        0x60000200
 #define SPI_REG_BASE_ESP32          0x3FF42000
 #define SPI_REG_BASE_ESP32S2        0x3F402000
-#define SPI_REG_BASE_ESP32S3        0x60002000  /* Also used by ESP32-C2/C3/C6 */
+#define SPI_REG_BASE_ESP32S3        0x60002000  /* Also used by ESP32-C2/C3 */
+#define SPI_REG_BASE_ESP32C6        0x60003000
 
 /* ============================================================================
  * UART register addresses per chip type
@@ -250,5 +251,9 @@ DWORD Chip_GetBootBaudRate(const CHIP_CTX *ctx);
    Returns multi-line ASCII string with \r\n line endings.
    reset_cause: 0x01=POWERON, 0x02=EXT, 0x03=WDT */
 const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BYTE reset_cause);
+
+/* Ensure chip revision is set in eFuse (for backward compatibility with
+   old .esp files that don't have chip revision data). */
+void Chip_EnsureRevision(CHIP_CTX *ctx);
 
 #endif

@@ -21,7 +21,7 @@
 static const char *TAG = "SER";
 #endif
 
-#define READ_BUFFER_SIZE 4096
+#define READ_BUFFER_SIZE 16384
 #define MAX_PORTS 64
 
 /* Port info structure for friendly name display */
@@ -140,15 +140,27 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
         if (!WaitCommEvent(ctx->hPort, &dwEvtMask, &ov)) {
             if (GetLastError() == ERROR_IO_PENDING) {
                 DWORD waitResult = WaitForSingleObject(ov.hEvent, 100);
-                if (waitResult == WAIT_TIMEOUT)
-                    continue;
-                if (waitResult != WAIT_OBJECT_0) {
+                if (waitResult == WAIT_TIMEOUT) {
+                    /* Timeout - check if there's data in the buffer anyway */
+                    COMSTAT comStat;
+                    DWORD dwErrors;
+                    if (ClearCommError(ctx->hPort, &dwErrors, &comStat) && comStat.cbInQue > 0) {
+                        dwEvtMask = EV_RXCHAR;
+                    } else {
+                        continue;
+                    }
+                }
+                if (waitResult != WAIT_OBJECT_0 && waitResult != WAIT_TIMEOUT) {
                     errorExit = (waitResult == WAIT_FAILED);
                     break;
                 }
-                if (!GetOverlappedResult(ctx->hPort, &ov, &(DWORD){0}, FALSE)) {
-                    errorExit = TRUE;
-                    break;
+                if (waitResult == WAIT_OBJECT_0) {
+                    if (!GetOverlappedResult(ctx->hPort, &ov, &(DWORD){0}, FALSE)) {
+                        if (GetLastError() == ERROR_OPERATION_ABORTED)
+                            continue;
+                        errorExit = TRUE;
+                        break;
+                    }
                 }
             } else if (GetLastError() == ERROR_OPERATION_ABORTED) {
                 /* Normal shutdown via CancelIo */
