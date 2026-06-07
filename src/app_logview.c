@@ -255,9 +255,7 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
     pos += FormatTimestamp(buf + pos, maxLineSize - pos);
     
     /* Direction */
-    int dirStart = pos;
     pos += wsprintfW(buf + pos, L"[%s] ", (dir == DIR_RX) ? L"RX" : L"TX");
-    int dirLen = pos - dirStart;
     
     /* Hex data with grouping */
     int prefixLen = pos;

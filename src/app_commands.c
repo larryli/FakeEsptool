@@ -116,12 +116,13 @@ void UpdateMenuState(HWND hWnd)
     BOOL connected = Serial_IsOpen(&g_serial);
     BOOL canReconnect = CanReconnect();
 
+    EnableMenuItem(hMenu, IDM_DEVICE_PROPS, connected ? MF_GRAYED : MF_ENABLED);
     EnableMenuItem(hMenu, IDM_CONNECT, connected ? MF_GRAYED : MF_ENABLED);
     EnableMenuItem(hMenu, IDM_DISCONNECT, connected ? MF_ENABLED : MF_GRAYED);
     EnableMenuItem(hMenu, IDM_RECONNECT, canReconnect ? MF_ENABLED : MF_GRAYED);
-    EnableMenuItem(hMenu, IDM_DEVICE_PROPS, connected ? MF_GRAYED : MF_ENABLED);
     EnableMenuItem(hMenu, IDM_FLASH_IMPORT, connected ? MF_GRAYED : MF_ENABLED);
 
+    SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_DEVICE_PROPS, !connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_CONNECT, !connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_DISCONNECT, connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_RECONNECT, canReconnect);

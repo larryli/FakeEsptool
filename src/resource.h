@@ -65,6 +65,7 @@
 #define IDS_TIP_RECONNECT   10032
 #define IDS_TIP_CLEAR       10033
 #define IDS_TIP_SAVEAS      10034
+#define IDS_TIP_DEVPROPS    10035
 
 /* Message strings */
 #define IDS_MSG_NOT_CONN    10060

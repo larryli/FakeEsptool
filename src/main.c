@@ -298,14 +298,14 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     SendMessageW(g_hToolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
     SendMessageW(g_hToolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(16, 16));
 
-    /* Load merged toolbar bitmap (10 icons) */
+    /* Load merged toolbar bitmap (11 icons) */
     TBADDBITMAP tbab = {0};
     tbab.hInst = hInst;
     tbab.nID = IDB_TOOLBAR;
-    int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 10, (LPARAM)&tbab);
+    int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 11, (LPARAM)&tbab);
 
-    /* Toolbar buttons: New, Open, Save | Connect, Reconnect, Disconnect | Import, Export | Clear, SaveLog */
-    TBBUTTON buttons[14] = {0};
+    /* Toolbar buttons: New, Open, Save | DeviceProps | Connect, Reconnect, Disconnect | Import, Export | Clear, SaveLog */
+    TBBUTTON buttons[16] = {0};
     int btn = 0;
 
     /* File group */
@@ -331,20 +331,30 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     buttons[btn].fsStyle = BTNS_SEP;
     btn++;
 
+    buttons[btn].iBitmap = iBase + 3;  /* Device Properties */
+    buttons[btn].idCommand = IDM_DEVICE_PROPS;
+    buttons[btn].fsState = TBSTATE_ENABLED;
+    buttons[btn].fsStyle = BTNS_BUTTON;
+    btn++;
+
+    /* Separator */
+    buttons[btn].fsStyle = BTNS_SEP;
+    btn++;
+
     /* Serial group */
-    buttons[btn].iBitmap = iBase + 3;  /* Connect */
+    buttons[btn].iBitmap = iBase + 4;  /* Connect */
     buttons[btn].idCommand = IDM_CONNECT;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 4;  /* Reconnect */
+    buttons[btn].iBitmap = iBase + 5;  /* Reconnect */
     buttons[btn].idCommand = IDM_RECONNECT;
     buttons[btn].fsState = 0;  /* Disabled initially */
     buttons[btn].fsStyle = BTNS_BUTTON;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 5;  /* Disconnect */
+    buttons[btn].iBitmap = iBase + 6;  /* Disconnect */
     buttons[btn].idCommand = IDM_DISCONNECT;
     buttons[btn].fsState = 0;  /* Disabled initially */
     buttons[btn].fsStyle = BTNS_BUTTON;
@@ -355,13 +365,13 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     btn++;
 
     /* Flash group */
-    buttons[btn].iBitmap = iBase + 6;  /* Import */
+    buttons[btn].iBitmap = iBase + 7;  /* Import */
     buttons[btn].idCommand = IDM_FLASH_IMPORT;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 7;  /* Export */
+    buttons[btn].iBitmap = iBase + 8;  /* Export */
     buttons[btn].idCommand = IDM_FLASH_EXPORT;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
@@ -372,13 +382,13 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     btn++;
 
     /* Log group */
-    buttons[btn].iBitmap = iBase + 8;  /* Clear */
+    buttons[btn].iBitmap = iBase + 9;  /* Clear */
     buttons[btn].idCommand = IDM_LOG_CLEAR;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 9;  /* Save Log */
+    buttons[btn].iBitmap = iBase + 10;  /* Save Log */
     buttons[btn].idCommand = IDM_LOG_SAVEAS;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
@@ -483,6 +493,9 @@ static LRESULT Main_OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
         NMTTDISPINFOW *ttt = (NMTTDISPINFOW *)lParam;
         ttt->hinst = GetModuleHandleW(NULL);
         switch (ttt->hdr.idFrom) {
+        case IDM_DEVICE_PROPS:
+            ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_DEVPROPS);
+            return 0;
         case IDM_CONNECT:
             ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_CONNECT);
             return 0;

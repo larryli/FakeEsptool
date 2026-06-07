@@ -127,6 +127,7 @@ STRINGTABLE
     IDS_TIP_RECONNECT   "Reconnect"
     IDS_TIP_CLEAR       "Clear Log"
     IDS_TIP_SAVEAS      "Save Log As..."
+    IDS_TIP_DEVPROPS    "Device Properties"
 }
 
 STRINGTABLE
