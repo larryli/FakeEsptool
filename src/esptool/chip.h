@@ -12,6 +12,96 @@
 /* Maximum chip name length */
 #define CHIP_NAME_MAX   32
 
+/* ============================================================================
+ * Chip detection register (used by esptool for autodetect)
+ * ============================================================================ */
+#define CHIP_DETECT_REG             0x40001000
+
+/* ============================================================================
+ * eFuse base addresses per chip type
+ * ============================================================================ */
+
+/* ESP8266 eFuse */
+#define EFUSE_RD_REG_BASE_ESP8266   0x3FF00050
+
+/* ESP32 eFuse */
+#define EFUSE_BASE_ESP32            0x3FF00000  /* Direct access */
+#define EFUSE_RD_REG_BASE_ESP32     0x3FF5A000  /* esptool readEfuse */
+
+/* ESP32-S2 eFuse */
+#define EFUSE_BASE_ESP32S2          0x3F41A000
+
+/* ESP32-S3 eFuse */
+#define EFUSE_BASE_ESP32S3          0x60007000
+
+/* ESP32-C2 eFuse */
+#define EFUSE_BASE_ESP32C2          0x60008800
+
+/* ESP32-C3 eFuse */
+#define EFUSE_BASE_ESP32C3          0x60008800
+
+/* ESP32-C6 eFuse */
+#define EFUSE_BASE_ESP32C6          0x600B0800
+
+/* ============================================================================
+ * SPI register base addresses per chip type
+ * ============================================================================ */
+#define SPI_REG_BASE_ESP8266        0x60000200
+#define SPI_REG_BASE_ESP32          0x3FF42000
+#define SPI_REG_BASE_ESP32S2        0x3F402000
+#define SPI_REG_BASE_ESP32S3        0x60002000  /* Also used by ESP32-C2/C3/C6 */
+
+/* ============================================================================
+ * UART register addresses per chip type
+ * ============================================================================ */
+#define UART_CLKDIV_REG_ESP32       0x3FF40014
+#define UART_CLKDIV_REG_ESP32S2     0x3F400014
+#define UART_CLKDIV_REG_ESP32S3     0x60000014  /* Also used by ESP32-C2/C3/C6 */
+#define UART_CLKDIV_REG_ESP8266     0x60000014
+#define UART_CLKDIV_MASK            0xFFFFF
+
+/* ESP32 flash size register */
+#define FLASH_SIZE_REG_ESP32        0x3F400010
+
+/* ============================================================================
+ * Chip ID values (used for chip detection)
+ * ============================================================================ */
+#define CHIP_ID_ESP8266             0xFFF0C101
+#define CHIP_ID_ESP32               0x00F01D83
+#define CHIP_ID_ESP32S2             0x000007C6
+#define CHIP_ID_ESP32S3             0x00000009
+#define CHIP_ID_ESP32C2             0x7C41A06F
+#define CHIP_ID_ESP32C3             0x6921506F
+#define CHIP_ID_ESP32C6             0x2CE0806F
+
+/* ============================================================================
+ * MAC eFuse offsets per chip type
+ * ============================================================================ */
+
+/* ESP8266 MAC eFuse offsets */
+#define MAC_EFUSE_WORD0_ESP8266     (EFUSE_RD_REG_BASE_ESP8266 + 0x00)  /* 0x3FF00050 */
+#define MAC_EFUSE_WORD1_ESP8266     (EFUSE_RD_REG_BASE_ESP8266 + 0x04)  /* 0x3FF00054 */
+#define MAC_EFUSE_WORD3_ESP8266     (EFUSE_RD_REG_BASE_ESP8266 + 0x0C)  /* 0x3FF0005C */
+
+/* ESP32 MAC eFuse offsets */
+#define MAC_EFUSE_WORD1_ESP32       (EFUSE_RD_REG_BASE_ESP32 + 0x04)    /* 0x3FF5A004 */
+#define MAC_EFUSE_WORD2_ESP32       (EFUSE_RD_REG_BASE_ESP32 + 0x08)    /* 0x3FF5A008 */
+
+/* ESP32-S2 MAC eFuse offset */
+#define MAC_EFUSE_BASE_ESP32S2      (EFUSE_BASE_ESP32S2 + 0x044)        /* 0x3F41A044 */
+
+/* ESP32-S3 MAC eFuse offset */
+#define MAC_EFUSE_BASE_ESP32S3      (EFUSE_BASE_ESP32S3 + 0x044)        /* 0x60007044 */
+
+/* ESP32-C2 MAC eFuse offset (note: +0x040, not +0x044) */
+#define MAC_EFUSE_BASE_ESP32C2      (EFUSE_BASE_ESP32C2 + 0x040)        /* 0x60008840 */
+
+/* ESP32-C3 MAC eFuse offset */
+#define MAC_EFUSE_BASE_ESP32C3      (EFUSE_BASE_ESP32C3 + 0x044)        /* 0x60008844 */
+
+/* ESP32-C6 MAC eFuse offset */
+#define MAC_EFUSE_BASE_ESP32C6      (EFUSE_BASE_ESP32C6 + 0x044)        /* 0x600B0844 */
+
 /* Flash mode constants */
 #define FLASH_MODE_QIO  0
 #define FLASH_MODE_DIO  2

@@ -102,7 +102,14 @@ BOOL CanReconnect(void)
     return IsPortAvailable(g_szPort);
 }
 
-/* Update menu and toolbar button states based on connection status */
+/*
+ * UpdateMenuState - Update menu and toolbar button states
+ *
+ * Enables/disables menu items and toolbar buttons based on
+ * current connection status and device state.
+ *
+ * @hWnd: Main window handle
+ */
 void UpdateMenuState(HWND hWnd)
 {
     HMENU hMenu = GetMenu(hWnd);
@@ -120,7 +127,14 @@ void UpdateMenuState(HWND hWnd)
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_RECONNECT, canReconnect);
 }
 
-/* Update window title: FakeEsptool - [Chip] - [File][*] - [Port] */
+/*
+ * UpdateTitle - Update window title bar
+ *
+ * Format: "FakeEsptool - [Chip] - [File][*] - [Port]"
+ * Shows chip type, filename, modified indicator, and port name.
+ *
+ * @hWnd: Main window handle
+ */
 void UpdateTitle(HWND hWnd)
 {
     WCHAR title[256] = {0};
@@ -164,7 +178,16 @@ void UpdateTitle(HWND hWnd)
     SetWindowTextW(hWnd, title);
 }
 
-/* Update status bar: [Chip] [Flash] [MAC] [Port] [Config] */
+/*
+ * UpdateStatusBar - Update status bar display
+ *
+ * Updates all 5 status bar parts:
+ * 1. Chip type (e.g. "ESP32")
+ * 2. Flash size (e.g. "4MB")
+ * 3. MAC address (e.g. "AA:BB:CC:DD:EE:01")
+ * 4. Port name (e.g. "COM10") or "Disconnected"
+ * 5. Port config (e.g. "115200,8N1")
+ */
 void UpdateStatusBar(void)
 {
     if (!g_hStatusbar)
@@ -245,7 +268,12 @@ void UpdateStatusBar(void)
     }
 }
 
-/* Apply font to RichEdit control */
+/*
+ * ApplyFontToEdit - Apply font to RichEdit control
+ *
+ * @hEdit: Handle to RichEdit control
+ * @plf:   Pointer to LOGFONTW structure with font settings
+ */
 void ApplyFontToEdit(HWND hEdit, LOGFONTW *plf)
 {
     CHARFORMAT2W cf = {0};
@@ -257,7 +285,12 @@ void ApplyFontToEdit(HWND hEdit, LOGFONTW *plf)
     SendMessageW(hEdit, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
 }
 
-/* Initialize default font (try to load from config) */
+/*
+ * InitDefaultFont - Initialize default font settings
+ *
+ * Tries to load font from config file. If not available,
+ * uses Consolas 10pt as default monospace font.
+ */
 void InitDefaultFont(void)
 {
     /* Try to load from config first */
@@ -276,7 +309,14 @@ void InitDefaultFont(void)
     }
 }
 
-/* Handle IDM_NEW_DEVICE command */
+/*
+ * Main_CmdNewDevice - Handle New Device command
+ *
+ * Creates a new default device (ESP32, 40MHz, 4MB).
+ * Prompts to disconnect and save if needed.
+ *
+ * @hWnd: Main window handle
+ */
 void Main_CmdNewDevice(HWND hWnd)
 {
     if (!PromptDisconnectIfNeeded(hWnd))
@@ -299,7 +339,14 @@ void Main_CmdNewDevice(HWND hWnd)
     }
 }
 
-/* Handle IDM_OPEN_DEVICE command */
+/*
+ * Main_CmdOpenDevice - Handle Open Device command
+ *
+ * Shows file open dialog and loads selected .esp file.
+ * Prompts to disconnect and save if needed.
+ *
+ * @hWnd: Main window handle
+ */
 void Main_CmdOpenDevice(HWND hWnd)
 {
     if (!PromptDisconnectIfNeeded(hWnd))
@@ -328,7 +375,17 @@ void Main_CmdOpenDevice(HWND hWnd)
     }
 }
 
-/* Open device file by path (used by command line and drag-drop) */
+/*
+ * Main_OpenDeviceFile - Open device file by path
+ *
+ * Used by command line and drag-drop to open a device file.
+ * Prompts to disconnect and save if needed.
+ *
+ * @hWnd:     Main window handle
+ * @filePath: Path to .esp file
+ *
+ * Returns TRUE on success.
+ */
 BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath)
 {
     if (!PromptDisconnectIfNeeded(hWnd))
@@ -350,7 +407,13 @@ BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath)
     }
 }
 
-/* Handle IDM_SAVE_DEVICE command */
+/*
+ * Main_CmdSaveDevice - Handle Save Device command
+ *
+ * Saves device to current file. If no file, does Save As.
+ *
+ * @hWnd: Main window handle
+ */
 void Main_CmdSaveDevice(HWND hWnd)
 {
     const WCHAR *filename = Device_GetFilename(&g_device);
@@ -364,7 +427,13 @@ void Main_CmdSaveDevice(HWND hWnd)
     }
 }
 
-/* Handle IDM_SAVE_DEVICE_AS command */
+/*
+ * Main_CmdSaveDeviceAs - Handle Save Device As command
+ *
+ * Shows file save dialog and saves device to selected path.
+ *
+ * @hWnd: Main window handle
+ */
 void Main_CmdSaveDeviceAs(HWND hWnd)
 {
     OPENFILENAMEW ofn = {0};
@@ -385,7 +454,13 @@ void Main_CmdSaveDeviceAs(HWND hWnd)
     }
 }
 
-/* Handle IDM_DEVICE_PROPS command */
+/*
+ * Main_CmdDeviceProps - Handle Device Properties command
+ *
+ * Shows device properties dialog. Disallowed when connected.
+ *
+ * @hWnd: Main window handle
+ */
 void Main_CmdDeviceProps(HWND hWnd)
 {
     if (Serial_IsOpen(&g_serial)) {
@@ -398,7 +473,14 @@ void Main_CmdDeviceProps(HWND hWnd)
     }
 }
 
-/* Handle Connect command */
+/*
+ * Main_OnConnect - Handle Connect command
+ *
+ * Shows port selection dialog and opens selected serial port.
+ * Registers esptool protocol callbacks and clears log.
+ *
+ * @hMainWnd: Main window handle
+ */
 void Main_OnConnect(HWND hMainWnd)
 {
     TRACE_FW(TAG, "Main_OnConnect called");
@@ -443,7 +525,14 @@ void Main_OnConnect(HWND hMainWnd)
     TRACE_FW(TAG, "Main_OnConnect completed");
 }
 
-/* Handle Reconnect command - connect to last port directly */
+/*
+ * Main_OnReconnect - Handle Reconnect command
+ *
+ * Connects directly to last used port without showing dialog.
+ * Port must exist and not be already connected.
+ *
+ * @hMainWnd: Main window handle
+ */
 void Main_OnReconnect(HWND hMainWnd)
 {
     TRACE_FW(TAG, "Main_OnReconnect called");
@@ -489,7 +578,13 @@ void Main_OnReconnect(HWND hMainWnd)
     TRACE_FW(TAG, "Main_OnReconnect completed");
 }
 
-/* Handle Disconnect command */
+/*
+ * Main_OnDisconnect - Handle Disconnect command
+ *
+ * Closes serial port and updates UI state.
+ *
+ * @hMainWnd: Main window handle
+ */
 void Main_OnDisconnect(HWND hMainWnd)
 {
     if (!Serial_IsOpen(&g_serial))
@@ -503,7 +598,14 @@ void Main_OnDisconnect(HWND hMainWnd)
     SetFocus(g_hEdit);
 }
 
-/* Handle Flash > Import command */
+/*
+ * Main_OnFlashImport - Handle Flash Import command
+ *
+ * Imports flash data from .bin file. File size must match current flash size.
+ * Disallowed when serial port is connected.
+ *
+ * @hMainWnd: Main window handle
+ */
 void Main_OnFlashImport(HWND hMainWnd)
 {
     if (Serial_IsOpen(&g_serial)) {
@@ -560,7 +662,13 @@ void Main_OnFlashImport(HWND hMainWnd)
     UpdateTitle(hMainWnd);
 }
 
-/* Handle Flash > Export command */
+/*
+ * Main_OnFlashExport - Handle Flash Export command
+ *
+ * Exports flash data to .bin file using snapshot to avoid data corruption.
+ *
+ * @hMainWnd: Main window handle
+ */
 void Main_OnFlashExport(HWND hMainWnd)
 {
     OPENFILENAMEW ofn = {0};
@@ -623,7 +731,12 @@ void Main_OnFlashExport(HWND hMainWnd)
     HeapFree(GetProcessHeap(), 0, flashSnapshot);
 }
 
-/* Device snapshot structure for Dump Device As */
+/*
+ * DEVICE_SNAPSHOT - Device data snapshot for Dump Device As
+ *
+ * Contains copies of device data for background thread processing.
+ * Thread frees this structure when done.
+ */
 typedef struct {
     DEVICE_CTX device;      /* Device header info */
     BYTE *efuse;            /* eFuse data snapshot */
@@ -634,7 +747,16 @@ typedef struct {
     HWND hWnd;              /* Owner window */
 } DEVICE_SNAPSHOT;
 
-/* Dump thread procedure */
+/*
+ * DumpThreadProc - Background thread for device dump
+ *
+ * Writes device data to text file in hex dump format.
+ * Notifies main window via WM_DUMP_COMPLETE when done.
+ *
+ * @lpParam: Pointer to DEVICE_SNAPSHOT structure (freed by thread)
+ *
+ * Returns 0 on success, 1 on failure.
+ */
 static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
 {
     DEVICE_SNAPSHOT *snap = (DEVICE_SNAPSHOT *)lpParam;
@@ -748,7 +870,14 @@ cleanup:
     return ok ? 0 : 1;
 }
 
-/* Handle File > Dump Device As command */
+/*
+ * Main_OnDumpDeviceAs - Handle Dump Device As command
+ *
+ * Exports device data to text file with hex dump format.
+ * Uses background thread to avoid blocking UI.
+ *
+ * @hMainWnd: Main window handle
+ */
 void Main_OnDumpDeviceAs(HWND hMainWnd)
 {
     OPENFILENAMEW ofn = {0};
@@ -835,7 +964,13 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
     CloseHandle(hThread); /* Thread will run independently */
 }
 
-/* Handle Log > Clear command */
+/*
+ * Main_OnLogClear - Handle Log Clear command
+ *
+ * Clears all content from the log display.
+ *
+ * @hMainWnd: Main window handle (unused)
+ */
 void Main_OnLogClear(HWND hMainWnd)
 {
     (void)hMainWnd;
@@ -843,7 +978,14 @@ void Main_OnLogClear(HWND hMainWnd)
         SetWindowTextW(g_hEdit, L"");
 }
 
-/* Handle Log > Font command - show font selection dialog */
+/*
+ * Main_OnLogFont - Handle Log Font command
+ *
+ * Shows font selection dialog. Only monospace fonts are listed.
+ * Saves selected font to config file.
+ *
+ * @hMainWnd: Main window handle
+ */
 void Main_OnLogFont(HWND hMainWnd)
 {
     CHOOSEFONTW cf = {0};
@@ -862,7 +1004,14 @@ void Main_OnLogFont(HWND hMainWnd)
     }
 }
 
-/* Handle Log > Save As command - save log to UTF-8 file */
+/*
+ * Main_OnLogSaveAs - Handle Log Save As command
+ *
+ * Saves log content to UTF-8 text file.
+ * Default filename includes timestamp.
+ *
+ * @hMainWnd: Main window handle
+ */
 void Main_OnLogSaveAs(HWND hMainWnd)
 {
     OPENFILENAMEW ofn = {0};
@@ -917,7 +1066,13 @@ void Main_OnLogSaveAs(HWND hMainWnd)
     CloseHandle(hFile);
 }
 
-/* Handle Exit command with confirmation if connected */
+/*
+ * Main_OnExit - Handle Exit command
+ *
+ * Prompts to disconnect and save if needed, then destroys window.
+ *
+ * @hWnd: Main window handle
+ */
 void Main_OnExit(HWND hWnd)
 {
     if (!PromptDisconnectIfNeeded(hWnd))

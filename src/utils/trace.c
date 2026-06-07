@@ -1,5 +1,8 @@
 /*
  * trace.c - Trace logging utility implementation
+ *
+ * Provides categorized trace logging to a log file.
+ * Log file is created in the same directory as the executable.
  */
 
 #include <wchar.h>
@@ -13,6 +16,12 @@
 static HANDLE g_hTraceFile = INVALID_HANDLE_VALUE;
 static CRITICAL_SECTION g_csTrace;
 
+/*
+ * Trace_Init - Initialize trace logging
+ *
+ * Creates log file and initializes critical section.
+ * Log file path is same as executable with .log extension.
+ */
 void Trace_Init(void)
 {
     InitializeCriticalSection(&g_csTrace);
@@ -36,6 +45,11 @@ void Trace_Init(void)
     }
 }
 
+/*
+ * Trace_Close - Close trace logging
+ *
+ * Closes log file and releases critical section.
+ */
 void Trace_Close(void)
 {
     if (g_hTraceFile != INVALID_HANDLE_VALUE) {
@@ -45,6 +59,16 @@ void Trace_Close(void)
     DeleteCriticalSection(&g_csTrace);
 }
 
+/*
+ * Trace_Write - Write trace message to log file
+ *
+ * Thread-safe function that writes timestamped message with tag.
+ * Format: "HH:MM:SS.mmm [thread_id] [tag] message\r\n"
+ *
+ * @tag: Category tag (e.g. "GUI", "ESP", "SER")
+ * @fmt: printf-style format string
+ * @...: Format arguments
+ */
 void Trace_Write(const char *tag, const char *fmt, ...)
 {
     if (g_hTraceFile == INVALID_HANDLE_VALUE)

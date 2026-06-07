@@ -47,6 +47,13 @@ static const ESP_CMD_INFO commandTable[256] = {
 
 #define ESP_RESP_BUF_SIZE  8192
 
+/* Get command name safely */
+static const char *GetCmdName(BYTE cmd)
+{
+    const char *name = commandTable[cmd].name;
+    return name ? name : "UNKNOWN";
+}
+
 /* SYNC response sequence (36 bytes).
    First 3 bytes (0x07, 0x07, 0x12) are used in Val field.
    The 4th byte (0x20) is NOT used - code uses 0x55 (first padding byte from request).
@@ -216,17 +223,24 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD sta
     }
     pos += data_len;
 
-    BYTE encoded[ESP_RESP_BUF_SIZE * 3];
-    int enc_len = Slip_Encode(resp, pos, encoded, sizeof(encoded));
+    /* SLIP encoding: worst case each byte needs escaping (2 bytes) + 2 frame markers */
+    DWORD encoded_max = (DWORD)pos * 2 + 2;
+    BYTE *encoded = (BYTE *)HeapAlloc(GetProcessHeap(), 0, encoded_max);
+    if (!encoded) {
+        TRACE_FW(TAG, "Failed to allocate encoded buffer (%lu bytes)", encoded_max);
+        return;
+    }
+
+    int enc_len = Slip_Encode(resp, pos, encoded, encoded_max);
     if (enc_len > 0) {
         if (ctx->onWrite) {
             ctx->onWrite(encoded, (DWORD)enc_len);
         }
     }
 
-    const char *cmdName = commandTable[cmd].name;
-    if (!cmdName)
-        cmdName = "UNKNOWN";
+    HeapFree(GetProcessHeap(), 0, encoded);
+
+    const char *cmdName = GetCmdName(cmd);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"[RES] %hs size=%u status=0x%08lX",
                     cmdName, total_data_len, status);
 
@@ -296,7 +310,7 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     ctx->last_read_val = val;
 
     /* Transition to READY state when chip detection register is read */
-    if (addr == 0x40001000 && ctx->state == ESP_STATE_SYNCED) {
+    if (addr == CHIP_DETECT_REG && ctx->state == ESP_STATE_SYNCED) {
         ctx->state = ESP_STATE_READY;
         Serial_PostLog(ctx->hNotify, L"ESP", L"  Chip detected, ready for commands");
     }
@@ -443,6 +457,19 @@ static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 }
 
+/*
+ * HandleFlashDeflBegin - Handle compressed flash write begin command
+ *
+ * FLASH_DEFL_BEGIN (0x10) starts a compressed flash write session.
+ * The command erases the specified flash region and prepares for
+ * receiving compressed data blocks.
+ *
+ * Implementation uses accumulation approach: compressed data is
+ * accumulated in a buffer and decompressed all at once when
+ * FLASH_DEFL_END is received.
+ *
+ * Request format: [uncompressed_size:4][num_blocks:4][block_size:4][offset:4]
+ */
 static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     /* FLASH_DEFL_BEGIN format:
@@ -515,6 +542,17 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
+/*
+ * HandleFlashDeflData - Handle compressed flash data block
+ *
+ * FLASH_DEFL_DATA (0x11) receives a block of compressed data.
+ * Data is accumulated in the deflate buffer for later decompression.
+ *
+ * Request format: [data_len:4][seq:4][padding:4][padding:4][compressed_data:data_len]
+ *
+ * The sequence number must match the expected value, and the checksum
+ * (XOR of payload) is verified before accumulating the data.
+ */
 static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     DWORD data_len = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
@@ -577,6 +615,14 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
+/*
+ * HandleFlashDeflEnd - Handle compressed flash write end command
+ *
+ * FLASH_DEFL_END (0x12) completes a compressed flash write session.
+ * Decompresses all accumulated data and writes it to flash.
+ *
+ * Request format: [reboot:4] (0=don't reboot, 1=reboot)
+ */
 static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     TRACE_PROTO(TAG, "FLASH_DEFL_END");
@@ -600,6 +646,16 @@ static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_END, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
+/*
+ * HandleReadFlash - Handle flash read command (stub-only)
+ *
+ * READ_FLASH (0xD2) reads data from flash memory.
+ * Response includes 2-byte status prefix followed by flash data.
+ *
+ * Request format: [flash_offset:4][read_len:4][block_size:4][packet_size:4]
+ *
+ * Note: Maximum read length is limited to 4094 bytes to fit in response buffer.
+ */
 static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     DWORD addr = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
@@ -629,6 +685,12 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 }
 
+/*
+ * HandleEraseFlash - Handle erase entire flash command (stub-only)
+ *
+ * ERASE_FLASH (0xD0) erases the entire flash memory.
+ * Also frees any pending deflate buffer.
+ */
 static void HandleEraseFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     TRACE_PROTO(TAG, "ERASE_FLASH");
@@ -643,6 +705,14 @@ static void HandleEraseFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_ERASE_FLASH, ctx->last_read_val, ESP_OK, 2, NULL, 2);
 }
 
+/*
+ * HandleEraseBlock - Handle erase flash region command (stub-only)
+ *
+ * ERASE_REGION (0xD1) erases a specified flash region.
+ * Request format: [offset:4][erase_len:4]
+ *
+ * Flash erase is sector-aligned (4KB boundaries).
+ */
 static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     DWORD offset = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
@@ -665,6 +735,17 @@ static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 }
 
+/*
+ * HandleFlashMd5 - Handle flash MD5 calculation command
+ *
+ * SPI_FLASH_MD5 (0x13) calculates MD5 hash of a flash region.
+ *
+ * Request format: [addr:4][len:4][padding:8]
+ *
+ * Response format differs by mode:
+ * - ROM mode:   32-byte ASCII hex MD5 + 2-byte status
+ * - Stub mode:  16-byte binary MD5 + 2-byte status
+ */
 static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     DWORD addr = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
@@ -703,6 +784,18 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 }
 
+/*
+ * HandleFlashBegin - Handle flash write begin command
+ *
+ * FLASH_BEGIN (0x02) starts a flash write session.
+ * Erases the specified flash region and prepares for receiving data blocks.
+ *
+ * Request format (stub): [erase_size:4][num_blocks:4][block_size:4][offset:4]
+ * Request format (ROM):  [erase_size:4][num_blocks:4][block_size:4][offset:4][encrypted:4]
+ *
+ * Note: Does NOT free deflate buffer, as client may send FLASH_BEGIN
+ * before FLASH_DEFL_END in some scenarios.
+ */
 static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     DWORD erase_size = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
@@ -746,6 +839,17 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_BEGIN, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
+/*
+ * HandleFlashData - Handle flash write data block
+ *
+ * FLASH_DATA (0x03) receives a block of uncompressed data to write to flash.
+ *
+ * Request format: [data_len:4][seq:4][padding:4][padding:4][data:data_len]
+ *
+ * Verifies sequence number and checksum before writing to flash.
+ * Flash write uses AND operation to simulate real Flash behavior
+ * (bits can only be cleared, not set).
+ */
 static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     DWORD data_len = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
@@ -790,6 +894,16 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
+/*
+ * HandleFlashEnd - Handle flash write end command
+ *
+ * FLASH_END (0x04) completes a flash write session.
+ * Optionally triggers a soft reboot.
+ *
+ * Request format: [reboot:4] (0=don't reboot, 1=reboot)
+ *
+ * Also frees any pending deflate buffer (mode switch scenario).
+ */
 static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     DWORD reboot = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
@@ -808,6 +922,21 @@ static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_END, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
+/*
+ * HandleGetSecurityInfo - Handle get security info command
+ *
+ * GET_SECURITY_INFO (0x14) returns chip security configuration.
+ * Response format varies by chip type:
+ * - ESP32-S2: 2-byte status + 10 bytes security info = 12 bytes
+ * - ESP32-S3/C3/C6: 2-byte status + 18 bytes security info = 20 bytes
+ *
+ * Security info includes:
+ * - flags: Security feature flags
+ * - flash_crypt_cnt: Flash encryption counter
+ * - key_purposes: Key purpose bytes (7 bytes)
+ * - chip_id: Chip ID (4 bytes, ESP32-S3+)
+ * - api_version: API version (4 bytes, ESP32-S3+)
+ */
 static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     TRACE_PROTO(TAG, "GET_SECURITY_INFO");
@@ -852,6 +981,12 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, sec_data, 20);
 }
 
+/*
+ * HandleSpiAttach - Handle SPI flash attach command
+ *
+ * SPI_ATTACH (0x0D) initializes the SPI flash controller.
+ * In the simulator, this is a no-op that always succeeds.
+ */
 static void HandleSpiAttach(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     TRACE_PROTO(TAG, "SPI_ATTACH");
@@ -862,6 +997,13 @@ static void HandleSpiAttach(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_SPI_ATTACH, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
+/*
+ * HandleRunUserCode - Handle soft reset command (stub-only)
+ *
+ * RUN_USER_CODE (0xD3) triggers a soft reset by jumping to user code.
+ * This is a fire-and-forget command - client does not wait for response.
+ * After sending response, resets protocol state for next connection.
+ */
 static void HandleRunUserCode(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     TRACE_PROTO(TAG, "RUN_USER_CODE");
@@ -874,6 +1016,18 @@ static void HandleRunUserCode(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_ResetState(ctx);
 }
 
+/*
+ * Esptool_ProcessFrame - Process a complete SLIP frame
+ *
+ * Parses the frame into an ESP_PACKET, validates direction (must be request),
+ * checks protocol state, and dispatches to the appropriate command handler.
+ *
+ * @ctx:       Pointer to esptool context
+ * @frame:     Pointer to decoded SLIP frame data
+ * @frame_len: Length of frame data in bytes
+ *
+ * Returns TRUE if frame was processed successfully, FALSE on error.
+ */
 BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
 {
     ESP_PACKET *pkt = &ctx->pkt;
@@ -886,9 +1040,7 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
     }
 
     /* Get command name */
-    const char *cmdName = commandTable[pkt->command].name;
-    if (!cmdName)
-        cmdName = "UNKNOWN";
+    const char *cmdName = GetCmdName(pkt->command);
 
     /* Get direction string */
     const WCHAR *dirStr = (pkt->direction == ESP_DIR_REQUEST) ? L"REQ" : L"RES";

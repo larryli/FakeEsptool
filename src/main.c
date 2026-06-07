@@ -50,7 +50,16 @@ static const DWORD  esp32_flash_sizes[] = { 1024*1024, 2*1024*1024, 4*1024*1024,
 #define ESP32_FLASH_COUNT 8
 #define ESP32_FLASH_DEFAULT 2  /* 4MB */
 
-/* Populate flash size combo box based on chip selection */
+/*
+ * PopulateFlashSizes - Populate flash size combo box
+ *
+ * Fills the combo box with flash size options based on chip type.
+ * ESP8266 has different size options than ESP32 family.
+ *
+ * @hFlash:     Handle to combo box control
+ * @chip:       Chip type enum
+ * @currentSize: Current flash size to select
+ */
 void PopulateFlashSizes(HWND hFlash, CHIP_TYPE chip, DWORD currentSize)
 {
     SendMessageW(hFlash, CB_RESETCONTENT, 0, 0);
@@ -70,7 +79,16 @@ void PopulateFlashSizes(HWND hFlash, CHIP_TYPE chip, DWORD currentSize)
     SendMessageW(hFlash, CB_SETCURSEL, selectIdx, 0);
 }
 
-/* Get flash size from combo box selection */
+/*
+ * GetFlashSizeFromCombo - Get flash size from combo box selection
+ *
+ * Returns the flash size in bytes based on current combo box selection.
+ *
+ * @hFlash: Handle to combo box control
+ * @chip:   Chip type enum (determines size table)
+ *
+ * Returns flash size in bytes.
+ */
 DWORD GetFlashSizeFromCombo(HWND hFlash, CHIP_TYPE chip)
 {
     int sel = (int)SendMessageW(hFlash, CB_GETCURSEL, 0, 0);
@@ -229,7 +247,12 @@ void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
     }
 }
 
-/* Main window procedure */
+/*
+ * MainWndProc - Main window procedure
+ *
+ * Handles all window messages for the application main window.
+ * Dispatches messages to specific handler functions.
+ */
 static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg) {
@@ -775,7 +798,16 @@ static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Initialize GUI: register window class, init common controls */
+/*
+ * Main_Init - Initialize GUI subsystem
+ *
+ * Registers window class, initializes common controls, and sets up
+ * esptool protocol callbacks.
+ *
+ * @hInstance: Application instance handle
+ *
+ * Returns TRUE on success.
+ */
 static BOOL Main_Init(HINSTANCE hInstance)
 {
     INITCOMMONCONTROLSEX icex = { .dwSize = sizeof(icex), .dwICC = ICC_BAR_CLASSES };
@@ -800,7 +832,15 @@ static BOOL Main_Init(HINSTANCE hInstance)
     return TRUE;
 }
 
-/* Create and show the main application window */
+/*
+ * Main_CreateWindow - Create and show main application window
+ *
+ * Creates the main window with menu and shows it.
+ *
+ * @hInstance: Application instance handle
+ *
+ * Returns window handle, or NULL on failure.
+ */
 static HWND Main_CreateWindow(HINSTANCE hInstance)
 {
     HMENU hMenu = LoadMenuW(hInstance, MAKEINTRESOURCEW(IDR_MAIN_MENU));
@@ -821,7 +861,19 @@ static HWND Main_CreateWindow(HINSTANCE hInstance)
     return hWnd;
 }
 
-/* Application entry point */
+/*
+ * wWinMain - Application entry point
+ *
+ * Initializes the application, handles single instance check,
+ * parses command line, creates main window, and runs message loop.
+ *
+ * @hInstance:     Current instance handle
+ * @hPrevInstance: Previous instance handle (unused)
+ * @lpCmdLine:     Command line string
+ * @nCmdShow:      Window show state (unused)
+ *
+ * Returns exit code from message loop.
+ */
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
     (void)hPrevInstance;

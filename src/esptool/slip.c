@@ -11,6 +11,11 @@
 static const char *TAG = "SLIP";
 #endif
 
+/*
+ * Slip_Init - Initialize SLIP decoder
+ *
+ * Resets decoder state for receiving a new frame.
+ */
 void Slip_Init(SLIP_CTX *ctx)
 {
     ctx->len = 0;
@@ -18,6 +23,17 @@ void Slip_Init(SLIP_CTX *ctx)
     ctx->escaped = FALSE;
 }
 
+/*
+ * Slip_PutByte - Feed a byte to the decoder
+ *
+ * Processes one byte of SLIP-encoded data. Handles frame delimiters (0xC0)
+ * and escape sequences (0xDB 0xDC, 0xDB 0xDD).
+ *
+ * @ctx: Pointer to SLIP context
+ * @b:   Byte to process
+ *
+ * Returns TRUE when a complete frame has been received.
+ */
 BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b)
 {
     if (b == SLIP_END) {
@@ -70,21 +86,41 @@ BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b)
     return FALSE;
 }
 
+/*
+ * Slip_IsComplete - Check if a complete frame has been received
+ *
+ * Returns TRUE if decoder has a complete frame ready for processing.
+ */
 BOOL Slip_IsComplete(const SLIP_CTX *ctx)
 {
     return !ctx->in_frame && ctx->len > 0;
 }
 
+/*
+ * Slip_GetPayload - Get pointer to decoded frame payload
+ *
+ * Returns pointer to internal buffer containing decoded frame data.
+ */
 const BYTE *Slip_GetPayload(const SLIP_CTX *ctx)
 {
     return ctx->buf;
 }
 
+/*
+ * Slip_GetLength - Get decoded frame length
+ *
+ * Returns length of decoded frame data in bytes.
+ */
 int Slip_GetLength(const SLIP_CTX *ctx)
 {
     return ctx->len;
 }
 
+/*
+ * Slip_Reset - Reset decoder state
+ *
+ * Prepares decoder for receiving the next frame.
+ */
 void Slip_Reset(SLIP_CTX *ctx)
 {
     ctx->len = 0;
@@ -92,6 +128,18 @@ void Slip_Reset(SLIP_CTX *ctx)
     ctx->escaped = FALSE;
 }
 
+/*
+ * Slip_Encode - Encode data into SLIP frame
+ *
+ * Wraps data with SLIP frame delimiters and escapes special bytes.
+ *
+ * @data:    Pointer to data to encode
+ * @len:     Length of data in bytes
+ * @out:     Output buffer for encoded frame
+ * @out_max: Size of output buffer
+ *
+ * Returns encoded frame length, or 0 on error (buffer too small).
+ */
 int Slip_Encode(const BYTE *data, int len, BYTE *out, int out_max)
 {
     int pos = 0;

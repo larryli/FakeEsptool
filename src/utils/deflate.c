@@ -43,7 +43,17 @@ static const BYTE deflate_cl_order[19] = {
     16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15
 };
 
-/* Read bits from bit buffer */
+/*
+ * deflate_read_bits - Read bits from bit buffer
+ *
+ * Reads up to 32 bits from the input bit buffer. Refills buffer
+ * from input stream as needed.
+ *
+ * @ctx:   Pointer to decompressor context
+ * @count: Number of bits to read (1-32)
+ *
+ * Returns bits read, or -1 on end of input.
+ */
 static int deflate_read_bits(DEFLATE_CTX *ctx, int count)
 {
     int value = 0;
@@ -71,7 +81,18 @@ static int deflate_read_bits(DEFLATE_CTX *ctx, int count)
     return value;
 }
 
-/* Build Huffman code from code lengths */
+/*
+ * deflate_build_huffman - Build Huffman code table from code lengths
+ *
+ * Constructs a Huffman code table from an array of code lengths.
+ * Used to build literal/length and distance code tables for DEFLATE.
+ *
+ * @huff:    Pointer to Huffman code structure to initialize
+ * @lengths: Array of code lengths (0 = unused symbol)
+ * @count:   Number of symbols in lengths array
+ *
+ * Returns DEFLATE_OK on success, DEFLATE_NO_MEMORY on allocation failure.
+ */
 static int deflate_build_huffman(DEFLATE_HUFF *huff, const BYTE *lengths, int count)
 {
     int i;
@@ -143,7 +164,11 @@ static int deflate_build_huffman(DEFLATE_HUFF *huff, const BYTE *lengths, int co
     return DEFLATE_OK;
 }
 
-/* Free Huffman code */
+/*
+ * deflate_free_huffman - Free Huffman code resources
+ *
+ * Releases memory allocated for Huffman code table.
+ */
 static void deflate_free_huffman(DEFLATE_HUFF *huff)
 {
     if (huff->counts) {
@@ -157,7 +182,17 @@ static void deflate_free_huffman(DEFLATE_HUFF *huff)
     huff->max_length = 0;
 }
 
-/* Decode a Huffman code */
+/*
+ * deflate_decode_huffman - Decode a Huffman code from input stream
+ *
+ * Reads bits one at a time and looks up the corresponding symbol
+ * in the Huffman code table.
+ *
+ * @ctx:  Pointer to decompressor context
+ * @huff: Pointer to Huffman code table
+ *
+ * Returns decoded symbol, or -1 on error.
+ */
 static int deflate_decode_huffman(DEFLATE_CTX *ctx, const DEFLATE_HUFF *huff)
 {
     int code = 0;
@@ -183,7 +218,16 @@ static int deflate_decode_huffman(DEFLATE_CTX *ctx, const DEFLATE_HUFF *huff)
     return -1;
 }
 
-/* Decode a dynamic Huffman block */
+/*
+ * deflate_decode_dynamic - Decode a dynamic Huffman block
+ *
+ * Reads Huffman code tables from the input stream and then decodes
+ * the compressed data using those tables.
+ *
+ * @ctx: Pointer to decompressor context
+ *
+ * Returns DEFLATE_OK on success, or negative error code.
+ */
 static int deflate_decode_dynamic(DEFLATE_CTX *ctx)
 {
     int hlit, hdist, hclen;
@@ -468,7 +512,19 @@ static int deflate_process_block(DEFLATE_CTX *ctx)
     return bfinal ? DEFLATE_OK : 1;  /* Return 1 if not final block */
 }
 
-/* Decompress DEFLATE data */
+/*
+ * deflate_decompress - Decompress DEFLATE data
+ *
+ * Main decompression function. Processes all blocks in the input stream
+ * until a final block is encountered.
+ *
+ * @ctx: Pointer to initialized decompressor context
+ *
+ * Returns DEFLATE_OK on success, or negative error code:
+ *   DEFLATE_ERROR     - Output buffer overflow
+ *   DEFLATE_BAD_INPUT - Invalid compressed data
+ *   DEFLATE_NO_MEMORY - Memory allocation failure
+ */
 int deflate_decompress(DEFLATE_CTX *ctx)
 {
     int ret;
@@ -483,7 +539,18 @@ int deflate_decompress(DEFLATE_CTX *ctx)
     return DEFLATE_OK;
 }
 
-/* Initialize decompressor context */
+/*
+ * deflate_init - Initialize decompressor context
+ *
+ * Sets up the decompressor for processing compressed data.
+ * Automatically detects and skips zlib header if present.
+ *
+ * @ctx:     Pointer to context to initialize
+ * @in_buf:  Input buffer with compressed data
+ * @in_len:  Length of input data in bytes
+ * @out_buf: Output buffer for decompressed data
+ * @out_len: Size of output buffer in bytes
+ */
 void deflate_init(DEFLATE_CTX *ctx, const BYTE *in_buf, size_t in_len,
                   BYTE *out_buf, size_t out_len)
 {

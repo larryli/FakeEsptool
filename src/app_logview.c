@@ -2,6 +2,10 @@
  * app_logview.c - Log display functions
  *
  * Provides colored log display in RichEdit control.
+ * Supports three types of log entries:
+ * - RX/TX data: Hex dump with timestamp and direction
+ * - Custom text: Protocol messages with tag
+ * - Signal/Config: System events with colored tags
  */
 
 #include "app_logview.h"
@@ -9,7 +13,12 @@
 #include <richedit.h>
 #include <stdio.h>
 
-/* Helper: Set text color for selection */
+/*
+ * SetEditColor - Set text color for current selection
+ *
+ * @hEdit: Handle to RichEdit control
+ * @color: RGB color value
+ */
 static void SetEditColor(HWND hEdit, COLORREF color)
 {
     CHARFORMAT2W cf = {0};
@@ -19,7 +28,16 @@ static void SetEditColor(HWND hEdit, COLORREF color)
     SendMessageW(hEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
 }
 
-/* Helper: Append colored text to RichEdit */
+/*
+ * AppendColoredText - Append colored text to RichEdit control
+ *
+ * Moves caret to end, sets color, and appends text.
+ *
+ * @hEdit: Handle to RichEdit control
+ * @text:  Text to append
+ * @len:   Text length in characters
+ * @color: RGB color value
+ */
 static void AppendColoredText(HWND hEdit, const WCHAR *text, int len, COLORREF color)
 {
     int textLen = GetWindowTextLengthW(hEdit);
@@ -28,7 +46,21 @@ static void AppendColoredText(HWND hEdit, const WCHAR *text, int len, COLORREF c
     SendMessageW(hEdit, EM_REPLACESEL, FALSE, (LPARAM)text);
 }
 
-/* Format and append data to log display with colors */
+/*
+ * Main_AppendLog - Format and append RX/TX data to log display
+ *
+ * Formats binary data as hex dump with timestamp and direction indicator.
+ * Display format:
+ *   2026-06-07 14:30:25.123 [RX] C0 00 08 00 ...
+ *   2026-06-07 14:30:25.124 [TX] C0 01 08 00 ...
+ *
+ * Hex grouping: 8 bytes per group, 16 bytes per line
+ *
+ * @hMainWnd: Main window handle (unused)
+ * @data:     Pointer to data bytes
+ * @len:      Number of bytes
+ * @dir:      Direction (DIR_RX or DIR_TX)
+ */
 void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
 {
     (void)hMainWnd;
@@ -90,7 +122,17 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
     HeapFree(GetProcessHeap(), 0, hexLine);
 }
 
-/* Format and append custom text to log display */
+/*
+ * Main_AppendCustomLog - Format and append custom text to log display
+ *
+ * Displays protocol messages with tag in orange color.
+ * Display format:
+ *   2026-06-07 14:30:25.123 [ESP] Sync handshake
+ *
+ * @hMainWnd: Main window handle (unused)
+ * @tag:      Tag text (e.g. "ESP", "SER")
+ * @text:     Message text
+ */
 void Main_AppendCustomLog(HWND hMainWnd, const WCHAR *tag, const WCHAR *text)
 {
     (void)hMainWnd;
@@ -124,7 +166,18 @@ void Main_AppendCustomLog(HWND hMainWnd, const WCHAR *tag, const WCHAR *text)
     SendMessageW(g_hEdit, EM_SCROLLCARET, 0, 0);
 }
 
-/* Format and append signal/config log with distinct colors */
+/*
+ * Main_AppendSignalLog - Format and append signal/config log
+ *
+ * Displays system events (signal changes, config updates) with colored tag.
+ * Display format:
+ *   2026-06-07 14:30:25.123 [SIG] DSR:ON CTS:OFF
+ *   2026-06-07 14:30:25.124 [CFG] 115200,8N1
+ *
+ * @tag:      Tag text (e.g. "SIG", "CFG")
+ * @text:     Event text
+ * @tagColor: RGB color for tag
+ */
 void Main_AppendSignalLog(const WCHAR *tag, const WCHAR *text, COLORREF tagColor)
 {
     if (!g_hEdit || !tag || !text)

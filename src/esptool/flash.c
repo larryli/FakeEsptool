@@ -15,6 +15,16 @@
 static const char *TAG = "FLASH";
 #endif
 
+/*
+ * Flash_Init - Initialize flash storage
+ *
+ * Allocates memory for flash data and initializes to erased state (0xFF).
+ *
+ * @ctx:  Pointer to flash context
+ * @size: Flash size in bytes
+ *
+ * Returns TRUE on success, FALSE on failure (invalid size or memory error).
+ */
 BOOL Flash_Init(FLASH_CTX *ctx, DWORD size)
 {
     if (size == 0)
@@ -33,6 +43,11 @@ BOOL Flash_Init(FLASH_CTX *ctx, DWORD size)
     return TRUE;
 }
 
+/*
+ * Flash_Close - Release flash resources
+ *
+ * Frees the flash data buffer. Safe to call multiple times.
+ */
 void Flash_Close(FLASH_CTX *ctx)
 {
     if (ctx->data) {
@@ -41,6 +56,16 @@ void Flash_Close(FLASH_CTX *ctx)
     }
 }
 
+/*
+ * Flash_Read - Read data from flash
+ *
+ * @ctx:  Pointer to flash context (const, read-only)
+ * @addr: Start address in flash
+ * @buf:  Buffer to receive data
+ * @len:  Number of bytes to read
+ *
+ * Returns TRUE on success, FALSE if address range is invalid.
+ */
 BOOL Flash_Read(const FLASH_CTX *ctx, DWORD addr, BYTE *buf, DWORD len)
 {
     if (!ctx->data || addr + len > ctx->size)
@@ -50,6 +75,20 @@ BOOL Flash_Read(const FLASH_CTX *ctx, DWORD addr, BYTE *buf, DWORD len)
     return TRUE;
 }
 
+/*
+ * Flash_Write - Write data to flash (AND operation)
+ *
+ * Simulates real Flash behavior: bits can only be changed from 1 to 0,
+ * never from 0 to 1. To set bits back to 1, the sector must be erased.
+ * Implementation: flash[i] &= data[i]
+ *
+ * @ctx:  Pointer to flash context
+ * @addr: Start address in flash
+ * @data: Data to write
+ * @len:  Number of bytes to write
+ *
+ * Returns TRUE on success, FALSE if address range is invalid.
+ */
 BOOL Flash_Write(FLASH_CTX *ctx, DWORD addr, const BYTE *data, DWORD len)
 {
     if (!ctx->data || addr + len > ctx->size)
@@ -61,6 +100,18 @@ BOOL Flash_Write(FLASH_CTX *ctx, DWORD addr, const BYTE *data, DWORD len)
     return TRUE;
 }
 
+/*
+ * Flash_Erase - Erase flash region
+ *
+ * Erases a flash region by setting all bytes to 0xFF.
+ * Erase operations are sector-aligned (4KB boundaries).
+ *
+ * @ctx: Pointer to flash context
+ * @addr: Start address (will be aligned to sector boundary)
+ * @len:  Number of bytes to erase (will be rounded up to sector boundary)
+ *
+ * Returns TRUE on success, FALSE if parameters are invalid.
+ */
 BOOL Flash_Erase(FLASH_CTX *ctx, DWORD addr, DWORD len)
 {
     if (!ctx->data || len == 0 || addr >= ctx->size)
@@ -84,6 +135,11 @@ BOOL Flash_Erase(FLASH_CTX *ctx, DWORD addr, DWORD len)
     return TRUE;
 }
 
+/*
+ * Flash_EraseAll - Erase entire flash
+ *
+ * Sets all flash bytes to 0xFF.
+ */
 BOOL Flash_EraseAll(FLASH_CTX *ctx)
 {
     if (!ctx->data)
@@ -93,6 +149,16 @@ BOOL Flash_EraseAll(FLASH_CTX *ctx)
     return TRUE;
 }
 
+/*
+ * Flash_CalcMd5 - Calculate MD5 hash of flash region
+ *
+ * Uses Windows CryptoAPI to calculate MD5 hash.
+ *
+ * @ctx:  Pointer to flash context (const, read-only)
+ * @addr: Start address in flash
+ * @len:  Number of bytes to hash
+ * @md5:  Buffer to receive 16-byte MD5 hash
+ */
 void Flash_CalcMd5(const FLASH_CTX *ctx, DWORD addr, DWORD len, BYTE md5[16])
 {
     HCRYPTPROV hProv = 0;

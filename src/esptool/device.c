@@ -12,6 +12,19 @@
 static const char *TAG = "DEV";
 #endif
 
+/*
+ * Device_Init - Initialize new device
+ *
+ * Creates a new device with specified chip type, flash size, and MAC address.
+ * Allocates memory for chip eFuse and flash storage.
+ *
+ * @ctx:       Pointer to device context
+ * @chipType:  Chip type enum (CHIP_ESP8266, CHIP_ESP32, etc.)
+ * @flashSize: Flash size in bytes
+ * @mac:       6-byte MAC address (can be NULL for default)
+ *
+ * Returns TRUE on success, FALSE on failure.
+ */
 BOOL Device_Init(DEVICE_CTX *ctx, CHIP_TYPE chipType, DWORD flashSize, const BYTE mac[6])
 {
     memset(ctx, 0, sizeof(DEVICE_CTX));
@@ -35,6 +48,11 @@ BOOL Device_Init(DEVICE_CTX *ctx, CHIP_TYPE chipType, DWORD flashSize, const BYT
     return TRUE;
 }
 
+/*
+ * Device_Close - Release device resources
+ *
+ * Frees flash and chip resources. Safe to call multiple times.
+ */
 void Device_Close(DEVICE_CTX *ctx)
 {
     Flash_Close(&ctx->flash);
@@ -43,6 +61,17 @@ void Device_Close(DEVICE_CTX *ctx)
     ctx->modified = FALSE;
 }
 
+/*
+ * Device_Save - Save device to .esp file
+ *
+ * Writes device configuration and data to binary file.
+ * File format: header + MAC + flash config + eFuse + flash data.
+ *
+ * @ctx:      Pointer to device context
+ * @filename: Path to save file
+ *
+ * Returns TRUE on success, FALSE on failure.
+ */
 BOOL Device_Save(DEVICE_CTX *ctx, const WCHAR *filename)
 {
     HANDLE hFile = CreateFileW(filename, GENERIC_WRITE, 0, NULL,
@@ -107,6 +136,17 @@ BOOL Device_Save(DEVICE_CTX *ctx, const WCHAR *filename)
     return TRUE;
 }
 
+/*
+ * Device_Load - Load device from .esp file
+ *
+ * Reads device configuration and data from binary file.
+ * Validates file magic, version, and chip type.
+ *
+ * @ctx:      Pointer to device context
+ * @filename: Path to load file
+ *
+ * Returns TRUE on success, FALSE on failure.
+ */
 BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
 {
     HANDLE hFile = CreateFileW(filename, GENERIC_READ, 0, NULL,
@@ -222,16 +262,32 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     return TRUE;
 }
 
+/*
+ * Device_IsModified - Check if device data has been modified
+ *
+ * Returns TRUE if device has unsaved changes.
+ */
 BOOL Device_IsModified(const DEVICE_CTX *ctx)
 {
     return ctx->modified;
 }
 
+/*
+ * Device_SetModified - Set or clear modification flag
+ *
+ * @ctx:      Pointer to device context
+ * @modified: TRUE to mark as modified, FALSE to clear
+ */
 void Device_SetModified(DEVICE_CTX *ctx, BOOL modified)
 {
     ctx->modified = modified;
 }
 
+/*
+ * Device_GetFilename - Get current file path
+ *
+ * Returns pointer to file path string, or empty string if no file.
+ */
 const WCHAR *Device_GetFilename(const DEVICE_CTX *ctx)
 {
     return ctx->filename;
