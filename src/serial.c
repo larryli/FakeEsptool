@@ -186,8 +186,10 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
                 break;
             }
 
-            if (comStat.cbInQue > 0 && comStat.cbInQue < READ_BUFFER_SIZE) {
+            if (comStat.cbInQue > 0) {
                 DWORD toRead = comStat.cbInQue;
+                if (toRead > READ_BUFFER_SIZE)
+                    toRead = READ_BUFFER_SIZE;
                 OVERLAPPED ovRead = {0};
                 ovRead.hEvent = hReadEvent;
                 ResetEvent(hReadEvent);
@@ -479,6 +481,9 @@ DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotif
 
     if (result && bytesWritten > 0) {
         ctx->dwTxBytes += bytesWritten;
+    } else {
+        Serial_PostLogF(hNotify, L"TX!", L"WriteFile failed: result=%d err=%lu written=%lu/%lu",
+                        result, GetLastError(), bytesWritten, len);
     }
 
     return bytesWritten;

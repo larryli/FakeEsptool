@@ -869,3 +869,23 @@ FLASH_DEFL_END → 解压 → 写入 flash → 释放缓冲区
 - 如果超时成为问题，可考虑在 `FLASH_DEFL_END` 时就处理（但 ROM 模式不发 END）
 
 **开发建议：** 实现后使用 Python esptool 的 ROM 模式进行多文件烧录测试，验证是否超时。
+
+---
+
+### ~~esptool Python stub 模式多文件烧录第二个大文件失败~~ (已修复)
+
+**现象：** `esptool write_flash` 使用 stub 模式烧录多个文件时，第一个文件成功，第二个大文件（如 107744 字节）写入失败，esptool 报 "Lost connection, retrying..."。`esptool --no-stub`、esptool-js、web-esptool 均正常。
+
+**原因：** 两个 Bug：
+
+1. **`Listener_Proc` 中 `cbInQue < READ_BUFFER_SIZE` 条件过严**：当 com0com 缓冲区数据量 >= 16384 字节时，listener 线程不读取数据。esptool stub 模式的 `FLASH_DEFL_DATA` 包经 SLIP 编码后约 16500 字节，超过此阈值后数据堆积在 com0com 缓冲区，导致 esptool 客户端写入超时。
+
+2. **`OnDeviceModified` 跨线程同步调用阻塞 listener 线程**：`UpdateTitle` 内部调用 `SetWindowTextW`（通过 `SendMessage`），当 UI 线程忙于处理 `WM_SERIAL_LOG` 消息时，listener 线程被阻塞数百毫秒，无法及时读取串口数据。
+
+**修复：**
+1. `serial.c` `Listener_Proc`：移除 `cbInQue < READ_BUFFER_SIZE` 条件，改为 `min(cbInQue, READ_BUFFER_SIZE)` 安全截断读取
+2. `main.c` `OnDeviceModified`：将 `UpdateTitle(g_hWnd)` 改为 `PostMessage(g_hWnd, WM_UPDATE_TITLE, 0, 0)`，避免阻塞 listener 线程
+3. `main.h`：添加 `WM_UPDATE_TITLE` 消息定义
+4. `main.c` `MainWndProc`：添加 `WM_UPDATE_TITLE` 处理
+
+**状态：** 已修复。
