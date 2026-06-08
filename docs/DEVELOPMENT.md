@@ -457,7 +457,7 @@ if (ret == DEFLATE_OK) {
 **Listener 线程注意事项：**
 - `Listener_Proc` 中不要使用过严的读取条件（如 `cbInQue < READ_BUFFER_SIZE`），应使用 `min(cbInQue, READ_BUFFER_SIZE)` 安全截断
 - 避免在 listener 线程中同步调用 UI 函数（如 `SetWindowTextW`），应使用 `PostMessage` 异步通知
-- stub 模式的 `FLASH_DEFL_DATA` 包经 SLIP 编码后约 16500 字节，需确保缓冲区足够
+- stub 模式的 `FLASH_DEFL_DATA` 包经 SLIP 编码后约 16500 字节，`READ_BUFFER_SIZE` (32KB) 足以一次读取
 
 ## 实现说明
 

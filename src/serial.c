@@ -21,7 +21,7 @@
 static const char *TAG = "SER";
 #endif
 
-#define READ_BUFFER_SIZE 16384
+#define READ_BUFFER_SIZE 32768
 #define MAX_PORTS 64
 
 /* Port info structure for friendly name display */
