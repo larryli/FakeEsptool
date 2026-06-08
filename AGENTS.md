@@ -1,14 +1,14 @@
 烧录器端参考代码库：
 
-1、相对项目根目录 ../esptool/esptool/ 对应 https://github.com/espressif/esptool 代码库
+1、目录 esptool/ 对应 https://github.com/espressif/esptool 代码库
 
-2、相对项目根目录 ../esptool/esptool-js/ 对应 https://github.com/espressif/esptool-js 代码库
+2、目录 esptool-js/ 对应 https://github.com/espressif/esptool-js 代码库
 
-3、相对项目根目录 ../esptool/web-esptool/ 对应 https://github.com/xingrz/web-esptool 代码库
+3、目录 web-esptool/ 对应 https://github.com/xingrz/web-esptool 代码库
 
 协议解码器参考代码库：
 
-1、相对项目根目录 ../esptool/sigrok-esp32-programmer-decoder/ 对应 https://github.com/ruediste/sigrok-esp32-programmer-decoder 代码库
+1、目录 sigrok-esp32-programmer-decoder/ 对应 https://github.com/ruediste/sigrok-esp32-programmer-decoder 代码库
 
 构建环境：
 
@@ -34,4 +34,4 @@
 
 2、代码修改完成后自动构建验证修改。修改无误，结束对话前自动运行最后构建的程序。仅修改文档不需要自动构建。
 
-3、除了 esptool/esptool-js 官方烧录器代码实现，其他代码不一定准确。
+3、除了 esptool 官方代码实现，其他代码不一定准确。

@@ -52,3 +52,12 @@ Thumbs.db
 # Binary and text files (optional, uncomment to ignore)
 *.bin
 *.txt
+
+# esptool code reference
+esptool/
+esptool-js/
+web-esptool/
+sigrok-esp32-programmer-decoder/
+
+# test data
+test-data/
