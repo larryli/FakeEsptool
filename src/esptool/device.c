@@ -34,6 +34,8 @@ BOOL Device_Init(DEVICE_CTX *ctx, CHIP_TYPE chipType, DWORD flashSize, const BYT
         return FALSE;
     }
 
+    Chip_SetFlashSize(&ctx->chip, flashSize);
+
     if (mac)
         Chip_SetMac(&ctx->chip, mac);
 
@@ -207,6 +209,7 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
         CloseHandle(hFile);
         return FALSE;
     }
+    Chip_SetFlashSize(&ctx->chip, flashSize);
     Chip_SetMac(&ctx->chip, mac);
     ctx->chip.xtal_freq = xtalFreq;
 
