@@ -141,6 +141,14 @@ cmake --build build
 | CHIP_ESP32C3 | ESP32-C3 |
 | CHIP_ESP32C6 | ESP32-C6 |
 
+**eFuse 初始化注意事项：**
+- 新增芯片时必须在初始化函数中设置默认芯片版本到 eFuse，否则 esptool 可能禁用 stub flasher
+- 各芯片 eFuse 版本字节位置：
+  - ESP32-C2：byte 0x46 = 0x10（major=1, minor=0）
+  - ESP32-S2：byte 0x52 = 0x10（major=1）
+  - ESP32-S3：byte 0x5A = 0x01（major=1）
+  - ESP32-C3/C6：byte 0x52 = 0x04（major=1）
+
 ## 使用示例
 
 ```c
@@ -446,6 +454,11 @@ if (ret == DEFLATE_OK) {
 | `Serial_PostLog(hNotify, tag, text)` | 发送日志 |
 | `Serial_PostLogF(hNotify, tag, fmt, ...)` | 格式化日志 |
 
+**Listener 线程注意事项：**
+- `Listener_Proc` 中不要使用过严的读取条件（如 `cbInQue < READ_BUFFER_SIZE`），应使用 `min(cbInQue, READ_BUFFER_SIZE)` 安全截断
+- 避免在 listener 线程中同步调用 UI 函数（如 `SetWindowTextW`），应使用 `PostMessage` 异步通知
+- stub 模式的 `FLASH_DEFL_DATA` 包经 SLIP 编码后约 16500 字节，需确保缓冲区足够
+
 ## 实现说明
 
 ### 单实例模式
@@ -666,6 +679,16 @@ esptool.py --port COM10 write_flash 0 firmware.bin
 esptool.py --port COM10 erase_flash
 ```
 
+### 注意事项
+
+**GET_SECURITY_INFO 响应格式：**
+- 响应 Data 字段中 status 字节必须放在**末尾**，不能放在开头
+- `chip_id` 必须使用 IMAGE_CHIP_ID（如 `13`），不能使用 magic value（如 `0x2CE0806F`）
+- 不同芯片支持情况不同：
+  - ESP8266/ESP32：不支持，应返回 `ROM_INVALID_RECV_MSG` 错误
+  - ESP32-S2：返回 14 字节响应（无 chip_id）
+  - ESP32-S3/C2/C3/C6：返回 22 字节响应 `[payload:20][status:2]`，包含 IMAGE_CHIP_ID
+
 ### 烧录验证工具
 
 **位置**：`tools/verify_flash.py`
@@ -730,56 +753,6 @@ All flash segments verified successfully.
 **返回值**：
 - `0`：所有烧录段验证通过
 - `1`：存在验证失败的烧录段
-
----
-
-## 已知问题
-
-### ~~GET_SECURITY_INFO 响应格式错误导致芯片检测失败~~ (已修复)
-
-**现象：** `esptool.py flash-id` 命令检测 ESP32-S3/C2/C3/C6 失败，报错 `Unexpected chip magic value`。
-
-**原因：** 三个 Bug：
-1. `GET_SECURITY_INFO` 响应 Data 字段中 status 字节放在了**开头**，应放在**末尾**。
-2. `GET_SECURITY_INFO` 返回的 `chip_id` 使用了 magic value（如 `0x2CE0806F`），应使用 IMAGE_CHIP_ID（如 `13`）。
-3. ESP8266/ESP32 不支持 `GET_SECURITY_INFO`，应返回错误；ESP32-S2 返回的响应应无 chip_id。FakeEsptool 对所有芯片统一返回了带 chip_id 的 22 字节响应。
-
-**修复：**
-1. `CHIP_CTX` 新增 `security_chip_id` 字段（IMAGE_CHIP_ID），与 `chip_id`（magic value）分离。
-2. `HandleGetSecurityInfo` 按芯片类型分别处理：
-   - ESP8266/ESP32：返回 `ROM_INVALID_RECV_MSG` 错误，触发 magic value 回退
-   - ESP32-S2：返回 14 字节响应（无 chip_id），触发 magic value 回退
-   - ESP32-S3/C2/C3/C6：返回 22 字节响应 `[payload:20][status:2]`，包含 IMAGE_CHIP_ID
-
-**状态：** 已修复。
-
----
-
-### ~~ESP32-C2 芯片版本为 0 导致 Stub Flasher 被禁用~~ (已修复)
-
-**现象：** ESP32-C2 检测成功，但 esptool 输出警告 `Stub flasher has been disabled for compatibility`。
-
-**原因：** eFuse 数据初始化为全零，芯片版本（chip revision）读取为 0。esptool 对 ESP32-C2 ECO0（revision 0）禁用 stub flasher。
-
-**修复：** 在各芯片初始化函数中设置默认芯片版本到 eFuse：
-- ESP32-C2：byte 0x46 = 0x10（major=1, minor=0）
-- ESP32-S2：byte 0x52 = 0x10（major=1）
-- ESP32-S3：byte 0x5A = 0x01（major=1）
-- ESP32-C3/C6：byte 0x52 = 0x04（major=1）
-
-**状态：** 已修复。
-
----
-
-### ~~FLASH_DEFL_DATA 分包解压 Bug~~ (已修复)
-
-**现象：** 压缩烧录大文件时，第二个及后续 `FLASH_DEFL_DATA` 包解压失败，导致烧录数据不完整。
-
-**原因：** 自定义 `deflate.c` 不支持流式输入。当 deflate block 边界跨越两个包时，解压器无法跨包保持状态。
-
-**修复：** 采用积累解压方案，在 `esptool.c` 中积累所有 `FLASH_DEFL_DATA` 包，到 `FLASH_DEFL_END` 时一次性解压。
-
-**状态：** 已修复。详见下方"积累解压方案实现细节"。
 
 ---
 
@@ -869,23 +842,3 @@ FLASH_DEFL_END → 解压 → 写入 flash → 释放缓冲区
 - 如果超时成为问题，可考虑在 `FLASH_DEFL_END` 时就处理（但 ROM 模式不发 END）
 
 **开发建议：** 实现后使用 Python esptool 的 ROM 模式进行多文件烧录测试，验证是否超时。
-
----
-
-### ~~esptool Python stub 模式多文件烧录第二个大文件失败~~ (已修复)
-
-**现象：** `esptool write_flash` 使用 stub 模式烧录多个文件时，第一个文件成功，第二个大文件（如 107744 字节）写入失败，esptool 报 "Lost connection, retrying..."。`esptool --no-stub`、esptool-js、web-esptool 均正常。
-
-**原因：** 两个 Bug：
-
-1. **`Listener_Proc` 中 `cbInQue < READ_BUFFER_SIZE` 条件过严**：当 com0com 缓冲区数据量 >= 16384 字节时，listener 线程不读取数据。esptool stub 模式的 `FLASH_DEFL_DATA` 包经 SLIP 编码后约 16500 字节，超过此阈值后数据堆积在 com0com 缓冲区，导致 esptool 客户端写入超时。
-
-2. **`OnDeviceModified` 跨线程同步调用阻塞 listener 线程**：`UpdateTitle` 内部调用 `SetWindowTextW`（通过 `SendMessage`），当 UI 线程忙于处理 `WM_SERIAL_LOG` 消息时，listener 线程被阻塞数百毫秒，无法及时读取串口数据。
-
-**修复：**
-1. `serial.c` `Listener_Proc`：移除 `cbInQue < READ_BUFFER_SIZE` 条件，改为 `min(cbInQue, READ_BUFFER_SIZE)` 安全截断读取
-2. `main.c` `OnDeviceModified`：将 `UpdateTitle(g_hWnd)` 改为 `PostMessage(g_hWnd, WM_UPDATE_TITLE, 0, 0)`，避免阻塞 listener 线程
-3. `main.h`：添加 `WM_UPDATE_TITLE` 消息定义
-4. `main.c` `MainWndProc`：添加 `WM_UPDATE_TITLE` 处理
-
-**状态：** 已修复。
