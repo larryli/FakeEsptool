@@ -27,8 +27,8 @@ BOOL PromptDisconnectIfNeeded(HWND hWnd)
         return TRUE;
 
     int ret = MessageBoxW(hWnd,
-                          L"Serial port is connected.\nDo you want to disconnect?",
-                          L"Disconnect",
+                          LoadStr(IDS_MSG_CONFIRM_DISCONN),
+                          LoadStr(IDS_MSG_DISCONN_CAP),
                           MB_YESNO | MB_ICONQUESTION);
     if (ret != IDYES)
         return FALSE;
@@ -47,8 +47,8 @@ BOOL PromptSaveIfNeeded(HWND hWnd)
         return TRUE;
 
     int ret = MessageBoxW(hWnd,
-                          L"Device data has been modified.\nDo you want to save changes?",
-                          L"Save Changes",
+                          LoadStr(IDS_MSG_CONFIRM_SAVE),
+                          LoadStr(IDS_MSG_SAVE_CAP),
                           MB_YESNOCANCEL | MB_ICONQUESTION);
     switch (ret) {
     case IDYES:
@@ -61,7 +61,7 @@ BOOL PromptSaveIfNeeded(HWND hWnd)
                 WCHAR szFile[MAX_PATH] = {0};
                 ofn.lStructSize = sizeof(ofn);
                 ofn.hwndOwner = hWnd;
-                ofn.lpstrFilter = LoadStr(IDS_DEVICE_SAVE_FILTER);
+                ofn.lpstrFilter = LoadStr(IDS_DEVICE_FILTER);
                 ofn.lpstrFile = szFile;
                 ofn.nMaxFile = MAX_PATH;
                 ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
@@ -161,7 +161,7 @@ void UpdateTitle(HWND hWnd)
         name = name ? name + 1 : filename;
         wsprintfW(p, L" - %s", name);
     } else {
-        lstrcatW(p, L" - Untitled");
+        lstrcatW(p, LoadStr(IDS_TITLE_UNTITLED));
     }
     p += lstrlenW(p);
 
@@ -210,7 +210,7 @@ void UpdateStatusBar(void)
         MultiByteToWideChar(CP_UTF8, 0, g_device.chip.name, -1, chipName, 32);
         SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)chipName);
     } else {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)L"No Device");
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)LoadStr(IDS_STATUS_NO_DEVICE));
     }
 
     /* Part 2: Flash size */
@@ -336,7 +336,7 @@ void Main_CmdNewDevice(HWND hWnd)
         UpdateTitle(hWnd);
         SetWindowTextW(g_hEdit, L"");
     } else {
-        MessageBoxW(hWnd, L"Failed to create device", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_CREATE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
     }
 }
 
@@ -371,7 +371,7 @@ void Main_CmdOpenDevice(HWND hWnd)
             UpdateTitle(hWnd);
             SetWindowTextW(g_hEdit, L"");
         } else {
-            MessageBoxW(hWnd, L"Failed to load device file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_LOAD_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         }
     }
 }
@@ -403,7 +403,7 @@ BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath)
         SetWindowTextW(g_hEdit, L"");
         return TRUE;
     } else {
-        MessageBoxW(hWnd, L"Failed to load device file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_LOAD_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return FALSE;
     }
 }
@@ -441,7 +441,7 @@ void Main_CmdSaveDeviceAs(HWND hWnd)
     WCHAR szFile[MAX_PATH] = {0};
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hWnd;
-    ofn.lpstrFilter = LoadStr(IDS_DEVICE_SAVE_FILTER);
+    ofn.lpstrFilter = LoadStr(IDS_DEVICE_FILTER);
     ofn.lpstrFile = szFile;
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
@@ -450,7 +450,7 @@ void Main_CmdSaveDeviceAs(HWND hWnd)
         if (Device_Save(&g_device, szFile)) {
             Config_SetLastDeviceFile(szFile);
         } else {
-            MessageBoxW(hWnd, L"Failed to save device file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         }
     }
 }
@@ -465,7 +465,7 @@ void Main_CmdSaveDeviceAs(HWND hWnd)
 void Main_CmdDeviceProps(HWND hWnd)
 {
     if (Serial_IsOpen(&g_serial)) {
-        MessageBoxW(hWnd, L"Disconnect serial port before modifying device properties", LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+        MessageBoxW(hWnd, LoadStr(IDS_MSG_DISCONN_PROPS), LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
     } else {
         if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_DEVICE_PROPS), hWnd, DevicePropsDlgProc) == IDOK) {
             UpdateStatusBar();
@@ -544,12 +544,12 @@ void Main_OnReconnect(HWND hMainWnd)
     }
 
     if (!g_szPort[0]) {
-        MessageBoxW(hMainWnd, L"No last port available", LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_NO_LAST_PORT), LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
         return;
     }
 
     if (!IsPortAvailable(g_szPort)) {
-        MessageBoxW(hMainWnd, L"Port is not available", LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_PORT_NOT_AVAIL), LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
         return;
     }
 
@@ -610,7 +610,7 @@ void Main_OnDisconnect(HWND hMainWnd)
 void Main_OnFlashImport(HWND hMainWnd)
 {
     if (Serial_IsOpen(&g_serial)) {
-        MessageBoxW(hMainWnd, L"Disconnect serial port before importing Flash", LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_DISCONN_IMPORT), LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
         return;
     }
 
@@ -629,7 +629,7 @@ void Main_OnFlashImport(HWND hMainWnd)
     /* Check file size */
     HANDLE hFile = CreateFileW(szFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
-        MessageBoxW(hMainWnd, L"Failed to open file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_OPEN_FILE), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -637,7 +637,7 @@ void Main_OnFlashImport(HWND hMainWnd)
     if (fileSize != g_device.flash.size) {
         CloseHandle(hFile);
         WCHAR msg[128];
-        wsprintfW(msg, L"File size (%lu bytes) does not match Flash size (%lu bytes)", fileSize, g_device.flash.size);
+        wsprintfW(msg, LoadStr(IDS_MSG_FLASH_MISMATCH), fileSize, g_device.flash.size);
         MessageBoxW(hMainWnd, msg, LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
@@ -655,7 +655,7 @@ void Main_OnFlashImport(HWND hMainWnd)
     SetCursor(hOldCursor);
 
     if (!ok) {
-        MessageBoxW(hMainWnd, L"Failed to read file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_READ_FILE), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -691,7 +691,7 @@ void Main_OnFlashExport(HWND hMainWnd)
     if (flashSize > 0 && g_device.flash.data) {
         flashSnapshot = (BYTE *)HeapAlloc(GetProcessHeap(), 0, flashSize);
         if (!flashSnapshot) {
-            MessageBoxW(hMainWnd, L"Failed to allocate memory for snapshot", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC_SNAP), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
             return;
         }
         memcpy(flashSnapshot, g_device.flash.data, flashSize);
@@ -707,7 +707,7 @@ void Main_OnFlashExport(HWND hMainWnd)
         EnableWindow(hMainWnd, TRUE);
         SetCursor(hOldCursor);
         HeapFree(GetProcessHeap(), 0, flashSnapshot);
-        MessageBoxW(hMainWnd, L"Failed to create file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_CREATE_FILE), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -725,7 +725,7 @@ void Main_OnFlashExport(HWND hMainWnd)
     if (!ok) {
         DeleteFileW(szFile);
         HeapFree(GetProcessHeap(), 0, flashSnapshot);
-        MessageBoxW(hMainWnd, L"Failed to write file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_WRITE_FILE), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -901,7 +901,7 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
 
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hMainWnd;
-    ofn.lpstrFilter = L"Text Files (*.txt)\0*.txt\0All Files (*.*)\0*.*\0";
+    ofn.lpstrFilter = LoadStr(IDS_TXT_FILTER);
     ofn.lpstrFile = szFile;
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
@@ -913,7 +913,7 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
     /* Create snapshot */
     DEVICE_SNAPSHOT *snap = (DEVICE_SNAPSHOT *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(DEVICE_SNAPSHOT));
     if (!snap) {
-        MessageBoxW(hMainWnd, L"Failed to allocate memory", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -928,7 +928,7 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
         snap->efuse = (BYTE *)HeapAlloc(GetProcessHeap(), 0, snap->efuseSize);
         if (!snap->efuse) {
             HeapFree(GetProcessHeap(), 0, snap);
-            MessageBoxW(hMainWnd, L"Failed to allocate eFuse snapshot", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC_EFUSE), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
             return;
         }
         memcpy(snap->efuse, g_device.chip.efuse, snap->efuseSize);
@@ -941,7 +941,7 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
         if (!snap->flash) {
             if (snap->efuse) HeapFree(GetProcessHeap(), 0, snap->efuse);
             HeapFree(GetProcessHeap(), 0, snap);
-            MessageBoxW(hMainWnd, L"Failed to allocate Flash snapshot", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC_FLASH), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
             return;
         }
         memcpy(snap->flash, g_device.flash.data, snap->flashSize);
@@ -959,7 +959,7 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
         if (snap->efuse) HeapFree(GetProcessHeap(), 0, snap->efuse);
         if (snap->flash) HeapFree(GetProcessHeap(), 0, snap->flash);
         HeapFree(GetProcessHeap(), 0, snap);
-        MessageBoxW(hMainWnd, L"Failed to create dump thread", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_DUMP_THREAD), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
     CloseHandle(hThread); /* Thread will run independently */

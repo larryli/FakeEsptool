@@ -9,6 +9,7 @@
 #include <commctrl.h>
 #include <commdlg.h>
 #include "../resource.h"
+#include "../utils/lang.h"
 #include "../esptool/chip.h"
 #include "../esptool/device.h"
 #include "../esptool/esptool.h"

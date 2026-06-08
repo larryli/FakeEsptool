@@ -1,4 +1,4 @@
-/*
+﻿/*
  * resource.rc - Resource file for FakeEsptool
  *
  * English (US) resources with LANGUAGE directive support for future i18n.
@@ -126,13 +126,12 @@ STRINGTABLE
     IDS_TIP_DISCONNECT  "Disconnect"
     IDS_TIP_RECONNECT   "Reconnect"
     IDS_TIP_CLEAR       "Clear Log"
-    IDS_TIP_SAVEAS      "Save Log As..."
+    IDS_TIP_SAVEAS      "Save Log As"
     IDS_TIP_DEVPROPS    "Device Properties"
 }
 
 STRINGTABLE
 {
-    IDS_MSG_NOT_CONN    "Serial port is not connected"
     IDS_MSG_CONN_TITLE  "Connection"
     IDS_MSG_CONFIRM_EXIT "Serial port is connected. Are you sure you want to exit?"
     IDS_MSG_CONFIRM_CAP "Confirm Exit"
@@ -147,14 +146,46 @@ STRINGTABLE
     IDS_LOG_SAVE_FILTER "Log Files (*.log)\0*.log\0All Files (*.*)\0*.*\0"
     IDS_MSG_CONN_LOST   "Connection lost. Serial port error."
     IDS_DEVICE_FILTER   "ESP Device (*.esp)\0*.esp\0All Files (*.*)\0*.*\0"
-    IDS_DEVICE_SAVE_FILTER "ESP Device (*.esp)\0*.esp\0All Files (*.*)\0*.*\0"
     IDS_BIN_FILTER      "Binary Files (*.bin)\0*.bin\0All Files (*.*)\0*.*\0"
     IDS_FLASH_SIZE_MISMATCH "Flash file size does not match current device Flash size"
+    IDS_MSG_CONFIRM_DISCONN "Serial port is connected.\nDo you want to disconnect?"
+    IDS_MSG_DISCONN_CAP     "Disconnect"
+    IDS_MSG_CONFIRM_SAVE    "Device data has been modified.\nDo you want to save changes?"
+    IDS_MSG_SAVE_CAP        "Save Changes"
+    IDS_MSG_FAIL_CREATE_DEV "Failed to create device"
+    IDS_MSG_FAIL_LOAD_DEV   "Failed to load device file"
+    IDS_MSG_FAIL_SAVE_DEV   "Failed to save device file"
+    IDS_MSG_DISCONN_PROPS   "Disconnect serial port before modifying device properties"
+    IDS_MSG_NO_LAST_PORT    "No last port available"
+    IDS_MSG_PORT_NOT_AVAIL  "Port is not available"
+    IDS_MSG_DISCONN_IMPORT  "Disconnect serial port before importing Flash"
+    IDS_MSG_FAIL_OPEN_FILE  "Failed to open file"
+    IDS_MSG_FLASH_MISMATCH  "File size (%lu bytes) does not match Flash size (%lu bytes)"
+    IDS_MSG_FAIL_READ_FILE  "Failed to read file"
+    IDS_MSG_FAIL_ALLOC_SNAP "Failed to allocate memory for snapshot"
+    IDS_MSG_FAIL_CREATE_FILE "Failed to create file"
+    IDS_MSG_FAIL_WRITE_FILE "Failed to write file"
+    IDS_MSG_FAIL_ALLOC      "Failed to allocate memory"
+    IDS_MSG_FAIL_ALLOC_EFUSE "Failed to allocate eFuse snapshot"
+    IDS_MSG_FAIL_ALLOC_FLASH "Failed to allocate Flash snapshot"
+    IDS_MSG_FAIL_DUMP_THREAD "Failed to create dump thread"
+    IDS_MSG_FAIL_DUMP       "Failed to dump device (error: %lu)"
+    IDS_MSG_FAIL_UPDATE_DEV "Failed to update device"
+    IDS_TXT_FILTER          "Text Files (*.txt)\0*.txt\0All Files (*.*)\0*.*\0"
+    IDS_OPEN_DEVICE_TITLE   "Open Device"
+    IDS_MSG_OPEN_LAST_FILE  "Open last device file?\n%s"
+    IDS_MSG_OPEN_FILE       "Open file?\n%s"
+    IDS_MSG_OPEN_MULTI_FILE "Multiple files dropped. Only the first file will be opened:\n%s\n\nContinue?"
+    IDS_MSG_ALREADY_RUNNING "FakeEsptool is already running. Open file in existing window?\n%s"
+    IDS_MSG_FILE_NOT_FOUND  "File not found."
+    IDS_MSG_ONLY_ESP        "Only .esp files are supported."
+    IDS_TITLE_UNTITLED      " - Untitled"
+    IDS_STATUS_NO_DEVICE    "No Device"
 }
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 1,0,0,0
-PRODUCTVERSION 1,0,0,0
+FILEVERSION 0,1,0,0
+PRODUCTVERSION 0,1,0,0
 FILEFLAGSMASK 0x3F
 FILEFLAGS 0x0
 FILEOS VOS__WINDOWS32
@@ -166,14 +197,210 @@ FILESUBTYPE VFT2_UNKNOWN
     BLOCK "040904B0"
     {
       VALUE "FileDescription", "ESP Chip Device Simulator\0"
-      VALUE "FileVersion", "1.0.0.0\0"
+      VALUE "FileVersion", "0.1.0.0\0"
       VALUE "LegalCopyright", "Copyright (c) 2025 - 2026 Larry Li\0"
       VALUE "ProductName", "FakeEsptool\0"
-      VALUE "ProductVersion", "1.0.0.0\0"
+      VALUE "ProductVersion", "0.1.0.0\0"
     }
   }
   BLOCK "VarFileInfo"
   {
     VALUE "Translation", 0x409, 0x4B0
+  }
+}
+
+/* ============================================================ */
+/* Simplified Chinese (CN)                                                 */
+/* ============================================================ */
+
+LANGUAGE LANG_CHINESE_SIMPLIFIED,SUBLANG_CHINESE_SIMPLIFIED
+
+IDR_MAIN_MENU MENUEX
+{
+  POPUP "文件(&F)", 0, 0, 0
+  {
+    MENUITEM "新设备(&N)...        Ctrl+N", IDM_NEW_DEVICE, 0, 0
+    MENUITEM "打开设备(&O)...      Ctrl+O", IDM_OPEN_DEVICE, 0, 0
+    MENUITEM "保存设备(&S)         Ctrl+S", IDM_SAVE_DEVICE, 0, 0
+    MENUITEM "设备另存为(&A)...    F12", IDM_SAVE_DEVICE_AS, 0, 0
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    MENUITEM "导出设备到文本文件...", IDM_DUMP_DEVICE_AS, 0, 0
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    MENUITEM "设备属性(&P)...", IDM_DEVICE_PROPS, 0, 0
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    MENUITEM "退出(&X)             Alt+F4", IDM_EXIT, 0, 0
+  }
+  POPUP "串口(&S)", 0, 0, 0
+  {
+    MENUITEM "连接(&C)", IDM_CONNECT, 0, 0
+    MENUITEM "重新连接(&R)         Ctrl+R", IDM_RECONNECT, 0, 0|MFS_GRAYED
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    MENUITEM "断开链接(&D)", IDM_DISCONNECT, 0, 0|MFS_GRAYED
+  }
+  POPUP "Flash(&L)", 0, 0, 0
+  {
+    MENUITEM "导入 Flash(&I)...", IDM_FLASH_IMPORT, 0, 0
+    MENUITEM "导出 Flash(&E)...", IDM_FLASH_EXPORT, 0, 0
+  }
+  POPUP "日志(&L)", 0, 0, 0
+  {
+    MENUITEM "清除(&C)             Ctrl+L", IDM_LOG_CLEAR, 0, 0
+    MENUITEM "另存为(&A)...", IDM_LOG_SAVEAS, 0, 0
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    MENUITEM "字体(&F)...", IDM_LOG_FONT, 0, 0
+  }
+  POPUP "帮助(&H)", 0, 0, 0
+  {
+    MENUITEM "关于(&A)             F1", IDM_ABOUT, 0, 0
+  }
+}
+
+IDR_MAIN_ACCEL ACCELERATORS
+{
+  VK_F1,      IDM_ABOUT,          VIRTKEY
+  VK_F12,     IDM_SAVE_DEVICE_AS, VIRTKEY
+  "N",        IDM_NEW_DEVICE,     VIRTKEY, CONTROL
+  "O",        IDM_OPEN_DEVICE,    VIRTKEY, CONTROL
+  "S",        IDM_SAVE_DEVICE,    VIRTKEY, CONTROL
+  "R",        IDM_RECONNECT,      VIRTKEY, CONTROL
+  "L",        IDM_LOG_CLEAR,      VIRTKEY, CONTROL
+}
+
+IDD_PORT_SELECT DIALOGEX 0, 0, 280, 100
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "选择端口"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    COMBOBOX        IDC_PORT_COMBO, 50, 10, 220, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "端口：", -1, 10, 13, 35, 8
+    LTEXT           "波特率：115200（固定）", -1, 10, 35, 260, 8
+    LTEXT           "数据位：8   校验：无   停止位：1", -1, 10, 50, 260, 8
+    DEFPUSHBUTTON   "确定", IDOK, 100, 75, 50, 14
+    PUSHBUTTON      "取消", IDCANCEL, 170, 75, 50, 14
+END
+
+IDD_ABOUT DIALOGEX 0, 0, 220, 100
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "关于 FakeEsptool"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON            IDI_APP, -1, 10, 10, 20, 20
+    CONTROL         "FakeEsptool v1.0", IDD_APPNAME, "Static", WS_GROUP, 40, 10, 170, 10
+    CONTROL         "版权所有 (c) 2026 Larry Li", IDD_COPYRIGHT, "Static", WS_GROUP, 40, 22, 170, 10
+    DEFPUSHBUTTON   "确定", IDOK, 85, 78, 50, 14
+    CONTROL         "<a href=""https://github.com/larryli/FakeEsptool"">https://github.com/larryli/FakeEsptool</a>", IDD_WEBSITE, "SysLink", WS_TABSTOP, 40, 38, 170, 10
+END
+
+IDD_DEVICE_PROPS DIALOGEX 0, 0, 260, 110
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "设备属性"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "芯片：", -1, 10, 12, 50, 8
+    COMBOBOX        IDC_CHIP_COMBO, 65, 10, 185, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "晶振：", -1, 10, 30, 50, 8
+    COMBOBOX        IDC_XTAL_FREQ_COMBO, 65, 28, 185, 80, CBS_DROPDOWNLIST | WS_TABSTOP
+
+    LTEXT           "Flash 大小：", -1, 10, 48, 50, 8
+    COMBOBOX        IDC_FLASH_SIZE_COMBO, 65, 46, 185, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "MAC:", -1, 10, 66, 50, 8
+    EDITTEXT        IDC_MAC_EDIT, 65, 64, 120, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "随机", IDC_RANDOM_MAC, 190, 63, 60, 16
+
+    DEFPUSHBUTTON   "确定", IDOK, 75, 88, 55, 16
+    PUSHBUTTON      "取消", IDCANCEL, 140, 88, 55, 16
+END
+
+STRINGTABLE
+{
+    IDS_APP_NAME        "FakeEsptool"
+    IDS_DISCONNECTED    "已断开连接"
+    IDS_TITLE_FORMAT    "FakeEsptool - %s"
+    IDS_TIP_CONNECT     "连接"
+    IDS_TIP_DISCONNECT  "断开连接"
+    IDS_TIP_RECONNECT   "重新连接"
+    IDS_TIP_CLEAR       "清除日志"
+    IDS_TIP_SAVEAS      "日志另存为"
+    IDS_TIP_DEVPROPS    "设备属性"
+}
+
+STRINGTABLE
+{
+    IDS_MSG_CONN_TITLE  "连接"
+    IDS_MSG_CONFIRM_EXIT "串口已连接。确定要退出么？"
+    IDS_MSG_CONFIRM_CAP "确认退出"
+    IDS_MSG_PORT_ERROR  "打开串口失败"
+    IDS_MSG_ERROR       "错误"
+    IDS_MSG_SELECT_PORT "请选择一个端口"
+    IDS_MSG_WARNING     "警告"
+    IDS_MSG_INVALID_PORT "无效的端口选择"
+    IDS_MSG_SAVE_ERROR  "创建文件失败"
+    IDS_MSG_DEV_REMOVED "串口设备已断开连接。"
+    IDS_MSG_DEV_TITLE   "设备已移除"
+    IDS_LOG_SAVE_FILTER "日志文件 (*.log)\0*.log\0所有文件 (*.*)\0*.*\0"
+    IDS_MSG_CONN_LOST   "连接断开。串口错误。"
+    IDS_DEVICE_FILTER   "ESP 设备 (*.esp)\0*.esp\0所有文件 (*.*)\0*.*\0"
+    IDS_BIN_FILTER      "二进制文件 (*.bin)\0*.bin\0所有文件 (*.*)\0*.*\0"
+    IDS_FLASH_SIZE_MISMATCH "Flash 文件大小不匹配当前设备的 Flash 大小"
+    IDS_MSG_CONFIRM_DISCONN "串口已连接。\n确定要断开连接吗？"
+    IDS_MSG_DISCONN_CAP     "断开连接"
+    IDS_MSG_CONFIRM_SAVE    "设备数据已修改。\n是否保存更改？"
+    IDS_MSG_SAVE_CAP        "保存更改"
+    IDS_MSG_FAIL_CREATE_DEV "创建设备失败"
+    IDS_MSG_FAIL_LOAD_DEV   "加载设备文件失败"
+    IDS_MSG_FAIL_SAVE_DEV   "保存设备文件失败"
+    IDS_MSG_DISCONN_PROPS   "修改设备属性前请先断开串口连接"
+    IDS_MSG_NO_LAST_PORT    "没有上次使用的端口"
+    IDS_MSG_PORT_NOT_AVAIL  "端口不可用"
+    IDS_MSG_DISCONN_IMPORT  "导入 Flash 前请先断开串口连接"
+    IDS_MSG_FAIL_OPEN_FILE  "打开文件失败"
+    IDS_MSG_FLASH_MISMATCH  "文件大小（%lu 字节）与 Flash 大小（%lu 字节）不匹配"
+    IDS_MSG_FAIL_READ_FILE  "读取文件失败"
+    IDS_MSG_FAIL_ALLOC_SNAP "分配快照内存失败"
+    IDS_MSG_FAIL_CREATE_FILE "创建文件失败"
+    IDS_MSG_FAIL_WRITE_FILE "写入文件失败"
+    IDS_MSG_FAIL_ALLOC      "分配内存失败"
+    IDS_MSG_FAIL_ALLOC_EFUSE "分配 eFuse 快照失败"
+    IDS_MSG_FAIL_ALLOC_FLASH "分配 Flash 快照失败"
+    IDS_MSG_FAIL_DUMP_THREAD "创建 Dump 线程失败"
+    IDS_MSG_FAIL_DUMP       "导出设备失败（错误：%lu）"
+    IDS_MSG_FAIL_UPDATE_DEV "更新设备失败"
+    IDS_TXT_FILTER          "文本文件 (*.txt)\0*.txt\0所有文件 (*.*)\0*.*\0"
+    IDS_OPEN_DEVICE_TITLE   "打开设备"
+    IDS_MSG_OPEN_LAST_FILE  "打开上次的设备文件？\n%s"
+    IDS_MSG_OPEN_FILE       "打开文件？\n%s"
+    IDS_MSG_OPEN_MULTI_FILE "拖放了多个文件。仅打开第一个文件：\n%s\n\n继续？"
+    IDS_MSG_ALREADY_RUNNING "FakeEsptool 已在运行。是否在现有窗口中打开文件？\n%s"
+    IDS_MSG_FILE_NOT_FOUND  "文件未找到。"
+    IDS_MSG_ONLY_ESP        "仅支持 .esp 文件。"
+    IDS_TITLE_UNTITLED      " - 未命名"
+    IDS_STATUS_NO_DEVICE    "无设备"
+}
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 0,1,0,0
+PRODUCTVERSION 0,1,0,0
+FILEFLAGSMASK 0x3F
+FILEFLAGS 0x0
+FILEOS VOS__WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE VFT2_UNKNOWN
+{
+  BLOCK "StringFileInfo"
+  {
+    BLOCK "080404B0"
+    {
+      VALUE "FileDescription", "ESP 芯片设备模拟器\0"
+      VALUE "FileVersion", "0.1.0.0\0"
+      VALUE "LegalCopyright", "版权所有 (c) 2025 - 2026 Larry Li\0"
+      VALUE "ProductName", "FakeEsptool\0"
+      VALUE "ProductVersion", "0.1.0.0\0"
+    }
+  }
+  BLOCK "VarFileInfo"
+  {
+    VALUE "Translation", 0x804, 0x4B0
   }
 }

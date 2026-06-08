@@ -659,7 +659,7 @@ static LRESULT Main_OnDumpComplete(HWND hWnd, WPARAM wParam, LPARAM lParam)
 
     if (!success) {
         WCHAR msg[128];
-        wsprintfW(msg, L"Failed to dump device (error: %lu)", errorCode);
+        wsprintfW(msg, LoadStr(IDS_MSG_FAIL_DUMP), errorCode);
         MessageBoxW(hWnd, msg, LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
     }
     return 0;
@@ -712,7 +712,7 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
             return 0;
         } else {
             TRACE_FW(TAG, "Failed to load command line file");
-            MessageBoxW(hWnd, L"Failed to load device file", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_LOAD_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         }
     }
 
@@ -724,8 +724,8 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
         if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
             /* Prompt user */
             WCHAR msg[MAX_PATH + 64];
-            wsprintfW(msg, L"Open last device file?\n%s", lastFile);
-            int ret = MessageBoxW(hWnd, msg, L"Open Device", MB_YESNO | MB_ICONQUESTION);
+            wsprintfW(msg, LoadStr(IDS_MSG_OPEN_LAST_FILE), lastFile);
+            int ret = MessageBoxW(hWnd, msg, LoadStr(IDS_OPEN_DEVICE_TITLE), MB_YESNO | MB_ICONQUESTION);
             if (ret == IDYES) {
                 if (Device_Load(&g_device, lastFile)) {
                     Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
@@ -746,7 +746,7 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
             UpdateStatusBar();
             UpdateTitle(hWnd);
         } else {
-            MessageBoxW(hWnd, L"Failed to create device", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_CREATE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
             DestroyWindow(hWnd);
         }
     }
@@ -793,7 +793,7 @@ static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam)
     WCHAR *ext = wcsrchr(filePath, L'.');
     if (!ext || _wcsicmp(ext, L".esp") != 0) {
         DragFinish(hDrop);
-        MessageBoxW(hWnd, L"Only .esp files are supported.",
+        MessageBoxW(hWnd, LoadStr(IDS_MSG_ONLY_ESP),
                     LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
         return 0;
     }
@@ -802,14 +802,13 @@ static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam)
     BOOL openFile = FALSE;
     if (fileCount == 1) {
         WCHAR msg[MAX_PATH + 64];
-        wsprintfW(msg, L"Open file?\n%s", filePath);
-        openFile = (MessageBoxW(hWnd, msg, L"Open Device",
+        wsprintfW(msg, LoadStr(IDS_MSG_OPEN_FILE), filePath);
+        openFile = (MessageBoxW(hWnd, msg, LoadStr(IDS_OPEN_DEVICE_TITLE),
                                MB_YESNO | MB_ICONQUESTION) == IDYES);
     } else {
         WCHAR msg[MAX_PATH + 128];
-        wsprintfW(msg, L"Multiple files dropped. Only the first file will be opened:\n%s\n\nContinue?",
-                  filePath);
-        openFile = (MessageBoxW(hWnd, msg, L"Open Device",
+        wsprintfW(msg, LoadStr(IDS_MSG_OPEN_MULTI_FILE), filePath);
+        openFile = (MessageBoxW(hWnd, msg, LoadStr(IDS_OPEN_DEVICE_TITLE),
                                MB_YESNO | MB_ICONQUESTION) == IDYES);
     }
 
@@ -972,8 +971,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
             if (cmdFilePath[0]) {
                 /* Prompt user */
                 WCHAR msg[MAX_PATH + 128];
-                wsprintfW(msg, L"FakeEsptool is already running. Open file in existing window?\n%s", cmdFilePath);
-                if (MessageBoxW(NULL, msg, L"FakeEsptool", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+                wsprintfW(msg, LoadStr(IDS_MSG_ALREADY_RUNNING), cmdFilePath);
+                if (MessageBoxW(NULL, msg, LoadStr(IDS_APP_NAME), MB_YESNO | MB_ICONQUESTION) == IDYES) {
                     /* Send file path to existing instance */
                     COPYDATASTRUCT cds = {0};
                     cds.dwData = 0;
@@ -1041,7 +1040,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
             wcscpy(s_cmdFilePath, cmdFilePath);
         } else {
             TRACE_FW(TAG, "Command line file not found: %ls", cmdFilePath);
-            MessageBoxW(NULL, L"File not found.", LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(NULL, LoadStr(IDS_MSG_FILE_NOT_FOUND), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         }
     }
 
