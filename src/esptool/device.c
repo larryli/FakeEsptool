@@ -45,7 +45,7 @@ BOOL Device_Init(DEVICE_CTX *ctx, CHIP_TYPE chipType, DWORD flashSize, const BYT
         return FALSE;
     }
 
-    ctx->modified = TRUE;
+    ctx->modified = FALSE;
     TRACE_FW(TAG, "Device created: %s, %lu MB", ctx->chip.name, flashSize / (1024*1024));
     return TRUE;
 }

@@ -40,6 +40,27 @@ BOOL PromptDisconnectIfNeeded(HWND hWnd)
     return TRUE;
 }
 
+/*
+ * GenerateDefaultFilename - Generate default device filename
+ *
+ * Format: "[Chip]-[Flash Size]" (e.g. "ESP32-4MB")
+ *
+ * @buf:     Output buffer (MAX_PATH)
+ */
+static void GenerateDefaultFilename(WCHAR *buf)
+{
+    WCHAR chipName[32] = {0};
+    MultiByteToWideChar(CP_UTF8, 0, g_device.chip.name, -1, chipName, 32);
+
+    DWORD flashSize = g_device.flash.size;
+    if (flashSize >= 1024 * 1024)
+        wsprintfW(buf, L"%s-%luMB", chipName, flashSize / (1024 * 1024));
+    else if (flashSize > 0)
+        wsprintfW(buf, L"%s-%luKB", chipName, flashSize / 1024);
+    else
+        lstrcpyW(buf, chipName);
+}
+
 /* Helper: Check if device is modified, prompt to save if needed */
 BOOL PromptSaveIfNeeded(HWND hWnd)
 {
@@ -59,6 +80,7 @@ BOOL PromptSaveIfNeeded(HWND hWnd)
             } else {
                 OPENFILENAMEW ofn = {0};
                 WCHAR szFile[MAX_PATH] = {0};
+                GenerateDefaultFilename(szFile);
                 ofn.lStructSize = sizeof(ofn);
                 ofn.hwndOwner = hWnd;
                 ofn.lpstrFilter = LoadStr(IDS_DEVICE_FILTER);
@@ -70,6 +92,7 @@ BOOL PromptSaveIfNeeded(HWND hWnd)
                     return FALSE;
                 Device_Save(&g_device, szFile);
             }
+            UpdateTitle(hWnd);
         }
         return TRUE;
     case IDNO:
@@ -421,6 +444,7 @@ void Main_CmdSaveDevice(HWND hWnd)
     if (filename[0]) {
         if (Device_Save(&g_device, filename)) {
             Config_SetLastDeviceFile(filename);
+            UpdateTitle(hWnd);
         }
     } else {
         /* No filename, do Save As */
@@ -439,6 +463,7 @@ void Main_CmdSaveDeviceAs(HWND hWnd)
 {
     OPENFILENAMEW ofn = {0};
     WCHAR szFile[MAX_PATH] = {0};
+    GenerateDefaultFilename(szFile);
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hWnd;
     ofn.lpstrFilter = LoadStr(IDS_DEVICE_FILTER);
@@ -449,6 +474,7 @@ void Main_CmdSaveDeviceAs(HWND hWnd)
     if (GetSaveFileNameW(&ofn)) {
         if (Device_Save(&g_device, szFile)) {
             Config_SetLastDeviceFile(szFile);
+            UpdateTitle(hWnd);
         } else {
             MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         }

@@ -182,7 +182,7 @@ void ResetSignalState(void)
 }
 
 /* Output boot message to serial and log window (for download mode) */
-static void OutputBootMessage(SERIAL_CTX *ctx, BYTE reset_cause, HWND hNotify)
+static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode, BYTE reset_cause, HWND hNotify)
 {
     Esptool_ResetState(&g_esptool);
 
@@ -192,7 +192,7 @@ static void OutputBootMessage(SERIAL_CTX *ctx, BYTE reset_cause, HWND hNotify)
         Serial_PostLogF(hNotify, L"CFG", L"Baud rate: %lu", bootBaud);
     }
 
-    const char *msg = Chip_GetBootMessage(&g_device.chip, reset_cause);
+    const char *msg = Chip_GetBootMessage(&g_device.chip, download_mode, reset_cause);
     if (msg[0]) {
         Serial_WriteData(ctx, (const BYTE *)msg, (DWORD)strlen(msg), hNotify);
 
@@ -246,11 +246,11 @@ void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
             if (g_saw_io0_low) {
                 /* ClassicReset: IO0 was LOW -> enter download mode */
                 Serial_PostLog(hNotify, L"SIG", L"Download mode entered");
-                OutputBootMessage(ctx, 0x01, hNotify);  /* 0x01=POWERON */
+                OutputBootMessage(ctx, TRUE, 0x01, hNotify);  /* download, POWERON */
             } else {
                 /* HardReset: IO0 stayed HIGH -> normal boot */
                 Serial_PostLog(hNotify, L"SIG", L"Hard reset (normal boot)");
-                OutputBootMessage(ctx, 0x02, hNotify);  /* 0x02=EXT */
+                OutputBootMessage(ctx, FALSE, 0x02, hNotify);  /* normal boot, EXT */
             }
             g_reset_pending = FALSE;
             g_saw_io0_low = FALSE;

@@ -761,80 +761,196 @@ static const char *ResetCauseStr(BYTE cause)
  * Chip_GetBootMessage - Get ROM bootloader boot message
  *
  * Returns chip-specific boot message text that the ROM bootloader
- * outputs when entering download mode. The message includes ROM version,
- * reset cause, and boot mode information.
+ * outputs on UART after reset. The message format depends on whether
+ * the chip enters download mode or performs a normal SPI flash boot.
  *
- * @ctx:         Pointer to chip context
- * @reset_cause: Reset cause code (0x01=POWERON, 0x02=EXT, 0x03=WDT)
+ * Download mode messages include "waiting for download".
+ * Normal boot messages include SPI config and segment loading info.
+ *
+ * @ctx:           Pointer to chip context
+ * @download_mode: TRUE for download mode entry, FALSE for normal flash boot
+ * @reset_cause:   Reset cause code (0x01=POWERON, 0x02=EXT, 0x03=WDT)
  *
  * Returns pointer to static buffer containing multi-line ASCII string
  * with \r\n line endings. Buffer is valid until next call to this function.
  */
-const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BYTE reset_cause)
+const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE reset_cause)
 {
     const char *rst = ResetCauseStr(reset_cause);
     static char buf[512];
 
-    switch (ctx->type) {
-    case CHIP_ESP8266:
-        snprintf(buf, sizeof(buf),
-            "ets_main.c 542 \r\n"
-            "ets_main.c 543 \r\n"
-            "rst:0x%02X (%s),boot:0x3 (DOWNLOAD(UART0/1/2))\r\n"
-            "waiting for download\r\n",
-            reset_cause, rst);
-        break;
-    case CHIP_ESP32:
-        snprintf(buf, sizeof(buf),
-            "ESP-ROM:esp32-20210719\r\n"
-            "Build:Jul 19 2021\r\n"
-            "rst:0x%02X (%s),boot:0x3 (DOWNLOAD(UART0/1/2))\r\n"
-            "waiting for download\r\n",
-            reset_cause, rst);
-        break;
-    case CHIP_ESP32S2:
-        snprintf(buf, sizeof(buf),
-            "ESP-ROM:esp32s2-20210719\r\n"
-            "Build:Jul 19 2021\r\n"
-            "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
-            "waiting for download\r\n",
-            reset_cause, rst);
-        break;
-    case CHIP_ESP32S3:
-        snprintf(buf, sizeof(buf),
-            "ESP-ROM:esp32s3-20210719\r\n"
-            "Build:Jul 19 2021\r\n"
-            "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
-            "waiting for download\r\n",
-            reset_cause, rst);
-        break;
-    case CHIP_ESP32C2:
-        snprintf(buf, sizeof(buf),
-            "ESP-ROM:esp8684-api2-20220127\r\n"
-            "Build:Jan 27 2022\r\n"
-            "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
-            "waiting for download\r\n",
-            reset_cause, rst);
-        break;
-    case CHIP_ESP32C3:
-        snprintf(buf, sizeof(buf),
-            "ESP-ROM:esp32c3-20210719\r\n"
-            "Build:Jul 19 2021\r\n"
-            "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
-            "waiting for download\r\n",
-            reset_cause, rst);
-        break;
-    case CHIP_ESP32C6:
-        snprintf(buf, sizeof(buf),
-            "ESP-ROM:esp32c6-20210719\r\n"
-            "Build:Jul 19 2021\r\n"
-            "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
-            "waiting for download\r\n",
-            reset_cause, rst);
-        break;
-    default:
-        buf[0] = '\0';
-        break;
+    if (download_mode) {
+        /* Download mode: ROM waits for UART sync from esptool */
+        switch (ctx->type) {
+        case CHIP_ESP8266:
+            snprintf(buf, sizeof(buf),
+                "ets_main.c 542 \r\n"
+                "ets_main.c 543 \r\n"
+                "rst:0x%02X (%s),boot:0x3 (DOWNLOAD(UART0/1/2))\r\n"
+                "waiting for download\r\n",
+                reset_cause, rst);
+            break;
+        case CHIP_ESP32:
+            snprintf(buf, sizeof(buf),
+                "ESP-ROM:esp32-20210719\r\n"
+                "Build:Jul 19 2021\r\n"
+                "rst:0x%02X (%s),boot:0x3 (DOWNLOAD(UART0/1/2))\r\n"
+                "waiting for download\r\n",
+                reset_cause, rst);
+            break;
+        case CHIP_ESP32S2:
+            snprintf(buf, sizeof(buf),
+                "ESP-ROM:esp32s2-20210719\r\n"
+                "Build:Jul 19 2021\r\n"
+                "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+                "waiting for download\r\n",
+                reset_cause, rst);
+            break;
+        case CHIP_ESP32S3:
+            snprintf(buf, sizeof(buf),
+                "ESP-ROM:esp32s3-20210719\r\n"
+                "Build:Jul 19 2021\r\n"
+                "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+                "waiting for download\r\n",
+                reset_cause, rst);
+            break;
+        case CHIP_ESP32C2:
+            snprintf(buf, sizeof(buf),
+                "ESP-ROM:esp8684-api2-20220127\r\n"
+                "Build:Jan 27 2022\r\n"
+                "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+                "waiting for download\r\n",
+                reset_cause, rst);
+            break;
+        case CHIP_ESP32C3:
+            snprintf(buf, sizeof(buf),
+                "ESP-ROM:esp32c3-20210719\r\n"
+                "Build:Jul 19 2021\r\n"
+                "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+                "waiting for download\r\n",
+                reset_cause, rst);
+            break;
+        case CHIP_ESP32C6:
+            snprintf(buf, sizeof(buf),
+                "ESP-ROM:esp32c6-20210719\r\n"
+                "Build:Jul 19 2021\r\n"
+                "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+                "waiting for download\r\n",
+                reset_cause, rst);
+            break;
+        default:
+            buf[0] = '\0';
+            break;
+        }
+    } else {
+        /* Normal SPI flash boot: ROM loads firmware from flash */
+        switch (ctx->type) {
+        case CHIP_ESP8266:
+            snprintf(buf, sizeof(buf),
+                "ets Jan  8 2014,rst cause %d, boot mode:(3,7)\r\n"
+                "\r\n"
+                "load 0x40100000, len 24236, room 16 \r\n"
+                "tail 12\r\n"
+                "chksum 0xb7\r\n"
+                "ho 0 tail 12 room 4\r\n"
+                "load 0x3ffe8000, len 3008, room 12 \r\n"
+                "tail 4\r\n"
+                "chksum 0x2c\r\n"
+                "load 0x3ffe8bc0, len 4816, room 4 \r\n"
+                "tail 12\r\n"
+                "chksum 0x46\r\n"
+                "csum 0x46\r\n",
+                reset_cause);
+            break;
+        case CHIP_ESP32:
+            snprintf(buf, sizeof(buf),
+                "ESP-ROM:esp32-20210719\r\n"
+                "Build:Jul 19 2021\r\n"
+                "rst:0x%02X (%s),boot:0x13 (SPI_FAST_FLASH_BOOT)\r\n"
+                "configsip: 0, SPIWP:0x00\r\n"
+                "clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00\r\n"
+                "mode:DIO, clock div:1\r\n"
+                "load:0x3fff0008,len:8\r\n"
+                "load:0x3fff0010,len:3680\r\n"
+                "load:0x40078000,len:8364\r\n"
+                "load:0x40080000,len:252\r\n"
+                "entry 0x40080034\r\n",
+                reset_cause, rst);
+            break;
+        case CHIP_ESP32S2:
+            snprintf(buf, sizeof(buf),
+                "ESP-ROM:esp32s2-20210719\r\n"
+                "Build:Jul 19 2021\r\n"
+                "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
+                "SPIWP:0xee\r\n"
+                "mode:DIO, clock div:1\r\n"
+                "load:0x3fff0008,len:8\r\n"
+                "load:0x3fff0010,len:3680\r\n"
+                "load:0x40078000,len:8364\r\n"
+                "load:0x40080000,len:252\r\n"
+                "entry 0x40080034\r\n",
+                reset_cause, rst);
+            break;
+        case CHIP_ESP32S3:
+            snprintf(buf, sizeof(buf),
+                "ESP-ROM:esp32s3-20210719\r\n"
+                "Build:Jul 19 2021\r\n"
+                "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
+                "SPIWP:0xee\r\n"
+                "mode:DIO, clock div:1\r\n"
+                "load:0x3fff0008,len:8\r\n"
+                "load:0x3fff0010,len:3680\r\n"
+                "load:0x40078000,len:8364\r\n"
+                "load:0x40080000,len:252\r\n"
+                "entry 0x40080034\r\n",
+                reset_cause, rst);
+            break;
+        case CHIP_ESP32C2:
+            snprintf(buf, sizeof(buf),
+                "ESP-ROM:esp8684-api2-20220127\r\n"
+                "Build:Jan 27 2022\r\n"
+                "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
+                "SPIWP:0xee\r\n"
+                "mode:DIO, clock div:1\r\n"
+                "load:0x3fff0008,len:8\r\n"
+                "load:0x3fff0010,len:3680\r\n"
+                "load:0x40078000,len:8364\r\n"
+                "load:0x40080000,len:252\r\n"
+                "entry 0x40080034\r\n",
+                reset_cause, rst);
+            break;
+        case CHIP_ESP32C3:
+            snprintf(buf, sizeof(buf),
+                "ESP-ROM:esp32c3-20210719\r\n"
+                "Build:Jul 19 2021\r\n"
+                "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
+                "SPIWP:0xee\r\n"
+                "mode:DIO, clock div:1\r\n"
+                "load:0x3fff0008,len:8\r\n"
+                "load:0x3fff0010,len:3680\r\n"
+                "load:0x40078000,len:8364\r\n"
+                "load:0x40080000,len:252\r\n"
+                "entry 0x40080034\r\n",
+                reset_cause, rst);
+            break;
+        case CHIP_ESP32C6:
+            snprintf(buf, sizeof(buf),
+                "ESP-ROM:esp32c6-20210719\r\n"
+                "Build:Jul 19 2021\r\n"
+                "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
+                "SPIWP:0xee\r\n"
+                "mode:DIO, clock div:1\r\n"
+                "load:0x3fff0008,len:8\r\n"
+                "load:0x3fff0010,len:3680\r\n"
+                "load:0x40078000,len:8364\r\n"
+                "load:0x40080000,len:252\r\n"
+                "entry 0x40080034\r\n",
+                reset_cause, rst);
+            break;
+        default:
+            buf[0] = '\0';
+            break;
+        }
     }
 
     return buf;
