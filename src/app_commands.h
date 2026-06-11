@@ -39,45 +39,149 @@ extern HWND g_hStatusbar;
 /* Message size limit */
 #define MAX_MSG_SIZE        65536
 
-/* Serial callbacks (defined in main.c) */
+/*
+ * OnEsptoolProcessData - esptool protocol data receive callback
+ */
 void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify);
+
+/*
+ * OnEsptoolSignal - esptool protocol signal change callback
+ */
 void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify);
+
+/*
+ * ResetSignalState - Reset signal state for download mode detection
+ */
 void ResetSignalState(void);
 
-/* Device modification callback (defined in main.c) */
+/*
+ * OnDeviceModified - Callback when device data is modified by protocol
+ */
 void OnDeviceModified(void);
 
-/* Helper functions (defined in app_commands.c, used by main.c) */
+/*
+ * UpdateMenuState - Update menu and toolbar button states
+ */
 void UpdateMenuState(HWND hWnd);
+
+/*
+ * UpdateTitle - Update window title bar
+ */
 void UpdateTitle(HWND hWnd);
+
+/*
+ * UpdateStatusBar - Update status bar display
+ */
 void UpdateStatusBar(void);
+
+/*
+ * PromptDisconnectIfNeeded - Check if serial is connected, prompt to disconnect
+ */
 BOOL PromptDisconnectIfNeeded(HWND hWnd);
+
+/*
+ * PromptSaveIfNeeded - Check if device is modified, prompt to save
+ */
 BOOL PromptSaveIfNeeded(HWND hWnd);
+
+/*
+ * IsPortAvailable - Check if a specific port exists in the system
+ */
 BOOL IsPortAvailable(const WCHAR *portName);
+
+/*
+ * CanReconnect - Check if reconnect is available
+ */
 BOOL CanReconnect(void);
 
-/* Font management (defined in app_commands.c) */
+/*
+ * ApplyFontToEdit - Apply font to RichEdit control
+ */
 void ApplyFontToEdit(HWND hEdit, LOGFONTW *plf);
+
+/*
+ * InitDefaultFont - Initialize default font settings
+ */
 void InitDefaultFont(void);
 
-/* Command handlers (defined in app_commands.c) */
+/*
+ * Main_OnConnect - Handle Connect command
+ */
 void Main_OnConnect(HWND hWnd);
+
+/*
+ * Main_OnDisconnect - Handle Disconnect command
+ */
 void Main_OnDisconnect(HWND hWnd);
+
+/*
+ * Main_OnReconnect - Handle Reconnect command
+ */
 void Main_OnReconnect(HWND hWnd);
+
+/*
+ * Main_OnFlashImport - Handle Flash Import command
+ */
 void Main_OnFlashImport(HWND hWnd);
+
+/*
+ * Main_OnFlashExport - Handle Flash Export command
+ */
 void Main_OnFlashExport(HWND hWnd);
+
+/*
+ * Main_OnDumpDeviceAs - Handle Dump Device As command
+ */
 void Main_OnDumpDeviceAs(HWND hWnd);
+
+/*
+ * Main_OnLogClear - Handle Log Clear command
+ */
 void Main_OnLogClear(HWND hWnd);
+
+/*
+ * Main_OnLogFont - Handle Log Font command
+ */
 void Main_OnLogFont(HWND hWnd);
+
+/*
+ * Main_OnLogSaveAs - Handle Log Save As command
+ */
 void Main_OnLogSaveAs(HWND hWnd);
+
+/*
+ * Main_OnExit - Handle Exit command
+ */
 void Main_OnExit(HWND hWnd);
+
+/*
+ * Main_CmdNewDevice - Handle New Device command
+ */
 void Main_CmdNewDevice(HWND hWnd);
+
+/*
+ * Main_CmdOpenDevice - Handle Open Device command
+ */
 void Main_CmdOpenDevice(HWND hWnd);
+
+/*
+ * Main_CmdSaveDevice - Handle Save Device command
+ */
 void Main_CmdSaveDevice(HWND hWnd);
+
+/*
+ * Main_CmdSaveDeviceAs - Handle Save Device As command
+ */
 void Main_CmdSaveDeviceAs(HWND hWnd);
+
+/*
+ * Main_CmdDeviceProps - Handle Device Properties command
+ */
 void Main_CmdDeviceProps(HWND hWnd);
 
-/* Open device file by path (used by command line and drag-drop) */
+/*
+ * Main_OpenDeviceFile - Open device file by path
+ */
 BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath);
 
 #endif /* APP_COMMANDS_H */

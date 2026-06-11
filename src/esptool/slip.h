@@ -26,25 +26,43 @@ typedef struct {
     BOOL escaped;             /* TRUE if previous byte was ESC */
 } SLIP_CTX;
 
-/* Initialize SLIP decoder */
+/*
+ * Slip_Init - Initialize SLIP decoder
+ */
 void Slip_Init(SLIP_CTX *ctx);
 
-/* Feed a byte to the decoder. Returns TRUE when frame is complete */
+/*
+ * Slip_PutByte - Feed a byte to the decoder
+ *
+ * Returns TRUE when frame is complete.
+ */
 BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b);
 
-/* Check if a complete frame has been received */
+/*
+ * Slip_IsComplete - Check if a complete frame has been received
+ */
 BOOL Slip_IsComplete(const SLIP_CTX *ctx);
 
-/* Get pointer to decoded frame payload */
+/*
+ * Slip_GetPayload - Get pointer to decoded frame payload
+ */
 const BYTE *Slip_GetPayload(const SLIP_CTX *ctx);
 
-/* Get decoded frame length */
+/*
+ * Slip_GetLength - Get decoded frame length
+ */
 int  Slip_GetLength(const SLIP_CTX *ctx);
 
-/* Reset decoder state for next frame */
+/*
+ * Slip_Reset - Reset decoder state for next frame
+ */
 void Slip_Reset(SLIP_CTX *ctx);
 
-/* Encode data into SLIP frame. Returns encoded length */
+/*
+ * Slip_Encode - Encode data into SLIP frame
+ *
+ * Returns encoded length.
+ */
 int Slip_Encode(const BYTE *data, int len, BYTE *out, int out_max);
 
 #endif

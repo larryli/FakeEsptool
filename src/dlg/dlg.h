@@ -19,19 +19,39 @@ extern DEVICE_CTX g_device;
 extern ESPTOOL_CTX g_esptool;
 extern WCHAR g_szSelectedPort[32];
 
-/* Helper functions (defined in main.c) */
+/*
+ * PopulateFlashSizes - Populate flash size combo box
+ */
 void PopulateFlashSizes(HWND hFlash, CHIP_TYPE chip, DWORD currentSize);
+
+/*
+ * GetFlashSizeFromCombo - Get flash size from combo box selection
+ */
 DWORD GetFlashSizeFromCombo(HWND hFlash, CHIP_TYPE chip);
 
-/* Callback when device data is modified (defined in main.c) */
+/*
+ * OnDeviceModified - Callback when device data is modified by protocol
+ */
 void OnDeviceModified(void);
 
-/* Dialog procedures (defined in respective .c files) */
+/*
+ * DevicePropsDlgProc - Device Properties dialog procedure
+ */
 INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+
+/*
+ * PortSelectDlgProc - Port selection dialog procedure
+ */
 INT_PTR CALLBACK PortSelectDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+
+/*
+ * AboutDlgProc - About dialog procedure
+ */
 INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
 
-/* Port selection dialog (defined in port_select.c) */
+/*
+ * ShowPortSelectDialog - Show port selection dialog
+ */
 BOOL ShowPortSelectDialog(HWND hWnd);
 
 #endif /* DLG_H */

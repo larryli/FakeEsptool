@@ -10,7 +10,9 @@
 #include <wchar.h>
 #include <stdlib.h>
 
-/* Device Properties dialog procedure */
+/*
+ * DevicePropsDlgProc - Device Properties dialog procedure
+ */
 INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     static BYTE mac[6];

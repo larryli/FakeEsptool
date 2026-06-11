@@ -50,25 +50,39 @@ typedef struct DEVICE_CTX_TAG {
     BOOL      modified;         /* TRUE if data has been modified */
 } DEVICE_CTX;
 
-/* Initialize new device with chip type, flash size, and MAC */
+/*
+ * Device_Init - Initialize new device with chip type, flash size, and MAC
+ */
 BOOL Device_Init(DEVICE_CTX *ctx, CHIP_TYPE chipType, DWORD flashSize, const BYTE mac[6]);
 
-/* Release device resources */
+/*
+ * Device_Close - Release device resources
+ */
 void Device_Close(DEVICE_CTX *ctx);
 
-/* Save device to .esp file */
+/*
+ * Device_Save - Save device to .esp file
+ */
 BOOL Device_Save(DEVICE_CTX *ctx, const WCHAR *filename);
 
-/* Load device from .esp file */
+/*
+ * Device_Load - Load device from .esp file
+ */
 BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename);
 
-/* Check if device data has been modified */
+/*
+ * Device_IsModified - Check if device data has been modified
+ */
 BOOL Device_IsModified(const DEVICE_CTX *ctx);
 
-/* Set or clear modification flag */
+/*
+ * Device_SetModified - Set or clear modification flag
+ */
 void Device_SetModified(DEVICE_CTX *ctx, BOOL modified);
 
-/* Get current file path */
+/*
+ * Device_GetFilename - Get current file path
+ */
 const WCHAR *Device_GetFilename(const DEVICE_CTX *ctx);
 
 #endif

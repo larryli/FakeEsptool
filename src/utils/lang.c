@@ -14,6 +14,9 @@
 static WCHAR g_pool[STR_POOL_SIZE][STR_BUF_LEN];
 static int g_idx = 0;
 
+/*
+ * LoadStr - Load localized string by ID
+ */
 const WCHAR *LoadStr(UINT id)
 {
     /* Rotate to next buffer in pool */

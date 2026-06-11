@@ -20,7 +20,9 @@
 static const char *TAG = "CMD";
 #endif
 
-/* Helper: Check if serial is connected, prompt to disconnect if needed */
+/*
+ * PromptDisconnectIfNeeded - Check if serial is connected, prompt to disconnect
+ */
 BOOL PromptDisconnectIfNeeded(HWND hWnd)
 {
     if (!Serial_IsOpen(&g_serial))
@@ -61,7 +63,9 @@ static void GenerateDefaultFilename(WCHAR *buf)
         lstrcpyW(buf, chipName);
 }
 
-/* Helper: Check if device is modified, prompt to save if needed */
+/*
+ * PromptSaveIfNeeded - Check if device is modified, prompt to save
+ */
 BOOL PromptSaveIfNeeded(HWND hWnd)
 {
     if (!Device_IsModified(&g_device))
@@ -102,7 +106,9 @@ BOOL PromptSaveIfNeeded(HWND hWnd)
     }
 }
 
-/* Helper: Check if a specific port exists in the system */
+/*
+ * IsPortAvailable - Check if a specific port exists in the system
+ */
 BOOL IsPortAvailable(const WCHAR *portName)
 {
     WCHAR fullPort[32];
@@ -115,7 +121,9 @@ BOOL IsPortAvailable(const WCHAR *portName)
     return TRUE;
 }
 
-/* Helper: Check if reconnect is available (last port exists and not connected) */
+/*
+ * CanReconnect - Check if reconnect is available
+ */
 BOOL CanReconnect(void)
 {
     if (Serial_IsOpen(&g_serial))

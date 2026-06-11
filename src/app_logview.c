@@ -103,8 +103,6 @@ static void FreeEntryChain(LOG_ENTRY *head)
 
 /*
  * FormatTimestamp - Format current time as timestamp string
- *
- * Returns length of formatted string.
  */
 static int FormatTimestamp(WCHAR *buf, int maxLen)
 {
@@ -133,8 +131,6 @@ static void SetEditColor(HWND hEdit, COLORREF color)
 
 /*
  * AppendColoredText - Append colored text to RichEdit control
- *
- * Moves caret to end, sets color, and appends text.
  */
 static void AppendColoredText(HWND hEdit, const WCHAR *text, int len, COLORREF color)
 {

@@ -10,7 +10,9 @@
 #include "../utils/lang.h"
 #include <string.h>
 
-/* Port selection dialog procedure */
+/*
+ * PortSelectDlgProc - Port selection dialog procedure
+ */
 INT_PTR CALLBACK PortSelectDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     (void)lParam;
@@ -71,7 +73,9 @@ INT_PTR CALLBACK PortSelectDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lP
     return FALSE;
 }
 
-/* Show port selection dialog, returns TRUE if user selected a port */
+/*
+ * ShowPortSelectDialog - Show port selection dialog
+ */
 BOOL ShowPortSelectDialog(HWND hWnd)
 {
     INT_PTR ret = DialogBoxW(GetModuleHandle(NULL),

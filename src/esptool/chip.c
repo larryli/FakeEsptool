@@ -64,8 +64,11 @@ static const CHIP_CONFIG chip_configs[CHIP_COUNT] = {
     [CHIP_ESP32C6] = { "ESP32-C6", CHIP_ID_ESP32C6, IMAGE_CHIP_ID_ESP32C6, 128, TRUE,  {0x6F, 0x80, 0xE0, 0x2C} },
 };
 
-/* Write chip_id as little-endian bytes at eFuse offset 0x4C
-   (where esptool reads EFUSE_RD_REG for chip detection) */
+/*
+ * WriteChipIdToEfuse - Write chip_id as little-endian bytes at eFuse offset 0x4C
+ *
+ * (where esptool reads EFUSE_RD_REG for chip detection)
+ */
 static void WriteChipIdToEfuse(CHIP_CTX *ctx)
 {
     if (!ctx->efuse || ctx->efuse_size < 0x50)
@@ -76,7 +79,9 @@ static void WriteChipIdToEfuse(CHIP_CTX *ctx)
     ctx->efuse[0x4F] = (BYTE)((ctx->chip_id >> 24) & 0xFF);
 }
 
-/* Common chip initialization */
+/*
+ * InitChipCommon - Common chip initialization
+ */
 static BOOL InitChipCommon(CHIP_CTX *ctx, CHIP_TYPE type)
 {
     const CHIP_CONFIG *cfg = &chip_configs[type];
@@ -106,13 +111,22 @@ static BOOL InitChipCommon(CHIP_CTX *ctx, CHIP_TYPE type)
     return TRUE;
 }
 
-/* Write MAC address to eFuse for ESP8266 */
+/*
+ * WriteMacEsp8266 - Write MAC address to eFuse for ESP8266
+ *
+ * ESP8266 eFuse layout (from esptool source):
+ * - BLOCK0 (0x00-0x17): EFUSE_DATA0-3
+ * - BLOCK1 (0x18-0x27): EFUSE_DATA4-7
+ * - BLOCK2 (0x28-0x3B): EFUSE_DATA8-13
+ * - BLOCK3 (0x3C-0x5F): EFUSE_DATA14-23 (MAC stored here)
+ *
+ * MAC eFuse offsets:
+ * - word14 (0x50-0x53): MAC[5] at byte[3], MAC[4] at byte[2], ...
+ * - word15 (0x54-0x57): MAC[3] at byte[1], MAC[2] at byte[0]
+ * - word18 (0x5C-0x5F): Custom OUI (MAC[0-2])
+ */
 static void WriteMacEsp8266(CHIP_CTX *ctx)
 {
-    /* ESP8266 MAC eFuse layout (esptool-js compatible):
-       word0 (MAC_EFUSE_WORD0_ESP8266): NIC[2]=MAC[5] at byte[3], rest unused
-       word1 (MAC_EFUSE_WORD1_ESP8266): NIC[0]=MAC[3] at byte[1], NIC[1]=MAC[4] at byte[0]
-       word3 (MAC_EFUSE_WORD3_ESP8266): OUI source (0 = use default, else custom OUI) */
     ctx->efuse[0x53] = ctx->mac[5];  /* byte[3] of word0: (mac0 >> 24) = MAC[5] */
     ctx->efuse[0x54] = ctx->mac[4];  /* byte[0] of word1: mac1 & 0xFF = MAC[4] */
     ctx->efuse[0x55] = ctx->mac[3];  /* byte[1] of word1: (mac1 >> 8) = MAC[3] */
@@ -122,10 +136,18 @@ static void WriteMacEsp8266(CHIP_CTX *ctx)
     ctx->efuse[0x5E] = ctx->mac[0];  /* byte[2] of word3: OUI byte 0 */
 }
 
-/* Write MAC address to eFuse for ESP32 */
+/*
+ * WriteMacEsp32 - Write MAC address to eFuse for ESP32
+ *
+ * ESP32 eFuse layout (from TRM Table 28-5):
+ * - eFuse word0 (0x00-0x03): chip_id
+ * - eFuse word1 (0x04-0x07): MAC[5:2]
+ * - eFuse word2 (0x08-0x0B): MAC[1:0] + padding
+ *
+ * MAC eFuse read base: 0x3FF5A000 (EFUSE_RD_REG_BASE_ESP32)
+ */
 static void WriteMacEsp32(CHIP_CTX *ctx)
 {
-    /* MAC at EFUSE_RD_REG_BASE + 4 (word1): mac[5],mac[4],mac[3],mac[2] */
     ctx->efuse[4] = ctx->mac[5];
     ctx->efuse[5] = ctx->mac[4];
     ctx->efuse[6] = ctx->mac[3];
@@ -135,7 +157,19 @@ static void WriteMacEsp32(CHIP_CTX *ctx)
     ctx->efuse[9] = ctx->mac[0];
 }
 
-/* Write MAC address to eFuse for ESP32-S2/S3/C3/C6 (at offset 0x44) */
+/*
+ * WriteMacAt0x44 - Write MAC address to eFuse for ESP32-S2/S3/C3/C6
+ *
+ * Common eFuse layout (from respective TRMs):
+ * - eFuse word17 (offset 0x44-0x47): MAC[5:2]
+ * - eFuse word18 (offset 0x48-0x4B): MAC[1:0] + padding
+ *
+ * Base addresses:
+ * - ESP32-S2: 0x3F41A000 (EFUSE_BASE_ESP32S2)
+ * - ESP32-S3: 0x60007000 (EFUSE_BASE_ESP32S3)
+ * - ESP32-C3: 0x60008800 (EFUSE_BASE_ESP32C3)
+ * - ESP32-C6: 0x600B0800 (EFUSE_BASE_ESP32C6)
+ */
 static void WriteMacAt0x44(CHIP_CTX *ctx)
 {
     ctx->efuse[0x44] = ctx->mac[5];
@@ -146,7 +180,16 @@ static void WriteMacAt0x44(CHIP_CTX *ctx)
     ctx->efuse[0x49] = ctx->mac[0];
 }
 
-/* Write MAC address to eFuse for ESP32-C2 (at offset 0x40) */
+/*
+ * WriteMacAt0x40 - Write MAC address to eFuse for ESP32-C2
+ *
+ * ESP32-C2 eFuse layout (from TRM):
+ * - eFuse word16 (offset 0x40-0x43): MAC[5:2]
+ * - eFuse word17 (offset 0x44-0x47): MAC[1:0] + padding
+ *
+ * Note: ESP32-C2 uses offset 0x40 (not 0x44 like other chips)
+ * Base address: 0x60008800 (EFUSE_BASE_ESP32C2)
+ */
 static void WriteMacAt0x40(CHIP_CTX *ctx)
 {
     ctx->efuse[0x40] = ctx->mac[5];
@@ -157,7 +200,9 @@ static void WriteMacAt0x40(CHIP_CTX *ctx)
     ctx->efuse[0x45] = ctx->mac[0];
 }
 
-/* Initialize ESP8266 chip context */
+/*
+ * InitEsp8266 - Initialize ESP8266 chip context
+ */
 static BOOL InitEsp8266(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP8266))
@@ -166,7 +211,9 @@ static BOOL InitEsp8266(CHIP_CTX *ctx)
     return TRUE;
 }
 
-/* Initialize ESP32 chip context */
+/*
+ * InitEsp32 - Initialize ESP32 chip context
+ */
 static BOOL InitEsp32(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32))
@@ -176,7 +223,9 @@ static BOOL InitEsp32(CHIP_CTX *ctx)
     return TRUE;
 }
 
-/* Initialize ESP32-S2 chip context */
+/*
+ * InitEsp32S2 - Initialize ESP32-S2 chip context
+ */
 static BOOL InitEsp32S2(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32S2))
@@ -191,7 +240,9 @@ static BOOL InitEsp32S2(CHIP_CTX *ctx)
     return TRUE;
 }
 
-/* Initialize ESP32-S3 chip context */
+/*
+ * InitEsp32S3 - Initialize ESP32-S3 chip context
+ */
 static BOOL InitEsp32S3(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32S3))
@@ -206,7 +257,9 @@ static BOOL InitEsp32S3(CHIP_CTX *ctx)
     return TRUE;
 }
 
-/* Initialize ESP32-C2 chip context */
+/*
+ * InitEsp32C2 - Initialize ESP32-C2 chip context
+ */
 static BOOL InitEsp32C2(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32C2))
@@ -224,7 +277,9 @@ static BOOL InitEsp32C2(CHIP_CTX *ctx)
     return TRUE;
 }
 
-/* Initialize ESP32-C3 chip context */
+/*
+ * InitEsp32C3 - Initialize ESP32-C3 chip context
+ */
 static BOOL InitEsp32C3(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32C3))
@@ -239,7 +294,9 @@ static BOOL InitEsp32C3(CHIP_CTX *ctx)
     return TRUE;
 }
 
-/* Initialize ESP32-C6 chip context */
+/*
+ * InitEsp32C6 - Initialize ESP32-C6 chip context
+ */
 static BOOL InitEsp32C6(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32C6))

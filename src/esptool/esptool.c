@@ -55,12 +55,12 @@ static const char *GetCmdName(BYTE cmd)
     return name ? name : "UNKNOWN";
 }
 
-/* SYNC response sequence (36 bytes).
-   First 3 bytes (0x07, 0x07, 0x12) are used in Val field.
-   The 4th byte (0x20) is NOT used - code uses 0x55 (first padding byte from request).
-   Remaining bytes are padding (not used in response). */
+/* SYNC response sequence template.
+   Bytes 0-2: {0x07, 0x07, 0x12} used in Val field (little-endian).
+   Byte 3: 0x55 from request padding (NOT from this array - see HandleSync).
+   Bytes 4-35: Padding (unused in response). */
 static const BYTE sync_response[ESP_SYNC_SEQ_LEN] = {
-    0x07, 0x07, 0x12, 0x20,
+    0x07, 0x07, 0x12, 0x20,  /* [3] = 0x20 placeholder, actual value from request */
     0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
     0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
     0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
@@ -75,7 +75,9 @@ BYTE Esptool_CalcChecksum(const BYTE *data, int len)
     return sum;
 }
 
-/* Free deflate accumulation buffer (without writing to flash) */
+/*
+ * Defl_FreeBuffer - Free deflate accumulation buffer (without writing to flash)
+ */
 static void Defl_FreeBuffer(ESPTOOL_CTX *ctx)
 {
     if (ctx->defl_buf) {
@@ -187,6 +189,17 @@ void Esptool_SetBaudRateCallback(ESPTOOL_CTX *ctx, ESP_BAUDRATE_CB cb)
     ctx->onBaudRate = cb;
 }
 
+/*
+ * Esptool_SendResponseEx - Send protocol response with configurable status length
+ *
+ * @ctx:        Protocol context
+ * @cmd:        Command code (response will echo this)
+ * @req_val:    Value field in response (usually last READ_REG value)
+ * @status:     Status code (ESP_OK or ESP_FAIL)
+ * @status_len: Status length in bytes (2 for stub, 4 for ROM)
+ * @data:       Optional data payload (can be NULL)
+ * @data_len:   Data payload length
+ */
 void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD status, BYTE status_len, const BYTE *data, WORD data_len)
 {
     BYTE resp[ESP_RESP_BUF_SIZE];

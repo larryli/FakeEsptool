@@ -13,7 +13,9 @@
 #include "../resource.h"
 #include "../utils/lang.h"
 
-/* About dialog procedure */
+/*
+ * AboutDlgProc - About dialog procedure
+ */
 INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg) {

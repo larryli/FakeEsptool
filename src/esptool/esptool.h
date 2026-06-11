@@ -128,37 +128,67 @@ typedef struct {
     DWORD     defl_unc_size;  /* Uncompressed size for current deflate session */
 } ESPTOOL_CTX;
 
-/* Initialize ESP protocol context with device data */
+/*
+ * Esptool_Init - Initialize ESP protocol context with device data
+ */
 void Esptool_Init(ESPTOOL_CTX *ctx, CHIP_CTX *chip, FLASH_CTX *flash);
 
-/* Reset protocol state (called on download mode entry) */
+/*
+ * Esptool_ResetState - Reset protocol state (called on download mode entry)
+ */
 void Esptool_ResetState(ESPTOOL_CTX *ctx);
 
-/* Set notification window for TX data */
+/*
+ * Esptool_SetNotify - Set notification window for TX data
+ */
 void Esptool_SetNotify(ESPTOOL_CTX *ctx, HWND hNotify);
 
-/* Set callback for device modification */
+/*
+ * Esptool_SetModifiedCallback - Set callback for device modification
+ */
 void Esptool_SetModifiedCallback(ESPTOOL_CTX *ctx, ESP_MODIFIED_CB cb);
 
-/* Set write callback for sending data to serial port */
+/*
+ * Esptool_SetWriteCallback - Set write callback for sending data to serial port
+ */
 void Esptool_SetWriteCallback(ESPTOOL_CTX *ctx, ESP_WRITE_CB cb);
 
-/* Set baud rate change callback */
+/*
+ * Esptool_SetBaudRateCallback - Set baud rate change callback
+ */
 void Esptool_SetBaudRateCallback(ESPTOOL_CTX *ctx, ESP_BAUDRATE_CB cb);
 
-/* Feed raw serial data to protocol decoder */
+/*
+ * Esptool_Feed - Feed raw serial data to protocol decoder
+ */
 BOOL Esptool_Feed(ESPTOOL_CTX *ctx, const BYTE *data, int len);
 
-/* Process a complete SLIP frame */
+/*
+ * Esptool_ProcessFrame - Process a complete SLIP frame
+ */
 BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len);
 
-/* Send response packet with status in data */
+/*
+ * Esptool_SendResponse - Send response packet with status in data
+ */
 void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD status, const BYTE *data, WORD data_len);
 
-/* Send response with configurable status length (2 or 4 bytes) */
+/*
+ * Esptool_SendResponseEx - Send response packet with configurable status length
+ *
+ * @ctx:        Protocol context
+ * @cmd:        Command code (echoed in response)
+ * @req_val:    Value field (usually last READ_REG value for non-SYNC/READ_REG)
+ * @status:     ESP_OK (0x00) or ESP_FAIL (0x01)
+ * @status_len: Status bytes (2 for stub mode, 4 for ROM mode)
+ * @data:       Optional data payload (can be NULL if data_len=0)
+ * @data_len:   Data payload length in bytes
+ */
 void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD status, BYTE status_len, const BYTE *data, WORD data_len);
 
-/* Calculate XOR checksum */
+/*
+ * Esptool_CalcChecksum - Calculate XOR checksum
+ */
 BYTE Esptool_CalcChecksum(const BYTE *data, int len);
 
 #endif

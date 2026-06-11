@@ -24,8 +24,19 @@
 
 #include <windows.h>
 
+/*
+ * Trace_Init - Initialize trace logging
+ */
 void Trace_Init(void);
+
+/*
+ * Trace_Close - Close trace logging
+ */
 void Trace_Close(void);
+
+/*
+ * Trace_Write - Write trace message to log file
+ */
 void Trace_Write(const char *tag, const char *fmt, ...);
 
 #define TRACE_INIT()    Trace_Init()

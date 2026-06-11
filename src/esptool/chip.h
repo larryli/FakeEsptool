@@ -208,53 +208,87 @@ typedef struct {
     DWORD spi_regs[SPI_REG_COUNT]; /* SPI register file */
 } CHIP_CTX;
 
-/* Initialize chip context with type-specific defaults */
+/*
+ * Chip_Init - Initialize chip context with type-specific defaults
+ */
 BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type);
 
-/* Release chip resources (free eFuse memory) */
+/*
+ * Chip_Close - Release chip resources (free eFuse memory)
+ */
 void Chip_Close(CHIP_CTX *ctx);
 
-/* Get chip name string */
+/*
+ * Chip_GetName - Get chip name string
+ */
 const char *Chip_GetName(const CHIP_CTX *ctx);
 
-/* Set MAC address */
+/*
+ * Chip_SetMac - Set MAC address
+ */
 BOOL Chip_SetMac(CHIP_CTX *ctx, const BYTE mac[6]);
 
-/* Get MAC address */
+/*
+ * Chip_GetMac - Get MAC address
+ */
 const BYTE *Chip_GetMac(const CHIP_CTX *ctx);
 
-/* Read register value (supports eFuse address range) */
+/*
+ * Chip_ReadReg - Read register value (supports eFuse address range)
+ */
 DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr);
 
-/* Write register value (eFuse OR operation) */
+/*
+ * Chip_WriteReg - Write register value (eFuse OR operation)
+ */
 BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val);
 
-/* Set flash size */
+/*
+ * Chip_SetFlashSize - Set flash size
+ */
 void Chip_SetFlashSize(CHIP_CTX *ctx, DWORD size);
 
-/* Get flash size */
+/*
+ * Chip_GetFlashSize - Get flash size
+ */
 DWORD Chip_GetFlashSize(const CHIP_CTX *ctx);
 
-/* Get chip ID */
+/*
+ * Chip_GetChipId - Get chip ID
+ */
 DWORD Chip_GetChipId(const CHIP_CTX *ctx);
 
-/* Get eFuse data pointer */
+/*
+ * Chip_GetEfuse - Get eFuse data pointer
+ */
 const BYTE *Chip_GetEfuse(const CHIP_CTX *ctx);
 
-/* Get eFuse size in bytes */
+/*
+ * Chip_GetEfuseSize - Get eFuse size in bytes
+ */
 int Chip_GetEfuseSize(const CHIP_CTX *ctx);
 
-/* Get boot message baud rate (depends on chip type and crystal frequency) */
+/*
+ * Chip_GetBootBaudRate - Get boot message baud rate
+ *
+ * Depends on chip type and crystal frequency.
+ */
 DWORD Chip_GetBootBaudRate(const CHIP_CTX *ctx);
 
-/* Get boot message text for reset.
-   Returns multi-line ASCII string with \r\n line endings.
-   download_mode: TRUE for download mode entry, FALSE for normal flash boot
-   reset_cause: 0x01=POWERON, 0x02=EXT, 0x03=WDT */
+/*
+ * Chip_GetBootMessage - Get boot message text for reset
+ *
+ * Returns multi-line ASCII string with \r\n line endings.
+ * download_mode: TRUE for download mode entry, FALSE for normal flash boot
+ * reset_cause: 0x01=POWERON, 0x02=EXT, 0x03=WDT
+ */
 const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE reset_cause);
 
-/* Ensure chip revision is set in eFuse (for backward compatibility with
-   old .esp files that don't have chip revision data). */
+/*
+ * Chip_EnsureRevision - Ensure chip revision is set in eFuse
+ *
+ * For backward compatibility with old .esp files that don't have chip revision data.
+ */
 void Chip_EnsureRevision(CHIP_CTX *ctx);
 
 #endif

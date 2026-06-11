@@ -98,8 +98,16 @@ BOOL Serial_EnumPorts(HWND hCombo)
 /*
  * Listener_Proc - Monitor serial port using WaitCommEvent
  *
- * This thread waits for comm events (EV_RXCHAR, etc.) and posts
- * notifications to the UI thread.
+ * This thread waits for comm events (EV_RXCHAR, EV_DSR, EV_CTS, etc.)
+ * and posts notifications to the UI thread via PostMessage.
+ *
+ * Thread safety:
+ * - Read only: ctx->hPort, ctx->hNotify, ctx->bRunning, ctx->onReceive, ctx->onSignal
+ * - Write only: ctx->dwRxBytes, ctx->dwTxBytes (volatile, no lock needed for stats)
+ * - Synchronization: ctx->bRunning checked before each operation
+ * - Callbacks (onReceive, onSignal) called from this thread, must be thread-safe
+ *
+ * Shutdown: Set ctx->bRunning = FALSE, then CancelIo to interrupt WaitCommEvent.
  */
 static DWORD WINAPI Listener_Proc(LPVOID param)
 {
@@ -418,19 +426,25 @@ void Serial_Close(SERIAL_CTX *ctx)
     }
 }
 
-/* Check if serial port is open */
+/*
+ * Serial_IsOpen - Check if port is open and running
+ */
 BOOL Serial_IsOpen(const SERIAL_CTX *ctx)
 {
     return (ctx->hPort != INVALID_HANDLE_VALUE && ctx->hPort != NULL && ctx->bRunning);
 }
 
-/* Get total received bytes */
+/*
+ * Serial_GetRxBytes - Get total received byte count
+ */
 DWORD Serial_GetRxBytes(const SERIAL_CTX *ctx)
 {
     return ctx->dwRxBytes;
 }
 
-/* Get port name by index */
+/*
+ * Serial_GetPortName - Get port name by index
+ */
 BOOL Serial_GetPortName(int index, WCHAR *portName, int maxLen)
 {
     if (index < 0 || index >= g_portCount)
@@ -439,13 +453,19 @@ BOOL Serial_GetPortName(int index, WCHAR *portName, int maxLen)
     return TRUE;
 }
 
-/* Get total sent bytes */
+/*
+ * Serial_GetTxBytes - Get total sent byte count
+ */
 DWORD Serial_GetTxBytes(const SERIAL_CTX *ctx)
 {
     return ctx->dwTxBytes;
 }
 
-/* Write data to serial port */
+/*
+ * Serial_WriteData - Write data to serial port
+ *
+ * Returns: Number of bytes written.
+ */
 DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify)
 {
     if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
@@ -489,14 +509,18 @@ DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotif
     return bytesWritten;
 }
 
-/* Set the receive data callback */
+/*
+ * Serial_SetReceiveCallback - Set the receive data callback
+ */
 void Serial_SetReceiveCallback(SERIAL_CTX *ctx, SERIAL_RX_CB cb)
 {
     if (ctx)
         ctx->onReceive = cb;
 }
 
-/* Post a custom log message to the UI thread */
+/*
+ * Serial_PostLog - Post a custom log message to the UI thread
+ */
 void Serial_PostLog(HWND hNotify, const WCHAR *tag, const WCHAR *text)
 {
     if (!hNotify || !IsWindow(hNotify) || !tag || !text)
@@ -521,7 +545,9 @@ void Serial_PostLog(HWND hNotify, const WCHAR *tag, const WCHAR *text)
     }
 }
 
-/* Post a formatted log message to the UI thread */
+/*
+ * Serial_PostLogF - Post a formatted log message to the UI thread
+ */
 #define LOGF_BUF_SIZE 4096
 
 void Serial_PostLogF(HWND hNotify, const WCHAR *tag, const WCHAR *fmt, ...)
@@ -538,14 +564,18 @@ void Serial_PostLogF(HWND hNotify, const WCHAR *tag, const WCHAR *fmt, ...)
     Serial_PostLog(hNotify, tag, buf);
 }
 
-/* Set the signal change callback */
+/*
+ * Serial_SetSignalCallback - Set the signal change callback
+ */
 void Serial_SetSignalCallback(SERIAL_CTX *ctx, SERIAL_SIGNAL_CB cb)
 {
     if (ctx)
         ctx->onSignal = cb;
 }
 
-/* Set or clear DTR signal */
+/*
+ * Serial_SetDtr - Set or clear DTR signal
+ */
 BOOL Serial_SetDtr(SERIAL_CTX *ctx, BOOL state)
 {
     if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
@@ -559,7 +589,9 @@ BOOL Serial_SetDtr(SERIAL_CTX *ctx, BOOL state)
     return result;
 }
 
-/* Set or clear RTS signal */
+/*
+ * Serial_SetRts - Set or clear RTS signal
+ */
 BOOL Serial_SetRts(SERIAL_CTX *ctx, BOOL state)
 {
     if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
@@ -573,7 +605,9 @@ BOOL Serial_SetRts(SERIAL_CTX *ctx, BOOL state)
     return result;
 }
 
-/* Change baud rate at runtime */
+/*
+ * Serial_SetBaudRate - Change baud rate at runtime
+ */
 BOOL Serial_SetBaudRate(SERIAL_CTX *ctx, DWORD baudRate)
 {
     if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
@@ -595,7 +629,9 @@ BOOL Serial_SetBaudRate(SERIAL_CTX *ctx, DWORD baudRate)
     return TRUE;
 }
 
-/* Change data bits at runtime */
+/*
+ * Serial_SetDataBits - Change data bits (5, 6, 7, 8)
+ */
 BOOL Serial_SetDataBits(SERIAL_CTX *ctx, BYTE dataBits)
 {
     if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
@@ -619,7 +655,9 @@ BOOL Serial_SetDataBits(SERIAL_CTX *ctx, BYTE dataBits)
     return TRUE;
 }
 
-/* Change parity mode */
+/*
+ * Serial_SetParity - Change parity mode
+ */
 BOOL Serial_SetParity(SERIAL_CTX *ctx, BYTE parity)
 {
     if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
@@ -642,7 +680,9 @@ BOOL Serial_SetParity(SERIAL_CTX *ctx, BYTE parity)
     return TRUE;
 }
 
-/* Change stop bits */
+/*
+ * Serial_SetStopBits - Change stop bits
+ */
 BOOL Serial_SetStopBits(SERIAL_CTX *ctx, BYTE stopBits)
 {
     if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
@@ -664,7 +704,9 @@ BOOL Serial_SetStopBits(SERIAL_CTX *ctx, BYTE stopBits)
     return TRUE;
 }
 
-/* Get current serial port configuration */
+/*
+ * Serial_GetConfig - Get current serial port configuration
+ */
 BOOL Serial_GetConfig(SERIAL_CTX *ctx, DWORD *baudRate, BYTE *dataBits, BYTE *parity, BYTE *stopBits)
 {
     if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)

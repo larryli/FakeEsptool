@@ -59,13 +59,19 @@ void LogView_FlushTimer(void);
  */
 void LogView_Flush(void);
 
-/* Format and append RX/TX data to log display */
+/*
+ * Main_AppendLog - Format and append RX/TX data to log display
+ */
 void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir);
 
-/* Format and append custom text to log display */
+/*
+ * Main_AppendCustomLog - Format and append custom text to log display
+ */
 void Main_AppendCustomLog(HWND hMainWnd, const WCHAR *tag, const WCHAR *text);
 
-/* Format and append signal/config log with distinct colors */
+/*
+ * Main_AppendSignalLog - Format and append signal/config log with distinct colors
+ */
 void Main_AppendSignalLog(const WCHAR *tag, const WCHAR *text, COLORREF tagColor);
 
 #endif /* APP_LOGVIEW_H */

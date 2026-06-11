@@ -13,6 +13,9 @@ static inline void *deflate_malloc(size_t size) {
     return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
 }
 
+/*
+ * deflate_free - Free allocated memory
+ */
 static inline void deflate_free(void *ptr) {
     if (ptr) HeapFree(GetProcessHeap(), 0, ptr);
 }
@@ -327,7 +330,9 @@ static int deflate_decode_dynamic(DEFLATE_CTX *ctx)
     return DEFLATE_OK;
 }
 
-/* Decode a static Huffman block */
+/*
+ * deflate_decode_static - Decode a static Huffman block
+ */
 static int deflate_decode_static(DEFLATE_CTX *ctx)
 {
     BYTE lengths[288];
@@ -362,7 +367,9 @@ static int deflate_decode_static(DEFLATE_CTX *ctx)
     return DEFLATE_OK;
 }
 
-/* Process a DEFLATE block */
+/*
+ * deflate_process_block - Process a DEFLATE block
+ */
 static int deflate_process_block(DEFLATE_CTX *ctx)
 {
     int bfinal, btype;

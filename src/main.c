@@ -133,7 +133,9 @@ static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam);
 static LRESULT Main_OnCopyData(HWND hWnd, WPARAM wParam, LPARAM lParam);
 static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam);
 
-/* Callback when device data is modified by protocol */
+/*
+ * OnDeviceModified - Callback when device data is modified by protocol
+ */
 void OnDeviceModified(void)
 {
     Device_SetModified(&g_device, TRUE);
@@ -141,7 +143,9 @@ void OnDeviceModified(void)
         UpdateTitle(g_hWnd);
 }
 
-/* Callback to write data to serial port */
+/*
+ * OnSerialWrite - Callback to write data to serial port
+ */
 static DWORD OnSerialWrite(const BYTE *data, DWORD len)
 {
     if (!Serial_IsOpen(&g_serial))
@@ -149,7 +153,9 @@ static DWORD OnSerialWrite(const BYTE *data, DWORD len)
     return Serial_WriteData(&g_serial, data, len, g_hWnd);
 }
 
-/* Callback to change serial port baud rate */
+/*
+ * OnBaudRateChange - Callback to change serial port baud rate
+ */
 static BOOL OnBaudRateChange(DWORD baudRate)
 {
     if (!Serial_IsOpen(&g_serial))
@@ -157,7 +163,9 @@ static BOOL OnBaudRateChange(DWORD baudRate)
     return Serial_SetBaudRate(&g_serial, baudRate);
 }
 
-/* esptool protocol data receive callback */
+/*
+ * OnEsptoolProcessData - esptool protocol data receive callback
+ */
 void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify)
 {
     if (!ctx || !data || len == 0)
@@ -172,7 +180,9 @@ static BOOL g_prev_cts = FALSE;
 static BOOL g_reset_pending = FALSE;
 static BOOL g_saw_io0_low = FALSE;  /* DSR:ON CTS:OFF seen = IO0=LOW */
 
-/* Reset signal state (call when serial connection is established) */
+/*
+ * ResetSignalState - Reset signal state (call when serial connection is established)
+ */
 void ResetSignalState(void)
 {
     g_prev_dsr = FALSE;
@@ -181,7 +191,9 @@ void ResetSignalState(void)
     g_saw_io0_low = FALSE;
 }
 
-/* Output boot message to serial and log window (for download mode) */
+/*
+ * OutputBootMessage - Output boot message to serial and log window (for download mode)
+ */
 static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode, BYTE reset_cause, HWND hNotify)
 {
     Esptool_ResetState(&g_esptool);
@@ -221,8 +233,11 @@ static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode, BYTE reset_ca
     }
 }
 
-/* esptool protocol signal change callback
-   Note: Called only from the serial listener thread (single-threaded access) */
+/*
+ * OnEsptoolSignal - esptool protocol signal change callback
+ *
+ * Note: Called only from the serial listener thread (single-threaded access)
+ */
 void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
 {
     BOOL dsr = (modemStatus & MS_DSR_ON) != 0;
@@ -302,7 +317,11 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
     return DefWindowProcW(hWnd, msg, wParam, lParam);
 }
 
-/* Handle WM_CREATE - create toolbar, status bar, and edit control */
+/*
+ * Main_OnCreate - Handle WM_CREATE
+ *
+ * Creates toolbar, status bar, and edit control.
+ */
 static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     g_hWnd = hWnd;
@@ -454,7 +473,11 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_SIZE - resize toolbar, status bar, and edit control */
+/*
+ * Main_OnSize - Handle WM_SIZE
+ *
+ * Resizes toolbar, status bar, and edit control.
+ */
 static LRESULT Main_OnSize(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     RECT rcClient;
@@ -478,7 +501,11 @@ static LRESULT Main_OnSize(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_COMMAND - menu and toolbar commands */
+/*
+ * Main_OnCommand - Handle WM_COMMAND
+ *
+ * Dispatches menu and toolbar commands.
+ */
 static LRESULT Main_OnCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     switch (LOWORD(wParam)) {
@@ -505,7 +532,11 @@ static LRESULT Main_OnCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_NOTIFY - toolbar tooltip requests */
+/*
+ * Main_OnNotify - Handle WM_NOTIFY
+ *
+ * Handles toolbar tooltip requests.
+ */
 static LRESULT Main_OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     if (((NMHDR *)lParam)->code == TTN_GETDISPINFOW) {
@@ -535,7 +566,11 @@ static LRESULT Main_OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_SERIAL_RX - RX data received from serial port */
+/*
+ * Main_OnSerialRx - Handle WM_SERIAL_RX
+ *
+ * RX data received from serial port.
+ */
 static LRESULT Main_OnSerialRx(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     DWORD len = (DWORD)wParam;
@@ -549,7 +584,11 @@ static LRESULT Main_OnSerialRx(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_SERIAL_TX - TX data sent to serial port */
+/*
+ * Main_OnSerialTx - Handle WM_SERIAL_TX
+ *
+ * TX data sent to serial port.
+ */
 static LRESULT Main_OnSerialTx(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     DWORD len = (DWORD)wParam;
@@ -563,7 +602,11 @@ static LRESULT Main_OnSerialTx(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_SERIAL_ERROR - connection lost notification */
+/*
+ * Main_OnSerialError - Handle WM_SERIAL_ERROR
+ *
+ * Connection lost notification.
+ */
 static LRESULT Main_OnSerialError(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     TRACE_FW(TAG, "Connection lost, error code: %lu", (DWORD)wParam);
@@ -575,7 +618,11 @@ static LRESULT Main_OnSerialError(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_SERIAL_LOG - custom log message from protocol layer */
+/*
+ * Main_OnSerialLog - Handle WM_SERIAL_LOG
+ *
+ * Custom log message from protocol layer.
+ */
 static LRESULT Main_OnSerialLog(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     WCHAR *tag = (WCHAR *)wParam;
@@ -588,7 +635,11 @@ static LRESULT Main_OnSerialLog(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_SERIAL_SIGNAL - signal change notification */
+/*
+ * Main_OnSerialSignal - Handle WM_SERIAL_SIGNAL
+ *
+ * Signal change notification.
+ */
 static LRESULT Main_OnSerialSignal(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     DWORD param = (DWORD)wParam;
@@ -618,7 +669,11 @@ static LRESULT Main_OnSerialSignal(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_SERIAL_CONFIG - configuration change notification */
+/*
+ * Main_OnSerialConfig - Handle WM_SERIAL_CONFIG
+ *
+ * Configuration change notification.
+ */
 static LRESULT Main_OnSerialConfig(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     DWORD baudRate = 0;
@@ -646,7 +701,11 @@ static LRESULT Main_OnSerialConfig(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_DUMP_COMPLETE - dump thread completion notification */
+/*
+ * Main_OnDumpComplete - Handle WM_DUMP_COMPLETE
+ *
+ * Dump thread completion notification.
+ */
 static LRESULT Main_OnDumpComplete(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     BOOL success = (BOOL)wParam;
@@ -665,7 +724,11 @@ static LRESULT Main_OnDumpComplete(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_DEVICECHANGE - device removal */
+/*
+ * Main_OnDeviceChange - Handle WM_DEVICECHANGE
+ *
+ * Device removal notification.
+ */
 static LRESULT Main_OnDeviceChange(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     if (wParam == DBT_DEVICEREMOVECOMPLETE && Serial_IsOpen(&g_serial)) {
@@ -683,7 +746,11 @@ static LRESULT Main_OnDeviceChange(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_CLOSE - close button (X) with confirmation */
+/*
+ * Main_OnClose - Handle WM_CLOSE
+ *
+ * Close button (X) with confirmation.
+ */
 static LRESULT Main_OnClose(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     if (!PromptDisconnectIfNeeded(hWnd))
@@ -694,7 +761,11 @@ static LRESULT Main_OnClose(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_APP_INIT - initialization, check for command line file or last device file */
+/*
+ * Main_OnAppInit - Handle WM_APP_INIT
+ *
+ * Initialization, check for command line file or last device file.
+ */
 static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     (void)wParam;
@@ -753,7 +824,11 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_COPYDATA - receive file path from another instance */
+/*
+ * Main_OnCopyData - Handle WM_COPYDATA
+ *
+ * Receive file path from another instance.
+ */
 static LRESULT Main_OnCopyData(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     PCOPYDATASTRUCT pcds = (PCOPYDATASTRUCT)lParam;
@@ -774,7 +849,11 @@ static LRESULT Main_OnCopyData(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return FALSE;
 }
 
-/* Handle WM_DROPFILES - file drag and drop */
+/*
+ * Main_OnDropFiles - Handle WM_DROPFILES
+ *
+ * File drag and drop.
+ */
 static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     HDROP hDrop = (HDROP)wParam;
@@ -820,7 +899,11 @@ static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-/* Handle WM_DESTROY - cleanup and exit */
+/*
+ * Main_OnDestroy - Handle WM_DESTROY
+ *
+ * Cleanup and exit.
+ */
 static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     /* Flush and shutdown log view subsystem */
