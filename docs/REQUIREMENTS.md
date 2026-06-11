@@ -488,51 +488,6 @@ ESP 芯片通过 DTR/RTS 信号控制 GPIO0 和 EN 引脚进入下载模式：
 
 详见 [PROTOCOL.md](PROTOCOL.md)。
 
-### 协议概述
-
-基于 SLIP 封装的请求/响应协议，模拟 ESP 芯片设备端行为。
-
-### SLIP 封装
-
-- 帧起始/结束: `0xC0`
-- 转义 `0xC0`: `0xDB 0xDC`
-- 转义 `0xDB`: `0xDB 0xDD`
-
-### 命令格式
-
-请求包:
-```
-[dir=0x00][cmd][size:2][value:4][data:N][checksum:1]
-```
-
-响应包:
-```
-[dir=0x01][cmd][size:2][status:4][data:N]
-```
-
-### 支持的命令
-
-| 码 | 名称 | 说明 |
-|----|------|------|
-| 0x02 | FLASH_BEGIN | Flash 写入开始 |
-| 0x03 | FLASH_DATA | Flash 写入数据 |
-| 0x04 | FLASH_END | Flash 写入结束 |
-| 0x05 | MEM_BEGIN | 内存写入开始 |
-| 0x06 | MEM_END | 内存写入结束 |
-| 0x07 | MEM_DATA | 内存写入数据 |
-| 0x08 | SYNC | 同步握手 |
-| 0x09 | WRITE_REG | 写寄存器 |
-| 0x0A | READ_REG | 读寄存器 |
-| 0x0F | CHANGE_BAUDRATE | 修改波特率 |
-| 0x10 | FLASH_DEFL_BEGIN | 压缩写入开始 |
-| 0x11 | FLASH_DEFL_DATA | 压缩写入数据 |
-| 0x12 | FLASH_DEFL_END | 压缩写入结束 |
-| 0x13 | SPI_FLASH_MD5 | 计算 Flash MD5 |
-| 0x14 | GET_SECURITY_INFO | 获取安全信息 |
-| 0xD0 | ERASE_FLASH | 擦除整个 Flash |
-| 0xD1 | ERASE_REGION | 擦除 Flash 区域 |
-| 0xD2 | READ_FLASH | 读取 Flash |
-
 ### 芯片支持
 
 | 芯片 | 说明 |
@@ -544,17 +499,3 @@ ESP 芯片通过 DTR/RTS 信号控制 GPIO0 和 EN 引脚进入下载模式：
 | ESP32-C2 | 低成本 WiFi |
 | ESP32-C3 | RISC-V WiFi+BT |
 | ESP32-C6 | WiFi 6+BLE 5 |
-
----
-
-## 已知问题
-
-### ~~FLASH_DEFL_DATA 分包解压 Bug~~ (已修复)
-
-**现象：** 压缩烧录大文件时，第二个及后续 `FLASH_DEFL_DATA` 包解压失败，导致烧录数据不完整。
-
-**原因：** esptool 客户端将整个镜像压缩为一个 deflate 流后按 `FLASH_WRITE_SIZE` 切分发送。当前自定义 `deflate.c` 不支持流式输入，无法处理跨包的 deflate block 边界。
-
-**修复：** 采用积累解压方案，在 `esptool.c` 中积累所有 `FLASH_DEFL_DATA` 包，到 `FLASH_DEFL_END` 时一次性解压。
-
-**状态：** 已修复。详见 `DEVELOPMENT.md` 积累解压方案实现细节。

@@ -34,40 +34,67 @@ cmake --build build
 
 ## 使用
 
-1. 创建虚拟串口对（使用 com0com 或其他虚拟串口驱动）
+### 快速开始
+
+1. 创建虚拟串口对或连接实体串口（见下方详细说明）
 2. 运行 `build\FakeEsptool.exe`（自动创建默认 ESP32 设备）
 3. 如需修改设备参数，使用 File > Device Properties
 4. Serial > Connect 选择串口
 5. 用 esptool 客户端连接另一端进行烧录测试
 
+### 串口连接方式
+
+#### 方式一：com0com 虚拟串口对
+
+com0com 是 Windows 平台免费的虚拟串口驱动，创建成对的虚拟串口（如 COM10 ↔ COM11）。
+
+**注意事项：**
+
+- com0com 虚拟串口支持 DTR/RTS 信号控制，可测试完整的下载模式进入流程
+- **⚠️ WSL 兼容性警告：** com0com 创建的虚拟串口在 WSL (Windows Subsystem for Linux) 中**无法使用**。WSL 无法访问 Windows 原生的 com0com 虚拟串口设备。如需在 WSL 中使用 esptool，请使用实体串口或支持 WSL 的其他虚拟串口方案。
+
+#### 方式二：实体串口对（USB 转串口）
+
+使用两个 USB 转串口适配器，通过物理连线创建串口对。
+
+**所需设备：**
+
+- 2 个 USB 转串口适配器（如 CH340、CP2102、FT232）
+- 杜邦线 2 根或 4 根（同一电脑 GND 已共地）
+
+**最小连接（2 线）：**
+
+仅需 TXD、RXD 两根线即可通信，但无法测试重启和下载模式开始信号：
+
+```
+  USB 串口 A          USB 串口 B
+  ┌────────┐         ┌────────┐
+  │  TXD ──┼─────────┼─► RXD  │
+  │  RXD ◄─┼─────────┼── TXD  │
+  └────────┘         └────────┘
+```
+
+**完整连接（含信号控制）：**
+
+支持信号检测的完整连线：
+
+```
+  烧录器端 (esptool)         模拟设备端 (FakeEsptool)
+  ┌────────┐                 ┌────────┐
+  │  TXD ──┼─────────────────┼─► RXD  │
+  │  RXD ◄─┼─────────────────┼── TXD  │
+  │  DTR ──┼─────────────────┼─► DSR  │
+  │  RTS ──┼─────────────────┼─► CTS  │
+  └────────┘                 └────────┘
+```
+
+当然，也可以使用 6 根连线连接，就无需区分方向。
+
 ## 项目结构
 
 ```
 FakeEsptool/
-├── src/                        # 源代码
-│   ├── main.c / main.h         # 程序入口和窗口过程
-│   ├── app_commands.c / app_commands.h # 菜单和工具栏命令处理
-│   ├── app_logview.c / app_logview.h # 日志视图和字体管理
-│   ├── serial.c / serial.h     # 串口通信模块
-│   ├── resource.h              # 资源 ID
-│   ├── resource.rc             # 资源文件（菜单、对话框、字符串）
-│   ├── esptool/                # esptool 协议模块
-│   │   ├── slip.c / slip.h     # SLIP 协议编解码
-│   │   ├── chip.c / chip.h     # 芯片特性模拟
-│   │   ├── flash.c / flash.h   # Flash 存储模拟
-│   │   ├── device.c / device.h # 设备文件管理
-│   │   └── esptool.c / esptool.h # 命令解析与响应
-│   ├── dlg/                    # 对话框
-│   │   ├── dlg.h               # 对话框公共头文件
-│   │   ├── device_props.c      # 设备属性对话框
-│   │   ├── port_select.c       # 串口选择对话框
-│   │   └── about.c             # 关于对话框
-│   ├── utils/                  # 辅助模块
-│   │   ├── config.c / config.h # 配置持久化
-│   │   ├── lang.c / lang.h     # 国际化辅助
-│   │   ├── trace.c / trace.h   # 调试日志
-│   │   └── deflate.c / deflate.h # DEFLATE 解压器
-│   └── res/                    # 资源文件（图标、位图、清单）
+├── src/                        # 源代码（具体请参考开发文档）
 ├── tests/                      # 测试
 │   ├── test_deflate.c          # DEFLATE 解压器测试
 │   ├── test_data.h             # 测试数据（Python zlib 生成）
