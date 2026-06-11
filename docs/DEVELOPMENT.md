@@ -283,7 +283,7 @@ Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 | `Chip_GetEfuse(ctx)` | 获取efuse数据 |
 | `Chip_GetEfuseSize(ctx)` | 获取efuse大小 |
 | `Chip_GetBootBaudRate(ctx)` | 获取启动日志波特率 |
-| `Chip_GetBootMessage(ctx, reset_cause)` | 获取启动日志文本 |
+| `Chip_GetBootMessage(ctx, download_mode, reset_cause)` | 获取启动日志文本 |
 
 ### flash.h
 
