@@ -102,7 +102,7 @@ SLIP 协议本身不提供校验机制，校验由上层协议（数据包结构
 
 **注意：**
 - 响应包的 bytes 4-7 是 val 字段，含义因命令而异：
-  - SYNC (0x08)：返回同步序列头 `07 07 12 20`（小端序 `0x20120707`）
+  - SYNC (0x08)：返回同步序列前 3 字节 + 请求第一个填充字节 `0x55`（小端序 `0x55120707`）
   - READ_REG (0x0A)：返回寄存器值
   - 其他命令：返回请求的 checksum / value
 - **真实设备行为**：真实设备在非 SYNC/READ_REG 命令的响应中，Val 字段返回最后一次 READ_REG 读取的寄存器值（而非请求的 checksum）。esptool 客户端对此字段不做校验。
@@ -378,7 +378,7 @@ Data:      0x01 0x05 0x00 0x00 (ROM_INVALID_RECV_MSG 错误)
 
 ### 3.6 SPI_ATTACH (0x0D) - 附加 SPI Flash
 
-**请求：**
+**请求（Stub 模式）：**
 ```
 Direction: 0x00
 Command:   0x0D
@@ -387,10 +387,21 @@ Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [hspi_arg:4]
 ```
 
+**请求（ROM 模式）：**
+```
+Direction: 0x00
+Command:   0x0D
+Size:      0x08 0x00 (8 bytes)
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
+Data:      [hspi_arg:4][is_legacy:1][reserved:3]
+```
+
 **字段说明：**
 | 字段 | 说明 |
 |------|------|
 | hspi_arg | SPI 附加参数，通常为 0 |
+| is_legacy | 是否使用 legacy SPI 驱动（通常为 0） |
+| reserved | 保留字段，填充 0x00 |
 
 **响应：**
 ```
@@ -413,6 +424,12 @@ Size:      0x08 0x00 (8 bytes)
 Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [new_baud:4][old_baud:4]
 ```
+
+**字段说明：**
+| 字段 | 说明 |
+|------|------|
+| new_baud | 新波特率 |
+| old_baud | 旧波特率。ROM 模式下固定为 0，Stub 模式下为实际旧波特率 |
 
 **响应（以旧波特率发送）：**
 
@@ -547,6 +564,7 @@ Data:      [erase_size:4][num_blocks:4][block_size:4][offset:4][encrypted:4]
 | num_blocks | 要写入的数据块数量 |
 | block_size | 每个数据块的大小 |
 | offset | Flash 起始偏移地址 |
+| encrypted | 加密写入标志（0=不加密，1=加密），仅 ROM 模式（ESP32 和 ESP8266 除外）发送 |
 
 **设备端行为：**
 1. 根据 `erase_size` 和 `offset` 擦除 Flash 区域
@@ -642,13 +660,24 @@ Data:      0x00 0x00 (2 字节 status=成功)
 
 **功能：** 进入压缩 Flash 下载模式，**擦除指定区域**，准备接收压缩数据。
 
-**请求：**
+**请求（Stub 模式）：**
 ```
 Direction: 0x00
 Command:   0x10
 Size:      0x10 0x00 (16 bytes)
 Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [uncompressed_size:4][num_blocks:4][block_size:4][offset:4]
+```
+
+**请求（ROM 模式，ESP32+，ESP32 和 ESP8266 除外）：**
+```
+Direction: 0x00
+Command:   0x10
+Size:      0x14 0x00 (20 bytes)
+Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
+Data:      [uncompressed_size:4][num_blocks:4][block_size:4][offset:4][encrypted:4]
+                                                                   ^^^^^^^^^^^^
+                                                                   额外 4 字节
 ```
 
 **字段说明：**
@@ -658,6 +687,7 @@ Data:      [uncompressed_size:4][num_blocks:4][block_size:4][offset:4]
 | num_blocks | 要写入的压缩数据块数量 |
 | block_size | 每个数据块的大小 |
 | offset | Flash 起始偏移地址 |
+| encrypted | 加密写入标志（0=不加密，1=加密），与 FLASH_BEGIN 一致 |
 
 **设备端行为：**
 1. 根据 `uncompressed_size` 和 `offset` 擦除 Flash 区域
