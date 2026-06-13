@@ -14,6 +14,7 @@
 #include <setupapi.h>
 #include <devguid.h>
 #include <stdio.h>
+#include <wchar.h>
 #include <wctype.h>
 
 #pragma comment(lib, "setupapi.lib")
