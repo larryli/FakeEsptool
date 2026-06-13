@@ -79,6 +79,12 @@ typedef enum {
 /* SYNC sequence length */
 #define ESP_SYNC_SEQ_LEN    36
 
+/* SYNC response count (real device sends 8 identical responses) */
+#define ESP_SYNC_RESPONSE_COUNT 8
+
+/* Maximum data payload size in ESP_PACKET (SLIP_MAX_FRAME - 8 header bytes) */
+#define ESP_PACKET_DATA_MAX (SLIP_MAX_FRAME - 8)
+
 /* Flash block size for erase operations */
 #define ESP_FLASH_BLOCK_SIZE    0x1000
 #define ESP_FLASH_ERASE_SIZE    0x10000
@@ -98,7 +104,7 @@ typedef struct {
     BYTE  command;            /* Command code */
     WORD  size;               /* Data payload size */
     DWORD value;              /* Command-specific value */
-    BYTE  data[32760];        /* Data payload (matches SLIP_MAX_FRAME - 8 header bytes) */
+    BYTE  data[ESP_PACKET_DATA_MAX]; /* Data payload */
 } ESP_PACKET;
 
 /* Forward declaration */

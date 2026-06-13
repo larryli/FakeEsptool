@@ -119,6 +119,7 @@ cmake --build build
 | 0x09 | WRITE_REG | 写寄存器 |
 | 0x0A | READ_REG | 读寄存器 |
 | 0x0B | SPI_SET_PARAMS | 设置 SPI Flash 参数 |
+| 0x0D | SPI_ATTACH | 附加 SPI Flash |
 | 0x0F | CHANGE_BAUDRATE | 修改波特率 |
 | 0x10 | FLASH_DEFL_BEGIN | 压缩写入开始（擦除指定区域） |
 | 0x11 | FLASH_DEFL_DATA | 压缩写入数据 |
@@ -181,7 +182,7 @@ Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 | `command` | BYTE | 命令码 |
 | `size` | WORD | 数据载荷大小 |
 | `value` | DWORD | 命令相关值 |
-| `data[32760]` | BYTE | 数据载荷 |
+| `data[ESP_PACKET_DATA_MAX]` | BYTE | 数据载荷 |
 
 **ESPTOOL_CTX 字段：**
 

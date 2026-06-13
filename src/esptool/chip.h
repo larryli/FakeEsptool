@@ -284,11 +284,4 @@ DWORD Chip_GetBootBaudRate(const CHIP_CTX *ctx);
  */
 const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE reset_cause);
 
-/*
- * Chip_EnsureRevision - Ensure chip revision is set in eFuse
- *
- * For backward compatibility with old .esp files that don't have chip revision data.
- */
-void Chip_EnsureRevision(CHIP_CTX *ctx);
-
 #endif

@@ -306,7 +306,7 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     /* Real device sends 8 consecutive responses per SYNC request.
        Response format: Size=4, Data=4 bytes status (0x00000000) */
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < ESP_SYNC_RESPONSE_COUNT; i++) {
         Esptool_SendResponseEx(ctx, ESP_CMD_SYNC, sync_val, ESP_OK, 4, NULL, 0);
     }
 }
