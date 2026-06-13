@@ -256,6 +256,10 @@ void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
         else if (g_reset_pending && dsr && !cts) {
             g_saw_io0_low = TRUE;
         }
+        /* DSR:ON CTS:ON = Intermediate state during ClassicReset (ignore) */
+        else if (g_reset_pending && dsr && cts) {
+            /* Keep g_reset_pending and g_saw_io0_low unchanged */
+        }
         /* DSR:OFF CTS:OFF = Reset end */
         else if (g_reset_pending && !dsr && !cts) {
             if (g_saw_io0_low) {
