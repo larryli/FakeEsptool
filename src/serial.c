@@ -14,6 +14,7 @@
 #include <setupapi.h>
 #include <devguid.h>
 #include <stdio.h>
+#include <wctype.h>
 
 #pragma comment(lib, "setupapi.lib")
 
@@ -23,6 +24,34 @@ static const char *TAG = "SER";
 
 #define READ_BUFFER_SIZE 32768
 #define MAX_PORTS 64
+
+/*
+ * NaturalCompare - Natural string comparison for sorting
+ *
+ * Compares strings with embedded numbers as numeric values.
+ * Example: "COM3" < "COM10" (3 < 10)
+ */
+static int NaturalCompare(const WCHAR *s1, const WCHAR *s2)
+{
+    while (*s1 && *s2) {
+        if (iswdigit(*s1) && iswdigit(*s2)) {
+            /* Compare numeric parts as integers */
+            long n1 = wcstol(s1, (WCHAR **)&s1, 10);
+            long n2 = wcstol(s2, (WCHAR **)&s2, 10);
+            if (n1 != n2)
+                return (n1 < n2) ? -1 : 1;
+        } else {
+            /* Compare character by character */
+            WCHAR c1 = towlower(*s1);
+            WCHAR c2 = towlower(*s2);
+            if (c1 != c2)
+                return (c1 < c2) ? -1 : 1;
+            s1++;
+            s2++;
+        }
+    }
+    return (*s1) ? 1 : ((*s2) ? -1 : 0);
+}
 
 /* Port info structure for friendly name display */
 typedef struct {
@@ -78,8 +107,8 @@ BOOL Serial_EnumPorts(HWND hCombo)
         lstrcpyW(g_portInfo[g_portCount].portName, portName);
         lstrcpyW(g_portInfo[g_portCount].friendlyName, friendlyName);
 
-        /* Add to combo box: friendly name only */
-        int idx = (int)SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)friendlyName);
+        /* Add to combo box without sorting (CB_INSERTSTRING at end) */
+        int idx = (int)SendMessageW(hCombo, CB_INSERTSTRING, (WPARAM)-1, (LPARAM)friendlyName);
         if (idx >= 0) {
             SendMessageW(hCombo, CB_SETITEMDATA, idx, (LPARAM)g_portCount);
             found = TRUE;
@@ -89,8 +118,48 @@ BOOL Serial_EnumPorts(HWND hCombo)
 
     SetupDiDestroyDeviceInfoList(devInfo);
 
-    if (found)
+    /* Sort combo box items using natural sort on port name */
+    if (found) {
+        int count = (int)SendMessageW(hCombo, CB_GETCOUNT, 0, 0);
+        if (count > 1) {
+            /* Collect items into temporary array */
+            typedef struct {
+                WCHAR text[128];
+                int portIdx;
+            } COMBO_ITEM;
+            
+            COMBO_ITEM *items = (COMBO_ITEM *)HeapAlloc(GetProcessHeap(), 0, count * sizeof(COMBO_ITEM));
+            if (items) {
+                for (int i = 0; i < count; i++) {
+                    SendMessageW(hCombo, CB_GETLBTEXT, i, (LPARAM)items[i].text);
+                    items[i].portIdx = (int)SendMessageW(hCombo, CB_GETITEMDATA, i, 0);
+                }
+
+                /* Sort using bubble sort with natural compare on port name */
+                for (int i = 0; i < count - 1; i++) {
+                    for (int j = 0; j < count - 1 - i; j++) {
+                        if (NaturalCompare(g_portInfo[items[j].portIdx].portName,
+                                          g_portInfo[items[j + 1].portIdx].portName) > 0) {
+                            COMBO_ITEM temp = items[j];
+                            items[j] = items[j + 1];
+                            items[j + 1] = temp;
+                        }
+                    }
+                }
+
+                /* Clear and repopulate combo box in sorted order */
+                SendMessageW(hCombo, CB_RESETCONTENT, 0, 0);
+                for (int i = 0; i < count; i++) {
+                    int idx = (int)SendMessageW(hCombo, CB_INSERTSTRING, (WPARAM)-1, (LPARAM)items[i].text);
+                    if (idx >= 0)
+                        SendMessageW(hCombo, CB_SETITEMDATA, idx, items[i].portIdx);
+                }
+
+                HeapFree(GetProcessHeap(), 0, items);
+            }
+        }
         SendMessageW(hCombo, CB_SETCURSEL, 0, 0);
+    }
 
     return found;
 }
