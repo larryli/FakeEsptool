@@ -332,7 +332,7 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* Real device returns register value in Value field (bytes 4-7),
        with status in Data field */
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_READ_REG, val, ESP_OK, status_len, NULL, status_len);
 }
 
@@ -412,7 +412,7 @@ static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     ctx->state = ESP_STATE_MEM_WRITING;
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_MEM_BEGIN, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
@@ -433,14 +433,14 @@ static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         if (expected != received) {
             TRACE_PROTO(TAG, "MEM_DATA checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
             Serial_PostLogF(ctx->hNotify, L"ESP", L"  Checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
-            BYTE status_len = ctx->stub_mode ? 2 : 4;
+            BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_MEM_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
             return;
         }
     }
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_MEM_DATA, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
@@ -455,7 +455,7 @@ static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     ctx->state = ESP_STATE_READY;
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_MEM_END, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 
     /* Send "OHAI" handshake after MEM_END to indicate stub is ready.
@@ -510,7 +510,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         if (ret != ESP_OK) {
             TRACE_FW(TAG, "FLASH_DEFL_BEGIN flush previous failed");
             Serial_PostLog(ctx->hNotify, L"ERR", L"  Failed to flush previous compressed data");
-            BYTE status_len = ctx->stub_mode ? 2 : 4;
+            BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
             return;
         }
@@ -542,7 +542,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         if (!ctx->defl_buf) {
             TRACE_FW(TAG, "Failed to allocate deflate buffer: %lu bytes", uncompressed_size);
             Serial_PostLogF(ctx->hNotify, L"ERR", L"  Failed to allocate deflate buffer: %lu bytes", uncompressed_size);
-            BYTE status_len = ctx->stub_mode ? 2 : 4;
+            BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
             return;
         }
@@ -552,7 +552,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
@@ -581,7 +581,7 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     if (seq != ctx->flash_seq) {
         TRACE_PROTO(TAG, "FLASH_DEFL_DATA seq mismatch: expected=%lu received=%lu", ctx->flash_seq, seq);
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  Seq mismatch: expected=%lu received=%lu", ctx->flash_seq, seq);
-        BYTE status_len = ctx->stub_mode ? 2 : 4;
+        BYTE status_len = ESP_STATUS_LEN(ctx);
         Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
         return;
     }
@@ -595,7 +595,7 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         if (expected != received) {
             TRACE_PROTO(TAG, "FLASH_DEFL_DATA checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
             Serial_PostLogF(ctx->hNotify, L"ESP", L"  Checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
-            BYTE status_len = ctx->stub_mode ? 2 : 4;
+            BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
             return;
         }
@@ -608,7 +608,7 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
                          ctx->defl_buf_size, ctx->defl_buf_cap, data_len);
                 Serial_PostLogF(ctx->hNotify, L"ERR", L"  Deflate buffer overflow");
                 Defl_FreeBuffer(ctx);
-                BYTE status_len = ctx->stub_mode ? 2 : 4;
+                BYTE status_len = ESP_STATUS_LEN(ctx);
                 Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
                 return;
             }
@@ -625,7 +625,7 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     if (ctx->onModified) ctx->onModified();
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
@@ -648,7 +648,7 @@ static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         TRACE_FW(TAG, "FLASH_DEFL_END flush failed");
         Serial_PostLog(ctx->hNotify, L"ERR", L"  Decompression flush failed");
         ctx->state = ESP_STATE_READY;
-        BYTE status_len = ctx->stub_mode ? 2 : 4;
+        BYTE status_len = ESP_STATUS_LEN(ctx);
         Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_END, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
         return;
     }
@@ -656,7 +656,7 @@ static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     ctx->state = ESP_STATE_READY;
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_END, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
@@ -896,7 +896,7 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_BEGIN, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
@@ -925,7 +925,7 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     if (seq != ctx->flash_seq) {
         TRACE_PROTO(TAG, "FLASH_DATA seq mismatch: expected=%lu received=%lu", ctx->flash_seq, seq);
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  Seq mismatch: expected=%lu received=%lu", ctx->flash_seq, seq);
-        BYTE status_len = ctx->stub_mode ? 2 : 4;
+        BYTE status_len = ESP_STATUS_LEN(ctx);
         Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
         return;
     }
@@ -939,7 +939,7 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         if (expected != received) {
             TRACE_PROTO(TAG, "FLASH_DATA checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
             Serial_PostLogF(ctx->hNotify, L"ESP", L"  Checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
-            BYTE status_len = ctx->stub_mode ? 2 : 4;
+            BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
             return;
         }
@@ -951,7 +951,7 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     if (ctx->onModified) ctx->onModified();
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
@@ -979,7 +979,7 @@ static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     ctx->state = ESP_STATE_READY;
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_END, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
@@ -1070,7 +1070,7 @@ static void HandleSpiAttach(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Attach SPI flash");
 
     /* SPI_ATTACH: ROM mode 4-byte status, stub mode 2-byte status */
-    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_SPI_ATTACH, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
@@ -1124,7 +1124,7 @@ static void HandleSpiSetParams(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     /* ESP32+ ROM and all stubs: return success.
        ROM mode: 4-byte status; stub mode: 2-byte status. */
-    BYTE status_len = ctx->stub_mode ? 2 : 4;
+    BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_SPI_SET_PARAMS, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 

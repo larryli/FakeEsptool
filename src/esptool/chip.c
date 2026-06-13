@@ -512,77 +512,62 @@ const BYTE *Chip_GetMac(const CHIP_CTX *ctx)
  *
  * Returns 32-bit register value, or 0 for unmapped addresses.
  */
+
+/*
+ * TryReadEfuse32 - Try to read a 32-bit value from eFuse address range
+ *
+ * @ctx:    Pointer to chip context (const, read-only)
+ * @base:   Base address of eFuse range
+ * @size:   Size of eFuse range (0x100 for most chips, ctx->efuse_size for ESP32)
+ * @addr:   Register address to read
+ * @result: Pointer to receive 32-bit value (set on success only)
+ *
+ * Returns TRUE if address is in range and read succeeds, FALSE otherwise.
+ */
+static BOOL TryReadEfuse32(const CHIP_CTX *ctx, DWORD base, DWORD size, DWORD addr, DWORD *result)
+{
+    if (addr < base || addr >= base + size)
+        return FALSE;
+    int offset = (int)(addr - base);
+    if (!ctx->efuse || offset + 3 >= ctx->efuse_size)
+        return FALSE;
+    *result = ctx->efuse[offset] |
+              ((DWORD)ctx->efuse[offset + 1] << 8) |
+              ((DWORD)ctx->efuse[offset + 2] << 16) |
+              ((DWORD)ctx->efuse[offset + 3] << 24);
+    return TRUE;
+}
+
 DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
 {
     /* ESP32 EFUSE: EFUSE_BASE_ESP32 + offset (ROM direct access) */
-    if (addr >= EFUSE_BASE_ESP32 && addr < EFUSE_BASE_ESP32 + (DWORD)ctx->efuse_size) {
-        int offset = (int)(addr - EFUSE_BASE_ESP32);
-        if (offset + 3 < ctx->efuse_size) {
-            return ctx->efuse[offset] | 
-                   ((DWORD)ctx->efuse[offset + 1] << 8) |
-                   ((DWORD)ctx->efuse[offset + 2] << 16) | 
-                   ((DWORD)ctx->efuse[offset + 3] << 24);
-        }
-    }
+    DWORD val;
+    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32, (DWORD)ctx->efuse_size, addr, &val))
+        return val;
 
     /* ESP32 EFUSE_RD_REG_BASE: esptool readEfuse */
-    if (addr >= EFUSE_RD_REG_BASE_ESP32 && addr < EFUSE_RD_REG_BASE_ESP32 + 0x100) {
-        int offset = (int)(addr - EFUSE_RD_REG_BASE_ESP32);
-        if (ctx->efuse && offset + 3 < ctx->efuse_size) {
-            return ctx->efuse[offset] |
-                   ((DWORD)ctx->efuse[offset + 1] << 8) |
-                   ((DWORD)ctx->efuse[offset + 2] << 16) |
-                   ((DWORD)ctx->efuse[offset + 3] << 24);
-        }
-    }
+    if (TryReadEfuse32(ctx, EFUSE_RD_REG_BASE_ESP32, 0x100, addr, &val))
+        return val;
 
     /* ESP32 flash size register */
     if (addr == FLASH_SIZE_REG_ESP32)
         return (ctx->flash_size >> 16) & 0xFFFF;
 
     /* ESP32-S2 EFUSE */
-    if (addr >= EFUSE_BASE_ESP32S2 && addr < EFUSE_BASE_ESP32S2 + 0x100) {
-        int offset = (int)(addr - EFUSE_BASE_ESP32S2);
-        if (ctx->efuse && offset + 3 < ctx->efuse_size) {
-            return ctx->efuse[offset] |
-                   ((DWORD)ctx->efuse[offset + 1] << 8) |
-                   ((DWORD)ctx->efuse[offset + 2] << 16) |
-                   ((DWORD)ctx->efuse[offset + 3] << 24);
-        }
-    }
+    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32S2, 0x100, addr, &val))
+        return val;
 
     /* ESP32-C2/C3 EFUSE */
-    if (addr >= EFUSE_BASE_ESP32C2 && addr < EFUSE_BASE_ESP32C2 + 0x100) {
-        int offset = (int)(addr - EFUSE_BASE_ESP32C2);
-        if (ctx->efuse && offset + 3 < ctx->efuse_size) {
-            return ctx->efuse[offset] |
-                   ((DWORD)ctx->efuse[offset + 1] << 8) |
-                   ((DWORD)ctx->efuse[offset + 2] << 16) |
-                   ((DWORD)ctx->efuse[offset + 3] << 24);
-        }
-    }
+    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32C2, 0x100, addr, &val))
+        return val;
 
     /* ESP32-S3 EFUSE */
-    if (addr >= EFUSE_BASE_ESP32S3 && addr < EFUSE_BASE_ESP32S3 + 0x100) {
-        int offset = (int)(addr - EFUSE_BASE_ESP32S3);
-        if (ctx->efuse && offset + 3 < ctx->efuse_size) {
-            return ctx->efuse[offset] |
-                   ((DWORD)ctx->efuse[offset + 1] << 8) |
-                   ((DWORD)ctx->efuse[offset + 2] << 16) |
-                   ((DWORD)ctx->efuse[offset + 3] << 24);
-        }
-    }
+    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32S3, 0x100, addr, &val))
+        return val;
 
     /* ESP32-C6 EFUSE */
-    if (addr >= EFUSE_BASE_ESP32C6 && addr < EFUSE_BASE_ESP32C6 + 0x100) {
-        int offset = (int)(addr - EFUSE_BASE_ESP32C6);
-        if (ctx->efuse && offset + 3 < ctx->efuse_size) {
-            return ctx->efuse[offset] |
-                   ((DWORD)ctx->efuse[offset + 1] << 8) |
-                   ((DWORD)ctx->efuse[offset + 2] << 16) |
-                   ((DWORD)ctx->efuse[offset + 3] << 24);
-        }
-    }
+    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32C6, 0x100, addr, &val))
+        return val;
 
     /* Chip detection magic register - used by esptool for autodetect */
     if (addr == CHIP_DETECT_REG)

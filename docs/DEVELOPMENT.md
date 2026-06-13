@@ -267,6 +267,12 @@ Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 | `mosi_dlen` | BYTE | SPI_MOSI_DLEN 偏移（0=不支持） |
 | `miso_dlen` | BYTE | SPI_MISO_DLEN 偏移（0=不支持） |
 
+**常量：**
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `CHIP_DETECT_REG` | `0x40001000` | 芯片检测魔数寄存器地址（用于 esptool 自动识别） |
+
 **函数：**
 
 | 函数 | 说明 |

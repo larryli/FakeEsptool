@@ -85,6 +85,9 @@ typedef enum {
 /* Maximum data payload size in ESP_PACKET (SLIP_MAX_FRAME - 8 header bytes) */
 #define ESP_PACKET_DATA_MAX (SLIP_MAX_FRAME - 8)
 
+/* Status length: 2 bytes for stub mode, 4 bytes for ROM mode */
+#define ESP_STATUS_LEN(ctx) ((ctx)->stub_mode ? 2 : 4)
+
 /* Flash block size for erase operations */
 #define ESP_FLASH_BLOCK_SIZE    0x1000
 #define ESP_FLASH_ERASE_SIZE    0x10000
