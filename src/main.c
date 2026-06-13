@@ -199,10 +199,8 @@ static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode, BYTE reset_ca
     Esptool_ResetState(&g_esptool);
 
     DWORD bootBaud = Chip_GetBootBaudRate(&g_device.chip);
-    if (bootBaud != 115200) {
-        Serial_SetBaudRate(ctx, bootBaud);
-        Serial_PostLogF(hNotify, L"CFG", L"Baud rate: %lu", bootBaud);
-    }
+    Serial_SetBaudRate(ctx, bootBaud);
+    Serial_PostLogF(hNotify, L"CFG", L"Baud rate: %lu", bootBaud);
 
     const char *msg = Chip_GetBootMessage(&g_device.chip, download_mode, reset_cause);
     if (msg[0]) {
@@ -227,7 +225,8 @@ static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode, BYTE reset_ca
         }
     }
 
-    if (bootBaud != 115200) {
+    /* Download mode: switch special chips (74880) to 115200 for esptool communication */
+    if (download_mode && bootBaud != 115200) {
         Serial_SetBaudRate(ctx, 115200);
         Serial_PostLogF(hNotify, L"CFG", L"Baud rate: 115200");
     }
