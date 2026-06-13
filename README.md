@@ -42,7 +42,7 @@ cmake --build build --config Release -j
 ### 快速开始
 
 1. 创建虚拟串口对或连接实体串口（见下方详细说明）
-2. 运行 `build\FakeEsptool.exe`（自动创建默认 ESP32 设备）
+2. 运行 `build\Release\FakeEsptool.exe`（自动创建默认 ESP32 设备）
 3. 如需修改设备参数，使用 File > Device Properties
 4. Serial > Connect 选择串口
 5. 用 esptool 客户端连接另一端进行烧录测试
