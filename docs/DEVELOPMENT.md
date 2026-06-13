@@ -466,6 +466,11 @@ if (ret == DEFLATE_OK) {
 - 避免在 listener 线程中同步调用 UI 函数（如 `SetWindowTextW`），应使用 `PostMessage` 异步通知
 - stub 模式的 `FLASH_DEFL_DATA` 包经 SLIP 编码后约 16500 字节，`READ_BUFFER_SIZE` (32KB) 足以一次读取
 
+**Serial_SetBaudRate 注意事项：**
+- `FlushFileBuffers` 只保证数据到达 USB 串口芯片的内部 FIFO，不保证 FIFO 已物理发出
+- 切换波特率前需等待 FIFO 排空，否则 FIFO 中剩余字节以错误波特率发送导致数据损坏
+- 当前实现按 `256 * 10 / BaudRate` 计算延迟（256 字节 FIFO + 起止位），com0com 等虚拟串口不受影响
+
 ## 实现说明
 
 ### 单实例模式

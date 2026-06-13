@@ -682,9 +682,20 @@ BOOL Serial_SetBaudRate(SERIAL_CTX *ctx, DWORD baudRate)
     if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
         return FALSE;
 
+    FlushFileBuffers(ctx->hPort);
+
     DCB dcb = { .DCBlength = sizeof(DCB) };
     if (!GetCommState(ctx->hPort, &dcb))
         return FALSE;
+
+    /* FlushFileBuffers only guarantees data reaches the USB-to-serial chip's
+       internal FIFO, not that the FIFO has been physically transmitted.
+       Calculate delay to let the FIFO drain at the current baud rate before
+       switching. */
+    if (dcb.BaudRate > 0) {
+        DWORD delayMs = (256 * 10 * 1000) / dcb.BaudRate + 1;
+        Sleep(delayMs);
+    }
 
     dcb.BaudRate = baudRate;
     if (!SetCommState(ctx->hPort, &dcb))
