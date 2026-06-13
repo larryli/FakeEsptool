@@ -234,8 +234,9 @@ static BOOL InitEsp32S2(CHIP_CTX *ctx)
     WriteChipIdToEfuse(ctx);
 
     /* Set chip revision to 1.0 in eFuse.
-       ESP32-S2: major at BLOCK1 word3 bits[21:20] = byte 0x52 bits[5:4] */
-    ctx->efuse[0x52] |= 0x10;  /* major=1 */
+       ESP32-S2: EFUSE_BLOCK1_ADDR = 0x3F41A044
+       major at word3 (BLOCK1 + 12) bits[19:18] = byte 0x51 bits[3:2] */
+    ctx->efuse[0x51] |= 0x04;  /* major=1, bits[19:18] = 01 */
 
     return TRUE;
 }
@@ -250,9 +251,17 @@ static BOOL InitEsp32S3(CHIP_CTX *ctx)
     WriteMacAt0x44(ctx);
     WriteChipIdToEfuse(ctx);
 
-    /* Set chip revision to 1.0 in eFuse.
-       ESP32-S3: major at BLOCK1 word5 bits[25:24] = byte 0x5A bits[1:0] */
-    ctx->efuse[0x5A] |= 0x01;  /* major=1 */
+    /* Set chip revision to v0.0 in eFuse via ECO0 detection workaround.
+       ESP32-S3's is_eco0() checks:
+         (minor_raw & 0x7) == 0 AND blk_version_major == 1 AND blk_version_minor == 1
+       When is_eco0() returns True, get_major_chip_version() returns 0.
+       
+       blk_version_major at BLOCK2 word4 bits[1:0] (EFUSE_BLOCK2_ADDR + 16)
+         = EFUSE_BASE + 0x5C + 0x10 = offset 0x6C, byte 0x6C bits[1:0]
+       blk_version_minor at BLOCK1 word3 bits[26:24] (EFUSE_BLOCK1_ADDR + 12)
+         = EFUSE_BASE + 0x44 + 0x0C = offset 0x50, byte 0x52 bits[2:0] */
+    ctx->efuse[0x6C] |= 0x01;  /* blk_version_major = 1 */
+    ctx->efuse[0x52] |= 0x01;  /* blk_version_minor = 1 */
 
     return TRUE;
 }
@@ -288,8 +297,9 @@ static BOOL InitEsp32C3(CHIP_CTX *ctx)
     WriteChipIdToEfuse(ctx);
 
     /* Set chip revision to 1.0 in eFuse.
-       ESP32-C3: major at BLOCK1 word3 bits[19:18] = byte 0x52 bits[3:2] */
-    ctx->efuse[0x52] |= 0x04;  /* major=1 */
+       ESP32-C3: EFUSE_BLOCK1_ADDR = 0x60008844
+       major at word5 (BLOCK1 + 20) bits[25:24] = byte 0x5B bits[1:0] */
+    ctx->efuse[0x5B] |= 0x01;  /* major=1, bits[25:24] = 01 */
 
     return TRUE;
 }
@@ -304,9 +314,8 @@ static BOOL InitEsp32C6(CHIP_CTX *ctx)
     WriteMacAt0x44(ctx);
     WriteChipIdToEfuse(ctx);
 
-    /* Set chip revision to 1.0 in eFuse.
-       ESP32-C6: major at BLOCK1 word3 bits[19:18] = byte 0x52 bits[3:2] */
-    ctx->efuse[0x52] |= 0x04;  /* major=1 */
+    /* ESP32-C6: no chip revision override needed.
+       Leave eFuse at 0 -> major=0, minor=0 -> v0.0 */
 
     return TRUE;
 }
