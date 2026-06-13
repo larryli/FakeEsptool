@@ -71,15 +71,20 @@ Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
 
 ```powershell
 # 配置
-cmake -S . -B build -G "NMake Makefiles"
+cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -B build
 
-# 编译
-cmake --build build
+# 编译（Release）
+cmake --build build --config Release -j
+
+# 编译（Debug）
+cmake --build build --config Debug
 
 # 启用调试日志
-cmake -S . -B build -G "NMake Makefiles" -DENABLE_TRACE_PROTO=ON
-cmake --build build
+cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DENABLE_TRACE_PROTO=ON -DENABLE_TRACE_FW=ON -B build
+cmake --build build --config Release -j
 ```
+
+输出：`build/Release/FakeEsptool.exe`（Release）或 `build/Debug/FakeEsptool.exe`（Debug）
 
 ## esptool 协议
 
@@ -651,8 +656,8 @@ HeapFree(GetProcessHeap(), 0, efuse);
 ### 启用日志
 
 ```powershell
-cmake -S . -B build -G "NMake Makefiles" -DENABLE_TRACE_PROTO=ON -DENABLE_TRACE_FW=ON
-cmake --build build
+cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DENABLE_TRACE_PROTO=ON -DENABLE_TRACE_FW=ON -B build
+cmake --build build --config Release -j
 ```
 
 ### 日志宏

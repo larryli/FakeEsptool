@@ -1,9 +1,9 @@
 # CMakeLists.txt - Build configuration for FakeEsptool
 #
 # Requires: CMake 3.20+, MSVC compiler
-# Build (Release): mkdir build && cd build && cmake .. -G "NMake Makefiles" && cmake --build .
-# Build (Debug):   mkdir build && cd build && cmake .. -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug && cmake --build .
-# Build (Trace):   mkdir build && cd build && cmake .. -G "NMake Makefiles" -DENABLE_TRACE_FW=ON -DENABLE_TRACE_PROTO=ON && cmake --build .
+# Build (Release): cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -B build && cmake --build build --config Release -j
+# Build (Debug):   cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -B build && cmake --build build --config Debug
+# Build (Trace):   cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DENABLE_TRACE_FW=ON -DENABLE_TRACE_PROTO=ON -B build && cmake --build build --config Release -j
 
 cmake_minimum_required(VERSION 3.20)
 project(FakeEsptool C)
