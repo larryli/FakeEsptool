@@ -586,7 +586,7 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         return;
     }
 
-    if (pkt->size >= 16 + data_len) {
+    if (pkt->size >= 16 && data_len <= (DWORD)(pkt->size - 16)) {
         const BYTE *payload = &pkt->data[16];
 
         /* Verify checksum */
@@ -930,7 +930,7 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         return;
     }
 
-    if (pkt->size >= 16 + data_len) {
+    if (pkt->size >= 16 && data_len <= (DWORD)(pkt->size - 16)) {
         const BYTE *payload = &pkt->data[16];
 
         /* Verify checksum */

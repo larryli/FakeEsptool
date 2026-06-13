@@ -68,7 +68,7 @@ void Flash_Close(FLASH_CTX *ctx)
  */
 BOOL Flash_Read(const FLASH_CTX *ctx, DWORD addr, BYTE *buf, DWORD len)
 {
-    if (!ctx->data || addr + len > ctx->size)
+    if (!ctx->data || addr >= ctx->size || len > ctx->size - addr)
         return FALSE;
 
     memcpy(buf, ctx->data + addr, len);
@@ -91,7 +91,7 @@ BOOL Flash_Read(const FLASH_CTX *ctx, DWORD addr, BYTE *buf, DWORD len)
  */
 BOOL Flash_Write(FLASH_CTX *ctx, DWORD addr, const BYTE *data, DWORD len)
 {
-    if (!ctx->data || addr + len > ctx->size)
+    if (!ctx->data || addr >= ctx->size || len > ctx->size - addr)
         return FALSE;
 
     for (DWORD i = 0; i < len; i++)
@@ -166,7 +166,7 @@ void Flash_CalcMd5(const FLASH_CTX *ctx, DWORD addr, DWORD len, BYTE md5[16])
 
     memset(md5, 0, 16);
 
-    if (!ctx->data || addr + len > ctx->size)
+    if (!ctx->data || addr >= ctx->size || len > ctx->size - addr)
         return;
 
     if (!CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
