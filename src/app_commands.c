@@ -80,7 +80,9 @@ BOOL PromptSaveIfNeeded(HWND hWnd)
         {
             const WCHAR *filename = Device_GetFilename(&g_device);
             if (filename[0]) {
-                Device_Save(&g_device, filename);
+                if (!Device_Save(&g_device, filename)) {
+                    MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+                }
             } else {
                 OPENFILENAMEW ofn = {0};
                 WCHAR szFile[MAX_PATH] = {0};
@@ -94,7 +96,9 @@ BOOL PromptSaveIfNeeded(HWND hWnd)
                 ofn.lpstrDefExt = L"esp";
                 if (!GetSaveFileNameW(&ofn))
                     return FALSE;
-                Device_Save(&g_device, szFile);
+                if (!Device_Save(&g_device, szFile)) {
+                    MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+                }
             }
             UpdateTitle(hWnd);
         }
@@ -147,13 +151,10 @@ void UpdateMenuState(HWND hWnd)
     BOOL connected = Serial_IsOpen(&g_serial);
     BOOL canReconnect = CanReconnect();
 
-    EnableMenuItem(hMenu, IDM_DEVICE_PROPS, connected ? MF_GRAYED : MF_ENABLED);
     EnableMenuItem(hMenu, IDM_CONNECT, connected ? MF_GRAYED : MF_ENABLED);
     EnableMenuItem(hMenu, IDM_DISCONNECT, connected ? MF_ENABLED : MF_GRAYED);
     EnableMenuItem(hMenu, IDM_RECONNECT, canReconnect ? MF_ENABLED : MF_GRAYED);
-    EnableMenuItem(hMenu, IDM_FLASH_IMPORT, connected ? MF_GRAYED : MF_ENABLED);
 
-    SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_DEVICE_PROPS, !connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_CONNECT, !connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_DISCONNECT, connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_RECONNECT, canReconnect);
@@ -453,6 +454,8 @@ void Main_CmdSaveDevice(HWND hWnd)
         if (Device_Save(&g_device, filename)) {
             Config_SetLastDeviceFile(filename);
             UpdateTitle(hWnd);
+        } else {
+            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         }
     } else {
         /* No filename, do Save As */
@@ -492,19 +495,19 @@ void Main_CmdSaveDeviceAs(HWND hWnd)
 /*
  * Main_CmdDeviceProps - Handle Device Properties command
  *
- * Shows device properties dialog. Disallowed when connected.
+ * Shows device properties dialog. Prompts to disconnect and save if needed.
  *
  * @hWnd: Main window handle
  */
 void Main_CmdDeviceProps(HWND hWnd)
 {
-    if (Serial_IsOpen(&g_serial)) {
-        MessageBoxW(hWnd, LoadStr(IDS_MSG_DISCONN_PROPS), LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
-    } else {
-        if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_DEVICE_PROPS), hWnd, DevicePropsDlgProc) == IDOK) {
-            UpdateStatusBar();
-            UpdateTitle(hWnd);
-        }
+    if (!PromptDisconnectIfNeeded(hWnd))
+        return;
+    if (!PromptSaveIfNeeded(hWnd))
+        return;
+    if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_DEVICE_PROPS), hWnd, DevicePropsDlgProc) == IDOK) {
+        UpdateStatusBar();
+        UpdateTitle(hWnd);
     }
 }
 
@@ -637,16 +640,16 @@ void Main_OnDisconnect(HWND hMainWnd)
  * Main_OnFlashImport - Handle Flash Import command
  *
  * Imports flash data from .bin file. File size must match current flash size.
- * Disallowed when serial port is connected.
+ * Prompts to disconnect and save if needed.
  *
  * @hMainWnd: Main window handle
  */
 void Main_OnFlashImport(HWND hMainWnd)
 {
-    if (Serial_IsOpen(&g_serial)) {
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_DISCONN_IMPORT), LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+    if (!PromptDisconnectIfNeeded(hMainWnd))
         return;
-    }
+    if (!PromptSaveIfNeeded(hMainWnd))
+        return;
 
     OPENFILENAMEW ofn = {0};
     WCHAR szFile[MAX_PATH] = {0};
