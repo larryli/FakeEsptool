@@ -114,6 +114,7 @@ FakeEsptool/
 │   ├── DEVELOPMENT.md          # 开发文档
 │   ├── PROTOCOL.md             # 协议规范
 │   └── TODO.md                 # 待办改进项
+├── CHANGELOG.md                # 变更记录
 ├── LICENSE                     # MIT 许可证
 └── README.md
 ```
@@ -123,6 +124,7 @@ FakeEsptool/
 - [需求规格说明](docs/REQUIREMENTS.md)
 - [开发文档](docs/DEVELOPMENT.md)
 - [协议规范](docs/PROTOCOL.md)
+- [变更记录](CHANGELOG.md)
 
 ## 致谢
 
