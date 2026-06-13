@@ -44,6 +44,7 @@ set_target_properties(FakeEsptool PROPERTIES
 target_link_libraries(FakeEsptool PRIVATE
     comctl32
     uuid
+    shlwapi
 )
 
 # Compiler options

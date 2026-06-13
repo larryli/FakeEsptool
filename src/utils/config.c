@@ -8,8 +8,10 @@
 #include "config.h"
 #include <wchar.h>
 #include <stdio.h>
+#include <shlwapi.h>
 
 static WCHAR g_iniPath[MAX_PATH] = {0};
+static WCHAR g_exeDir[MAX_PATH] = {0};
 
 /* Section and key names */
 #define SECTION_FONT    L"Font"
@@ -26,6 +28,12 @@ static WCHAR g_iniPath[MAX_PATH] = {0};
 void Config_Init(void)
 {
     GetModuleFileNameW(NULL, g_iniPath, MAX_PATH);
+
+    /* Save exe directory before replacing extension */
+    lstrcpyW(g_exeDir, g_iniPath);
+    WCHAR *lastSlash = wcsrchr(g_exeDir, L'\\');
+    if (lastSlash)
+        *(lastSlash + 1) = L'\0';
 
     /* Replace .exe with .ini */
     WCHAR *ext = wcsrchr(g_iniPath, L'.');
@@ -120,27 +128,65 @@ void Config_SetLastPort(const WCHAR *portName)
 
 /*
  * Config_GetLastDeviceFile - Get last opened device file path
+ *
+ * Resolves relative paths based on executable directory.
  */
 BOOL Config_GetLastDeviceFile(WCHAR *filePath, int maxLen)
 {
     if (!g_iniPath[0])
         return FALSE;
 
+    WCHAR savedPath[MAX_PATH] = {0};
     GetPrivateProfileStringW(L"Device", L"LastFile", L"",
-                             filePath, maxLen, g_iniPath);
+                             savedPath, MAX_PATH, g_iniPath);
+
+    if (savedPath[0] == L'\0')
+        return FALSE;
+
+    /* Check if relative path (no drive letter) */
+    if (savedPath[1] != L':' && g_exeDir[0]) {
+        /* Relative path - resolve based on exe directory */
+        WCHAR fullPath[MAX_PATH] = {0};
+        lstrcpyW(fullPath, g_exeDir);
+        lstrcatW(fullPath, savedPath);
+        lstrcpynW(filePath, fullPath, maxLen);
+    } else {
+        /* Absolute path */
+        lstrcpynW(filePath, savedPath, maxLen);
+    }
 
     return (filePath[0] != L'\0');
 }
 
 /*
  * Config_SetLastDeviceFile - Save last opened device file path
+ *
+ * Saves relative path if file is on the same drive as executable,
+ * absolute path otherwise.
  */
 void Config_SetLastDeviceFile(const WCHAR *filePath)
 {
     if (!g_iniPath[0])
         return;
 
-    WritePrivateProfileStringW(L"Device", L"LastFile", filePath ? filePath : L"", g_iniPath);
+    if (!filePath || !filePath[0]) {
+        WritePrivateProfileStringW(L"Device", L"LastFile", L"", g_iniPath);
+        return;
+    }
+
+    /* Check if same drive letter */
+    if (g_exeDir[0] && filePath[0] &&
+        (g_exeDir[0] | 0x20) == (filePath[0] | 0x20) &&
+        filePath[1] == L':') {
+        /* Same drive - save relative path */
+        WCHAR relPath[MAX_PATH] = {0};
+        PathRelativePathToW(relPath, g_exeDir, FILE_ATTRIBUTE_DIRECTORY,
+                            filePath, 0);
+        WritePrivateProfileStringW(L"Device", L"LastFile", relPath, g_iniPath);
+    } else {
+        /* Different drive - save absolute path */
+        WritePrivateProfileStringW(L"Device", L"LastFile", filePath, g_iniPath);
+    }
 }
 
 /*
