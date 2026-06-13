@@ -403,11 +403,13 @@ LastFile=C:\path\to\device.esp
 
 ### 命令行打开文件
 
-支持通过命令行参数指定 .esp 文件路径：
+支持通过命令行参数指定 .esp 文件路径（支持相对路径，基于当前工作目录）：
 
 ```
 FakeEsptool.exe <文件路径.esp>
 FakeEsptool.exe "C:\path\to\device.esp"
+FakeEsptool.exe ".\device.esp"
+FakeEsptool.exe "device.esp"
 ```
 
 **用途**：
