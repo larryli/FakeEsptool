@@ -332,7 +332,7 @@ LastFile=C:\path\to\device.esp
 |--------|----------|
 | Font | 用户通过字体对话框修改时 |
 | LastPort | 成功连接串口时 |
-| LastFile | 打开设备文件时 |
+| LastFile | 打开设备文件时、保存设备文件时 |
 
 ### 加载时机
 

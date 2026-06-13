@@ -80,7 +80,9 @@ BOOL PromptSaveIfNeeded(HWND hWnd)
         {
             const WCHAR *filename = Device_GetFilename(&g_device);
             if (filename[0]) {
-                if (!Device_Save(&g_device, filename)) {
+                if (Device_Save(&g_device, filename)) {
+                    Config_SetLastDeviceFile(filename);
+                } else {
                     MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
                 }
             } else {
@@ -96,7 +98,9 @@ BOOL PromptSaveIfNeeded(HWND hWnd)
                 ofn.lpstrDefExt = L"esp";
                 if (!GetSaveFileNameW(&ofn))
                     return FALSE;
-                if (!Device_Save(&g_device, szFile)) {
+                if (Device_Save(&g_device, szFile)) {
+                    Config_SetLastDeviceFile(szFile);
+                } else {
                     MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
                 }
             }
@@ -363,7 +367,6 @@ void Main_CmdNewDevice(HWND hWnd)
     if (Device_Init(&g_device, CHIP_ESP32, 4 * 1024 * 1024, defaultMac)) {
         g_device.chip.xtal_freq = XTAL_FREQ_40M;
         Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
-        Config_SetLastDeviceFile(NULL);
         UpdateStatusBar();
         UpdateTitle(hWnd);
         SetWindowTextW(g_hEdit, L"");
