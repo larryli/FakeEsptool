@@ -96,9 +96,9 @@ if self.IS_STUB or self.CHIP_NAME not in ("ESP32", "ESP8266"):
 完整加密烧录工作流需要三个工具配合：
 
 ```
-1. espsecure generate-flash-encryption-key -k 256 key.bin   # 生成密钥（离线，不与设备通信）
-2. espefuse burn_key flash_encryption key.bin                # 烧录密钥到 eFuse（通过 READ_REG/WRITE_REG）
-3. esptool --encrypt write_flash 0x0 firmware.bin            # 加密烧录（设备端加密后写入 Flash）
+1. espsecure generate-flash-encryption-key -k 256 key.bin              # 生成密钥（离线，不与设备通信）
+2. espefuse --chip esp32c3 burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY # 烧录密钥到 eFuse（通过 READ_REG/WRITE_REG）
+3. esptool --encrypt write-flash 0x0 firmware.bin                      # 加密烧录（设备端加密后写入 Flash）
 ```
 
 | 工具 | 功能 | 与设备通信 | FakeEsptool 支持状态 |
@@ -247,12 +247,12 @@ if get_encrypted_download_disabled() and get_flash_encryption_enabled():
 
 **ESP32-S2/S3/C2/C3/C6（ROM 模式支持）**：
 ```bash
-esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
+esptool --port COM10 --encrypt write-flash 0x0 firmware.bin
 ```
 
 **ESP32（需要 Stub 模式）**：
 ```bash
-esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
+esptool --port COM10 --encrypt write-flash 0x0 firmware.bin
 ```
 注意：ESP32 在 ROM 模式下不会发送 encrypted 标志，需要 Stub 模式才能测试加密烧录。
 
@@ -262,10 +262,10 @@ esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
 espsecure generate-flash-encryption-key -k 256 key.bin
 
 # 2. 烧录密钥到 FakeEsptool 的 eFuse
-espefuse.py --port COM10 burn_key flash_encryption key.bin
+espefuse --port COM10 --chip esp32c3 burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
 
 # 3. 加密烧录
-esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
+esptool --port COM10 --encrypt write-flash 0x0 firmware.bin
 ```
 
 验证 FakeEsptool 日志中是否正确显示 `encrypted=1`（ESP32 Stub 模式或其他芯片 ROM 模式）。
@@ -484,17 +484,17 @@ if (Chip_IsProductionMode(ctx->chip) && !encrypted) {
 
 ```bash
 # 1. 创建设备并设置 eFuse
-espefuse.py --port COM10 burn_efuse FLASH_CRYPT_CNT 1
-espefuse.py --port COM10 burn_efuse DISABLE_DL_ENCRYPT 1
+espefuse --port COM10 burn-efuse FLASH_CRYPT_CNT 1
+espefuse --port COM10 burn-efuse DISABLE_DL_ENCRYPT 1
 
 # 2. 检查状态栏显示
 # 应显示：加密（生产）
 
 # 3. 尝试明文烧录（应失败）
-esptool.py --port COM10 write_flash 0x0 firmware.bin
+esptool --port COM10 write-flash 0x0 firmware.bin
 
 # 4. 加密烧录（应成功）
-esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
+esptool --port COM10 --encrypt write-flash 0x0 firmware.bin
 ```
 
 ### 协议处理逻辑

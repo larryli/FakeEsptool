@@ -1,11 +1,11 @@
 # FakeEsptool - 烧录流程指南
 
-本文档基于 `esptool.py write-flash` 的真实交互日志，从使用和交互的角度解读烧录全过程。作为 [PROTOCOL.md](PROTOCOL.md) 的补充，侧重于**流程串联**和**日志解读**，而非单条命令的包格式细节。
+本文档基于 `esptool write-flash` 的真实交互日志，从使用和交互的角度解读烧录全过程。作为 [PROTOCOL.md](PROTOCOL.md) 的补充，侧重于**流程串联**和**日志解读**，而非单条命令的包格式细节。
 
 **适用场景：** 使用 FakeEsptool 模拟 ESP32-C2 设备，执行以下命令：
 
 ```bash
-esptool.py --baud 921600 write-flash 0x0 bootloader.bin 0x10000 app.bin 0x8000 partition-table.bin
+esptool --baud 921600 write-flash 0x0 bootloader.bin 0x10000 app.bin 0x8000 partition-table.bin
 ```
 
 ---

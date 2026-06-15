@@ -187,6 +187,10 @@ ctest --test-dir build_tests --build-config Release
   - ESP32-S3：byte 0x6C |= 0x01（blk_version_major=1）+ byte 0x52 |= 0x01（blk_version_minor=1）
   - ESP32-C3：byte 0x5B |= 0x01（major=1，bits[25:24] of EFUSE_BLOCK1_ADDR+20）
   - ESP32-C6：无芯片版本覆盖（major=0, minor=0）
+- 有 eFuse 控制器的芯片（C2/C3/C6）必须在初始化中设置 `efuse_conf_ofs` 和 `efuse_cmd_ofs`：
+  - ESP32-C2：`efuse_conf_ofs = 0x8C`，`efuse_cmd_ofs = 0x94`
+  - ESP32-C3：`efuse_conf_ofs = 0x1CC`，`efuse_cmd_ofs = 0x1D4`
+  - ESP32-C6：`efuse_conf_ofs = 0x1CC`，`efuse_cmd_ofs = 0x1D4`
 
 ### 加密烧录支持
 
@@ -340,6 +344,14 @@ Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 |------|-----|------|
 | `CHIP_DETECT_REG` | `0x40001000` | 芯片检测魔数寄存器地址（用于 esptool 自动识别） |
 
+**CHIP_CTX eFuse 控制器字段（用于 C2/C3/C6 烧录模拟）：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `pgm_data[8]` | DWORD[] | PGM_DATA0-7 暂存区（烧录数据暂存） |
+| `efuse_conf_ofs` | DWORD | CONF_REG 相对 EFUSE_BASE 的偏移（0 = 无控制器） |
+| `efuse_cmd_ofs` | DWORD | CMD_REG 相对 EFUSE_BASE 的偏移 |
+
 **函数：**
 
 | 函数 | 说明 |
@@ -349,8 +361,8 @@ Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 | `Chip_GetName(ctx)` | 获取芯片名称 |
 | `Chip_SetMac(ctx, mac)` | 设置MAC地址 |
 | `Chip_GetMac(ctx)` | 获取MAC地址 |
-| `Chip_ReadReg(ctx, addr)` | 读取寄存器 |
-| `Chip_WriteReg(ctx, addr, val)` | 写入寄存器 |
+| `Chip_ReadReg(ctx, addr)` | 读取寄存器（含 eFuse 值存储读取） |
+| `Chip_WriteReg(ctx, addr, val)` | 写入寄存器（含 eFuse 控制器烧录模拟） |
 | `Chip_SetFlashSize(ctx, size)` | 设置Flash大小 |
 | `Chip_GetFlashSize(ctx)` | 获取Flash大小 |
 | `Chip_GetChipId(ctx)` | 获取芯片ID |
@@ -358,6 +370,14 @@ Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 | `Chip_GetEfuseSize(ctx)` | 获取efuse大小 |
 | `Chip_GetBootBaudRate(ctx)` | 获取启动日志波特率 |
 | `Chip_GetBootMessage(ctx, download_mode, reset_cause)` | 获取启动日志文本 |
+
+**Chip_WriteReg eFuse 控制器行为：**
+- 对于有控制器的芯片（C2/C3/C6，`efuse_conf_ofs != 0`）：
+  - 写入 PGM_DATA 范围（`EFUSE_BASE+0x00..+0x1F`）→ 暂存到 `pgm_data[]`
+  - 写入 CONF_REG → 记录解锁码
+  - 写入 CMD_REG 且 bit1 置位 → 触发烧录：根据 block 编号将 `pgm_data[]` OR 写入 eFuse 数组的 block 位置
+  - 其他寄存器写入 → 忽略
+- 对于无控制器的芯片（ESP32/S2/S3）：直接 OR 写入 eFuse 数组
 
 ### flash.h
 
@@ -814,20 +834,20 @@ HH:MM:SS.mmm +S.mmm [thread_id] [TAG] message
 
 ## 测试
 
-使用 esptool.py 测试:
+使用 esptool 测试:
 
 ```bash
 # 读取MAC
-esptool.py --port COM10 read_mac
+esptool --port COM10 read-mac
 
 # 读取Flash
-esptool.py --port COM10 read_flash 0 0x1000 flash.bin
+esptool --port COM10 read-flash 0 0x1000 flash.bin
 
 # 写入Flash
-esptool.py --port COM10 write_flash 0 firmware.bin
+esptool --port COM10 write-flash 0 firmware.bin
 
 # 擦除Flash
-esptool.py --port COM10 erase_flash
+esptool --port COM10 erase-flash
 ```
 
 ### 注意事项
