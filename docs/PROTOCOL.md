@@ -1408,13 +1408,23 @@ Stub 上传成功后，设备行为发生变化：
 
 ## 7. 未实现的命令
 
-以下命令在现代 esptool 中已较少使用，FakeEsptool 暂未实现：
+以下命令 FakeEsptool 暂未实现：
 
 | 命令码 | 名称 | 说明 |
 |--------|------|------|
 | 0x0E | READ_FLASH_SLOW | 慢速读取 Flash（已废弃） |
+| 0xD5 | SPI_NAND_ATTACH | 附加 SPI NAND Flash（仅 Stub） |
+| 0xD6 | SPI_NAND_READ_SPARE | 读取 NAND 备用区域（仅 Stub） |
+| 0xD7 | SPI_NAND_WRITE_SPARE | 写入 NAND 备用区域（仅 Stub） |
+| 0xD8 | SPI_NAND_READ_FLASH | 读取 NAND Flash（仅 Stub） |
+| 0xD9 | SPI_NAND_WRITE_FLASH_BEGIN | NAND Flash 写入开始（仅 Stub） |
+| 0xDA | SPI_NAND_WRITE_FLASH_DATA | NAND Flash 写入数据（仅 Stub） |
+| 0xDB | SPI_NAND_ERASE_FLASH | 擦除整个 NAND Flash（仅 Stub） |
+| 0xDC | SPI_NAND_ERASE_REGION | 擦除 NAND Flash 区域（仅 Stub） |
+| 0xDD | SPI_NAND_READ_PAGE_DEBUG | 读取 NAND 页面（调试，仅 Stub） |
+| 0xDE | SPI_NAND_WRITE_FLASH_END | NAND Flash 写入结束（仅 Stub） |
 
-**兼容性处理：** 若收到未实现的命令，可返回 Status != 0 或直接忽略，esptool 会 fallback。
+**兼容性处理：** 若收到未实现的命令，返回 `ROM_INVALID_RECV_MSG (0x05)` 错误，esptool 会 fallback。
 
 ---
 
@@ -1950,8 +1960,8 @@ Stub 通过 SPI 寄存器与 Flash 芯片通信。以读取 Flash ID（JEDEC RDI
 | ESP32-S2 | `0x3F400014` | `0xFFFFF` |
 | ESP32-S3 | `0x60000014` | `0xFFFFF` |
 | ESP32-C2 | `0x60000014` | `0xFFFFF` |
-| ESP32-C3 | `0x3FF40014` | `0xFFFFF` |
-| ESP32-C6 | `0x3FF40014` | `0xFFFFF` |
+| ESP32-C3 | `0x60000014` | `0xFFFFF` |
+| ESP32-C6 | `0x60000014` | `0xFFFFF` |
 | ESP8266 | `0x60000014` | `0xFFFFF` |
 
 **晶振频率检测：**
@@ -2190,6 +2200,7 @@ UART: TX: C0 4F 48 41 49 C0
 | 0x08 | SYNC | ✓ | ✓ | 同步握手 |
 | 0x09 | WRITE_REG | ✓ | ✓ | 写寄存器 |
 | 0x0A | READ_REG | ✓ | ✓ | 读寄存器 |
+| 0x0B | SPI_SET_PARAMS | ✓* | ✓ | 设置 SPI Flash 参数 |
 | 0x0D | SPI_ATTACH | ✓ | ✓ | 附加 SPI Flash |
 | 0x0F | CHANGE_BAUDRATE | ✓ | ✓ | 修改波特率 |
 | 0x10 | FLASH_DEFL_BEGIN | ✓ | ✓ | 压缩写入开始 |

@@ -69,7 +69,7 @@ void Trace_Close(void)
  * Trace_Write - Write trace message to log file
  *
  * Thread-safe function that writes timestamped message with tag.
- * Format: "HH:MM:SS.mmm [thread_id] [tag] +X.XXX message\r\n"
+ * Format: "HH:MM:SS.mmm +X.XXX [thread_id] [tag] message\r\n"
  *
  * @tag: Category tag (e.g. "GUI", "ESP", "SER")
  * @fmt: printf-style format string
@@ -103,8 +103,16 @@ void Trace_Write(const char *tag, const char *fmt, ...)
 
     va_list args;
     va_start(args, fmt);
-    len += vsnprintf(buf + len, sizeof(buf) - len, fmt, args);
+    int msgLen = vsnprintf(buf + len, sizeof(buf) - len, fmt, args);
     va_end(args);
+
+    /* vsnprintf returns number of chars that would be written (excluding null).
+       Clamp len to actual buffer size to prevent out-of-bounds access. */
+    if (msgLen >= 0) {
+        len += msgLen;
+        if (len >= (int)sizeof(buf))
+            len = (int)sizeof(buf) - 1;
+    }
 
     if (len > 0 && len < (int)sizeof(buf) - 2) {
         buf[len++] = '\r';

@@ -317,7 +317,7 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* Real device sends 8 consecutive responses per SYNC request.
        Response format: Size=4, Data=4 bytes status (0x00000000) */
     for (int i = 0; i < ESP_SYNC_RESPONSE_COUNT; i++) {
-        Esptool_SendResponseEx(ctx, ESP_CMD_SYNC, sync_val, ESP_OK, 4, NULL, 0);
+        Esptool_SendResponseEx(ctx, ESP_CMD_SYNC, sync_val, ESP_OK, 4, NULL, 4);
     }
 }
 
@@ -1251,6 +1251,21 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
             valid = FALSE;
         }
         break;
+
+    /* NAND flash commands (0xD5-0xDE) - not implemented in FakeEsptool.
+       These commands are stub-only and used by ESP32-S3 etc. for NAND flash.
+       Listed here explicitly for documentation; they will return ROM_INVALID_RECV_MSG. */
+    case ESP_CMD_SPI_NAND_ATTACH:
+    case ESP_CMD_SPI_NAND_READ_SPARE:
+    case ESP_CMD_SPI_NAND_WRITE_SPARE:
+    case ESP_CMD_SPI_NAND_READ_FLASH:
+    case ESP_CMD_SPI_NAND_WRITE_FLASH_BEGIN:
+    case ESP_CMD_SPI_NAND_WRITE_FLASH_DATA:
+    case ESP_CMD_SPI_NAND_ERASE_FLASH:
+    case ESP_CMD_SPI_NAND_ERASE_REGION:
+    case ESP_CMD_SPI_NAND_READ_PAGE_DEBUG:
+    case ESP_CMD_SPI_NAND_WRITE_FLASH_END:
+        /* Fall through to default - not implemented */
 
     default:
         valid = FALSE;

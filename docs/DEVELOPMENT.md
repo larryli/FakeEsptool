@@ -134,6 +134,17 @@ cmake --build build --config Release -j
 | 0xD0 | ERASE_FLASH | 擦除整个Flash |
 | 0xD1 | ERASE_REGION | 擦除Flash区域 |
 | 0xD2 | READ_FLASH | 读取Flash |
+| 0xD3 | RUN_USER_CODE | 运行用户代码（软复位） |
+| 0xD5 | SPI_NAND_ATTACH | 附加 SPI NAND Flash（未实现） |
+| 0xD6 | SPI_NAND_READ_SPARE | 读取 NAND 备用区域（未实现） |
+| 0xD7 | SPI_NAND_WRITE_SPARE | 写入 NAND 备用区域（未实现） |
+| 0xD8 | SPI_NAND_READ_FLASH | 读取 NAND Flash（未实现） |
+| 0xD9 | SPI_NAND_WRITE_FLASH_BEGIN | NAND Flash 写入开始（未实现） |
+| 0xDA | SPI_NAND_WRITE_FLASH_DATA | NAND Flash 写入数据（未实现） |
+| 0xDB | SPI_NAND_ERASE_FLASH | 擦除整个 NAND Flash（未实现） |
+| 0xDC | SPI_NAND_ERASE_REGION | 擦除 NAND Flash 区域（未实现） |
+| 0xDD | SPI_NAND_READ_PAGE_DEBUG | 读取 NAND 页面（调试，未实现） |
+| 0xDE | SPI_NAND_WRITE_FLASH_END | NAND Flash 写入结束（未实现） |
 
 ## 芯片支持
 
@@ -251,6 +262,8 @@ Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 | `Esptool_SendResponse(ctx, cmd, req_val, status, data, len)` | 发送响应（4字节状态） |
 | `Esptool_SendResponseEx(ctx, cmd, req_val, status, status_len, data, len)` | 发送响应（可配置状态长度） |
 | `Esptool_CalcChecksum(data, len)` | 计算校验和 |
+
+**注意：** `SendResponseEx` 的 `status` 和 `status_len` 参数仅用于日志记录，不影响响应包内容。响应包的 status 字节由调用方通过 `data`/`len` 参数传入。当 `data=NULL` 且 `len>0` 时，函数自动填充零字节（表示成功）。
 
 ### chip.h
 
@@ -676,6 +689,27 @@ TRACE_PROTO(TAG, "Protocol message: 0x%02X", cmd);
 ```c
 Serial_PostLog(hNotify, L"ESP", L"Command received");
 Serial_PostLogF(hNotify, L"ESP", L"Flash addr=0x%08lX", addr);
+```
+
+### Trace 日志格式
+
+Trace 日志输出到与可执行文件同目录的 `.log` 文件，格式：
+
+```
+HH:MM:SS.mmm +S.mmm [thread_id] [TAG] message
+```
+
+- `HH:MM:SS.mmm` - 绝对时间（时:分:秒.毫秒）
+- `+S.mmm` - 相对时间（距上一条 trace 的秒数.毫秒）
+- `thread_id` - 线程 ID
+- `TAG` - 日志标签（如 `ESP`、`SER`、`GUI`）
+- `message` - 日志内容
+
+示例：
+```
+08:58:38.094 +0.000 [18628] [ESP] RX frame len=44
+08:58:38.095 +0.001 [18628] [ESP] SYNC received
+08:58:38.121 +0.026 [18628] [ESP] SendResponse cmd=0x08
 ```
 
 ## 测试

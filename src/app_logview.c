@@ -104,29 +104,33 @@ static void FreeEntryChain(LOG_ENTRY *head)
 /* High-precision timing for relative timestamps */
 static LARGE_INTEGER g_freq = {0};        /* Performance counter frequency */
 static LARGE_INTEGER g_lastCounter = {0}; /* Last performance counter value */
+static CRITICAL_SECTION g_tsLock;         /* Lock for timestamp counter */
 
 /*
  * FormatTimestamp - Format current time as timestamp string with relative delta
  *
  * Format: "YYYY-MM-DD HH:MM:SS.mmm +X.XXX "
  *         Absolute time + relative delta since last log entry (millisecond precision)
+ *
+ * Thread-safe: uses separate lock for timestamp counter.
  */
 static int FormatTimestamp(WCHAR *buf, int maxLen)
 {
     SYSTEMTIME st;
     GetLocalTime(&st);
 
-    /* Get high-precision counter */
+    /* Get high-precision counter and calculate delta under lock */
     LARGE_INTEGER now;
     QueryPerformanceCounter(&now);
 
-    /* Calculate relative time delta in milliseconds */
     DWORD deltaMs = 0;
+    EnterCriticalSection(&g_tsLock);
     if (g_freq.QuadPart != 0 && g_lastCounter.QuadPart != 0) {
         LONGLONG deltaTicks = now.QuadPart - g_lastCounter.QuadPart;
         deltaMs = (DWORD)(deltaTicks * 1000 / g_freq.QuadPart);
     }
     g_lastCounter = now;
+    LeaveCriticalSection(&g_tsLock);
 
     return wsprintfW(buf, L"%04d-%02d-%02d %02d:%02d:%02d.%03d +%lu.%03lu ",
                      st.wYear, st.wMonth, st.wDay,
@@ -153,7 +157,7 @@ static void SetEditColor(HWND hEdit, COLORREF color)
 /*
  * AppendColoredText - Append colored text to RichEdit control
  */
-static void AppendColoredText(HWND hEdit, const WCHAR *text, int len, COLORREF color)
+static void AppendColoredText(HWND hEdit, const WCHAR *text, COLORREF color)
 {
     int textLen = GetWindowTextLengthW(hEdit);
     SendMessageW(hEdit, EM_SETSEL, textLen, textLen);
@@ -174,6 +178,7 @@ void LogView_Init(HWND hWnd)
         return;
     
     InitializeCriticalSection(&g_logLock);
+    InitializeCriticalSection(&g_tsLock);
     g_hMainWnd = hWnd;
     g_logHead = NULL;
     g_logTail = NULL;
@@ -204,8 +209,9 @@ void LogView_Close(void)
     /* Flush remaining entries */
     LogView_Flush();
     
-    /* Free lock */
+    /* Free locks */
     DeleteCriticalSection(&g_logLock);
+    DeleteCriticalSection(&g_tsLock);
     g_initialized = FALSE;
 }
 
@@ -229,7 +235,7 @@ void LogView_FlushTimer(void)
     LOG_ENTRY *entry = head;
     while (entry) {
         if (entry->text && entry->textLen > 0) {
-            AppendColoredText(g_hEdit, entry->text, entry->textLen, entry->color1);
+            AppendColoredText(g_hEdit, entry->text, entry->color1);
         }
         entry = entry->next;
     }
@@ -268,16 +274,16 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
         return;
 
     /* Calculate buffer size:
-     * - Timestamp: 24 chars "YYYY-MM-DD HH:MM:SS.mmm "
+     * - Timestamp: ~33 chars "YYYY-MM-DD HH:MM:SS.mmm +S.DDD "
      * - Direction: 5 chars "[RX] " or "[TX] "
      * - Per line (hex): 16*3 (hex bytes) + 1 (extra space at byte 8) = 49 chars
-     * - Per line (ASCII): 3 (" |") + 16 (ASCII chars) + 1 ("|") = 20 chars
+     * - Per line (ASCII): 2 (" |") + 16 (ASCII chars) + 1 ("|") = 19 chars
      * - Per line (newline): 2 chars
-     * - Continuation prefix: ~30 chars
+     * - Continuation prefix: ~35 chars
      * - Safety margin: 64 chars
      */
     DWORD numLines = (len + 15) / 16;
-    DWORD bufSize = 64 + numLines * (49 + 20 + 2 + 30) + 64;
+    DWORD bufSize = 64 + numLines * (49 + 19 + 2 + 35) + 64;
     WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bufSize * sizeof(WCHAR));
     if (!buf)
         return;
