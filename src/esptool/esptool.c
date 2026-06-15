@@ -214,9 +214,6 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD sta
     TRACE_PROTO(TAG, "SendResponse cmd=0x%02X req_val=0x%08lX status=0x%08lX status_len=%u data_len=%u",
                 cmd, req_val, status, status_len, data_len);
 
-    Serial_PostLogF(ctx->hNotify, L"DBG", L"SendResponse cmd=0x%02X status_len=%u data_len=%u",
-                    cmd, status_len, data_len);
-
     /* Check if data fits in response buffer */
     if (data_len > sizeof(resp) - 8) {
         TRACE_FW(TAG, "Response too large: cmd=0x%02X data_len=%u max=%zu", cmd, data_len, sizeof(resp) - 8);

@@ -380,7 +380,6 @@ FakeEsptool 日志每行格式：
 | `[CFG]` | 配置层 | 波特率/数据位等配置变化 |
 | `[BOOT]` | 启动 | ROM Bootloader 启动日志 |
 | `[ERR]` | 错误 | 错误信息 |
-| `[DBG]` | 调试 | 响应发送详情（SendResponse 调用） |
 
 **[RX]/[TX] hex dump 格式：**
 
