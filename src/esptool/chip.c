@@ -557,7 +557,7 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
         return val;
 
     /* ESP32 EFUSE_RD_REG_BASE: esptool readEfuse */
-    if (TryReadEfuse32(ctx, EFUSE_RD_REG_BASE_ESP32, 0x100, addr, &val))
+    if (TryReadEfuse32(ctx, EFUSE_RD_REG_BASE_ESP32, (DWORD)ctx->efuse_size, addr, &val))
         return val;
 
     /* ESP32 flash size register */
@@ -565,20 +565,38 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
         return (ctx->flash_size >> 16) & 0xFFFF;
 
     /* ESP32-S2 EFUSE */
-    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32S2, 0x100, addr, &val))
+    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32S2, (DWORD)ctx->efuse_size, addr, &val))
         return val;
 
     /* ESP32-C2/C3 EFUSE */
-    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32C2, 0x100, addr, &val))
+    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32C2, (DWORD)ctx->efuse_size, addr, &val))
         return val;
 
     /* ESP32-S3 EFUSE */
-    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32S3, 0x100, addr, &val))
+    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32S3, (DWORD)ctx->efuse_size, addr, &val))
         return val;
 
     /* ESP32-C6 EFUSE */
-    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32C6, 0x100, addr, &val))
+    if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32C6, (DWORD)ctx->efuse_size, addr, &val))
         return val;
+
+    /* eFuse controller command register - always return 0 (no pending command).
+       This allows espefuse to poll for command completion. */
+    {
+        DWORD cmd_reg = 0;
+        switch (ctx->type) {
+        case CHIP_ESP32:   cmd_reg = EFUSE_CMD_REG_ESP32; break;
+        case CHIP_ESP32S2: cmd_reg = EFUSE_CMD_REG_ESP32S2; break;
+        case CHIP_ESP32S3: cmd_reg = EFUSE_CMD_REG_ESP32S3; break;
+        case CHIP_ESP32C2: cmd_reg = EFUSE_CMD_REG_ESP32C2; break;
+        case CHIP_ESP32C3: cmd_reg = EFUSE_CMD_REG_ESP32C3; break;
+        case CHIP_ESP32C6: cmd_reg = EFUSE_CMD_REG_ESP32C6; break;
+        default: break;
+        }
+        if (cmd_reg != 0 && addr == cmd_reg) {
+            return 0;  /* No pending command */
+        }
+    }
 
     /* Chip detection magic register - used by esptool for autodetect */
     if (addr == CHIP_DETECT_REG)
@@ -648,11 +666,18 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
         if (addr >= (base) && addr < (base) + (DWORD)ctx->efuse_size) { \
             int offset = (int)(addr - (base)); \
             if (offset + 3 < ctx->efuse_size) { \
+                BYTE b0 = ctx->efuse[offset]; \
+                BYTE b1 = ctx->efuse[offset + 1]; \
+                BYTE b2 = ctx->efuse[offset + 2]; \
+                BYTE b3 = ctx->efuse[offset + 3]; \
                 ctx->efuse[offset] |= (BYTE)(val & 0xFF); \
                 ctx->efuse[offset + 1] |= (BYTE)((val >> 8) & 0xFF); \
                 ctx->efuse[offset + 2] |= (BYTE)((val >> 16) & 0xFF); \
                 ctx->efuse[offset + 3] |= (BYTE)((val >> 24) & 0xFF); \
-                TRACE_FW(TAG, "eFuse write: base=0x%08lX offset=0x%X val=0x%08lX", (DWORD)(base), offset, val); \
+                TRACE_FW(TAG, "eFuse write: base=0x%08lX offset=0x%X val=0x%08lX before=%02X%02X%02X%02X after=%02X%02X%02X%02X", \
+                         (DWORD)(base), offset, val, b3,b2,b1,b0, \
+                         ctx->efuse[offset+3], ctx->efuse[offset+2], \
+                         ctx->efuse[offset+1], ctx->efuse[offset]); \
             } \
             return TRUE; \
         }
@@ -673,6 +698,27 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
     EFUSE_WRITE_AT(EFUSE_BASE_ESP32C6)
 
     #undef EFUSE_WRITE_AT
+
+    /* eFuse controller command simulation.
+       When espefuse writes EFUSE_PGM_CMD to EFUSE_CMD_REG, immediately
+       clear the register to signal command completion. */
+    {
+        DWORD cmd_reg = 0;
+        switch (ctx->type) {
+        case CHIP_ESP32:   cmd_reg = EFUSE_CMD_REG_ESP32; break;
+        case CHIP_ESP32S2: cmd_reg = EFUSE_CMD_REG_ESP32S2; break;
+        case CHIP_ESP32S3: cmd_reg = EFUSE_CMD_REG_ESP32S3; break;
+        case CHIP_ESP32C2: cmd_reg = EFUSE_CMD_REG_ESP32C2; break;
+        case CHIP_ESP32C3: cmd_reg = EFUSE_CMD_REG_ESP32C3; break;
+        case CHIP_ESP32C6: cmd_reg = EFUSE_CMD_REG_ESP32C6; break;
+        default: break;
+        }
+        if (cmd_reg != 0 && addr == cmd_reg) {
+            /* Command register write - immediately clear to signal completion */
+            TRACE_FW(TAG, "eFuse cmd: addr=0x%08lX val=0x%08lX (cleared)", addr, val);
+            return TRUE;
+        }
+    }
 
     /* SPI register write */
     if (ctx->spi_reg_base != 0 &&
@@ -1015,4 +1061,146 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
     }
 
     return buf;
+}
+
+/*
+ * ReadEfuseBits - Read bits from eFuse by offset and mask
+ *
+ * @ctx:    Chip context
+ * @offset: Byte offset within eFuse array
+ * @mask:   Bit mask to apply
+ *
+ * Returns the masked value shifted to LSB, or 0 if offset is out of range.
+ */
+static DWORD ReadEfuseBits(const CHIP_CTX *ctx, int offset, DWORD mask)
+{
+    if (!ctx->efuse || offset + 3 >= ctx->efuse_size)
+        return 0;
+    DWORD val = ctx->efuse[offset] |
+                ((DWORD)ctx->efuse[offset + 1] << 8) |
+                ((DWORD)ctx->efuse[offset + 2] << 16) |
+                ((DWORD)ctx->efuse[offset + 3] << 24);
+    return val & mask;
+}
+
+/*
+ * CountBits - Count number of 1-bits in a value
+ */
+static int CountBits(DWORD val)
+{
+    int count = 0;
+    while (val) {
+        count += val & 1;
+        val >>= 1;
+    }
+    return count;
+}
+
+DWORD Chip_GetFlashCryptCnt(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_FLASH_CRYPT_CNT_ESP32,
+                             EFUSE_MASK_FLASH_CRYPT_CNT_ESP32) >> 20;
+    case CHIP_ESP32S2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32S2,
+                             EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32S2) >> 18;
+    case CHIP_ESP32S3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32S3,
+                             EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32S3) >> 18;
+    case CHIP_ESP32C2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C2,
+                             EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C2) >> 7;
+    case CHIP_ESP32C3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C3,
+                             EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C3) >> 18;
+    case CHIP_ESP32C6:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C6,
+                             EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C6) >> 18;
+    default:
+        return 0;
+    }
+}
+
+BOOL Chip_IsFlashEncryptionEnabled(const CHIP_CTX *ctx)
+{
+    DWORD cnt = Chip_GetFlashCryptCnt(ctx);
+    return (CountBits(cnt) & 1) != 0;
+}
+
+BOOL Chip_IsDownloadEncryptDisabled(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DISABLE_DL_ENCRYPT_ESP32,
+                             EFUSE_BIT_DISABLE_DL_ENCRYPT_ESP32) != 0;
+    case CHIP_ESP32S2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32S2,
+                             EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32S2) != 0;
+    case CHIP_ESP32S3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32S3,
+                             EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32S3) != 0;
+    case CHIP_ESP32C2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C2,
+                             EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C2) != 0;
+    case CHIP_ESP32C3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C3,
+                             EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C3) != 0;
+    case CHIP_ESP32C6:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C6,
+                             EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C6) != 0;
+    default:
+        return FALSE;
+    }
+}
+
+BOOL Chip_IsDownloadModeDisabled(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_UART_DOWNLOAD_DIS_ESP32,
+                             EFUSE_BIT_UART_DOWNLOAD_DIS_ESP32) != 0;
+    case CHIP_ESP32S2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32S2,
+                             EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32S2) != 0;
+    case CHIP_ESP32S3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32S3,
+                             EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32S3) != 0;
+    case CHIP_ESP32C2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C2,
+                             EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C2) != 0;
+    case CHIP_ESP32C3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C3,
+                             EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C3) != 0;
+    case CHIP_ESP32C6:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C6,
+                             EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C6) != 0;
+    default:
+        return FALSE;
+    }
+}
+
+BOOL Chip_IsSecureDownloadEnabled(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        return FALSE;  /* ESP32 does not support secure download mode */
+    case CHIP_ESP32S2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32S2,
+                             EFUSE_BIT_ENABLE_SECURITY_DL_ESP32S2) != 0;
+    case CHIP_ESP32S3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32S3,
+                             EFUSE_BIT_ENABLE_SECURITY_DL_ESP32S3) != 0;
+    case CHIP_ESP32C2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C2,
+                             EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C2) != 0;
+    case CHIP_ESP32C3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C3,
+                             EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C3) != 0;
+    case CHIP_ESP32C6:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C6,
+                             EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C6) != 0;
+    default:
+        return FALSE;
+    }
 }

@@ -216,10 +216,17 @@ void Main_CmdDownloadMode(HWND hWnd, int mode)
 /*
  * GetEncryptStateStrId - Get string ID for current encryption state
  *
- * Returns: String ID for status bar display
+ * Uses eFuse state when chip is available, falls back to manual toggle.
  */
 static UINT GetEncryptStateStrId(void)
 {
+    if (g_device.chip.name[0]) {
+        BOOL encrypted = Chip_IsFlashEncryptionEnabled(&g_device.chip);
+        BOOL prod = Chip_IsDownloadEncryptDisabled(&g_device.chip);
+        if (encrypted && prod) return IDS_ENCRYPT_PROD;
+        if (encrypted) return IDS_ENCRYPT_DEV;
+        return IDS_ENCRYPT_NONE;
+    }
     switch (g_encryptState) {
     case ENCRYPT_STATE_DEV:  return IDS_ENCRYPT_DEV;
     case ENCRYPT_STATE_PROD: return IDS_ENCRYPT_PROD;
@@ -230,10 +237,17 @@ static UINT GetEncryptStateStrId(void)
 /*
  * GetDownloadModeStrId - Get string ID for current download mode
  *
- * Returns: String ID for status bar display
+ * Uses eFuse state when chip is available, falls back to manual toggle.
  */
 static UINT GetDownloadModeStrId(void)
 {
+    if (g_device.chip.name[0]) {
+        BOOL dl_disabled = Chip_IsDownloadModeDisabled(&g_device.chip);
+        BOOL secure = Chip_IsSecureDownloadEnabled(&g_device.chip);
+        if (dl_disabled) return IDS_DOWNLOAD_DISABLED;
+        if (secure) return IDS_DOWNLOAD_SECURE;
+        return IDS_DOWNLOAD_NORMAL;
+    }
     switch (g_downloadMode) {
     case DOWNLOAD_MODE_SECURE:   return IDS_DOWNLOAD_SECURE;
     case DOWNLOAD_MODE_DISABLED: return IDS_DOWNLOAD_DISABLED;

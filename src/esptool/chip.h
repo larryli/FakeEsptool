@@ -114,6 +114,112 @@
 /* ESP32-C6 MAC eFuse offset */
 #define MAC_EFUSE_BASE_ESP32C6      (EFUSE_BASE_ESP32C6 + 0x044)        /* 0x600B0844 */
 
+/* ============================================================================
+ * eFuse encryption field offsets and bit masks
+ *
+ * These define the locations of encryption-related eFuse fields within
+ * the BLOCK0 region. Offsets are from the chip's eFuse base address.
+ * ============================================================================ */
+
+/* ESP32 eFuse encryption fields (EFUSE_RD_REG_BASE = 0x3FF5A000) */
+#define EFUSE_OFFS_FLASH_CRYPT_CNT_ESP32        0x00    /* BLOCK0 word0 */
+#define EFUSE_MASK_FLASH_CRYPT_CNT_ESP32        (0x7FUL << 20)
+#define EFUSE_OFFS_DISABLE_DL_ENCRYPT_ESP32     0x18    /* BLOCK0 word6 */
+#define EFUSE_BIT_DISABLE_DL_ENCRYPT_ESP32      (1UL << 7)
+#define EFUSE_OFFS_UART_DOWNLOAD_DIS_ESP32      0x00    /* BLOCK0 word0 */
+#define EFUSE_BIT_UART_DOWNLOAD_DIS_ESP32       (1UL << 27)
+
+/* ESP32-S2 eFuse encryption fields (EFUSE_BASE = 0x3F41A000) */
+#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32S2   0x08    /* BLOCK0 word2 */
+#define EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32S2   (7UL << 18)
+#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32S2 0x04   /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32S2 (1UL << 20)
+#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32S2    0x10    /* BLOCK0 word4 */
+#define EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32S2     (1UL << 4)
+#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32S2   0x10    /* BLOCK0 word4 */
+#define EFUSE_BIT_ENABLE_SECURITY_DL_ESP32S2    (1UL << 5)
+
+/* ESP32-S3 eFuse encryption fields (EFUSE_BASE = 0x60007000) */
+#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32S3   0x08    /* BLOCK0 word2 */
+#define EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32S3   (7UL << 18)
+#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32S3 0x04   /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32S3 (1UL << 20)
+#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32S3    0x10    /* BLOCK0 word4 */
+#define EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32S3     (1UL << 4)
+#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32S3   0x10    /* BLOCK0 word4 */
+#define EFUSE_BIT_ENABLE_SECURITY_DL_ESP32S3    (1UL << 5)
+
+/* ESP32-C2 eFuse encryption fields (EFUSE_BASE = 0x60008800) */
+#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C2   0x04    /* BLOCK0 word1 */
+#define EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C2   (7UL << 7)
+#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C2 0x04   /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C2 (1UL << 6)
+#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C2    0x04    /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C2     (1UL << 14)
+#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C2   0x04    /* BLOCK0 word1 */
+#define EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C2    (1UL << 16)
+
+/* ESP32-C3 eFuse encryption fields (EFUSE_BASE = 0x60008800) */
+#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C3   0x08    /* BLOCK0 word2 */
+#define EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C3   (7UL << 18)
+#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C3 0x04   /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C3 (1UL << 20)
+#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C3    0x10    /* BLOCK0 word4 */
+#define EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C3     (1UL << 0)
+#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C3   0x10    /* BLOCK0 word4 */
+#define EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C3    (1UL << 5)
+
+/* ESP32-C6 eFuse encryption fields (EFUSE_BASE = 0x600B0800) */
+#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C6   0x08    /* BLOCK0 word2 */
+#define EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C6   (7UL << 18)
+#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C6 0x04   /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C6 (1UL << 20)
+#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C6    0x10    /* BLOCK0 word4 */
+#define EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C6     (1UL << 0)
+#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C6   0x10    /* BLOCK0 word4 */
+#define EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C6    (1UL << 5)
+
+/* ============================================================================
+ * eFuse controller command registers per chip type
+ * Used by espefuse to trigger eFuse program/read operations.
+ * When EFUSE_CMD_REG is written with EFUSE_PGM_CMD, the controller
+ * programs the eFuse and then clears the command register.
+ * ============================================================================ */
+
+/* ESP32 eFuse controller */
+#define EFUSE_CONF_REG_ESP32        (EFUSE_BASE_ESP32 + 0x03C)
+#define EFUSE_CMD_REG_ESP32         (EFUSE_BASE_ESP32 + 0x040)
+#define EFUSE_CONF_WRITE_ESP32      0x5A5A
+#define EFUSE_CONF_READ_ESP32       0x5AA5
+#define EFUSE_CMD_WRITE_ESP32       0x2
+#define EFUSE_CMD_READ_ESP32        0x1
+
+/* ESP32-S2 eFuse controller */
+#define EFUSE_CONF_REG_ESP32S2      (EFUSE_BASE_ESP32S2 + 0x1CC)
+#define EFUSE_CMD_REG_ESP32S2       (EFUSE_BASE_ESP32S2 + 0x1D4)
+
+/* ESP32-S3 eFuse controller */
+#define EFUSE_CONF_REG_ESP32S3      (EFUSE_BASE_ESP32S3 + 0x1CC)
+#define EFUSE_CMD_REG_ESP32S3       (EFUSE_BASE_ESP32S3 + 0x1D4)
+
+/* ESP32-C2 eFuse controller */
+#define EFUSE_CONF_REG_ESP32C2      (EFUSE_BASE_ESP32C2 + 0x08C)
+#define EFUSE_CMD_REG_ESP32C2       (EFUSE_BASE_ESP32C2 + 0x094)
+
+/* ESP32-C3 eFuse controller */
+#define EFUSE_CONF_REG_ESP32C3      (EFUSE_BASE_ESP32C3 + 0x1CC)
+#define EFUSE_CMD_REG_ESP32C3       (EFUSE_BASE_ESP32C3 + 0x1D4)
+
+/* ESP32-C6 eFuse controller */
+#define EFUSE_CONF_REG_ESP32C6      (EFUSE_BASE_ESP32C6 + 0x1CC)
+#define EFUSE_CMD_REG_ESP32C6       (EFUSE_BASE_ESP32C6 + 0x1D4)
+
+/* Common eFuse command values (for S2/S3/C2/C3/C6) */
+#define EFUSE_WRITE_OP_CODE         0x5A5A
+#define EFUSE_READ_OP_CODE          0x5AA5
+#define EFUSE_PGM_CMD               0x2
+#define EFUSE_READ_CMD              0x1
+
 /* Flash mode constants */
 #define FLASH_MODE_QIO  0
 #define FLASH_MODE_DIO  2
@@ -292,5 +398,42 @@ DWORD Chip_GetBootBaudRate(const CHIP_CTX *ctx);
  * reset_cause: 0x01=POWERON, 0x02=EXT, 0x03=WDT
  */
 const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE reset_cause);
+
+/*
+ * Chip_GetFlashCryptCnt - Get flash encryption counter value from eFuse
+ *
+ * Returns the raw bitfield value. Check if odd number of 1-bits
+ * to determine if encryption is enabled.
+ */
+DWORD Chip_GetFlashCryptCnt(const CHIP_CTX *ctx);
+
+/*
+ * Chip_IsFlashEncryptionEnabled - Check if flash encryption is active
+ *
+ * Returns TRUE if flash_crypt_cnt has an odd number of 1-bits.
+ */
+BOOL Chip_IsFlashEncryptionEnabled(const CHIP_CTX *ctx);
+
+/*
+ * Chip_IsDownloadEncryptDisabled - Check if manual encrypt is disabled (production mode)
+ *
+ * Returns TRUE if DISABLE_DL_ENCRYPT / DIS_DOWNLOAD_MANUAL_ENCRYPT is set.
+ */
+BOOL Chip_IsDownloadEncryptDisabled(const CHIP_CTX *ctx);
+
+/*
+ * Chip_IsDownloadModeDisabled - Check if download mode is disabled
+ *
+ * Returns TRUE if UART_DOWNLOAD_DIS / DIS_DOWNLOAD_MODE is set.
+ */
+BOOL Chip_IsDownloadModeDisabled(const CHIP_CTX *ctx);
+
+/*
+ * Chip_IsSecureDownloadEnabled - Check if secure download mode is active
+ *
+ * Returns TRUE if ENABLE_SECURITY_DOWNLOAD is set.
+ * ESP32 does not support this feature.
+ */
+BOOL Chip_IsSecureDownloadEnabled(const CHIP_CTX *ctx);
 
 #endif

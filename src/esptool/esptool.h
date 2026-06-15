@@ -147,6 +147,7 @@ typedef struct {
     DWORD     defl_buf_cap;   /* Buffer capacity (flash_uncompressed_size) */
     DWORD     defl_offset;    /* Flash offset for current deflate session */
     DWORD     defl_unc_size;  /* Uncompressed size for current deflate session */
+    BOOL      flash_encrypted; /* Current flash session uses encryption (encrypted=1) */
 } ESPTOOL_CTX;
 
 /*

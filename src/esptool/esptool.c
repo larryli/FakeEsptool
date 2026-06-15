@@ -8,6 +8,7 @@
 #include "../serial.h"
 #include "../utils/trace.h"
 #include "../utils/deflate.h"
+#include "../utils/encrypt.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -124,13 +125,54 @@ static DWORD Defl_FlushBuffer(ESPTOOL_CTX *ctx)
         return ESP_FAIL;
     }
 
-    /* Write decompressed data to flash */
     DWORD decomp_size = (DWORD)deflate_ctx.out_pos;
     TRACE_PROTO(TAG, "Defl flush: %lu -> %lu bytes at offset 0x%08lX",
                 ctx->defl_buf_size, decomp_size, ctx->defl_offset);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  Decompressed %lu -> %lu bytes at offset 0x%08lX",
                     ctx->defl_buf_size, decomp_size, ctx->defl_offset);
 
+    /* Encrypt if encrypted flag was set */
+    if (ctx->flash_encrypted) {
+        int key_offset = -1;
+        int key_len = 32;
+        switch (ctx->chip->type) {
+        case CHIP_ESP32:   key_offset = 0x38; break;
+        case CHIP_ESP32S2: key_offset = 0x9C; key_len = 64; break;
+        case CHIP_ESP32S3: key_offset = 0x9C; key_len = 64; break;
+        case CHIP_ESP32C2: key_offset = 0x60; break;
+        case CHIP_ESP32C3: key_offset = 0x9C; break;
+        case CHIP_ESP32C6: key_offset = 0x9C; break;
+        default: break;
+        }
+
+        if (key_offset >= 0 && ctx->chip->efuse &&
+            key_offset + key_len <= ctx->chip->efuse_size) {
+            const BYTE *key = &ctx->chip->efuse[key_offset];
+            ENCRYPT_CTX enc_ctx;
+            ret = Encrypt_Init(&enc_ctx, key, key_len, ctx->defl_offset);
+            if (ret == ENCRYPT_OK) {
+                ret = Encrypt_Data(&enc_ctx, decomp_buf, decomp_buf, decomp_size);
+            }
+            if (ret == ENCRYPT_OK) {
+                TRACE_PROTO(TAG, "Encrypted %lu bytes at offset 0x%08lX", decomp_size, ctx->defl_offset);
+                Serial_PostLogF(ctx->hNotify, L"ESP", L"  Encrypted %lu bytes", decomp_size);
+            } else {
+                TRACE_FW(TAG, "Encryption failed: %d", ret);
+                Serial_PostLogF(ctx->hNotify, L"ERR", L"  Encryption failed: %d", ret);
+                HeapFree(GetProcessHeap(), 0, decomp_buf);
+                Defl_FreeBuffer(ctx);
+                return ESP_FAIL;
+            }
+        } else {
+            TRACE_FW(TAG, "No encryption key available");
+            Serial_PostLog(ctx->hNotify, L"ERR", L"  No encryption key in eFuse");
+            HeapFree(GetProcessHeap(), 0, decomp_buf);
+            Defl_FreeBuffer(ctx);
+            return ESP_FAIL;
+        }
+    }
+
+    /* Write to flash */
     Flash_Write(ctx->flash, ctx->defl_offset, decomp_buf, decomp_size);
 
     HeapFree(GetProcessHeap(), 0, decomp_buf);
@@ -167,6 +209,7 @@ void Esptool_ResetState(ESPTOOL_CTX *ctx)
     ctx->flash_uncompressed_size = 0;
     ctx->defl_offset = 0;
     ctx->defl_unc_size = 0;
+    ctx->flash_encrypted = FALSE;
     Slip_Reset(&ctx->slip);
     TRACE_PROTO(TAG, "Protocol state reset to IDLE");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Protocol state reset");
@@ -361,11 +404,20 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "WRITE_REG addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr, val, mask, delayUs);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr, val, mask, delayUs);
+    Serial_PostLogF(ctx->hNotify, L"DBG", L"  WRITE_REG raw size=%u [%02X %02X %02X %02X %02X %02X %02X %02X]",
+                    pkt->size,
+                    pkt->data[0], pkt->data[1], pkt->data[2], pkt->data[3],
+                    pkt->data[4], pkt->data[5], pkt->data[6], pkt->data[7]);
 
     /* Apply mask: only bits set in mask are written */
     DWORD currentVal = Chip_ReadReg(ctx->chip, addr);
     DWORD newVal = (currentVal & ~mask) | (val & mask);
     Chip_WriteReg(ctx->chip, addr, newVal);
+
+    /* Debug: verify eFuse write by reading back */
+    DWORD readback = Chip_ReadReg(ctx->chip, addr);
+    Serial_PostLogF(ctx->hNotify, L"DBG", L"  WRITE_REG: current=0x%08lX val=0x%08lX mask=0x%08lX new=0x%08lX readback=0x%08lX",
+                    currentVal, val, mask, newVal, readback);
 
     if (ctx->onModified) ctx->onModified();
     /* WRITE_REG always returns 2-byte status, Val field is 0x00000000 */
@@ -500,10 +552,27 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD offset = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
                    ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
 
-    TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN uncompressed=%lu blocks=%lu bsize=%lu offset=0x%08lX",
-                uncompressed_size, blocks, bsize, offset);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  uncompressed=%lu blocks=%lu bsize=%lu offset=0x%08lX",
-                    uncompressed_size, blocks, bsize, offset);
+    /* ROM mode sends extra 4 bytes for encrypted flag */
+    DWORD encrypted = 0;
+    if (pkt->size >= 20) {
+        encrypted = pkt->data[16] | ((DWORD)pkt->data[17] << 8) |
+                    ((DWORD)pkt->data[18] << 16) | ((DWORD)pkt->data[19] << 24);
+    }
+
+    /* Product mode: reject plaintext writes when encryption is active */
+    if (!encrypted && Chip_IsFlashEncryptionEnabled(ctx->chip) &&
+        Chip_IsDownloadEncryptDisabled(ctx->chip)) {
+        TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN rejected: production mode, plaintext not allowed");
+        Serial_PostLog(ctx->hNotify, L"ERR", L"  Production mode: plaintext flash disabled");
+        BYTE status_len = ESP_STATUS_LEN(ctx);
+        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+        return;
+    }
+
+    TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN uncompressed=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
+                uncompressed_size, blocks, bsize, offset, encrypted);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  uncompressed=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
+                    uncompressed_size, blocks, bsize, offset, encrypted);
 
     /* Flush any pending accumulated data from previous session */
     if (ctx->defl_buf && ctx->defl_buf_size > 0) {
@@ -530,6 +599,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     ctx->flash_offset = offset;
     ctx->flash_seq = 0;
     ctx->flash_uncompressed_size = uncompressed_size;
+    ctx->flash_encrypted = (encrypted != 0);
     ctx->state = ESP_STATE_FLASH_WRITING;
 
     /* Erase the flash region (use uncompressed_size for erase calculation) */
@@ -878,12 +948,23 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
                     ((DWORD)pkt->data[18] << 16) | ((DWORD)pkt->data[19] << 24);
     }
 
+    /* Product mode: reject plaintext writes when encryption is active */
+    if (!encrypted && Chip_IsFlashEncryptionEnabled(ctx->chip) &&
+        Chip_IsDownloadEncryptDisabled(ctx->chip)) {
+        TRACE_PROTO(TAG, "FLASH_BEGIN rejected: production mode, plaintext not allowed");
+        Serial_PostLog(ctx->hNotify, L"ERR", L"  Production mode: plaintext flash disabled");
+        BYTE status_len = ESP_STATUS_LEN(ctx);
+        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_BEGIN, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+        return;
+    }
+
     /* Note: Do NOT free deflate buffer here.
        Client may send FLASH_BEGIN before FLASH_DEFL_END.
        The buffer will be flushed by HandleFlashDeflEnd. */
 
     ctx->flash_offset = offset;
     ctx->flash_seq = 0;
+    ctx->flash_encrypted = (encrypted != 0);
     ctx->state = ESP_STATE_FLASH_WRITING;
 
     TRACE_PROTO(TAG, "FLASH_BEGIN erase=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
@@ -947,7 +1028,48 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             return;
         }
 
-        Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
+        /* Encrypt if encrypted flag was set */
+        if (ctx->flash_encrypted) {
+            int key_offset = -1;
+            int key_len = 32;
+            switch (ctx->chip->type) {
+            case CHIP_ESP32:   key_offset = 0x38; break;
+            case CHIP_ESP32S2: key_offset = 0x9C; key_len = 64; break;
+            case CHIP_ESP32S3: key_offset = 0x9C; key_len = 64; break;
+            case CHIP_ESP32C2: key_offset = 0x60; break;
+            case CHIP_ESP32C3: key_offset = 0x9C; break;
+            case CHIP_ESP32C6: key_offset = 0x9C; break;
+            default: break;
+            }
+
+            if (key_offset >= 0 && ctx->chip->efuse &&
+                key_offset + key_len <= ctx->chip->efuse_size) {
+                const BYTE *key = &ctx->chip->efuse[key_offset];
+                BYTE *enc_buf = (BYTE *)HeapAlloc(GetProcessHeap(), 0, data_len);
+                if (enc_buf) {
+                    ENCRYPT_CTX enc_ctx;
+                    int ret = Encrypt_Init(&enc_ctx, key, key_len, ctx->flash_offset);
+                    if (ret == ENCRYPT_OK)
+                        ret = Encrypt_Data(&enc_ctx, payload, enc_buf, data_len);
+                    if (ret == ENCRYPT_OK) {
+                        Flash_Write(ctx->flash, ctx->flash_offset, enc_buf, data_len);
+                        TRACE_PROTO(TAG, "Encrypted %lu bytes at offset 0x%08lX", data_len, ctx->flash_offset);
+                    } else {
+                        Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
+                        TRACE_FW(TAG, "Encryption failed: %d", ret);
+                    }
+                    HeapFree(GetProcessHeap(), 0, enc_buf);
+                } else {
+                    Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
+                }
+            } else {
+                Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
+                TRACE_FW(TAG, "No encryption key available");
+            }
+        } else {
+            Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
+        }
+
         ctx->flash_offset += data_len;
         ctx->flash_seq = seq + 1;
     }
@@ -1024,11 +1146,13 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     if (ctx->chip->type == CHIP_ESP32S2) {
         TRACE_PROTO(TAG, "  ESP32-S2: returning 14-byte response (no chip_id)");
         Serial_PostLog(ctx->hNotify, L"ESP", L"  ESP32-S2: no chip_id in response");
+        DWORD flash_crypt_cnt = Chip_GetFlashCryptCnt(ctx->chip);
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  flags=0x%08lX flash_crypt_cnt=%u",
-                        0UL, 0U);
+                        0UL, (unsigned)flash_crypt_cnt);
         BYTE sec_data[14] = {0};
         /* bytes 0-3:   flags (all zeros) */
-        /* byte 4:      flash_crypt_cnt (0) */
+        /* byte 4:      flash_crypt_cnt */
+        sec_data[4] = (BYTE)(flash_crypt_cnt & 0xFF);
         /* bytes 5-11:  key_purposes (all zeros) */
         /* bytes 12-13: status = success (0x00, 0x00) */
         Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, sec_data, 14);
@@ -1038,10 +1162,12 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* ESP32-S3, C2, C3, C6: Return 22-byte response with IMAGE_CHIP_ID.
        [flags:4][flash_crypt_cnt:1][key_purposes:7][chip_id:4][api_version:4][status:2] */
     DWORD chip_id = ctx->chip->security_chip_id;
+    DWORD flash_crypt_cnt = Chip_GetFlashCryptCnt(ctx->chip);
 
     BYTE sec_data[22] = {0};
     /* bytes 0-3:   flags (all zeros) */
-    /* byte 4:      flash_crypt_cnt (0) */
+    /* byte 4:      flash_crypt_cnt */
+    sec_data[4] = (BYTE)(flash_crypt_cnt & 0xFF);
     /* bytes 5-11:  key_purposes (all zeros) */
     /* bytes 12-15: chip_id (IMAGE_CHIP_ID, little-endian) */
     sec_data[12] = (BYTE)(chip_id & 0xFF);
@@ -1053,7 +1179,7 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "  chip_id (IMAGE_CHIP_ID)=%lu (0x%08lX)", chip_id, chip_id);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  flags=0x%08lX flash_crypt_cnt=%u",
-                    0UL, 0U);
+                    0UL, (unsigned)flash_crypt_cnt);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  chip_id=%lu (0x%08lX) api_version=%lu",
                     chip_id, chip_id, 0UL);
 
