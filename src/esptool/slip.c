@@ -148,7 +148,7 @@ int Slip_Encode(const BYTE *data, int len, BYTE *out, int out_max)
         return 0;
     out[pos++] = SLIP_END;
 
-    for (int i = 0; i < len && pos < out_max - 2; i++) {
+    for (int i = 0; i < len && pos < out_max - 1; i++) {
         switch (data[i]) {
         case SLIP_END:
             out[pos++] = SLIP_ESC;

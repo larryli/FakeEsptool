@@ -57,7 +57,6 @@
  * ============================================================================ */
 #define UART_CLKDIV_REG_ESP32       0x3FF40014
 #define UART_CLKDIV_REG_ESP32S2     0x3F400014
-#define UART_CLKDIV_REG_ESP32S3     0x60000014  /* Also used by ESP32-C2/C3/C6 */
 #define UART_CLKDIV_REG_ESP8266     0x60000014
 #define UART_CLKDIV_MASK            0xFFFFF
 

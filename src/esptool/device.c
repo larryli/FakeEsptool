@@ -161,7 +161,8 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     DWORD read;
     DWORD magic, version, chipType, flashSize, efuseSize;
     BYTE xtalFreq;
-    BYTE reserved[3];
+    BYTE headerReserved[3];
+    BYTE macReserved[2];
     BYTE mac[6];
     BOOL ok = TRUE;
 
@@ -188,11 +189,11 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     }
 
     ok = ok && ReadFile(hFile, &xtalFreq, 1, &read, NULL) && read == 1;
-    ok = ok && ReadFile(hFile, reserved, 3, &read, NULL) && read == 3;
+    ok = ok && ReadFile(hFile, headerReserved, 3, &read, NULL) && read == 3;
 
     /* MAC (8 bytes) */
     ok = ok && ReadFile(hFile, mac, 6, &read, NULL) && read == 6;
-    ok = ok && ReadFile(hFile, reserved, 2, &read, NULL) && read == 2;
+    ok = ok && ReadFile(hFile, macReserved, 2, &read, NULL) && read == 2;
 
     /* Flash config (4 bytes) */
     ok = ok && ReadFile(hFile, &flashSize, 4, &read, NULL) && read == 4;

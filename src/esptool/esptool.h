@@ -88,13 +88,10 @@ typedef enum {
 #define ESP_CMD_SPI_NAND_READ_PAGE_DEBUG  0xDD
 #define ESP_CMD_SPI_NAND_WRITE_FLASH_END  0xDE
 
-/* SYNC sequence length */
-#define ESP_SYNC_SEQ_LEN    36
-
 /* SYNC response count (real device sends 8 identical responses) */
 #define ESP_SYNC_RESPONSE_COUNT 8
 
-/* Maximum data payload size in ESP_PACKET (SLIP_MAX_FRAME - 8 header bytes) */
+/* Maximum data payload size in ESP_PACKET (SLIP_MAX_FRAME minus 8-byte packet header: dir+cmd+size+value) */
 #define ESP_PACKET_DATA_MAX (SLIP_MAX_FRAME - 8)
 
 /* Status length: 2 bytes for stub mode, 4 bytes for ROM mode */

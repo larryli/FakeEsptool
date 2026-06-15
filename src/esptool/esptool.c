@@ -65,17 +65,10 @@ static const char *GetCmdName(BYTE cmd)
     return name ? name : "UNKNOWN";
 }
 
-/* SYNC response sequence template.
-   Bytes 0-2: {0x07, 0x07, 0x12} used in Val field (little-endian).
-   Byte 3: 0x55 from request padding (NOT from this array - see HandleSync).
-   Bytes 4-35: Padding (unused in response). */
-static const BYTE sync_response[ESP_SYNC_SEQ_LEN] = {
-    0x07, 0x07, 0x12, 0x20,  /* [3] = 0x20 placeholder, actual value from request */
-    0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
-    0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
-    0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
-    0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55
-};
+/* SYNC response Val field prefix: {0x07, 0x07, 0x12}.
+   The 4th byte (0x55) comes from request padding, not this array.
+   Full response data is all zeros (4-byte status). */
+static const BYTE sync_prefix[3] = { 0x07, 0x07, 0x12 };
 
 BYTE Esptool_CalcChecksum(const BYTE *data, int len)
 {
@@ -309,9 +302,9 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* Real device returns sync sequence in Value field:
        {0x07, 0x07, 0x12, 0x55} as little-endian DWORD 0x55120707
        Note: The 4th byte is 0x55 (first padding byte from request), not 0x20 */
-    DWORD sync_val = ((DWORD)sync_response[0]) |
-                     ((DWORD)sync_response[1] << 8) |
-                     ((DWORD)sync_response[2] << 16) |
+    DWORD sync_val = ((DWORD)sync_prefix[0]) |
+                     ((DWORD)sync_prefix[1] << 8) |
+                     ((DWORD)sync_prefix[2] << 16) |
                      ((DWORD)0x55 << 24);
 
     /* Real device sends 8 consecutive responses per SYNC request.

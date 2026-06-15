@@ -160,11 +160,12 @@ cmake --build build --config Release -j
 
 **eFuse 初始化注意事项：**
 - 新增芯片时必须在初始化函数中设置默认芯片版本到 eFuse，否则 esptool 可能禁用 stub flasher
-- 各芯片 eFuse 版本字节位置：
-  - ESP32-C2：byte 0x46 = 0x10（major=1, minor=0）
-  - ESP32-S2：byte 0x52 = 0x10（major=1）
-  - ESP32-S3：byte 0x5A = 0x01（major=1）
-  - ESP32-C3/C6：byte 0x52 = 0x04（major=1）
+- 各芯片 eFuse 版本字节位置（以代码 `chip.c` 实现为准）：
+  - ESP32-C2：byte 0x46 |= 0x10（major=1, minor=0，bits[21:16] of EFUSE_BLOCK2_ADDR+4）
+  - ESP32-S2：byte 0x51 |= 0x04（major=1，bits[19:18] of EFUSE_BLOCK1_ADDR+12）
+  - ESP32-S3：byte 0x6C |= 0x01（blk_version_major=1）+ byte 0x52 |= 0x01（blk_version_minor=1）
+  - ESP32-C3：byte 0x5B |= 0x01（major=1，bits[25:24] of EFUSE_BLOCK1_ADDR+20）
+  - ESP32-C6：无芯片版本覆盖（major=0, minor=0）
 
 ## 使用示例
 
@@ -263,7 +264,7 @@ Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 | `Esptool_SendResponseEx(ctx, cmd, req_val, status, status_len, data, len)` | 发送响应（可配置状态长度） |
 | `Esptool_CalcChecksum(data, len)` | 计算校验和 |
 
-**注意：** `SendResponseEx` 的 `status` 和 `status_len` 参数仅用于日志记录，不影响响应包内容。响应包的 status 字节由调用方通过 `data`/`len` 参数传入。当 `data=NULL` 且 `len>0` 时，函数自动填充零字节（表示成功）。
+**注意：** `SendResponseEx` 的 `status` 参数仅用于日志记录，不影响响应包内容。`status_len` 参数决定响应 Data 字段的长度（2 或 4 字节），当 `data=NULL` 且 `data_len>0` 时，函数自动填充零字节（表示成功）。
 
 ### chip.h
 
@@ -704,6 +705,8 @@ HH:MM:SS.mmm +S.mmm [thread_id] [TAG] message
 - `thread_id` - 线程 ID
 - `TAG` - 日志标签（如 `ESP`、`SER`、`GUI`）
 - `message` - 日志内容
+
+**注意：** `%ls`（宽字符串格式符）是 MSVC 扩展，非标准 C。在本项目 MSVC 编译环境下可正常使用。
 
 示例：
 ```
