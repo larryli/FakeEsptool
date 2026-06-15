@@ -10,23 +10,23 @@
 
 ```bash
 # 1. 生成密钥
-espsecure.py generate-flash-encryption-key -k 256 key.bin
+espsecure generate-flash-encryption-key -k 256 key.bin
 
 # 2. 烧录密钥到 eFuse
-espefuse.py --port COM10 burn_key flash_encryption key.bin
+espefuse --port COM10 --chip esp32c3 burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
 
 # 3. 启用开发模式（加密计数器置 1）
-espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 1
+espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 1
 
 # 4. 加密烧录（设备端加密）
-esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
+esptool --port COM10 --encrypt write-flash 0x0 firmware.bin
 
 # 5. 预加密文件烧录（离线加密后直接写入）
-espsecure.py encrypt_flash_data -k key.bin -a 0x0 -o firmware_enc.bin firmware.bin
-esptool.py --port COM10 write_flash 0x0 firmware_enc.bin
+espsecure encrypt-flash-data -k key.bin -a 0x0 -o firmware_enc.bin firmware.bin
+esptool --port COM10 write-flash 0x0 firmware_enc.bin
 
 # 6. 关闭加密（FakeEsptool 模拟）
-espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 0
+espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 0
 ```
 
 **ESP32 使用 `FLASH_CRYPT_CNT` 替代 `SPI_BOOT_CRYPT_CNT`，且需要 Stub 模式（esptool 自动上传）。**
@@ -39,25 +39,25 @@ espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 0
 
 ```bash
 # 1. 生成密钥
-espsecure.py generate-flash-encryption-key -l 256 key.bin
+espsecure generate-flash-encryption-key -k 256 key.bin
 
 # 2. 烧录密钥到 eFuse
-espefuse.py --port COM10 burn_key flash_encryption key.bin
+espefuse --port COM10 --chip esp32c3 burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
 
 # 3. 启用开发模式（前置步骤）
-espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 1
+espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 1
 
 # 4. 启用产品模式（禁用手动加密）
-espefuse.py --port COM10 burn_efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
+espefuse --port COM10 --chip esp32c3 burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
 
 # 5. 预加密文件
-espsecure.py encrypt_flash_data -k key.bin -a 0x0 -o firmware_enc.bin firmware.bin
+espsecure encrypt-flash-data -k key.bin -a 0x0 -o firmware_enc.bin firmware.bin
 
 # 6. 强制烧录预加密文件（--force 跳过产品模式保护检查）
-esptool.py --port COM10 --force write_flash 0x0 firmware_enc.bin
+esptool --port COM10 --force write-flash 0x0 firmware_enc.bin
 
 # 7. 关闭加密（FakeEsptool 模拟）
-espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 0
+espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 0
 ```
 
 **ESP32 使用 `FLASH_CRYPT_CNT` / `DISABLE_DL_ENCRYPT` 替代上述字段。**
@@ -70,7 +70,7 @@ espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 0
 
 启动 FakeEsptool，选择芯片，连接串口进入下载模式。
 
-以下命令中 `COM10` 替换为实际串口号。
+以下命令中 `COM10` 替换为实际串口号，`--chip esp32c3` 替换为实际芯片类型。
 
 ---
 
@@ -79,7 +79,7 @@ espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 0
 离线生成 256-bit Flash 加密密钥，不与设备通信：
 
 ```bash
-espsecure.py generate-flash-encryption-key -l 256 key.bin
+espsecure generate-flash-encryption-key -k 256 key.bin
 ```
 
 生成的 `key.bin` 为 32 字节随机数据。各芯片通用。
@@ -88,10 +88,23 @@ espsecure.py generate-flash-encryption-key -l 256 key.bin
 
 ## 3. 烧录密钥到 eFuse
 
-通过 espefuse 将密钥写入 FakeEsptool 的 eFuse 存储：
+通过 espefuse 将密钥写入 FakeEsptool 的 eFuse 存储。
+
+**burn-key 语法（ESP32-C3/C2/C6/S2/S3）：**
 
 ```bash
-espefuse.py --port COM10 burn_key flash_encryption key.bin
+espefuse --port COM10 --chip esp32c3 burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
+```
+
+参数说明：
+- `BLOCK_KEY0`：密钥块名称（Flash 加密使用 BLOCK_KEY0）
+- `key.bin`：密钥文件（32 字节）
+- `XTS_AES_128_KEY`：密钥用途（Flash 加密）
+
+**ESP32（语法不同，仅需 2 参数）：**
+
+```bash
+espefuse --port COM10 burn-key BLOCK1 key.bin
 ```
 
 **验证：** FakeEsptool 日志中应出现多条 `WRITE_REG` 操作，目标地址在芯片 eFuse 密钥块范围内。
@@ -103,7 +116,7 @@ espefuse.py --port COM10 burn_key flash_encryption key.bin
 使用 `--encrypt` 参数烧录，客户端发送明文，设备端加密后写入 Flash：
 
 ```bash
-esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
+esptool --port COM10 --encrypt write-flash 0x0 firmware.bin
 ```
 
 **验证：** FakeEsptool 日志中 `FLASH_BEGIN` 或 `FLASH_DEFL_BEGIN` 应显示 `encrypted=1`。
@@ -111,7 +124,7 @@ esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
 对比普通烧录（不加密）：
 
 ```bash
-esptool.py --port COM10 write_flash 0x0 firmware.bin
+esptool --port COM10 write-flash 0x0 firmware.bin
 ```
 
 日志应显示 `encrypted=0`。
@@ -127,26 +140,26 @@ esptool.py --port COM10 write_flash 0x0 firmware.bin
 **ESP32-S2/S3/C3/C6：**
 
 ```bash
-espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 1
+espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 1
 ```
 
 **ESP32：**
 
 ```bash
-espefuse.py --port COM10 burn_efuse FLASH_CRYPT_CNT 1
+espefuse --port COM10 burn-efuse FLASH_CRYPT_CNT 1
 ```
 
 **ESP32-C2：**
 
 ```bash
-espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 1
+espefuse --port COM10 --chip esp32c2 burn-efuse SPI_BOOT_CRYPT_CNT 1
 ```
 
 **预期状态栏：** `Encrypted (Dev)`
 
 **行为：**
-- 允许明文烧录（`write_flash` 不带 `--encrypt`）
-- 允许加密烧录（`write_flash --encrypt`）
+- 允许明文烧录（`write-flash` 不带 `--encrypt`）
+- 允许加密烧录（`write-flash --encrypt`）
 
 ---
 
@@ -157,19 +170,19 @@ espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 1
 **ESP32：**
 
 ```bash
-espefuse.py --port COM10 burn_efuse DISABLE_DL_ENCRYPT 1
+espefuse --port COM10 burn-efuse DISABLE_DL_ENCRYPT 1
 ```
 
 **ESP32-S2/S3/C3/C6：**
 
 ```bash
-espefuse.py --port COM10 burn_efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
+espefuse --port COM10 --chip esp32c3 burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
 ```
 
 **ESP32-C2：**
 
 ```bash
-espefuse.py --port COM10 burn_efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
+espefuse --port COM10 --chip esp32c2 burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
 ```
 
 **预期状态栏：** `Encrypted (Prod)`
@@ -185,11 +198,11 @@ espefuse.py --port COM10 burn_efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
 
 ## 7. 预加密文件烧录
 
-使用 `espsecure.py` 离线加密固件，再将加密后的文件烧录到设备。
+使用 `espsecure` 离线加密固件，再将加密后的文件烧录到设备。
 
 ```bash
 # 离线加密（不与设备通信）
-espsecure.py encrypt_flash_data -k key.bin -a 0x10000 -o firmware_enc.bin firmware.bin
+espsecure encrypt-flash-data -k key.bin -a 0x10000 -o firmware_enc.bin firmware.bin
 ```
 
 开发模式和产品模式下的行为不同：
@@ -199,7 +212,7 @@ espsecure.py encrypt_flash_data -k key.bin -a 0x10000 -o firmware_enc.bin firmwa
 预加密文件 + 不加 `--encrypt` → 设备收到 `encrypted=0`，直接写入 Flash，不做二次加密。✅ 正确。
 
 ```bash
-esptool.py --port COM10 write_flash 0x10000 firmware_enc.bin
+esptool --port COM10 write-flash 0x10000 firmware_enc.bin
 ```
 
 也可用 `--encrypt` 让设备端加密明文，效果相同。
@@ -211,7 +224,7 @@ esptool.py --port COM10 write_flash 0x10000 firmware_enc.bin
 正确做法是用 `--force` 跳过 esptool 的保护检查：
 
 ```bash
-esptool.py --port COM10 --force write_flash 0x10000 firmware_enc.bin
+esptool --port COM10 --force write-flash 0x10000 firmware_enc.bin
 ```
 
 或者产品设备不走串口烧录，使用产线烧录器直接写 Flash。
@@ -232,13 +245,13 @@ esptool.py --port COM10 --force write_flash 0x10000 firmware_enc.bin
 **ESP32：**
 
 ```bash
-espefuse.py --port COM10 burn_efuse FLASH_CRYPT_CNT 0
+espefuse --port COM10 burn-efuse FLASH_CRYPT_CNT 0
 ```
 
 **ESP32-S2/S3/C2/C3/C6：**
 
 ```bash
-espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 0
+espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 0
 ```
 
 **预期状态栏：** `No Encryption`
@@ -254,13 +267,13 @@ espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 0
 **ESP32：**
 
 ```bash
-espefuse.py --port COM10 burn_efuse UART_DOWNLOAD_DIS 1
+espefuse --port COM10 burn-efuse UART_DOWNLOAD_DIS 1
 ```
 
 **ESP32-S2/S3/C2/C3/C6：**
 
 ```bash
-espefuse.py --port COM10 burn_efuse DIS_DOWNLOAD_MODE 1
+espefuse --port COM10 --chip esp32c3 burn-efuse DIS_DOWNLOAD_MODE 1
 ```
 
 **预期状态栏：** `Download Disabled`
@@ -277,10 +290,10 @@ espefuse.py --port COM10 burn_efuse DIS_DOWNLOAD_MODE 1
 
 ```bash
 # 先启用下载模式禁用（安全下载的前提）
-espefuse.py --port COM10 burn_efuse DIS_DOWNLOAD_MODE 1
+espefuse --port COM10 --chip esp32c3 burn-efuse DIS_DOWNLOAD_MODE 1
 
 # 再启用安全下载
-espefuse.py --port COM10 burn_efuse ENABLE_SECURITY_DOWNLOAD 1
+espefuse --port COM10 --chip esp32c3 burn-efuse ENABLE_SECURITY_DOWNLOAD 1
 ```
 
 **预期状态栏：** `Download Secure`
@@ -311,3 +324,19 @@ espefuse.py --port COM10 burn_efuse ENABLE_SECURITY_DOWNLOAD 1
 | ESP32-C2 | `SPI_BOOT_CRYPT_CNT` (3-bit) | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | KEY0 |
 | ESP32-C3 | `SPI_BOOT_CRYPT_CNT` (3-bit) | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | KEY0-KEY5 |
 | ESP32-C6 | `SPI_BOOT_CRYPT_CNT` (3-bit) | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | KEY0-KEY5 |
+
+---
+
+## 12. burn-key 密钥用途对照
+
+| 密钥用途 | 说明 | 适用芯片 |
+|----------|------|----------|
+| `XTS_AES_128_KEY` | Flash 加密密钥 | ESP32-S2/S3/C2/C3/C6 |
+| `SECURE_BOOT_DIGEST0` | 安全启动摘要 0 | ESP32-S2/S3/C3/C6 |
+| `SECURE_BOOT_DIGEST1` | 安全启动摘要 1 | ESP32-S2/S3/C3/C6 |
+| `SECURE_BOOT_DIGEST2` | 安全启动摘要 2 | ESP32-S2/S3/C3/C6 |
+| `HMAC_DOWN_ALL` | HMAC 下行全量 | ESP32-S2/S3/C3/C6 |
+| `HMAC_DOWN_JTAG` | HMAC JTAG 解锁 | ESP32-S2/S3/C3/C6 |
+| `HMAC_DOWN_DIGITAL_SIGNATURE` | HMAC 数字签名 | ESP32-S2/S3/C3/C6 |
+| `HMAC_UP` | HMAC 上行 | ESP32-S2/S3/C3/C6 |
+| `USER` | 用户自定义 | ESP32-S2/S3/C3/C6 |

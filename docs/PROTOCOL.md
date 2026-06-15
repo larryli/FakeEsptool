@@ -317,6 +317,17 @@ Checksum:  0x00 0x00 0x00 0x00 (固定为 0，不计算)
 Data:      [addr:4][value:4][mask:4][delay_us:4]
 ```
 
+**字段说明：**
+
+| 字段 | 大小 | 说明 |
+|------|------|------|
+| addr | 4 字节 | 目标寄存器地址（小端序） |
+| value | 4 字节 | 写入值（小端序） |
+| mask | 4 字节 | 写入掩码（小端序，默认 0xFFFFFFFF）；仅 mask 为 1 的位被写入 |
+| delay_us | 4 字节 | 写入后延时（微秒，通常为 0） |
+
+**掩码计算：** `reg = (reg & ~mask) | (value & mask)`
+
 **响应：**
 ```
 Direction: 0x01
@@ -325,6 +336,11 @@ Size:      0x02 0x00 (2 bytes)
 Val:       0x00 0x00 0x00 0x00 (通常为 0)
 Data:      0x00 0x00 (2 字节 status=成功)
 ```
+
+**用途：**
+- 写入 SPI 控制器寄存器（Flash 读写操作）
+- 写入 eFuse 控制器寄存器（eFuse 烧录操作，详见附录 G.4）
+- 写入 UART 寄存器（波特率切换）
 
 ---
 
@@ -2057,6 +2073,74 @@ etsXtal = (115200 * 347) / 1000000 / 1 = 39.97 MHz ≈ 40 MHz
 | ESP32-C2 | `0x60008840` |
 | ESP32-C3 | `0x60008844` |
 | ESP32-C6 | `0x600B0844` |
+
+### G.4 eFuse 控制器寄存器（ESP32-C2/C3/C6）
+
+ESP32-C2/C3/C6 的 eFuse 使用控制器模式：PGM_DATA 寄存器暂存数据，通过 CONF_REG 解锁、CMD_REG 触发烧录。所有 block 共享同一个 PGM_DATA 写窗口。
+
+**eFuse 内存布局（以 EFUSE_BASE 为基址）：**
+
+| 偏移范围 | 用途 | 说明 |
+|----------|------|------|
+| `+0x000..+0x01F` | PGM_DATA0-7 | 编程数据暂存区（8 words = 32 字节） |
+| `+0x020..+0x02B` | CHECK_VALUE0-2 | RS 编码校验值（3 words = 12 字节，仅非 BLK0） |
+| `+0x02C..` | BLOCK0 读回 | eFuse BLOCK0 数据（6 words） |
+| `+0x044..` | BLOCK1 读回 | eFuse BLOCK1/MAC 数据（6 words，C2 偏移为 +0x040） |
+| `+0x05C..` | BLOCK2 读回 | eFuse BLOCK2/SYS_DATA（8 words） |
+| ... | ... | 更多 block |
+
+**控制器寄存器：**
+
+| 寄存器 | ESP32-C2 偏移 | ESP32-C3/C6 偏移 | 说明 |
+|--------|--------------|-----------------|------|
+| EFUSE_CONF_REG | `+0x08C` | `+0x1CC` | 解锁寄存器（写 0x5A5A 解锁编程，0x5AA5 解锁读取） |
+| EFUSE_CMD_REG | `+0x094` | `+0x1D4` | 命令寄存器（写 `0x02 \| (block << 2)` 触发编程，`0x01` 触发读取） |
+| EFUSE_DAC_CONF_REG | `+0x108` | `+0x1E8` | DAC 时序配置 |
+| EFUSE_WR_TIM_CONF1_REG | `+0x114` | `+0x1F0` | 写入时序配置 1 |
+| EFUSE_WR_TIM_CONF2_REG | `+0x118` | `+0x1F4` | 写入时序配置 2 |
+
+**烧录序列（以 burn-efuse 为例）：**
+
+```
+1. 时序配置:
+   WRITE_REG EFUSE_DAC_CONF_REG   (设置 DAC_NUM, DAC_CLK_DIV)
+   WRITE_REG EFUSE_WR_TIM_CONF1  (设置 PWR_ON_NUM)
+   WRITE_REG EFUSE_WR_TIM_CONF2  (设置 PWR_OFF_NUM)
+
+2. 清零 PGM_DATA:
+   WRITE_REG PGM_DATA0..7 = 0x00000000
+
+3. 等待空闲:
+   READ_REG CMD_REG (循环直到 PGM_CMD|READ_CMD == 0)
+
+4. 写入编程数据:
+   WRITE_REG PGM_DATA0 = word[0]    (block 数据第 1 个字)
+   WRITE_REG PGM_DATA1 = word[1]
+   ...
+   WRITE_REG PGM_DATA7 = word[7]
+   WRITE_REG CHECK_VALUE0..2 = rs_word[0..2]  (仅非 BLK0)
+
+5. 触发编程:
+   WRITE_REG CONF_REG = 0x5A5A      (解锁)
+   WRITE_REG CMD_REG  = 0x02 | (block << 2)  (触发)
+
+6. 等待完成:
+   READ_REG CMD_REG (循环直到 PGM_CMD == 0)
+
+7. 清零 PGM_DATA:
+   WRITE_REG PGM_DATA0..7 = 0x00000000
+
+8. 读回确认:
+   WRITE_REG CONF_REG = 0x5AA5      (读取解锁)
+   WRITE_REG CMD_REG  = 0x01        (触发读取)
+   READ_REG block_read_addr         (读取 block 数据)
+```
+
+**关键说明：**
+- PGM_DATA 寄存器（`EFUSE_BASE+0x00..+0x1F`）是暂存区，不是 eFuse 存储
+- Block 读回地址（如 `EFUSE_BASE+0x02C`）才是 eFuse 实际值
+- 所有 block 共享同一个 PGM_DATA 写窗口，通过 CMD_REG 的 block 编号指定目标
+- eFuse 为 OTP（一次性可编程），只能从 0 置为 1，使用 OR 操作
 
 ---
 

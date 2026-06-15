@@ -277,13 +277,17 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
      * - Timestamp: ~33 chars "YYYY-MM-DD HH:MM:SS.mmm +S.DDD "
      * - Direction: 5 chars "[RX] " or "[TX] "
      * - Per line (hex): 16*3 (hex bytes) + 1 (extra space at byte 8) = 49 chars
-     * - Per line (ASCII): 2 (" |") + 16 (ASCII chars) + 1 ("|") = 19 chars
+     * - Per line (ASCII): 2 (" |") + 16 (ASCII chars) + 1 ("|") = 19 chars (optional)
      * - Per line (newline): 2 chars
      * - Continuation prefix: ~35 chars
      * - Safety margin: 64 chars
      */
     DWORD numLines = (len + 15) / 16;
+#ifndef LOG_NOT_SHOW_ASCII
     DWORD bufSize = 64 + numLines * (49 + 19 + 2 + 35) + 64;
+#else
+    DWORD bufSize = 64 + numLines * (49 + 2 + 35) + 64;
+#endif
     WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bufSize * sizeof(WCHAR));
     if (!buf)
         return;
@@ -303,6 +307,7 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
     for (DWORD i = 0; i < len && pos < maxPos - 30; i++) {
         /* Line break every 16 bytes */
         if (i > 0 && i % 16 == 0) {
+#ifndef LOG_NOT_SHOW_ASCII
             /* Add ASCII decode for previous line */
             if (pos + 20 < maxPos) {
                 buf[pos++] = L' ';
@@ -312,6 +317,7 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
                 }
                 buf[pos++] = L'|';
             }
+#endif
 
             /* Newline */
             if (pos + 2 + prefixLen < maxPos) {
@@ -334,6 +340,7 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
             pos += wsprintfW(buf + pos, L"%02X ", data[i]);
     }
 
+#ifndef LOG_NOT_SHOW_ASCII
     /* Add ASCII decode for last line (pad hex to align ASCII) */
     int lastLineLen = (int)len - lineStart;
     if (lastLineLen > 0 && pos + 20 < maxPos) {
@@ -352,6 +359,7 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
         }
         buf[pos++] = L'|';
     }
+#endif
 
     if (pos + 2 < maxPos) {
         buf[pos++] = L'\r';

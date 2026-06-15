@@ -1,11 +1,11 @@
 # FakeEsptool - 烧录流程指南
 
-本文档基于 `esptool.py write-flash` 的真实交互日志，从使用和交互的角度解读烧录全过程。作为 [PROTOCOL.md](PROTOCOL.md) 的补充，侧重于**流程串联**和**日志解读**，而非单条命令的包格式细节。
+本文档基于 `esptool write-flash` 的真实交互日志，从使用和交互的角度解读烧录全过程。作为 [PROTOCOL.md](PROTOCOL.md) 的补充，侧重于**流程串联**和**日志解读**，而非单条命令的包格式细节。
 
 **适用场景：** 使用 FakeEsptool 模拟 ESP32-C2 设备，执行以下命令：
 
 ```bash
-esptool.py --baud 921600 write-flash 0x0 bootloader.bin 0x10000 app.bin 0x8000 partition-table.bin
+esptool --baud 921600 write-flash 0x0 bootloader.bin 0x10000 app.bin 0x8000 partition-table.bin
 ```
 
 ---
@@ -380,7 +380,6 @@ FakeEsptool 日志每行格式：
 | `[CFG]` | 配置层 | 波特率/数据位等配置变化 |
 | `[BOOT]` | 启动 | ROM Bootloader 启动日志 |
 | `[ERR]` | 错误 | 错误信息 |
-| `[DBG]` | 调试 | 响应发送详情（SendResponse 调用） |
 
 **[RX]/[TX] hex dump 格式：**
 
@@ -394,6 +393,15 @@ FakeEsptool 日志每行格式：
 - 右侧：ASCII 解码（不可打印字符显示为 `.`）
 - `C0` 是 SLIP 帧定界符
 - 第一个 `C0` 后的字节是 Direction（`00`=请求, `01`=响应）
+
+**注意**：ASCII 解码部分可通过编译选项 `LOG_NOT_SHOW_ASCII=ON` 禁用（参见 [DEVELOPMENT.md](DEVELOPMENT.md)），禁用后日志仅显示十六进制数据，适合 Agents 分析。
+
+禁用 ASCII 后的日志格式：
+```
+[RX] C0 00 08 24 00 00 00 00 00 07 07 12 20 55 55 55
+     55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55
+     55 55 55 55 55 55 55 55 55 55 55 55 55 C0
+```
 
 **[ESP] 命令日志格式：**
 
