@@ -83,7 +83,19 @@ cmake --build build --config Debug
 # 启用调试日志
 cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DENABLE_TRACE_PROTO=ON -DENABLE_TRACE_FW=ON -B build
 cmake --build build --config Release -j
+
+# 禁用 RX/TX hex dump 中的 ASCII 解码（减少日志 tokens，适合 Agents 分析）
+cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DLOG_NOT_SHOW_ASCII=ON -B build
+cmake --build build --config Release -j
 ```
+
+**构建选项：**
+
+| 选项 | 默认值 | 说明 |
+|------|--------|------|
+| `ENABLE_TRACE_FW` | OFF | 启用框架调试日志（TRACE_FW） |
+| `ENABLE_TRACE_PROTO` | OFF | 启用协议调试日志（TRACE_PROTO） |
+| `LOG_NOT_SHOW_ASCII` | OFF | 禁用 RX/TX hex dump 中的 ASCII 解码 |
 
 输出：`build/Release/FakeEsptool.exe`（Release）或 `build/Debug/FakeEsptool.exe`（Debug）
 

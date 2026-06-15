@@ -4,6 +4,7 @@
 # Build (Release): cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -B build && cmake --build build --config Release -j
 # Build (Debug):   cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -B build && cmake --build build --config Debug
 # Build (Trace):   cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DENABLE_TRACE_FW=ON -DENABLE_TRACE_PROTO=ON -B build && cmake --build build --config Release -j
+# Build (Agents):  cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DLOG_NOT_SHOW_ASCII=ON -B build && cmake --build build --config Release -j
 
 cmake_minimum_required(VERSION 3.20)
 project(FakeEsptool C)
@@ -74,4 +75,12 @@ endif()
 if(ENABLE_TRACE_PROTO)
     target_compile_definitions(FakeEsptool PRIVATE ENABLE_TRACE_PROTO=1)
     message(STATUS "Protocol trace enabled")
+endif()
+
+# Log display options
+option(LOG_NOT_SHOW_ASCII "Hide ASCII decode in RX/TX hex dump" OFF)
+
+if(LOG_NOT_SHOW_ASCII)
+    target_compile_definitions(FakeEsptool PRIVATE LOG_NOT_SHOW_ASCII=1)
+    message(STATUS "ASCII decode in hex dump disabled")
 endif()
