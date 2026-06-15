@@ -39,7 +39,7 @@ espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 0
 
 ```bash
 # 1. 生成密钥
-espsecure.py generate-flash-encryption-key -k 256 key.bin
+espsecure.py generate-flash-encryption-key -l 256 key.bin
 
 # 2. 烧录密钥到 eFuse
 espefuse.py --port COM10 burn_key flash_encryption key.bin
@@ -79,7 +79,7 @@ espefuse.py --port COM10 burn_efuse SPI_BOOT_CRYPT_CNT 0
 离线生成 256-bit Flash 加密密钥，不与设备通信：
 
 ```bash
-espsecure.py generate-flash-encryption-key -k 256 key.bin
+espsecure.py generate-flash-encryption-key -l 256 key.bin
 ```
 
 生成的 `key.bin` 为 32 字节随机数据。各芯片通用。
