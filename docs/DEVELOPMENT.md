@@ -57,12 +57,14 @@ Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
 | `esptool/device.c/h` | 设备文件管理 |
 | `esptool/esptool.c/h` | esptool 命令解析与响应 |
 | `dlg/device_props.c` | 设备属性对话框 |
+| `dlg/key_mgmt.c` | 密钥管理对话框 |
 | `dlg/port_select.c` | 串口选择对话框 |
 | `dlg/about.c` | 关于对话框 |
 | `utils/config.c/h` | 配置持久化 |
 | `utils/lang.c/h` | 国际化辅助 |
 | `utils/trace.c/h` | 调试日志 |
 | `utils/deflate.c/h` | DEFLATE 解压（用于压缩模式烧录） |
+| `utils/encrypt.c/h` | AES-XTS 加密/解密（用于加密烧录） |
 
 ## 编译
 
@@ -165,6 +167,33 @@ cmake --build build --config Release -j
   - ESP32-S3：byte 0x6C |= 0x01（blk_version_major=1）+ byte 0x52 |= 0x01（blk_version_minor=1）
   - ESP32-C3：byte 0x5B |= 0x01（major=1，bits[25:24] of EFUSE_BLOCK1_ADDR+20）
   - ESP32-C6：无芯片版本覆盖（major=0, minor=0）
+
+### 加密烧录支持
+
+**概述**：加密烧录是 ESP 芯片的安全功能，客户端发送明文数据，设备端使用 eFuse 中的密钥加密后写入 Flash。
+
+**各芯片支持情况**：
+
+| 芯片 | ROM 模式 | Stub 模式 | 说明 |
+|------|---------|----------|------|
+| ESP8266 | ❌ | ✅ | ROM 不支持扩展参数格式 |
+| ESP32 | ❌ | ✅ | ROM 不支持扩展参数格式 |
+| ESP32-S2/S3/C2/C3/C6 | ✅ | ✅ | |
+
+**协议说明**：
+- `FLASH_BEGIN (0x02)` 和 `FLASH_DEFL_BEGIN (0x10)` 支持 `encrypted` 字段
+- `encrypted=1` 告诉设备"请在写入前加密数据"，客户端发送明文数据
+- 加密烧录时，客户端会跳过 MD5 验证
+
+**密钥管理**：
+- 密钥存储在芯片的 eFuse 中（BLOCK_KEY0）
+- 通过 Key Management 对话框管理密钥的导入、导出和生成
+- 密钥文件格式：纯二进制（128-bit 或 256-bit）
+
+**实现要点**：
+- 使用 AES-XTS 算法进行加密/解密
+- 参考 espsecure 的 `_flash_encryption_operation_esp32` 实现
+- 加密写入和解密读取需要成对实现
 
 ## 使用示例
 
@@ -405,6 +434,55 @@ if (ret == DEFLATE_OK) {
     // ctx.out_pos 包含解压后的数据长度
     // decompressed[0..ctx.out_pos-1] 包含解压后的数据
 }
+```
+
+### encrypt.h
+
+**数据结构：**
+
+| 结构体 | 说明 |
+|--------|------|
+| `ENCRYPT_CTX` | 加密上下文 |
+
+**ENCRYPT_CTX 字段：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `key` | BYTE[32] | 加密密钥（256-bit） |
+| `key_len` | int | 密钥长度（16 或 32 字节） |
+| `flash_addr` | DWORD | Flash 地址（用于 XTS 偏移） |
+
+**常量：**
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `ENCRYPT_OK` | 0 | 成功 |
+| `ENCRYPT_ERROR` | -1 | 通用错误 |
+| `ENCRYPT_BAD_INPUT` | -2 | 输入数据无效 |
+
+**函数：**
+
+| 函数 | 说明 |
+|------|------|
+| `encrypt_init(ctx, key, key_len, flash_addr)` | 初始化加密上下文 |
+| `encrypt_data(ctx, in_buf, out_buf, len)` | 加密数据 |
+| `decrypt_data(ctx, in_buf, out_buf, len)` | 解密数据 |
+
+**使用示例：**
+
+```c
+#include "utils/encrypt.h"
+
+BYTE key[32] = { /* ... */ };
+BYTE plaintext[4096];
+BYTE ciphertext[4096];
+ENCRYPT_CTX ctx;
+
+encrypt_init(&ctx, key, 32, 0x10000);
+encrypt_data(&ctx, plaintext, ciphertext, sizeof(plaintext));
+
+// 解密
+decrypt_data(&ctx, ciphertext, plaintext, sizeof(ciphertext));
 ```
 
 ### slip.h

@@ -602,6 +602,12 @@ Val:       <返回请求的 checksum>
 Data:      0x00 0x00 (2 字节 status=成功)
 ```
 
+**FakeEsptool 实现说明：**
+- 已解析 `encrypted` 字段（检查 `pkt->size >= 20`）
+- 已记录日志输出 `encrypted` 字段
+- 加密写入：使用 eFuse 密钥通过 AES-XTS 算法加密后写入 Flash
+- 解密读取：READ_FLASH 返回解密后的明文数据
+
 ---
 
 ### 3.12 FLASH_DATA (0x03) - Flash 写入数据
@@ -724,6 +730,12 @@ Size:      0x02 0x00 (2 bytes)
 Val:       <返回请求的 checksum>
 Data:      0x00 0x00 (2 字节 status=成功)
 ```
+
+**FakeEsptool 实现说明：**
+- 已解析 `encrypted` 字段（检查 `pkt->size >= 20`）
+- 已记录日志输出 `encrypted` 字段
+- 加密写入：使用 eFuse 密钥通过 AES-XTS 算法加密后写入 Flash
+- 解密读取：READ_FLASH 返回解密后的明文数据
 
 ---
 

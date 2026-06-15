@@ -154,6 +154,21 @@ FakeEsptool 当前状态：
 - 实现解密读取：READ_FLASH 返回解密后的明文数据
 - 加解密算法：AES-XTS（参考 espsecure 的 `_flash_encryption_operation_esp32` 实现）
 
+**Key Management 对话框（dlg/key_mgmt.c）**：
+- 新增源文件：`src/dlg/key_mgmt.c` 和 `src/dlg/key_mgmt.h`
+- 列表控件：显示所有可用密钥块（根据芯片类型动态显示）
+- 列：Block、Purpose、Status、Size
+- 按钮：Import、Export、Generate、Close
+- 功能：
+  - Import：从 .bin 文件导入密钥到选中的密钥块
+  - Export：从选中的密钥块导出密钥到 .bin 文件
+  - Generate：生成随机密钥并写入选中的密钥块
+- 状态逻辑：串口连接时禁用
+
+**菜单更新（app_commands.c）**：
+- Flash 菜单添加 "Key Management..." 选项
+- 打开 Key Management 对话框
+
 **测试（tests/test_encrypt.c）**：
 - 参考 `tests/test_deflate.c` 的测试框架
 - 测试 AES-XTS 加密/解密正确性
