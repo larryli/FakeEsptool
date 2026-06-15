@@ -184,7 +184,7 @@ ctest --test-dir build_tests --build-config Release
 
 | 芯片 | ROM 模式 | Stub 模式 | 说明 |
 |------|---------|----------|------|
-| ESP8266 | ❌ | ✅ | ROM 不支持扩展参数格式 |
+| ESP8266 | ❌ | ❌ | 芯片不支持 Flash 加密 |
 | ESP32 | ❌ | ✅ | ROM 不支持扩展参数格式 |
 | ESP32-S2/S3/C2/C3/C6 | ✅ | ✅ | |
 

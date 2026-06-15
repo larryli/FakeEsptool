@@ -63,7 +63,7 @@
 
 | 芯片 | ROM 模式 | Stub 模式 | 说明 |
 |------|---------|----------|------|
-| ESP8266 | ❌ 不支持 | ✅ 支持 | ROM 不支持扩展参数格式 |
+| ESP8266 | ❌ 不支持 | ❌ 不支持 | 芯片不支持 Flash 加密 |
 | ESP32 | ❌ 不支持 | ✅ 支持 | ROM 不支持扩展参数格式 |
 | ESP32-S2 | ✅ 支持 | ✅ 支持 | |
 | ESP32-S3 | ✅ 支持 | ✅ 支持 | |
@@ -199,16 +199,16 @@ FakeEsptool 当前状态：
 
 ### 测试方法
 
-**ESP32-S2/S3/C2/C3/C6 等芯片（ROM 模式支持）**：
+**ESP32-S2/S3/C2/C3/C6（ROM 模式支持）**：
 ```bash
 esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
 ```
 
-**ESP32/ESP8266（需要 Stub 模式）**：
+**ESP32（需要 Stub 模式）**：
 ```bash
 esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
 ```
-注意：ESP32/ESP8266 在 ROM 模式下不会发送 encrypted 标志，需要 Stub 模式才能测试加密烧录。
+注意：ESP32 在 ROM 模式下不会发送 encrypted 标志，需要 Stub 模式才能测试加密烧录。
 
 **完整测试流程**：
 ```bash
