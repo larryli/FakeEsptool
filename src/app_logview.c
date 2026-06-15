@@ -101,16 +101,37 @@ static void FreeEntryChain(LOG_ENTRY *head)
     }
 }
 
+/* High-precision timing for relative timestamps */
+static LARGE_INTEGER g_freq = {0};        /* Performance counter frequency */
+static LARGE_INTEGER g_lastCounter = {0}; /* Last performance counter value */
+
 /*
- * FormatTimestamp - Format current time as timestamp string
+ * FormatTimestamp - Format current time as timestamp string with relative delta
+ *
+ * Format: "YYYY-MM-DD HH:MM:SS.mmm +X.XXX "
+ *         Absolute time + relative delta since last log entry (millisecond precision)
  */
 static int FormatTimestamp(WCHAR *buf, int maxLen)
 {
     SYSTEMTIME st;
     GetLocalTime(&st);
-    return wsprintfW(buf, L"%04d-%02d-%02d %02d:%02d:%02d.%03d ",
+
+    /* Get high-precision counter */
+    LARGE_INTEGER now;
+    QueryPerformanceCounter(&now);
+
+    /* Calculate relative time delta in milliseconds */
+    DWORD deltaMs = 0;
+    if (g_freq.QuadPart != 0 && g_lastCounter.QuadPart != 0) {
+        LONGLONG deltaTicks = now.QuadPart - g_lastCounter.QuadPart;
+        deltaMs = (DWORD)(deltaTicks * 1000 / g_freq.QuadPart);
+    }
+    g_lastCounter = now;
+
+    return wsprintfW(buf, L"%04d-%02d-%02d %02d:%02d:%02d.%03d +%lu.%03lu ",
                      st.wYear, st.wMonth, st.wDay,
-                     st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+                     st.wHour, st.wMinute, st.wSecond, st.wMilliseconds,
+                     deltaMs / 1000, deltaMs % 1000);
 }
 
 /* ============================================================================
@@ -157,6 +178,11 @@ void LogView_Init(HWND hWnd)
     g_logHead = NULL;
     g_logTail = NULL;
     g_logCount = 0;
+    
+    /* Initialize high-precision timing */
+    QueryPerformanceFrequency(&g_freq);
+    QueryPerformanceCounter(&g_lastCounter);
+    
     g_initialized = TRUE;
     
     /* Start flush timer */

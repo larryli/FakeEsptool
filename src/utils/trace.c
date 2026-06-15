@@ -15,6 +15,8 @@
 
 static HANDLE g_hTraceFile = INVALID_HANDLE_VALUE;
 static CRITICAL_SECTION g_csTrace;
+static LARGE_INTEGER g_traceFreq = {0};        /* Performance counter frequency */
+static LARGE_INTEGER g_lastTraceCounter = {0}; /* Last performance counter value */
 
 /*
  * Trace_Init - Initialize trace logging
@@ -25,6 +27,10 @@ static CRITICAL_SECTION g_csTrace;
 void Trace_Init(void)
 {
     InitializeCriticalSection(&g_csTrace);
+    
+    /* Initialize high-precision timing */
+    QueryPerformanceFrequency(&g_traceFreq);
+    QueryPerformanceCounter(&g_lastTraceCounter);
 
     WCHAR path[MAX_PATH];
     GetModuleFileNameW(NULL, path, MAX_PATH);
@@ -63,7 +69,7 @@ void Trace_Close(void)
  * Trace_Write - Write trace message to log file
  *
  * Thread-safe function that writes timestamped message with tag.
- * Format: "HH:MM:SS.mmm [thread_id] [tag] message\r\n"
+ * Format: "HH:MM:SS.mmm [thread_id] [tag] +X.XXX message\r\n"
  *
  * @tag: Category tag (e.g. "GUI", "ESP", "SER")
  * @fmt: printf-style format string
@@ -79,9 +85,20 @@ void Trace_Write(const char *tag, const char *fmt, ...)
     SYSTEMTIME st;
     GetLocalTime(&st);
 
+    /* Calculate relative time delta using high-precision counter */
+    LARGE_INTEGER now;
+    QueryPerformanceCounter(&now);
+    DWORD deltaMs = 0;
+    if (g_traceFreq.QuadPart != 0 && g_lastTraceCounter.QuadPart != 0) {
+        LONGLONG deltaTicks = now.QuadPart - g_lastTraceCounter.QuadPart;
+        deltaMs = (DWORD)(deltaTicks * 1000 / g_traceFreq.QuadPart);
+    }
+    g_lastTraceCounter = now;
+
     char buf[4096];
-    int len = snprintf(buf, sizeof(buf), "%02d:%02d:%02d.%03d [%lu] [%s] ",
+    int len = snprintf(buf, sizeof(buf), "%02d:%02d:%02d.%03d +%lu.%03lu [%lu] [%s] ",
                        st.wHour, st.wMinute, st.wSecond, st.wMilliseconds,
+                       deltaMs / 1000, deltaMs % 1000,
                        GetCurrentThreadId(), tag ? tag : "?");
 
     va_list args;
