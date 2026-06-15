@@ -4,52 +4,6 @@
 
 ---
 
-## 中优先级 - 流式解压支持
-
-### 集成 miniz 库替换 deflate.c（流式解压方案）
-
-**问题描述：**
-
-当前积累解压方案虽然可行，但存在以下局限：
-- 需要为每个文件分配 `uncompressed_size` 大小的内存来存储压缩数据
-- 无法在 `FLASH_DEFL_DATA` 时提供真实的解压状态反馈
-- 大文件烧录时内存占用较高
-
-**修复方案：**
-
-集成第三方 miniz 库（单文件 zlib 兼容实现）替换自定义 `deflate.c`，使用其流式 `mz_inflate()` API 支持分块喂数据。
-
-- 删除 `src/utils/deflate.c`、`src/utils/deflate.h`
-- 删除 `tests/test_deflate.c`、`tests/test_data.h`、`tests/generate_test_data.py`
-- 集成 miniz 到 `lib/miniz/`（单头文件库，MIT 许可证）
-- `FLASH_DEFL_BEGIN` 时调用 `mz_inflateInit2()` 初始化流式解压器
-- `FLASH_DEFL_DATA` 时设置 `next_in`/`avail_in` 和 `next_out`/`avail_out`，调用 `mz_inflate(MZ_NO_FLUSH)` 流式解压，立即写入 flash
-- `FLASH_DEFL_END` 时调用 `mz_inflateEnd()` 释放资源
-
-**实现时必须注意：**
-- 生命周期管理与积累解压方案相同（见 `DEVELOPMENT.md` 积累解压方案实现细节）
-- 输出缓冲区建议使用固定大小（如 `FLASH_WRITE_SIZE`），循环调用 `mz_inflate`，缓冲区满即写入 flash
-- 解压失败时（`MZ_DATA_ERROR`/`MZ_MEM_ERROR`）返回 `ESP_FAIL` 给客户端，清理资源
-
-**实现内容：**
-- lib/miniz/: 集成 miniz 库（miniz.h 单头文件）
-- CMakeLists.txt: 添加 miniz 编译，移除 deflate.c
-- esptool.h: ESPTOOL_CTX 添加 `mz_stream`、解压输出缓冲区（建议 `FLASH_WRITE_SIZE` 大小）、解压器活跃标志
-- esptool.c: HandleFlashDeflBegin 初始化 `mz_inflateInit2()`，分配输出缓冲区
-- esptool.c: HandleFlashDeflData 循环调用 `mz_inflate(MZ_NO_FLUSH)`，输出缓冲区满时写入 flash
-- esptool.c: HandleFlashDeflEnd 调用 `mz_inflateEnd()`，释放输出缓冲区
-- LICENSE: 追加 miniz 版权声明（MIT 许可证，Copyright (c) 2013 Rich Geldreich）
-- about.c: 添加「第三方库」静态文本控件，显示 miniz 致谢信息
-- resource.rc: 对话框模板中添加致谢控件
-- 删除: src/utils/deflate.c、src/utils/deflate.h
-- 删除: tests/test_deflate.c、tests/test_data.h、tests/generate_test_data.py
-- tests: 基于 miniz 添加分包解压测试用例
-
-**参考：**
-- miniz: https://github.com/richgel999/miniz
-
----
-
 ## 低优先级 - 成熟芯片支持
 
 支持 esptool 官方已完善支持的 ESP 芯片。
