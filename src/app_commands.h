@@ -187,6 +187,22 @@ void Main_CmdDeviceProps(HWND hWnd);
 void Main_CmdKeyMgmt(HWND hWnd);
 
 /*
+ * Main_CmdEncryptState - Handle encryption state menu command
+ *
+ * @hWnd: Main window handle
+ * @state: New encryption state (0=none, 1=dev, 2=prod)
+ */
+void Main_CmdEncryptState(HWND hWnd, int state);
+
+/*
+ * Main_CmdDownloadMode - Handle download mode menu command
+ *
+ * @hWnd: Main window handle
+ * @mode: New download mode (0=normal, 1=secure, 2=disabled)
+ */
+void Main_CmdDownloadMode(HWND hWnd, int mode);
+
+/*
  * Main_OpenDeviceFile - Open device file by path
  */
 BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath);

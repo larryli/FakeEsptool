@@ -561,6 +561,12 @@ static LRESULT Main_OnCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
     case IDM_ABOUT:
         DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_ABOUT), hWnd, AboutDlgProc);
         break;
+    case IDM_ENCRYPT_NONE:   Main_CmdEncryptState(hWnd, 0); break;
+    case IDM_ENCRYPT_DEV:    Main_CmdEncryptState(hWnd, 1); break;
+    case IDM_ENCRYPT_PROD:   Main_CmdEncryptState(hWnd, 2); break;
+    case IDM_DOWNLOAD_NORMAL:   Main_CmdDownloadMode(hWnd, 0); break;
+    case IDM_DOWNLOAD_SECURE:   Main_CmdDownloadMode(hWnd, 1); break;
+    case IDM_DOWNLOAD_DISABLED: Main_CmdDownloadMode(hWnd, 2); break;
     }
     SetFocus(g_hEdit);
     return 0;

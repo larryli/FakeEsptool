@@ -315,3 +315,378 @@ esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
 | 标志位 | 说明 |
 |--------|------|
 | `DISABLE_BT` | 禁用蓝牙 |
+
+---
+
+## 中优先级 - 加密状态与下载模式模拟
+
+在串口协议端模拟加密状态（开发/产品模式）和下载模式（安全/禁用）的真实逻辑处理。
+
+### 功能概述
+
+FakeEsptool 需要模拟以下状态，并在状态栏显示：
+
+| 状态栏 | 状态 | 说明 |
+|--------|------|------|
+| 加密状态 | `No Encryption` | Flash 未加密 |
+| | `Encrypted (Dev)` | Flash 已加密，开发模式（允许明文烧录） |
+| | `Encrypted (Prod)` | Flash 已加密，产品模式（禁止明文烧录） |
+| 下载模式 | `Download Normal` | 下载模式正常 |
+| | `Download Secure` | 安全下载模式（只读/只写，禁止 Stub） |
+| | `Download Disabled` | 下载模式已禁用 |
+
+### eFuse 字段映射
+
+#### 加密状态判断字段
+
+| 芯片 | 字段 | 偏移 | 位 | 说明 |
+|------|------|------|-----|------|
+| ESP32 | `FLASH_CRYPT_CNT` | BLOCK0 word0 | [26:20] | 奇数个 1 位表示加密启用 |
+| ESP32-S2/S3 | `SPI_BOOT_CRYPT_CNT` | BLOCK0 word2 | [20:18] | 奇数个 1 位表示加密启用 |
+| ESP32-C2 | `SPI_BOOT_CRYPT_CNT` | BLOCK0 word1 | [9:7] | 奇数个 1 位表示加密启用 |
+| ESP32-C3/C6 | `SPI_BOOT_CRYPT_CNT` | BLOCK0 word2 | [20:18] | 奇数个 1 位表示加密启用 |
+
+#### 开发/产品模式判断字段
+
+| 芯片 | 字段 | 偏移 | 位 | 说明 |
+|------|------|------|-----|------|
+| ESP32 | `DISABLE_DL_ENCRYPT` | BLOCK0 word6 | [7] | 1=禁用下载加密（产品模式） |
+| | `DISABLE_DL_DECRYPT` | BLOCK0 word6 | [8] | 1=禁用下载解密 |
+| | `DISABLE_DL_CACHE` | BLOCK0 word6 | [9] | 1=禁用下载缓存 |
+| ESP32-S2/S3 | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | BLOCK0 word1 | [20] | 1=禁用手动加密（产品模式） |
+| ESP32-C2 | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | BLOCK0 word1 | [6] | 1=禁用手动加密（产品模式） |
+| ESP32-C3/C6 | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | BLOCK0 word1 | [20] | 1=禁用手动加密（产品模式） |
+
+#### 下载模式判断字段
+
+| 芯片 | 字段 | 偏移 | 位 | 说明 |
+|------|------|------|-----|------|
+| ESP32 | `UART_DOWNLOAD_DIS` | BLOCK0 word0 | [27] | 1=禁用 UART 下载 |
+| ESP32-S2 | `DIS_USB_DOWNLOAD_MODE` | BLOCK0 word4 | [4] | 1=禁用 USB 下载 |
+| ESP32-S3 | `DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE` | BLOCK0 word4 | [4] | 1=禁用 USB-Serial-JTAG 下载 |
+| ESP32-C2 | `DIS_DOWNLOAD_MODE` | BLOCK0 word1 | [14] | 1=禁用下载模式 |
+| ESP32-C3 | `DIS_DOWNLOAD_MODE` | BLOCK0 word4 | [0] | 1=禁用下载模式 |
+| | `DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE` | BLOCK0 word4 | [4] | 1=禁用 USB-Serial-JTAG 下载 |
+| ESP32-C6 | `DIS_DOWNLOAD_MODE` | BLOCK0 word4 | [0] | 1=禁用下载模式 |
+| | `DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE` | BLOCK0 word4 | [4] | 1=禁用 USB-Serial-JTAG 下载 |
+
+#### 安全下载判断字段
+
+| 芯片 | 字段 | 偏移 | 位 | 说明 |
+|------|------|------|-----|------|
+| ESP32-S2 | `ENABLE_SECURITY_DOWNLOAD` | BLOCK0 word4 | [5] | 1=启用安全下载 |
+| ESP32-S3 | `ENABLE_SECURITY_DOWNLOAD` | BLOCK0 word4 | [5] | 1=启用安全下载 |
+| ESP32-C2 | `ENABLE_SECURITY_DOWNLOAD` | BLOCK0 word1 | [16] | 1=启用安全下载 |
+| ESP32-C3 | `ENABLE_SECURITY_DOWNLOAD` | BLOCK0 word4 | [5] | 1=启用安全下载 |
+| ESP32-C6 | `ENABLE_SECURITY_DOWNLOAD` | BLOCK0 word4 | [5] | 1=启用安全下载 |
+
+### 实现内容
+
+#### 1. eFuse 字段定义（chip.h）
+
+```c
+/* ESP32 eFuse 字段偏移和位掩码 */
+#define ESP32_FLASH_CRYPT_CNT_REG      0x00  /* BLOCK0 word0 */
+#define ESP32_FLASH_CRYPT_CNT_MASK     0x7F << 20
+#define ESP32_DISABLE_DL_ENCRYPT_REG   0x18  /* BLOCK0 word6 */
+#define ESP32_DISABLE_DL_ENCRYPT       1 << 7
+#define ESP32_UART_DOWNLOAD_DIS_REG    0x00  /* BLOCK0 word0 */
+#define ESP32_UART_DOWNLOAD_DIS        1 << 27
+
+/* ESP32-S2/S3/C3/C6 eFuse 字段偏移和位掩码 */
+#define ESP32S2_SPI_BOOT_CRYPT_CNT_REG      0x08  /* BLOCK0 word2 */
+#define ESP32S2_SPI_BOOT_CRYPT_CNT_MASK     0x7 << 18
+#define ESP32S2_DIS_DOWNLOAD_MANUAL_ENCRYPT 1 << 20
+#define ESP32S2_ENABLE_SECURITY_DOWNLOAD    1 << 5
+#define ESP32S2_DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE 1 << 4
+
+/* ESP32-C2 eFuse 字段偏移和位掩码 */
+#define ESP32C2_SPI_BOOT_CRYPT_CNT_REG      0x04  /* BLOCK0 word1 */
+#define ESP32C2_SPI_BOOT_CRYPT_CNT_MASK     0x7 << 7
+#define ESP32C2_DIS_DOWNLOAD_MANUAL_ENCRYPT 1 << 6
+#define ESP32C2_ENABLE_SECURITY_DOWNLOAD    1 << 16
+#define ESP32C2_DIS_DOWNLOAD_MODE           1 << 14
+```
+
+#### 2. 状态判断函数（chip.c）
+
+```c
+/* 检查 Flash 加密是否启用 */
+BOOL Chip_IsFlashEncryptionEnabled(const CHIP_CTX *ctx);
+
+/* 检查是否为产品模式（禁止明文烧录） */
+BOOL Chip_IsProductionMode(const CHIP_CTX *ctx);
+
+/* 检查下载模式是否禁用 */
+BOOL Chip_IsDownloadDisabled(const CHIP_CTX *ctx);
+
+/* 检查是否为安全下载模式 */
+BOOL Chip_IsSecureDownload(const CHIP_CTX *ctx);
+
+/* 获取加密状态字符串 ID */
+UINT Chip_GetEncryptionStatusStrId(const CHIP_CTX *ctx);
+
+/* 获取下载模式字符串 ID */
+UINT Chip_GetDownloadModeStrId(const CHIP_CTX *ctx);
+```
+
+#### 3. 状态栏显示（app_commands.c）
+
+```c
+/* UpdateStatusBar 中添加 */
+SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)LoadStr(Chip_GetEncryptionStatusStrId(&g_device.chip)));
+SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)LoadStr(Chip_GetDownloadModeStrId(&g_device.chip)));
+```
+
+#### 4. GET_SECURITY_INFO 响应更新
+
+```c
+/* flash_crypt_cnt 字段从 eFuse 读取 */
+sec_data[4] = Chip_GetFlashCryptCnt(ctx->chip);
+```
+
+#### 5. 烧录命令检查
+
+```c
+/* HandleFlashBegin / HandleFlashDeflBegin 中检查 */
+if (Chip_IsProductionMode(ctx->chip) && !encrypted) {
+    /* 产品模式下禁止明文烧录 */
+    Serial_PostLog(ctx->hNotify, L"ERR", L"  Production mode: plaintext flash disabled");
+    // 返回错误或警告
+}
+```
+
+### 状态判断逻辑
+
+```
+加密状态判断：
+  if (flash_crypt_cnt 为奇数个 1 位) {
+      if (disable_dl_encrypt == 1) {
+          状态 = "Encrypted (Prod)"  // 产品模式
+      } else {
+          状态 = "Encrypted (Dev)"   // 开发模式
+      }
+  } else {
+      状态 = "No Encryption"         // 未加密
+  }
+
+下载模式判断：
+  if (download_disabled) {
+      状态 = "Download Disabled"     // 下载禁用
+  } else if (security_download_enabled) {
+      状态 = "Download Secure"       // 安全下载
+  } else {
+      状态 = "Download Normal"       // 正常
+  }
+```
+
+### 测试方法
+
+```bash
+# 1. 创建设备并设置 eFuse
+espefuse.py --port COM10 burn_efuse FLASH_CRYPT_CNT 1
+espefuse.py --port COM10 burn_efuse DISABLE_DL_ENCRYPT 1
+
+# 2. 检查状态栏显示
+# 应显示：加密（生产）
+
+# 3. 尝试明文烧录（应失败）
+esptool.py --port COM10 write_flash 0x0 firmware.bin
+
+# 4. 加密烧录（应成功）
+esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
+```
+
+### 协议处理逻辑
+
+#### 1. GET_SECURITY_INFO 响应更新
+
+烧录器通过 `GET_SECURITY_INFO` 命令获取设备安全状态，响应中包含 `flash_crypt_cnt` 字段。
+
+```c
+/* HandleGetSecurityInfo 中更新 */
+static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+{
+    /* ... 现有代码 ... */
+
+    /* 更新 flash_crypt_cnt 字段 */
+    sec_data[4] = Chip_GetFlashCryptCnt(ctx->chip);
+
+    /* ... 现有代码 ... */
+}
+```
+
+**烧录器行为**：
+- esptool 读取 `flash_crypt_cnt` 判断是否启用加密
+- 如果 `flash_crypt_cnt` 为奇数个 1 位，认为加密已启用
+- 如果加密已启用且未使用 `--encrypt` 参数，esptool 会警告或拒绝烧录
+
+#### 2. 下载模式禁用处理
+
+当 `DIS_DOWNLOAD_MODE=1` 时，设备应拒绝所有协议命令。
+
+```c
+/* Esptool_ProcessFrame 中添加检查 */
+BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
+{
+    /* 检查下载模式是否禁用 */
+    if (Chip_IsDownloadDisabled(ctx->chip)) {
+        /* 下载模式已禁用，不响应任何命令 */
+        TRACE_PROTO(TAG, "Download mode disabled, ignoring command 0x%02X", frame[1]);
+        Serial_PostLog(ctx->hNotify, L"ESP", L"  Download mode disabled, command ignored");
+        return FALSE;
+    }
+
+    /* ... 现有代码 ... */
+}
+```
+
+**真实芯片行为**：
+- ESP32：`UART_DOWNLOAD_DIS=1` 时，ROM 不响应任何 SLIP 命令
+- ESP32-S2/S3/C2/C3/C6：`DIS_DOWNLOAD_MODE=1` 时，ROM 不进入下载模式
+
+**FakeEsptool 模拟**：
+- 收到 SYNC 命令时不响应（模拟 ROM 不进入下载模式）
+- 收到其他命令时也不响应
+
+#### 3. 安全下载模式处理
+
+当 `ENABLE_SECURITY_DOWNLOAD=1` 时，设备应限制某些命令。
+
+```c
+/* Esptool_ProcessFrame 中添加检查 */
+BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
+{
+    /* ... 现有代码 ... */
+
+    /* 安全下载模式检查 */
+    if (Chip_IsSecureDownload(ctx->chip)) {
+        /* 安全下载模式下，只允许以下命令：
+         * - SYNC (0x08)
+         * - READ_REG (0x0A)
+         * - WRITE_REG (0x09)
+         * - SPI_ATTACH (0x0D)
+         * - FLASH_BEGIN (0x02)
+         * - FLASH_DATA (0x03)
+         * - FLASH_END (0x04)
+         * - FLASH_DEFL_BEGIN (0x10)
+         * - FLASH_DEFL_DATA (0x11)
+         * - FLASH_DEFL_END (0x12)
+         * - SPI_SET_PARAMS (0x0B)
+         * - SPI_FLASH_MD5 (0x13)
+         * - CHANGE_BAUDRATE (0x0F)
+         *
+         * 禁止以下命令：
+         * - MEM_BEGIN (0x05)
+         * - MEM_DATA (0x07)
+         * - MEM_END (0x06)
+         * - READ_FLASH (0xD2) - stub only
+         * - ERASE_FLASH (0xD0) - stub only
+         * - ERASE_REGION (0xD1) - stub only
+         */
+        switch (pkt->command) {
+        case ESP_CMD_MEM_BEGIN:
+        case ESP_CMD_MEM_DATA:
+        case ESP_CMD_MEM_END:
+        case ESP_CMD_READ_FLASH:
+        case ESP_CMD_ERASE_FLASH:
+        case ESP_CMD_ERASE_REGION:
+            TRACE_PROTO(TAG, "Secure download: command 0x%02X not allowed", pkt->command);
+            Serial_PostLogF(ctx->hNotify, L"ESP", L"  Secure download: command 0x%02X rejected", pkt->command);
+            Esptool_SendResponse(ctx, pkt->command, pkt->value, ESP_FAIL, NULL, 4);
+            return FALSE;
+        }
+    }
+
+    /* ... 现有代码 ... */
+}
+```
+
+**真实芯片行为**：
+- 安全下载模式下，ROM 只允许 Flash 烧录相关命令
+- 禁止内存读写命令（防止固件提取）
+- 禁止 Flash 擦除命令（防止恶意擦除）
+
+#### 4. 产品模式明文烧录检查
+
+当 `DISABLE_DL_ENCRYPT=1` 且 `flash_crypt_cnt` 为奇数时，禁止明文烧录。
+
+```c
+/* HandleFlashBegin / HandleFlashDeflBegin 中添加检查 */
+static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+{
+    /* ... 现有代码 ... */
+
+    /* 产品模式检查 */
+    if (Chip_IsProductionMode(ctx->chip) && !encrypted) {
+        TRACE_PROTO(TAG, "Production mode: plaintext flash not allowed");
+        Serial_PostLog(ctx->hNotify, L"ERR", L"  Production mode: plaintext flash disabled");
+        BYTE status_len = ESP_STATUS_LEN(ctx);
+        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_BEGIN, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+        return;
+    }
+
+    /* ... 现有代码 ... */
+}
+```
+
+**真实芯片行为**：
+- 产品模式下，ROM 强制要求 `encrypted=1`
+- 如果 `encrypted=0`，ROM 返回错误
+
+#### 5. 菜单和状态栏同步更新
+
+当通过协议命令修改 eFuse 时，需要同步更新菜单和状态栏。
+
+```c
+/* eFuse 写入后更新 UI */
+void Chip_UpdateEfuse(CHIP_CTX *chip, int offset, int size, const BYTE *data)
+{
+    /* 写入 eFuse */
+    BYTE *efuse = Chip_GetEfuseMut(chip);
+    memcpy(efuse + offset, data, size);
+
+    /* 检查是否影响加密状态或下载模式 */
+    if (Chip_IsEncryptionStateChanged(chip) || Chip_IsDownloadModeChanged(chip)) {
+        /* 通知主窗口更新 UI */
+        PostMessage(g_hMainWnd, WM_UPDATE_STATUS, 0, 0);
+    }
+}
+```
+
+#### 6. 完整命令处理流程
+
+```
+收到 SLIP 帧
+    │
+    ▼
+检查下载模式是否禁用
+    │
+    ├── 是 → 不响应（模拟 ROM 不进入下载模式）
+    │
+    ▼
+检查安全下载模式
+    │
+    ├── 是 → 检查命令是否允许
+    │         │
+    │         ├── 不允许 → 返回 ESP_FAIL
+    │         │
+    │         ▼
+    │      继续处理
+    │
+    ▼
+解析命令
+    │
+    ├── FLASH_BEGIN / FLASH_DEFL_BEGIN
+    │       │
+    │       ▼
+    │   检查产品模式
+    │       │
+    │       ├── 是且未加密 → 返回 ESP_FAIL
+    │       │
+    │       ▼
+    │   正常处理
+    │
+    ▼
+执行命令并返回响应
+```

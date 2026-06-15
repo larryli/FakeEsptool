@@ -29,6 +29,16 @@
 #define IDM_ABOUT           2015
 #define IDM_KEY_MGMT        2016
 
+/* Encryption state menu IDs */
+#define IDM_ENCRYPT_NONE    2020
+#define IDM_ENCRYPT_DEV     2021
+#define IDM_ENCRYPT_PROD    2022
+
+/* Download mode menu IDs */
+#define IDM_DOWNLOAD_NORMAL 2030
+#define IDM_DOWNLOAD_SECURE 2031
+#define IDM_DOWNLOAD_DISABLED 2032
+
 /* Dialog IDs */
 #define IDD_PORT_SELECT     3001
 #define IDC_PORT_COMBO      3002

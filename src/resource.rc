@@ -47,6 +47,19 @@ IDR_MAIN_MENU MENUEX
     MENUITEM "&Export Flash...", IDM_FLASH_EXPORT, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "&Key Management...", IDM_KEY_MGMT, 0, 0
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    POPUP "Encryption &State", 0, 0, 0
+    {
+      MENUITEM "&No Encryption", IDM_ENCRYPT_NONE, 0, 0
+      MENUITEM "Encrypted (&Dev)", IDM_ENCRYPT_DEV, 0, 0
+      MENUITEM "Encrypted (&Prod)", IDM_ENCRYPT_PROD, 0, 0
+    }
+    POPUP "&Download Mode", 0, 0, 0
+    {
+      MENUITEM "Download &Normal", IDM_DOWNLOAD_NORMAL, 0, 0
+      MENUITEM "Download &Secure", IDM_DOWNLOAD_SECURE, 0, 0
+      MENUITEM "Download &Disabled", IDM_DOWNLOAD_DISABLED, 0, 0
+    }
   }
   POPUP "&Log", 0, 0, 0
   {
@@ -295,6 +308,19 @@ IDR_MAIN_MENU MENUEX
     MENUITEM "导出 Flash(&E)...", IDM_FLASH_EXPORT, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "密钥管理(&K)...", IDM_KEY_MGMT, 0, 0
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    POPUP "加密状态(&S)", 0, 0, 0
+    {
+      MENUITEM "未加密(&N)", IDM_ENCRYPT_NONE, 0, 0
+      MENUITEM "加密（开发）(&D)", IDM_ENCRYPT_DEV, 0, 0
+      MENUITEM "加密（生产）(&P)", IDM_ENCRYPT_PROD, 0, 0
+    }
+    POPUP "下载模式(&M)", 0, 0, 0
+    {
+      MENUITEM "下载正常(&N)", IDM_DOWNLOAD_NORMAL, 0, 0
+      MENUITEM "下载安全(&S)", IDM_DOWNLOAD_SECURE, 0, 0
+      MENUITEM "下载禁用(&D)", IDM_DOWNLOAD_DISABLED, 0, 0
+    }
   }
   POPUP "日志(&L)", 0, 0, 0
   {

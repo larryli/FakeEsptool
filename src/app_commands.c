@@ -20,6 +20,22 @@
 static const char *TAG = "CMD";
 #endif
 
+/* Encryption state and download mode for testing */
+typedef enum {
+    ENCRYPT_STATE_NONE = 0,
+    ENCRYPT_STATE_DEV = 1,
+    ENCRYPT_STATE_PROD = 2,
+} ENCRYPT_STATE;
+
+typedef enum {
+    DOWNLOAD_MODE_NORMAL = 0,
+    DOWNLOAD_MODE_SECURE = 1,
+    DOWNLOAD_MODE_DISABLED = 2,
+} DOWNLOAD_MODE;
+
+static ENCRYPT_STATE g_encryptState = ENCRYPT_STATE_NONE;
+static DOWNLOAD_MODE g_downloadMode = DOWNLOAD_MODE_NORMAL;
+
 /*
  * PromptDisconnectIfNeeded - Check if serial is connected, prompt to disconnect
  */
@@ -142,6 +158,90 @@ BOOL CanReconnect(void)
 }
 
 /*
+ * UpdateEncryptionMenu - Update encryption state menu check marks
+ *
+ * @hMenu: Menu handle
+ */
+static void UpdateEncryptionMenu(HMENU hMenu)
+{
+    CheckMenuItem(hMenu, IDM_ENCRYPT_NONE, 
+        g_encryptState == ENCRYPT_STATE_NONE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+    CheckMenuItem(hMenu, IDM_ENCRYPT_DEV, 
+        g_encryptState == ENCRYPT_STATE_DEV ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+    CheckMenuItem(hMenu, IDM_ENCRYPT_PROD, 
+        g_encryptState == ENCRYPT_STATE_PROD ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+}
+
+/*
+ * UpdateDownloadMenu - Update download mode menu check marks
+ *
+ * @hMenu: Menu handle
+ */
+static void UpdateDownloadMenu(HMENU hMenu)
+{
+    CheckMenuItem(hMenu, IDM_DOWNLOAD_NORMAL, 
+        g_downloadMode == DOWNLOAD_MODE_NORMAL ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+    CheckMenuItem(hMenu, IDM_DOWNLOAD_SECURE, 
+        g_downloadMode == DOWNLOAD_MODE_SECURE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+    CheckMenuItem(hMenu, IDM_DOWNLOAD_DISABLED, 
+        g_downloadMode == DOWNLOAD_MODE_DISABLED ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+}
+
+/*
+ * Main_CmdEncryptState - Handle encryption state menu command
+ *
+ * @hWnd: Main window handle
+ * @state: New encryption state (0=none, 1=dev, 2=prod)
+ */
+void Main_CmdEncryptState(HWND hWnd, int state)
+{
+    g_encryptState = (ENCRYPT_STATE)state;
+    UpdateEncryptionMenu(GetMenu(hWnd));
+    UpdateStatusBar();
+}
+
+/*
+ * Main_CmdDownloadMode - Handle download mode menu command
+ *
+ * @hWnd: Main window handle
+ * @mode: New download mode (0=normal, 1=secure, 2=disabled)
+ */
+void Main_CmdDownloadMode(HWND hWnd, int mode)
+{
+    g_downloadMode = (DOWNLOAD_MODE)mode;
+    UpdateDownloadMenu(GetMenu(hWnd));
+    UpdateStatusBar();
+}
+
+/*
+ * GetEncryptStateStrId - Get string ID for current encryption state
+ *
+ * Returns: String ID for status bar display
+ */
+static UINT GetEncryptStateStrId(void)
+{
+    switch (g_encryptState) {
+    case ENCRYPT_STATE_DEV:  return IDS_ENCRYPT_DEV;
+    case ENCRYPT_STATE_PROD: return IDS_ENCRYPT_PROD;
+    default:                 return IDS_ENCRYPT_NONE;
+    }
+}
+
+/*
+ * GetDownloadModeStrId - Get string ID for current download mode
+ *
+ * Returns: String ID for status bar display
+ */
+static UINT GetDownloadModeStrId(void)
+{
+    switch (g_downloadMode) {
+    case DOWNLOAD_MODE_SECURE:   return IDS_DOWNLOAD_SECURE;
+    case DOWNLOAD_MODE_DISABLED: return IDS_DOWNLOAD_DISABLED;
+    default:                     return IDS_DOWNLOAD_NORMAL;
+    }
+}
+
+/*
  * UpdateMenuState - Update menu and toolbar button states
  *
  * Enables/disables menu items and toolbar buttons based on
@@ -165,6 +265,10 @@ void UpdateMenuState(HWND hWnd)
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_DISCONNECT, connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_RECONNECT, canReconnect);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_KEY_MGMT, canKeyMgmt);
+
+    /* Update encryption state and download mode menu check marks */
+    UpdateEncryptionMenu(hMenu);
+    UpdateDownloadMenu(hMenu);
 }
 
 /*
@@ -277,16 +381,16 @@ void UpdateStatusBar(void)
         SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)L"");
     }
 
-    /* Part 4: Encryption status (placeholder - always "No Encryption" for now) */
+    /* Part 4: Encryption status */
     if (g_device.chip.name[0]) {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)LoadStr(IDS_ENCRYPT_NONE));
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)LoadStr(GetEncryptStateStrId()));
     } else {
         SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)L"");
     }
 
-    /* Part 5: Download mode status (placeholder - always "Download Normal" for now) */
+    /* Part 5: Download mode status */
     if (g_device.chip.name[0]) {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)LoadStr(IDS_DOWNLOAD_NORMAL));
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)LoadStr(GetDownloadModeStrId()));
     } else {
         SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)L"");
     }
