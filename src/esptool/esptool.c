@@ -1150,7 +1150,10 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         /* bytes 0-3:   flags (all zeros) */
         /* byte 4:      flash_crypt_cnt */
         sec_data[4] = (BYTE)(flash_crypt_cnt & 0xFF);
-        /* bytes 5-11:  key_purposes (all zeros) */
+        /* bytes 5-11:  key_purposes (7 bytes, one per key block KEY0-KEY5 + reserved) */
+        for (int i = 0; i < 7; i++) {
+            sec_data[5 + i] = Chip_GetKeyPurpose(ctx->chip, i);
+        }
         /* bytes 12-13: status = success (0x00, 0x00) */
         Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, sec_data, 14);
         return;
@@ -1165,7 +1168,10 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* bytes 0-3:   flags (all zeros) */
     /* byte 4:      flash_crypt_cnt */
     sec_data[4] = (BYTE)(flash_crypt_cnt & 0xFF);
-    /* bytes 5-11:  key_purposes (all zeros) */
+    /* bytes 5-11:  key_purposes (7 bytes, one per key block KEY0-KEY5 + reserved) */
+    for (int i = 0; i < 7; i++) {
+        sec_data[5 + i] = Chip_GetKeyPurpose(ctx->chip, i);
+    }
     /* bytes 12-15: chip_id (IMAGE_CHIP_ID, little-endian) */
     sec_data[12] = (BYTE)(chip_id & 0xFF);
     sec_data[13] = (BYTE)((chip_id >> 8) & 0xFF);

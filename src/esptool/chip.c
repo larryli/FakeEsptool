@@ -1322,3 +1322,59 @@ BOOL Chip_IsSecureDownloadEnabled(const CHIP_CTX *ctx)
         return FALSE;
     }
 }
+
+/*
+ * Key purpose values (from espefuse)
+ */
+#define KEY_PURPOSE_USER            0
+#define KEY_PURPOSE_RESERVED        1
+#define KEY_PURPOSE_XTS_AES_128_KEY 2
+
+BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block)
+{
+    if (!ctx->efuse || block < 0)
+        return KEY_PURPOSE_USER;
+
+    /* Key block offsets in eFuse array (index 0 = KEY0, 1 = KEY1, ...) */
+    static const DWORD key_offsets_c3[] = { 0x09C, 0x0BC, 0x0DC, 0x0FC, 0x11C, 0x13C };
+    static const DWORD key_offsets_c2[] = { 0x060 };
+
+    const DWORD *offsets = NULL;
+    int num_keys = 0;
+
+    switch (ctx->type) {
+    case CHIP_ESP32C3:
+    case CHIP_ESP32C6:
+        offsets = key_offsets_c3;
+        num_keys = (int)(sizeof(key_offsets_c3) / sizeof(key_offsets_c3[0]));
+        break;
+    case CHIP_ESP32C2:
+        offsets = key_offsets_c2;
+        num_keys = (int)(sizeof(key_offsets_c2) / sizeof(key_offsets_c2[0]));
+        break;
+    default:
+        return KEY_PURPOSE_USER;
+    }
+
+    if (block >= num_keys)
+        return KEY_PURPOSE_USER;
+
+    int offset = (int)offsets[block];
+    /* Check if key block has any non-zero data (32 bytes = 8 words) */
+    BOOL has_data = FALSE;
+    for (int i = 0; i < 32; i++) {
+        if (offset + i < ctx->efuse_size && ctx->efuse[offset + i] != 0) {
+            has_data = TRUE;
+            break;
+        }
+    }
+
+    if (!has_data)
+        return KEY_PURPOSE_USER;
+
+    /* BLOCK_KEY0 is used for flash encryption */
+    if (block == 0)
+        return KEY_PURPOSE_XTS_AES_128_KEY;
+
+    return KEY_PURPOSE_USER;
+}

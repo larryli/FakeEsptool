@@ -139,8 +139,11 @@ static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam);
 void OnDeviceModified(void)
 {
     Device_SetModified(&g_device, TRUE);
-    if (g_hWnd)
+    if (g_hWnd) {
         UpdateTitle(g_hWnd);
+        UpdateStatusBar();
+        UpdateMenuState(g_hWnd);
+    }
 }
 
 /*

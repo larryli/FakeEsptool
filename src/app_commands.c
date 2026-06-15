@@ -160,31 +160,51 @@ BOOL CanReconnect(void)
 /*
  * UpdateEncryptionMenu - Update encryption state menu check marks
  *
+ * Auto-detects from eFuse when chip is available, falls back to manual toggle.
+ *
  * @hMenu: Menu handle
  */
 static void UpdateEncryptionMenu(HMENU hMenu)
 {
+    ENCRYPT_STATE state = g_encryptState;
+    if (g_device.chip.name[0]) {
+        BOOL encrypted = Chip_IsFlashEncryptionEnabled(&g_device.chip);
+        BOOL prod = Chip_IsDownloadEncryptDisabled(&g_device.chip);
+        if (encrypted && prod) state = ENCRYPT_STATE_PROD;
+        else if (encrypted) state = ENCRYPT_STATE_DEV;
+        else state = ENCRYPT_STATE_NONE;
+    }
     CheckMenuItem(hMenu, IDM_ENCRYPT_NONE, 
-        g_encryptState == ENCRYPT_STATE_NONE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+        state == ENCRYPT_STATE_NONE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
     CheckMenuItem(hMenu, IDM_ENCRYPT_DEV, 
-        g_encryptState == ENCRYPT_STATE_DEV ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+        state == ENCRYPT_STATE_DEV ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
     CheckMenuItem(hMenu, IDM_ENCRYPT_PROD, 
-        g_encryptState == ENCRYPT_STATE_PROD ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+        state == ENCRYPT_STATE_PROD ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
 }
 
 /*
  * UpdateDownloadMenu - Update download mode menu check marks
  *
+ * Auto-detects from eFuse when chip is available, falls back to manual toggle.
+ *
  * @hMenu: Menu handle
  */
 static void UpdateDownloadMenu(HMENU hMenu)
 {
+    DOWNLOAD_MODE mode = g_downloadMode;
+    if (g_device.chip.name[0]) {
+        BOOL dl_disabled = Chip_IsDownloadModeDisabled(&g_device.chip);
+        BOOL secure = Chip_IsSecureDownloadEnabled(&g_device.chip);
+        if (dl_disabled) mode = DOWNLOAD_MODE_DISABLED;
+        else if (secure) mode = DOWNLOAD_MODE_SECURE;
+        else mode = DOWNLOAD_MODE_NORMAL;
+    }
     CheckMenuItem(hMenu, IDM_DOWNLOAD_NORMAL, 
-        g_downloadMode == DOWNLOAD_MODE_NORMAL ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+        mode == DOWNLOAD_MODE_NORMAL ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
     CheckMenuItem(hMenu, IDM_DOWNLOAD_SECURE, 
-        g_downloadMode == DOWNLOAD_MODE_SECURE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+        mode == DOWNLOAD_MODE_SECURE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
     CheckMenuItem(hMenu, IDM_DOWNLOAD_DISABLED, 
-        g_downloadMode == DOWNLOAD_MODE_DISABLED ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+        mode == DOWNLOAD_MODE_DISABLED ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
 }
 
 /*

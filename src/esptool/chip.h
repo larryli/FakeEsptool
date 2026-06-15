@@ -121,62 +121,62 @@
  * the BLOCK0 region. Offsets are from the chip's eFuse base address.
  * ============================================================================ */
 
-/* ESP32 eFuse encryption fields (EFUSE_RD_REG_BASE = 0x3FF5A000) */
-#define EFUSE_OFFS_FLASH_CRYPT_CNT_ESP32        0x00    /* BLOCK0 word0 */
+/* ESP32 eFuse encryption fields (EFUSE_RD_REG_BASE = 0x3FF5A000, BLOCK0 at +0x2C) */
+#define EFUSE_OFFS_FLASH_CRYPT_CNT_ESP32        0x2C    /* BLOCK0 word0 */
 #define EFUSE_MASK_FLASH_CRYPT_CNT_ESP32        (0x7FUL << 20)
-#define EFUSE_OFFS_DISABLE_DL_ENCRYPT_ESP32     0x18    /* BLOCK0 word6 */
+#define EFUSE_OFFS_DISABLE_DL_ENCRYPT_ESP32     0x44    /* BLOCK0 word6 */
 #define EFUSE_BIT_DISABLE_DL_ENCRYPT_ESP32      (1UL << 7)
-#define EFUSE_OFFS_UART_DOWNLOAD_DIS_ESP32      0x00    /* BLOCK0 word0 */
+#define EFUSE_OFFS_UART_DOWNLOAD_DIS_ESP32      0x2C    /* BLOCK0 word0 */
 #define EFUSE_BIT_UART_DOWNLOAD_DIS_ESP32       (1UL << 27)
 
-/* ESP32-S2 eFuse encryption fields (EFUSE_BASE = 0x3F41A000) */
-#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32S2   0x08    /* BLOCK0 word2 */
+/* ESP32-S2 eFuse encryption fields (EFUSE_BASE = 0x3F41A000, BLOCK0 at +0x5C) */
+#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32S2   0x64    /* BLOCK0 word2 */
 #define EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32S2   (7UL << 18)
-#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32S2 0x04   /* BLOCK0 word1 */
+#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32S2 0x60   /* BLOCK0 word1 */
 #define EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32S2 (1UL << 20)
-#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32S2    0x10    /* BLOCK0 word4 */
+#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32S2    0x6C    /* BLOCK0 word4 */
 #define EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32S2     (1UL << 4)
-#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32S2   0x10    /* BLOCK0 word4 */
+#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32S2   0x6C    /* BLOCK0 word4 */
 #define EFUSE_BIT_ENABLE_SECURITY_DL_ESP32S2    (1UL << 5)
 
-/* ESP32-S3 eFuse encryption fields (EFUSE_BASE = 0x60007000) */
-#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32S3   0x08    /* BLOCK0 word2 */
+/* ESP32-S3 eFuse encryption fields (EFUSE_BASE = 0x60007000, BLOCK0 at +0x5C) */
+#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32S3   0x64    /* BLOCK0 word2 */
 #define EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32S3   (7UL << 18)
-#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32S3 0x04   /* BLOCK0 word1 */
+#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32S3 0x60   /* BLOCK0 word1 */
 #define EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32S3 (1UL << 20)
-#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32S3    0x10    /* BLOCK0 word4 */
+#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32S3    0x6C    /* BLOCK0 word4 */
 #define EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32S3     (1UL << 4)
-#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32S3   0x10    /* BLOCK0 word4 */
+#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32S3   0x6C    /* BLOCK0 word4 */
 #define EFUSE_BIT_ENABLE_SECURITY_DL_ESP32S3    (1UL << 5)
 
-/* ESP32-C2 eFuse encryption fields (EFUSE_BASE = 0x60008800) */
-#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C2   0x04    /* BLOCK0 word1 */
+/* ESP32-C2 eFuse encryption fields (EFUSE_BASE = 0x60008800, BLOCK0 at +0x2C) */
+#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C2   0x30    /* BLOCK0 word1 */
 #define EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C2   (7UL << 7)
-#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C2 0x04   /* BLOCK0 word1 */
+#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C2 0x30   /* BLOCK0 word1 */
 #define EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C2 (1UL << 6)
-#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C2    0x04    /* BLOCK0 word1 */
+#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C2    0x30    /* BLOCK0 word1 */
 #define EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C2     (1UL << 14)
-#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C2   0x04    /* BLOCK0 word1 */
+#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C2   0x30    /* BLOCK0 word1 */
 #define EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C2    (1UL << 16)
 
-/* ESP32-C3 eFuse encryption fields (EFUSE_BASE = 0x60008800) */
-#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C3   0x08    /* BLOCK0 word2 */
+/* ESP32-C3 eFuse encryption fields (EFUSE_BASE = 0x60008800, BLOCK0 at +0x2C) */
+#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C3   0x34    /* BLOCK0 word2 */
 #define EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C3   (7UL << 18)
-#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C3 0x04   /* BLOCK0 word1 */
+#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C3 0x30   /* BLOCK0 word1 */
 #define EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C3 (1UL << 20)
-#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C3    0x10    /* BLOCK0 word4 */
+#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C3    0x3C    /* BLOCK0 word4 */
 #define EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C3     (1UL << 0)
-#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C3   0x10    /* BLOCK0 word4 */
+#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C3   0x3C    /* BLOCK0 word4 */
 #define EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C3    (1UL << 5)
 
-/* ESP32-C6 eFuse encryption fields (EFUSE_BASE = 0x600B0800) */
-#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C6   0x08    /* BLOCK0 word2 */
+/* ESP32-C6 eFuse encryption fields (EFUSE_BASE = 0x600B0800, BLOCK0 at +0x2C) */
+#define EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C6   0x34    /* BLOCK0 word2 */
 #define EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C6   (7UL << 18)
-#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C6 0x04   /* BLOCK0 word1 */
+#define EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C6 0x30   /* BLOCK0 word1 */
 #define EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C6 (1UL << 20)
-#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C6    0x10    /* BLOCK0 word4 */
+#define EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C6    0x3C    /* BLOCK0 word4 */
 #define EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C6     (1UL << 0)
-#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C6   0x10    /* BLOCK0 word4 */
+#define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C6   0x3C    /* BLOCK0 word4 */
 #define EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C6    (1UL << 5)
 
 /* ============================================================================
@@ -440,5 +440,17 @@ BOOL Chip_IsDownloadModeDisabled(const CHIP_CTX *ctx);
  * ESP32 does not support this feature.
  */
 BOOL Chip_IsSecureDownloadEnabled(const CHIP_CTX *ctx);
+
+/*
+ * Chip_GetKeyPurpose - Get key purpose for a key block
+ *
+ * @ctx:   Chip context
+ * @block: Key block index (0 = KEY0, 1 = KEY1, etc.)
+ *
+ * Returns key purpose value (0 = empty/USER, 2 = XTS_AES_128_KEY).
+ * Checks if the key block has non-zero data; returns XTS_AES_128_KEY for
+ * BLOCK_KEY0 when programmed, 0 otherwise.
+ */
+BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block);
 
 #endif
