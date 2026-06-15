@@ -232,7 +232,6 @@ STRINGTABLE
     IDS_KEY_MGMT_CONFIRM_OVERWRITE "Selected key block already contains a key.\nOverwrite with a new random key?"
     IDS_KEY_MGMT_CONFIRM_CLEAR   "Clear the selected key block? This cannot be undone."
     IDS_KEY_MGMT_ALREADY_EMPTY   "Selected key block is already empty."
-    IDS_KEY_MGMT_NO_ENCRYPTION   "ESP8266 does not support flash encryption."
     IDS_KEY_MGMT_CAPTION         "Key Management"
 }
 
@@ -481,7 +480,6 @@ STRINGTABLE
     IDS_KEY_MGMT_CONFIRM_OVERWRITE "选中的密钥块已包含密钥。\n是否用新的随机密钥覆盖？"
     IDS_KEY_MGMT_CONFIRM_CLEAR   "清除选中的密钥块？此操作不可撤销。"
     IDS_KEY_MGMT_ALREADY_EMPTY   "选中的密钥块已为空。"
-    IDS_KEY_MGMT_NO_ENCRYPTION   "ESP8266 不支持 Flash 加密。"
     IDS_KEY_MGMT_CAPTION         "密钥管理"
 }
 

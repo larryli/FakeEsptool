@@ -111,12 +111,12 @@ if self.IS_STUB or self.CHIP_NAME not in ("ESP32", "ESP8266"):
 
 加密密钥存储在芯片的 eFuse（一次性可编程存储器）中：
 
-| 芯片 | 密钥 eFuse 块 | 密钥长度 |
-|------|--------------|---------|
-| ESP32 | BLOCK1 (1个) | 256-bit |
-| ESP32-S2/S3 | KEY0-KEY5 (6个) | 256-bit |
-| ESP32-C2 | KEY0 (1个) | 128-bit |
-| ESP32-C3/C6 | KEY0-KEY5 (6个) | 256-bit |
+| 芯片 | eFuse 块数量 | 密钥块 | 密钥长度 | 说明 |
+|------|-------------|--------|---------|------|
+| ESP32 | 4 个 (BLOCK0-3) | BLOCK1-3 (3个) | 256-bit | BLOCK1=Flash加密, BLOCK2=安全启动, BLOCK3=用户数据 |
+| ESP32-S2/S3 | 多个 | KEY0-KEY5 (6个) | 256-bit | 统一密钥管理器，支持用途标记 |
+| ESP32-C2 | 4 个 (BLOCK0-3) | BLOCK_KEY0 (1个) | 256-bit | 只有 BLOCK_KEY0 用于密钥存储 |
+| ESP32-C3/C6 | 多个 | KEY0-KEY5 (6个) | 256-bit | 标准新架构，完整支持安全启动 v2 |
 
 FakeEsptool 当前状态：
 - eFuse 数组可存放密钥（动态分配的字节数组）

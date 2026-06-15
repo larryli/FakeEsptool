@@ -154,15 +154,17 @@ void UpdateMenuState(HWND hWnd)
     HMENU hMenu = GetMenu(hWnd);
     BOOL connected = Serial_IsOpen(&g_serial);
     BOOL canReconnect = CanReconnect();
+    BOOL canKeyMgmt = g_device.chip.type != CHIP_ESP8266;
 
     EnableMenuItem(hMenu, IDM_CONNECT, connected ? MF_GRAYED : MF_ENABLED);
     EnableMenuItem(hMenu, IDM_DISCONNECT, connected ? MF_ENABLED : MF_GRAYED);
     EnableMenuItem(hMenu, IDM_RECONNECT, canReconnect ? MF_ENABLED : MF_GRAYED);
-    EnableMenuItem(hMenu, IDM_KEY_MGMT, g_device.chip.type != CHIP_ESP8266 ? MF_ENABLED : MF_GRAYED);
+    EnableMenuItem(hMenu, IDM_KEY_MGMT, canKeyMgmt ? MF_ENABLED : MF_GRAYED);
 
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_CONNECT, !connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_DISCONNECT, connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_RECONNECT, canReconnect);
+    SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_KEY_MGMT, canKeyMgmt);
 }
 
 /*
@@ -539,19 +541,12 @@ void Main_CmdDeviceProps(HWND hWnd)
  * Main_CmdKeyMgmt - Handle Key Management command
  *
  * Shows key management dialog for flash encryption keys.
- * ESP8266 does not support flash encryption, so the command is disabled.
  * If serial is connected, prompts to disconnect first.
  *
  * @hWnd: Main window handle
  */
 void Main_CmdKeyMgmt(HWND hWnd)
 {
-    if (g_device.chip.type == CHIP_ESP8266) {
-        MessageBoxW(hWnd,
-            LoadStr(IDS_KEY_MGMT_NO_ENCRYPTION),
-            LoadStr(IDS_KEY_MGMT_CAPTION), MB_OK | MB_ICONINFORMATION);
-        return;
-    }
     if (!PromptDisconnectIfNeeded(hWnd))
         return;
     DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_KEY_MGMT), hWnd, KeyMgmtDlgProc);

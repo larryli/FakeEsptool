@@ -45,8 +45,10 @@ typedef struct {
 /* Chip-specific key block definitions */
 static const KEY_BLOCK_INFO key_blocks_esp32[] = {
     { "BLOCK1", "Flash Encryption", 0x38, 32 },
+    { "BLOCK2", "Secure Boot",      0x58, 32 },
+    { "BLOCK3", "User Data",        0x78, 32 },
 };
-#define KEY_BLOCKS_ESP32_COUNT 1
+#define KEY_BLOCKS_ESP32_COUNT 3
 
 static const KEY_BLOCK_INFO key_blocks_esp32s2[] = {
     { "KEY0", "XTS-AES-256-1", 0x9C, 32 },
@@ -69,7 +71,7 @@ static const KEY_BLOCK_INFO key_blocks_esp32s3[] = {
 #define KEY_BLOCKS_ESP32S3_COUNT 6
 
 static const KEY_BLOCK_INFO key_blocks_esp32c2[] = {
-    { "KEY0", "Flash Encryption", 0x60, 16 },
+    { "KEY0", "Flash Encryption", 0x60, 32 },
 };
 #define KEY_BLOCKS_ESP32C2_COUNT 1
 

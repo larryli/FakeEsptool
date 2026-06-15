@@ -159,7 +159,6 @@
 #define IDS_KEY_MGMT_CONFIRM_OVERWRITE 10215  /* "Selected key block already contains a key.\nOverwrite with a new random key?" */
 #define IDS_KEY_MGMT_CONFIRM_CLEAR   10216  /* "Clear the selected key block? This cannot be undone." */
 #define IDS_KEY_MGMT_ALREADY_EMPTY   10217  /* "Selected key block is already empty." */
-#define IDS_KEY_MGMT_NO_ENCRYPTION   10218  /* "ESP8266 does not support flash encryption." */
 #define IDS_KEY_MGMT_CAPTION         10219  /* "Key Management" */
 
 #endif /* RESOURCE_H */
