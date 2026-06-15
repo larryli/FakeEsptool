@@ -135,6 +135,11 @@
 #define IDS_ENCRYPT_DEV          10121  /* "Encrypted (Dev)" */
 #define IDS_ENCRYPT_PROD         10122  /* "Encrypted (Prod)" */
 
+/* Download mode status strings */
+#define IDS_DOWNLOAD_NORMAL      10130  /* "Download Normal" */
+#define IDS_DOWNLOAD_SECURE      10131  /* "Download Secure" */
+#define IDS_DOWNLOAD_DISABLED    10132  /* "Download Disabled" */
+
 /* Key Management dialog strings */
 #define IDS_KEY_MGMT_TITLE      10200  /* "Key Management - %s" */
 #define IDS_KEY_MGMT_COLUMN_BLOCK    10201  /* "Block" */

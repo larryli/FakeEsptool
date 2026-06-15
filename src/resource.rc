@@ -207,6 +207,9 @@ STRINGTABLE
     IDS_ENCRYPT_NONE        "No Encryption"
     IDS_ENCRYPT_DEV         "Encrypted (Dev)"
     IDS_ENCRYPT_PROD        "Encrypted (Prod)"
+    IDS_DOWNLOAD_NORMAL     "Download Normal"
+    IDS_DOWNLOAD_SECURE     "Download Secure"
+    IDS_DOWNLOAD_DISABLED   "Download Disabled"
 }
 
 STRINGTABLE
@@ -453,6 +456,9 @@ STRINGTABLE
     IDS_ENCRYPT_NONE        "未加密"
     IDS_ENCRYPT_DEV         "加密（开发）"
     IDS_ENCRYPT_PROD        "加密（生产）"
+    IDS_DOWNLOAD_NORMAL     "下载正常"
+    IDS_DOWNLOAD_SECURE     "下载安全"
+    IDS_DOWNLOAD_DISABLED   "下载禁用"
 }
 
 STRINGTABLE

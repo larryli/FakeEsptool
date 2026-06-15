@@ -231,7 +231,7 @@ void UpdateStatusBar(void)
     if (!g_hStatusbar)
         return;
 
-    int parts[6];
+    int parts[7];
     RECT rc;
     GetClientRect(GetParent(g_hStatusbar), &rc);
     parts[0] = STATUS_PART1_WIDTH;
@@ -239,8 +239,9 @@ void UpdateStatusBar(void)
     parts[2] = parts[1] + STATUS_PART3_WIDTH;
     parts[3] = parts[2] + STATUS_PART4_WIDTH;
     parts[4] = parts[3] + STATUS_PART5_WIDTH;
-    parts[5] = -1;
-    SendMessageW(g_hStatusbar, SB_SETPARTS, 6, (LPARAM)parts);
+    parts[5] = parts[4] + STATUS_PART6_WIDTH;
+    parts[6] = -1;
+    SendMessageW(g_hStatusbar, SB_SETPARTS, 7, (LPARAM)parts);
 
     /* Part 1: Chip type */
     if (g_device.chip.name[0]) {
@@ -281,9 +282,16 @@ void UpdateStatusBar(void)
         SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)L"");
     }
 
-    /* Part 5 & 6: Serial port and config */
+    /* Part 5: Download mode status (placeholder - always "Download Normal" for now) */
+    if (g_device.chip.name[0]) {
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)LoadStr(IDS_DOWNLOAD_NORMAL));
+    } else {
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)L"");
+    }
+
+    /* Part 6 & 7: Serial port and config */
     if (Serial_IsOpen(&g_serial)) {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)g_szPort);
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 5, (LPARAM)g_szPort);
 
         DWORD baudRate = 115200;
         BYTE dataBits = 8, parity = NOPARITY, stopBits = ONESTOPBIT;
@@ -307,10 +315,10 @@ void UpdateStatusBar(void)
 
         WCHAR configBuf[32];
         wsprintfW(configBuf, L"%lu,%d%s%s", baudRate, dataBits, parityStr, stopStr);
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 5, (LPARAM)configBuf);
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 6, (LPARAM)configBuf);
     } else {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)LoadStr(IDS_DISCONNECTED));
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 5, (LPARAM)L"");
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 5, (LPARAM)LoadStr(IDS_DISCONNECTED));
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 6, (LPARAM)L"");
     }
 }
 

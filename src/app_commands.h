@@ -34,8 +34,9 @@ extern HWND g_hStatusbar;
 #define STATUS_PART2_WIDTH  80   /* Flash size */
 #define STATUS_PART3_WIDTH  150  /* MAC address */
 #define STATUS_PART4_WIDTH  140  /* Encryption status */
-#define STATUS_PART5_WIDTH  120  /* Port name */
-#define STATUS_PART6_WIDTH  140  /* Port config */
+#define STATUS_PART5_WIDTH  120  /* UART status */
+#define STATUS_PART6_WIDTH  120  /* Port name */
+#define STATUS_PART7_WIDTH  140  /* Port config */
 
 /* Message size limit */
 #define MAX_MSG_SIZE        65536
