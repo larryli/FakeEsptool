@@ -332,13 +332,21 @@ static int deflate_decode_dynamic(DEFLATE_CTX *ctx)
 
 /*
  * deflate_decode_static - Decode a static Huffman block
+ *
+ * Static Huffman codes are defined in RFC 1951, Section 3.2.6.
+ * Literal/length code lengths:
+ *   0-143:   8 bits
+ *   144-255: 9 bits
+ *   256-279: 7 bits
+ *   280-287: 8 bits
+ * Distance code lengths: all 5 bits
  */
 static int deflate_decode_static(DEFLATE_CTX *ctx)
 {
     BYTE lengths[288];
     int i;
 
-    /* Literal/length code lengths */
+    /* Literal/length code lengths (RFC 1951, Section 3.2.6) */
     for (i = 0; i < 144; i++)
         lengths[i] = 8;
     for (i = 144; i < 256; i++)
@@ -369,13 +377,21 @@ static int deflate_decode_static(DEFLATE_CTX *ctx)
 
 /*
  * deflate_process_block - Process a DEFLATE block
+ *
+ * Block format (RFC 1951, Section 3.2.3):
+ *   BFINAL: 1 bit - last block flag
+ *   BTYPE:  2 bits - block type
+ *     00: no compression
+ *     01: compressed with fixed Huffman codes
+ *     10: compressed with dynamic Huffman codes
+ *     11: reserved (error)
  */
 static int deflate_process_block(DEFLATE_CTX *ctx)
 {
     int bfinal, btype;
     int ret;
 
-    /* Read block header */
+    /* Read block header (RFC 1951, Section 3.2.3) */
     bfinal = deflate_read_bits(ctx, 1);
     btype = deflate_read_bits(ctx, 2);
 

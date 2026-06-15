@@ -13,7 +13,7 @@ ESP 芯片设备端模拟器的第一个正式版本。
 ### 功能
 
 - **芯片支持**：ESP8266、ESP32、ESP32-S2、ESP32-S3、ESP32-C2、ESP32-C3、ESP32-C6
-- **协议支持**：esptool SLIP 协议完整实现
+- **协议支持**：esptool SLIP 协议基本实现（NAND 命令除外）
   - 同步握手（SYNC）
   - 芯片检测（READ_REG / GET_SECURITY_INFO）
   - Flash 烧录（FLASH_BEGIN / FLASH_DATA / FLASH_END）
@@ -26,6 +26,7 @@ ESP 芯片设备端模拟器的第一个正式版本。
   - 波特率切换（CHANGE_BAUDRATE）
   - MD5 验证（SPI_FLASH_MD5）
   - 安全信息（GET_SECURITY_INFO）
+  - *未实现：NAND Flash 命令（0xD5-0xDE）*
 - **设备管理**：
   - 新建、打开、保存 .esp 设备文件
   - 设备属性修改（芯片类型、晶振频率、Flash 大小、MAC 地址）

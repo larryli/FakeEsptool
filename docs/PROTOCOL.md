@@ -413,6 +413,8 @@ Data:      [hspi_arg:4][is_legacy:1][reserved:3]
 | is_legacy | 是否使用 legacy SPI 驱动（通常为 0） |
 | reserved | 保留字段，填充 0x00 |
 
+**FakeEsptool 实现说明：** 代码统一处理两种请求格式，不区分 Stub/ROM 模式的 Size 差异。由于 `is_legacy` 和 `reserved` 字段通常为 0，统一读取前 4 字节作为 `hspi_arg` 即可。
+
 **响应：**
 ```
 Direction: 0x01
@@ -462,6 +464,8 @@ Data:      [old_baud:4][new_baud:4]
 ```
 
 **工程提示：** 模拟器建议统一按 ESP32 标准格式（2 字节 status）返回，ESP8266 客户端通常也能兼容。
+
+**FakeEsptool 实现说明：** 代码统一使用 ESP32 标准格式（2 字节 status）返回，未实现 ESP8266 ROM 的 8 字节特殊响应格式。这与上述"工程提示"建议一致，ESP8266 客户端可以兼容。
 
 **波特率切换时序：**
 1. 主机发送请求（以旧波特率）

@@ -12,6 +12,9 @@
 #include "chip.h"
 #include "flash.h"
 
+/* WM_SERIAL_TX - Serial data transmitted notification
+ * Primary definition in main.h. This is a fallback definition.
+ * wParam: bytes sent, lParam: pointer to sent data (HeapAlloc'd, receiver frees) */
 #ifndef WM_SERIAL_TX
 #define WM_SERIAL_TX (WM_USER + 2)
 #endif

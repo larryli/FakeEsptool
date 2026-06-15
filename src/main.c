@@ -235,6 +235,26 @@ static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode, BYTE reset_ca
 /*
  * OnEsptoolSignal - esptool protocol signal change callback
  *
+ * Detects ClassicReset sequence (DTR/RTS) to enter download mode.
+ *
+ * Signal mapping (active-low logic):
+ *   DTR -> GPIO0: DTR=ON -> GPIO0=LOW (select download mode)
+ *   RTS -> EN:    RTS=ON -> EN=LOW (reset chip)
+ *
+ * ClassicReset sequence:
+ *   Step 1: DTR=OFF, RTS=ON  -> DSR=OFF, CTS=ON  (EN=LOW, GPIO0=HIGH)
+ *   Step 2: DTR=ON,  RTS=OFF -> DSR=ON,  CTS=OFF (GPIO0=LOW, EN=HIGH)
+ *   Step 3: DTR=OFF, RTS=OFF -> DSR=OFF, CTS=OFF (release, enter mode)
+ *
+ * State transition table:
+ *   DSR  CTS  g_reset_pending  g_saw_io0_low  Action
+ *   OFF  ON   FALSE            -              Start reset, set pending
+ *   ON   OFF  TRUE             FALSE          Set IO0 low flag
+ *   ON   ON   TRUE             -              Intermediate (ignore)
+ *   OFF  OFF  TRUE             TRUE           ClassicReset: download mode
+ *   OFF  OFF  TRUE             FALSE          HardReset: normal boot
+ *   Other combinations                      Cancel pending reset
+ *
  * Note: Called only from the serial listener thread (single-threaded access)
  */
 void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
