@@ -204,6 +204,9 @@ STRINGTABLE
     IDS_MSG_ONLY_ESP        "Only .esp files are supported."
     IDS_TITLE_UNTITLED      " - Untitled"
     IDS_STATUS_NO_DEVICE    "No Device"
+    IDS_ENCRYPT_NONE        "No Encryption"
+    IDS_ENCRYPT_DEV         "Encrypted (Dev)"
+    IDS_ENCRYPT_PROD        "Encrypted (Prod)"
 }
 
 STRINGTABLE
@@ -447,6 +450,9 @@ STRINGTABLE
     IDS_MSG_ONLY_ESP        "仅支持 .esp 文件。"
     IDS_TITLE_UNTITLED      " - 未命名"
     IDS_STATUS_NO_DEVICE    "无设备"
+    IDS_ENCRYPT_NONE        "未加密"
+    IDS_ENCRYPT_DEV         "加密（开发）"
+    IDS_ENCRYPT_PROD        "加密（生产）"
 }
 
 STRINGTABLE

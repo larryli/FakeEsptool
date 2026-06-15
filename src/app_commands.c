@@ -231,15 +231,16 @@ void UpdateStatusBar(void)
     if (!g_hStatusbar)
         return;
 
-    int parts[5];
+    int parts[6];
     RECT rc;
     GetClientRect(GetParent(g_hStatusbar), &rc);
     parts[0] = STATUS_PART1_WIDTH;
     parts[1] = parts[0] + STATUS_PART2_WIDTH;
     parts[2] = parts[1] + STATUS_PART3_WIDTH;
     parts[3] = parts[2] + STATUS_PART4_WIDTH;
-    parts[4] = -1;
-    SendMessageW(g_hStatusbar, SB_SETPARTS, 5, (LPARAM)parts);
+    parts[4] = parts[3] + STATUS_PART5_WIDTH;
+    parts[5] = -1;
+    SendMessageW(g_hStatusbar, SB_SETPARTS, 6, (LPARAM)parts);
 
     /* Part 1: Chip type */
     if (g_device.chip.name[0]) {
@@ -273,9 +274,16 @@ void UpdateStatusBar(void)
         SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)L"");
     }
 
-    /* Part 4 & 5: Serial port and config */
+    /* Part 4: Encryption status (placeholder - always "No Encryption" for now) */
+    if (g_device.chip.name[0]) {
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)LoadStr(IDS_ENCRYPT_NONE));
+    } else {
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)L"");
+    }
+
+    /* Part 5 & 6: Serial port and config */
     if (Serial_IsOpen(&g_serial)) {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)g_szPort);
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)g_szPort);
 
         DWORD baudRate = 115200;
         BYTE dataBits = 8, parity = NOPARITY, stopBits = ONESTOPBIT;
@@ -299,10 +307,10 @@ void UpdateStatusBar(void)
 
         WCHAR configBuf[32];
         wsprintfW(configBuf, L"%lu,%d%s%s", baudRate, dataBits, parityStr, stopStr);
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)configBuf);
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 5, (LPARAM)configBuf);
     } else {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)LoadStr(IDS_DISCONNECTED));
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)L"");
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)LoadStr(IDS_DISCONNECTED));
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 5, (LPARAM)L"");
     }
 }
 

@@ -131,6 +131,52 @@ FakeEsptool 当前状态：
 
 **注意**：切换到产品模式是不可逆的（烧录 eFuse 位）。
 
+### 设备加密状态
+
+设备加密有 3 种状态，通过 eFuse 字段判断：
+
+| 状态 | flash_crypt_cnt | DISABLE_DL_ENCRYPT | 行为 |
+|------|-----------------|-------------------|------|
+| **无加密** | 偶数个 1 位 (0, 2, 4...) | 0 | 可明文烧录 |
+| **开发模式** | 奇数个 1 位 (1, 3, 5...) | 0 | 已加密但允许明文烧录 |
+| **产品模式** | 奇数个 1 位 (1, 3, 5...) | 1 | 已加密且禁止明文烧录 |
+
+**判断函数**（参考 esptool `targets/esp32.py`）：
+
+```python
+def get_flash_encryption_enabled(self):
+    """检查 flash_crypt_cnt 的二进制中 1 的个数是否为奇数"""
+    flash_crypt_cnt = self.read_reg(EFUSE_SPI_BOOT_CRYPT_CNT_REG)
+    return bin(flash_crypt_cnt).count("1") & 1 != 0
+
+def get_encrypted_download_disabled(self):
+    """检查 DISABLE_DL_ENCRYPT eFuse 位"""
+    return self.read_reg(EFUSE_DIS_DOWNLOAD_MANUAL_ENCRYPT_REG) & EFUSE_DIS_DOWNLOAD_MANUAL_ENCRYPT
+```
+
+**关键 eFuse 字段**：
+
+| 字段 | 说明 | 来源 |
+|------|------|------|
+| `flash_crypt_cnt` | 加密计数器（位计数） | GET_SECURITY_INFO 响应 |
+| `DISABLE_DL_ENCRYPT` | 禁用下载加密 | eFuse BLOCK0 |
+
+**esptool 烧录时的检查逻辑**：
+
+```python
+# 产品模式检查（禁止明文烧录）
+if get_encrypted_download_disabled() and get_flash_encryption_enabled():
+    raise FatalError("Flash encryption enabled and download manual encrypt disabled.\n"
+                     "Data must be encrypted appropriately before flashing.")
+```
+
+**FakeEsptool 实现需求**：
+- [ ] 在 eFuse 中定义 `flash_crypt_cnt` 和 `DISABLE_DL_ENCRYPT` 字段位置
+- [ ] 实现 `get_flash_encryption_enabled()` 和 `get_encrypted_download_disabled()` 函数
+- [ ] 在 GET_SECURITY_INFO 响应中返回正确的 `flash_crypt_cnt` 值
+- [ ] 在 Key Management 对话框中显示加密状态
+- [ ] 在 FLASH_BEGIN/FLASH_DEFL_BEGIN 处理中检查加密状态
+
 ### 当前状态
 
 | 处理函数 | encrypted 解析 | 日志输出 |

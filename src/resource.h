@@ -130,6 +130,11 @@
 #define IDS_TITLE_UNTITLED       10109
 #define IDS_STATUS_NO_DEVICE     10110
 
+/* Encryption status strings */
+#define IDS_ENCRYPT_NONE         10120  /* "No Encryption" */
+#define IDS_ENCRYPT_DEV          10121  /* "Encrypted (Dev)" */
+#define IDS_ENCRYPT_PROD         10122  /* "Encrypted (Prod)" */
+
 /* Key Management dialog strings */
 #define IDS_KEY_MGMT_TITLE      10200  /* "Key Management - %s" */
 #define IDS_KEY_MGMT_COLUMN_BLOCK    10201  /* "Block" */
