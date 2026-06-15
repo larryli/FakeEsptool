@@ -87,6 +87,14 @@ cmake --build build --config Release -j
 
 输出：`build/Release/FakeEsptool.exe`（Release）或 `build/Debug/FakeEsptool.exe`（Debug）
 
+### 测试
+
+```powershell
+cmake -B build_tests -S tests
+cmake --build build_tests --config Release -j
+ctest --test-dir build_tests --build-config Release
+```
+
 ## esptool 协议
 
 ### SLIP 封装
@@ -884,6 +892,43 @@ All flash segments verified successfully.
 **返回值**：
 - `0`：所有烧录段验证通过
 - `1`：存在验证失败的烧录段
+
+### 单元测试框架
+
+**位置**：`tests/`
+
+**测试文件**：
+
+| 文件 | 测试内容 |
+|------|----------|
+| `test_deflate.c` | DEFLATE 解压器测试 |
+| `test_encrypt.c` | AES-XTS 加密/解密测试 |
+
+**测试数据**：
+
+| 文件 | 说明 |
+|------|------|
+| `deflate_test_data.h` | DEFLATE 测试数据（由 `generate_deflate_test_data.py` 生成） |
+| `encrypt_test_data.h` | 加密测试数据（由 `generate_encrypt_test_data.py` 生成） |
+| `test_data/` | 加密测试数据目录（.bin 文件，可重新生成） |
+
+**添加新测试**：
+
+1. 在 `tests/` 目录创建新的测试文件（如 `test_xxx.c`）
+2. 更新 `tests/CMakeLists.txt`，添加新的测试目标
+3. 使用 `TEST_ASSERT` 宏编写测试用例
+4. 运行测试验证
+
+### CI/CD
+
+**GitHub Actions 工作流**：`.github/workflows/build.yml`
+
+**构建流程**：
+1. 配置测试 → 编译测试 → 运行测试
+2. 配置应用 → 编译应用
+3. 打包发布（仅 tag 触发）
+
+**测试通过条件**：所有单元测试必须通过，否则应用构建不会执行。
 
 ---
 

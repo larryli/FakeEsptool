@@ -103,11 +103,7 @@ com0com 是 Windows 平台免费的虚拟串口驱动，创建成对的虚拟串
 ```
 FakeEsptool/
 ├── src/                        # 源代码（具体请参考开发文档）
-├── tests/                      # 测试
-│   ├── test_deflate.c          # DEFLATE 解压器测试
-│   ├── test_data.h             # 测试数据（Python zlib 生成）
-│   ├── generate_test_data.py   # 测试数据生成脚本
-│   └── CMakeLists.txt          # 测试构建配置
+├── tests/                      # 测试代码（具体请参考开发文档）
 ├── tools/                      # 工具
 │   └── verify_flash.py         # 烧录验证工具
 ├── docs/                       # 文档

@@ -9,7 +9,7 @@
 #include <string.h>
 #include <windows.h>
 #include "../src/utils/deflate.h"
-#include "test_data.h"
+#include "deflate_test_data.h"
 
 /* Test result tracking */
 static int tests_passed = 0;

@@ -224,18 +224,7 @@ esptool.py --port COM10 --encrypt write_flash 0x0 firmware.bin
 
 验证 FakeEsptool 日志中是否正确显示 `encrypted=1`（ESP32 Stub 模式或其他芯片 ROM 模式）。
 
-**单元测试（tests/test_encrypt.c）**：
-```powershell
-# 编译测试
-cd tests
-mkdir build_tests
-cd build_tests
-cmake ..
-cmake --build . --config Release
-
-# 运行测试
-ctest --config Release
-```
+**单元测试**：`tests/test_encrypt.c`
 
 测试内容：
 - AES-XTS 加密/解密正确性验证
