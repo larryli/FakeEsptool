@@ -231,50 +231,103 @@ void LogView_Flush(void)
 
 /*
  * Main_AppendLog - Format and append RX/TX data to log buffer
+ *
+ * Format: timestamp [RX/TX] HH HH HH ... HH HH HH ... |ASCII....|
+ *         Each line shows 16 bytes with ASCII decode at end.
  */
 void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
 {
     (void)hMainWnd;
     if (!g_initialized || len == 0)
         return;
-    
-    /* Build formatted text: timestamp + direction + hex data */
+
+    /* Calculate buffer size:
+     * - Timestamp: 24 chars "YYYY-MM-DD HH:MM:SS.mmm "
+     * - Direction: 5 chars "[RX] " or "[TX] "
+     * - Per line (hex): 16*3 (hex bytes) + 1 (extra space at byte 8) = 49 chars
+     * - Per line (ASCII): 3 (" |") + 16 (ASCII chars) + 1 ("|") = 20 chars
+     * - Per line (newline): 2 chars
+     * - Continuation prefix: ~30 chars
+     * - Safety margin: 64 chars
+     */
     DWORD numLines = (len + 15) / 16;
-    DWORD maxLineSize = 64 + 16 + (len * 4) + (numLines * 64) + 64;
-    WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, maxLineSize * sizeof(WCHAR));
+    DWORD bufSize = 64 + numLines * (49 + 20 + 2 + 30) + 64;
+    WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bufSize * sizeof(WCHAR));
     if (!buf)
         return;
-    
+
     int pos = 0;
-    
+    int maxPos = (int)bufSize - 1; /* Leave room for null terminator */
+
     /* Timestamp */
-    pos += FormatTimestamp(buf + pos, maxLineSize - pos);
-    
+    pos += FormatTimestamp(buf + pos, maxPos - pos);
+
     /* Direction */
     pos += wsprintfW(buf + pos, L"[%s] ", (dir == DIR_RX) ? L"RX" : L"TX");
-    
-    /* Hex data with grouping */
+
     int prefixLen = pos;
-    for (DWORD i = 0; i < len; i++) {
+    int lineStart = 0;      /* Index into data[] for current line start */
+
+    for (DWORD i = 0; i < len && pos < maxPos - 30; i++) {
+        /* Line break every 16 bytes */
         if (i > 0 && i % 16 == 0) {
-            buf[pos++] = L'\r';
-            buf[pos++] = L'\n';
-            for (int j = 0; j < prefixLen; j++)
+            /* Add ASCII decode for previous line */
+            if (pos + 20 < maxPos) {
                 buf[pos++] = L' ';
+                buf[pos++] = L'|';
+                for (int k = lineStart; k < (int)i && pos < maxPos - 2; k++) {
+                    buf[pos++] = (data[k] >= 0x20 && data[k] <= 0x7E) ? (WCHAR)data[k] : L'.';
+                }
+                buf[pos++] = L'|';
+            }
+
+            /* Newline */
+            if (pos + 2 + prefixLen < maxPos) {
+                buf[pos++] = L'\r';
+                buf[pos++] = L'\n';
+
+                /* Prefix alignment */
+                for (int j = 0; j < prefixLen; j++)
+                    buf[pos++] = L' ';
+            }
+
+            lineStart = i;
         } else if (i > 0 && i % 8 == 0) {
-            buf[pos++] = L' ';
+            /* Extra space at byte 8 */
+            if (pos < maxPos)
+                buf[pos++] = L' ';
         }
-        pos += wsprintfW(buf + pos, L"%02X ", data[i]);
+
+        if (pos + 4 < maxPos)
+            pos += wsprintfW(buf + pos, L"%02X ", data[i]);
     }
-    buf[pos++] = L'\r';
-    buf[pos++] = L'\n';
+
+    /* Add ASCII decode for last line (pad hex to align ASCII) */
+    int lastLineLen = (int)len - lineStart;
+    if (lastLineLen > 0 && pos + 20 < maxPos) {
+        /* Pad hex to align ASCII (full line = 49 hex chars) */
+        int hexChars = lastLineLen * 3 + (lastLineLen > 8 ? 1 : 0);
+        int targetHexWidth = 49; /* 16*3 + 1 */
+        while (hexChars < targetHexWidth && pos < maxPos - 2) {
+            buf[pos++] = L' ';
+            hexChars++;
+        }
+
+        buf[pos++] = L' ';
+        buf[pos++] = L'|';
+        for (int k = lineStart; k < (int)len && pos < maxPos - 2; k++) {
+            buf[pos++] = (data[k] >= 0x20 && data[k] <= 0x7E) ? (WCHAR)data[k] : L'.';
+        }
+        buf[pos++] = L'|';
+    }
+
+    if (pos + 2 < maxPos) {
+        buf[pos++] = L'\r';
+        buf[pos++] = L'\n';
+    }
     buf[pos] = L'\0';
-    
-    /* Create entry: timestamp color first, then direction color */
-    /* We need 3 entries: timestamp (gray) + direction (color) + data (black) */
-    
-    /* For simplicity, create one entry with the entire text.
-       Color will be the direction color for the whole line. */
+
+    /* Create entry */
     LOG_ENTRY *entry = (LOG_ENTRY *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(LOG_ENTRY));
     if (entry) {
         entry->type = LOG_TYPE_DATA;
