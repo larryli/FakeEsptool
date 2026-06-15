@@ -50,6 +50,11 @@ INT_PTR CALLBACK PortSelectDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lP
 INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
 
 /*
+ * KeyMgmtDlgProc - Key Management dialog procedure
+ */
+INT_PTR CALLBACK KeyMgmtDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+
+/*
  * ShowPortSelectDialog - Show port selection dialog
  */
 BOOL ShowPortSelectDialog(HWND hWnd);

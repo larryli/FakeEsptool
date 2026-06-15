@@ -359,14 +359,14 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     SendMessageW(g_hToolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
     SendMessageW(g_hToolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(16, 16));
 
-    /* Load merged toolbar bitmap (11 icons) */
+    /* Load merged toolbar bitmap (12 icons) */
     TBADDBITMAP tbab = {0};
     tbab.hInst = hInst;
     tbab.nID = IDB_TOOLBAR;
-    int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 11, (LPARAM)&tbab);
+    int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 12, (LPARAM)&tbab);
 
-    /* Toolbar buttons: New, Open, Save | DeviceProps | Connect, Reconnect, Disconnect | Import, Export | Clear, SaveLog */
-    TBBUTTON buttons[16] = {0};
+    /* Toolbar buttons: New, Open, Save | DeviceProps | Connect, Reconnect, Disconnect | Import, Export, KeyMgmt | Clear, SaveLog */
+    TBBUTTON buttons[18] = {0};
     int btn = 0;
 
     /* File group */
@@ -442,14 +442,24 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     buttons[btn].fsStyle = BTNS_SEP;
     btn++;
 
+    buttons[btn].iBitmap = iBase + 9;  /* Key Management */
+    buttons[btn].idCommand = IDM_KEY_MGMT;
+    buttons[btn].fsState = TBSTATE_ENABLED;
+    buttons[btn].fsStyle = BTNS_BUTTON;
+    btn++;
+
+    /* Separator */
+    buttons[btn].fsStyle = BTNS_SEP;
+    btn++;
+
     /* Log group */
-    buttons[btn].iBitmap = iBase + 9;  /* Clear */
+    buttons[btn].iBitmap = iBase + 10;  /* Clear */
     buttons[btn].idCommand = IDM_LOG_CLEAR;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 10;  /* Save Log */
+    buttons[btn].iBitmap = iBase + 11;  /* Save Log */
     buttons[btn].idCommand = IDM_LOG_SAVEAS;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
@@ -542,6 +552,7 @@ static LRESULT Main_OnCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
     case IDM_RECONNECT:      Main_OnReconnect(hWnd); break;
     case IDM_FLASH_IMPORT:   Main_OnFlashImport(hWnd); break;
     case IDM_FLASH_EXPORT:   Main_OnFlashExport(hWnd); break;
+    case IDM_KEY_MGMT:       Main_CmdKeyMgmt(hWnd); break;
     case IDM_DUMP_DEVICE_AS: Main_OnDumpDeviceAs(hWnd); break;
     case IDM_LOG_CLEAR:      Main_OnLogClear(hWnd); break;
     case IDM_LOG_SAVEAS:     Main_OnLogSaveAs(hWnd); break;
@@ -577,6 +588,9 @@ static LRESULT Main_OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
             return 0;
         case IDM_RECONNECT:
             ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_RECONNECT);
+            return 0;
+        case IDM_KEY_MGMT:
+            ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_KEY_MGMT);
             return 0;
         case IDM_LOG_CLEAR:
             ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_CLEAR);
@@ -823,6 +837,7 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
             if (ret == IDYES) {
                 if (Device_Load(&g_device, lastFile)) {
                     Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+                    UpdateMenuState(hWnd);
                     UpdateStatusBar();
                     UpdateTitle(hWnd);
                     SetWindowTextW(g_hEdit, L"");
@@ -837,6 +852,7 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
         if (Device_Init(&g_device, CHIP_ESP32, 4 * 1024 * 1024, defaultMac)) {
             g_device.chip.xtal_freq = XTAL_FREQ_40M;
             Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+            UpdateMenuState(hWnd);
             UpdateStatusBar();
             UpdateTitle(hWnd);
         } else {

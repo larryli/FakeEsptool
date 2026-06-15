@@ -158,6 +158,7 @@ void UpdateMenuState(HWND hWnd)
     EnableMenuItem(hMenu, IDM_CONNECT, connected ? MF_GRAYED : MF_ENABLED);
     EnableMenuItem(hMenu, IDM_DISCONNECT, connected ? MF_ENABLED : MF_GRAYED);
     EnableMenuItem(hMenu, IDM_RECONNECT, canReconnect ? MF_ENABLED : MF_GRAYED);
+    EnableMenuItem(hMenu, IDM_KEY_MGMT, g_device.chip.type != CHIP_ESP8266 ? MF_ENABLED : MF_GRAYED);
 
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_CONNECT, !connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_DISCONNECT, connected);
@@ -367,6 +368,7 @@ void Main_CmdNewDevice(HWND hWnd)
     if (Device_Init(&g_device, CHIP_ESP32, 4 * 1024 * 1024, defaultMac)) {
         g_device.chip.xtal_freq = XTAL_FREQ_40M;
         Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+        UpdateMenuState(hWnd);
         UpdateStatusBar();
         UpdateTitle(hWnd);
         SetWindowTextW(g_hEdit, L"");
@@ -402,6 +404,7 @@ void Main_CmdOpenDevice(HWND hWnd)
         if (Device_Load(&g_device, szFile)) {
             Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
             Config_SetLastDeviceFile(szFile);
+            UpdateMenuState(hWnd);
             UpdateStatusBar();
             UpdateTitle(hWnd);
             SetWindowTextW(g_hEdit, L"");
@@ -433,6 +436,7 @@ BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath)
     if (Device_Load(&g_device, filePath)) {
         Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
         Config_SetLastDeviceFile(filePath);
+        UpdateMenuState(hWnd);
         UpdateStatusBar();
         UpdateTitle(hWnd);
         SetWindowTextW(g_hEdit, L"");
@@ -509,9 +513,32 @@ void Main_CmdDeviceProps(HWND hWnd)
     if (!PromptSaveIfNeeded(hWnd))
         return;
     if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_DEVICE_PROPS), hWnd, DevicePropsDlgProc) == IDOK) {
+        UpdateMenuState(hWnd);
         UpdateStatusBar();
         UpdateTitle(hWnd);
     }
+}
+
+/*
+ * Main_CmdKeyMgmt - Handle Key Management command
+ *
+ * Shows key management dialog for flash encryption keys.
+ * ESP8266 does not support flash encryption, so the command is disabled.
+ * If serial is connected, prompts to disconnect first.
+ *
+ * @hWnd: Main window handle
+ */
+void Main_CmdKeyMgmt(HWND hWnd)
+{
+    if (g_device.chip.type == CHIP_ESP8266) {
+        MessageBoxW(hWnd,
+            LoadStr(IDS_KEY_MGMT_NO_ENCRYPTION),
+            LoadStr(IDS_KEY_MGMT_CAPTION), MB_OK | MB_ICONINFORMATION);
+        return;
+    }
+    if (!PromptDisconnectIfNeeded(hWnd))
+        return;
+    DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_KEY_MGMT), hWnd, KeyMgmtDlgProc);
 }
 
 /*

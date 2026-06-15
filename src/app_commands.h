@@ -180,6 +180,11 @@ void Main_CmdSaveDeviceAs(HWND hWnd);
 void Main_CmdDeviceProps(HWND hWnd);
 
 /*
+ * Main_CmdKeyMgmt - Handle Key Management command
+ */
+void Main_CmdKeyMgmt(HWND hWnd);
+
+/*
  * Main_OpenDeviceFile - Open device file by path
  */
 BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath);

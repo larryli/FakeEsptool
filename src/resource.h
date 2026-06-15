@@ -27,12 +27,14 @@
 #define IDM_LOG_FONT        2013
 #define IDM_EXIT            2014
 #define IDM_ABOUT           2015
+#define IDM_KEY_MGMT        2016
 
 /* Dialog IDs */
 #define IDD_PORT_SELECT     3001
 #define IDC_PORT_COMBO      3002
 #define IDD_ABOUT           3003
 #define IDD_DEVICE_PROPS    3004
+#define IDD_KEY_MGMT        3005
 
 /* About dialog controls */
 #define IDD_APPNAME         3101
@@ -45,6 +47,15 @@
 #define IDC_MAC_EDIT        3203
 #define IDC_RANDOM_MAC      3204
 #define IDC_XTAL_FREQ_COMBO 3205
+
+/* Key Management dialog controls */
+#define IDC_KEY_LIST        3301
+#define IDC_KEY_HEX         3302
+#define IDC_KEY_IMPORT      3303
+#define IDC_KEY_EXPORT      3304
+#define IDC_KEY_GENERATE    3305
+#define IDC_KEY_CLEAR       3306
+#define IDC_KEY_CLOSE       3307
 
 /* Icon and menu resource IDs */
 #define IDI_APP             5001
@@ -66,6 +77,7 @@
 #define IDS_TIP_CLEAR       10033
 #define IDS_TIP_SAVEAS      10034
 #define IDS_TIP_DEVPROPS    10035
+#define IDS_TIP_KEY_MGMT    10036
 
 /* Message strings */
 #define IDS_MSG_CONN_TITLE  10061
@@ -117,5 +129,27 @@
 #define IDS_MSG_ONLY_ESP         10108
 #define IDS_TITLE_UNTITLED       10109
 #define IDS_STATUS_NO_DEVICE     10110
+
+/* Key Management dialog strings */
+#define IDS_KEY_MGMT_TITLE      10200  /* "Key Management - %s" */
+#define IDS_KEY_MGMT_COLUMN_BLOCK    10201  /* "Block" */
+#define IDS_KEY_MGMT_COLUMN_PURPOSE  10202  /* "Purpose" */
+#define IDS_KEY_MGMT_COLUMN_STATUS   10203  /* "Status" */
+#define IDS_KEY_MGMT_COLUMN_SIZE     10204  /* "Size" */
+#define IDS_KEY_MGMT_STATUS_EMPTY    10205  /* "Empty" */
+#define IDS_KEY_MGMT_STATUS_SET      10206  /* "Set" */
+#define IDS_KEY_MGMT_SELECT_BLOCK    10207  /* "Please select a key block." */
+#define IDS_KEY_MGMT_FILE_FILTER     10208  /* "Binary Files (*.bin)\0*.bin\0All Files (*.*)\0*.*\0" */
+#define IDS_KEY_MGMT_FAIL_OPEN       10209  /* "Failed to open file." */
+#define IDS_KEY_MGMT_FAIL_READ       10210  /* "Failed to read key file." */
+#define IDS_KEY_MGMT_FAIL_CREATE     10211  /* "Failed to create file." */
+#define IDS_KEY_MGMT_FAIL_WRITE      10212  /* "Failed to write key file." */
+#define IDS_KEY_MGMT_SIZE_MISMATCH   10213  /* "Key file size (%lu bytes) does not match key block size (%d bytes)." */
+#define IDS_KEY_MGMT_KEY_EMPTY       10214  /* "Selected key block is empty." */
+#define IDS_KEY_MGMT_CONFIRM_OVERWRITE 10215  /* "Selected key block already contains a key.\nOverwrite with a new random key?" */
+#define IDS_KEY_MGMT_CONFIRM_CLEAR   10216  /* "Clear the selected key block? This cannot be undone." */
+#define IDS_KEY_MGMT_ALREADY_EMPTY   10217  /* "Selected key block is already empty." */
+#define IDS_KEY_MGMT_NO_ENCRYPTION   10218  /* "ESP8266 does not support flash encryption." */
+#define IDS_KEY_MGMT_CAPTION         10219  /* "Key Management" */
 
 #endif /* RESOURCE_H */

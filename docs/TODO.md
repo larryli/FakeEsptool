@@ -113,10 +113,10 @@ if self.IS_STUB or self.CHIP_NAME not in ("ESP32", "ESP8266"):
 
 | 芯片 | 密钥 eFuse 块 | 密钥长度 |
 |------|--------------|---------|
-| ESP32 | BLOCK1 | 256-bit |
-| ESP32-S2/S3 | BLOCK1 (KEY0) | 256-bit |
-| ESP32-C2 | BLOCK1 (KEY0) | 128-bit |
-| ESP32-C3/C6 | BLOCK1 (KEY0) | 256-bit |
+| ESP32 | BLOCK1 (1个) | 256-bit |
+| ESP32-S2/S3 | KEY0-KEY5 (6个) | 256-bit |
+| ESP32-C2 | KEY0 (1个) | 128-bit |
+| ESP32-C3/C6 | KEY0-KEY5 (6个) | 256-bit |
 
 FakeEsptool 当前状态：
 - eFuse 数组可存放密钥（动态分配的字节数组）

@@ -58,8 +58,10 @@ FakeEsptool.exe: \
 	output\deflate.obj \
 	output\device.obj \
 	output\device_props.obj \
+	output\encrypt.obj \
 	output\esptool.obj \
 	output\flash.obj \
+	output\key_mgmt.obj \
 	output\lang.obj \
 	output\main.obj \
 	output\main.res \
@@ -263,6 +265,33 @@ output\app_commands.obj: \
 	src\utils\config.h \
 	src\utils\lang.h \
 	src\utils\trace.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build key_mgmt.obj.
+# 
+output\key_mgmt.obj: \
+	src\dlg\key_mgmt.c \
+	src\app_commands.h \
+	src\dlg\dlg.h \
+	src\esptool\chip.h \
+	src\esptool\device.h \
+	src\esptool\esptool.h \
+	src\esptool\flash.h \
+	src\esptool\slip.h \
+	src\resource.h \
+	src\serial.h \
+	src\utils\config.h \
+	src\utils\lang.h \
+	src\utils\trace.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build encrypt.obj.
+# 
+output\encrypt.obj: \
+	src\utils\encrypt.c \
+	src\utils\encrypt.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 .SILENT:

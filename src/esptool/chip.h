@@ -258,9 +258,19 @@ DWORD Chip_GetFlashSize(const CHIP_CTX *ctx);
 DWORD Chip_GetChipId(const CHIP_CTX *ctx);
 
 /*
- * Chip_GetEfuse - Get eFuse data pointer
+ * Chip_GetEfuse - Get pointer to eFuse data
+ *
+ * Returns pointer to eFuse byte array, or NULL if not allocated.
  */
 const BYTE *Chip_GetEfuse(const CHIP_CTX *ctx);
+
+/*
+ * Chip_GetEfuseMut - Get mutable pointer to eFuse data
+ *
+ * Returns pointer to eFuse byte array for writing, or NULL if not allocated.
+ * Use with caution - eFuse is one-time-programmable in real hardware.
+ */
+BYTE *Chip_GetEfuseMut(CHIP_CTX *ctx);
 
 /*
  * Chip_GetEfuseSize - Get eFuse size in bytes

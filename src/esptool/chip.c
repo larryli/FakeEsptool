@@ -55,13 +55,13 @@ typedef struct {
 } CHIP_CONFIG;
 
 static const CHIP_CONFIG chip_configs[CHIP_COUNT] = {
-    [CHIP_ESP8266] = { "ESP8266",  CHIP_ID_ESP8266, IMAGE_CHIP_ID_ESP8266, 96,  FALSE, {0x01, 0xC1, 0xF0, 0xFF} },
-    [CHIP_ESP32]   = { "ESP32",    CHIP_ID_ESP32,   IMAGE_CHIP_ID_ESP32,   64,  FALSE, {0x83, 0x1D, 0xF0, 0x00} },
-    [CHIP_ESP32S2] = { "ESP32-S2", CHIP_ID_ESP32S2, IMAGE_CHIP_ID_ESP32S2, 128, TRUE,  {0xC6, 0x07, 0x00, 0x00} },
-    [CHIP_ESP32S3] = { "ESP32-S3", CHIP_ID_ESP32S3, IMAGE_CHIP_ID_ESP32S3, 256, TRUE,  {0x09, 0x00, 0x00, 0x00} },
-    [CHIP_ESP32C2] = { "ESP32-C2", CHIP_ID_ESP32C2, IMAGE_CHIP_ID_ESP32C2, 128, FALSE, {0x6F, 0xA0, 0x41, 0x7C} },
-    [CHIP_ESP32C3] = { "ESP32-C3", CHIP_ID_ESP32C3, IMAGE_CHIP_ID_ESP32C3, 128, TRUE,  {0x6F, 0x50, 0x21, 0x69} },
-    [CHIP_ESP32C6] = { "ESP32-C6", CHIP_ID_ESP32C6, IMAGE_CHIP_ID_ESP32C6, 128, TRUE,  {0x6F, 0x80, 0xE0, 0x2C} },
+    [CHIP_ESP8266] = { "ESP8266",  CHIP_ID_ESP8266, IMAGE_CHIP_ID_ESP8266, 96,   FALSE, {0x01, 0xC1, 0xF0, 0xFF} },
+    [CHIP_ESP32]   = { "ESP32",    CHIP_ID_ESP32,   IMAGE_CHIP_ID_ESP32,   288,  FALSE, {0x83, 0x1D, 0xF0, 0x00} },
+    [CHIP_ESP32S2] = { "ESP32-S2", CHIP_ID_ESP32S2, IMAGE_CHIP_ID_ESP32S2, 512,  TRUE,  {0xC6, 0x07, 0x00, 0x00} },
+    [CHIP_ESP32S3] = { "ESP32-S3", CHIP_ID_ESP32S3, IMAGE_CHIP_ID_ESP32S3, 512,  TRUE,  {0x09, 0x00, 0x00, 0x00} },
+    [CHIP_ESP32C2] = { "ESP32-C2", CHIP_ID_ESP32C2, IMAGE_CHIP_ID_ESP32C2, 512,  FALSE, {0x6F, 0xA0, 0x41, 0x7C} },
+    [CHIP_ESP32C3] = { "ESP32-C3", CHIP_ID_ESP32C3, IMAGE_CHIP_ID_ESP32C3, 512,  TRUE,  {0x6F, 0x50, 0x21, 0x69} },
+    [CHIP_ESP32C6] = { "ESP32-C6", CHIP_ID_ESP32C6, IMAGE_CHIP_ID_ESP32C6, 512,  TRUE,  {0x6F, 0x80, 0xE0, 0x2C} },
 };
 
 /*
@@ -219,7 +219,9 @@ static BOOL InitEsp32(CHIP_CTX *ctx)
     if (!InitChipCommon(ctx, CHIP_ESP32))
         return FALSE;
     WriteMacEsp32(ctx);
-    WriteChipIdToEfuse(ctx);
+    /* ESP32 chip detection uses magic value at 0x40001000 (CHIP_DETECT_REG),
+       not eFuse. Do NOT call WriteChipIdToEfuse as it would overlap with
+       BLOCK1 (key area at 0x38-0x57). */
     return TRUE;
 }
 
@@ -770,6 +772,14 @@ DWORD Chip_GetChipId(const CHIP_CTX *ctx)
  * Returns pointer to eFuse byte array, or NULL if not allocated.
  */
 const BYTE *Chip_GetEfuse(const CHIP_CTX *ctx)
+{
+    return ctx->efuse;
+}
+
+/*
+ * Chip_GetEfuseMut - Get mutable pointer to eFuse data
+ */
+BYTE *Chip_GetEfuseMut(CHIP_CTX *ctx)
 {
     return ctx->efuse;
 }

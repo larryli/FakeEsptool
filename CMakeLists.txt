@@ -27,6 +27,7 @@ add_executable(FakeEsptool WIN32
     src/app_logview.c
     src/app_commands.c
     src/dlg/device_props.c
+    src/dlg/key_mgmt.c
     src/dlg/port_select.c
     src/dlg/about.c
     src/resource.rc
@@ -51,7 +52,7 @@ target_link_libraries(FakeEsptool PRIVATE
 target_compile_options(FakeEsptool PRIVATE /utf-8)
 
 # Resource compiler options
-set_source_files_properties(src/resource.rc PROPERTIES COMPILE_FLAGS "/utf-8")
+set_source_files_properties(src/resource.rc PROPERTIES COMPILE_FLAGS "/utf-8 /nologo")
 
 # Preprocessor definitions
 target_compile_definitions(FakeEsptool PRIVATE
