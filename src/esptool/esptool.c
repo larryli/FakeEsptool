@@ -1031,6 +1031,8 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     if (ctx->chip->type == CHIP_ESP32S2) {
         TRACE_PROTO(TAG, "  ESP32-S2: returning 14-byte response (no chip_id)");
         Serial_PostLog(ctx->hNotify, L"ESP", L"  ESP32-S2: no chip_id in response");
+        Serial_PostLogF(ctx->hNotify, L"ESP", L"  flags=0x%08lX flash_crypt_cnt=%u",
+                        0UL, 0U);
         BYTE sec_data[14] = {0};
         /* bytes 0-3:   flags (all zeros) */
         /* byte 4:      flash_crypt_cnt (0) */
@@ -1057,7 +1059,10 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* bytes 20-21: status = success (0x00, 0x00) */
 
     TRACE_PROTO(TAG, "  chip_id (IMAGE_CHIP_ID)=%lu (0x%08lX)", chip_id, chip_id);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  chip_id=%lu (0x%08lX)", chip_id, chip_id);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  flags=0x%08lX flash_crypt_cnt=%u",
+                    0UL, 0U);
+    Serial_PostLogF(ctx->hNotify, L"ESP", L"  chip_id=%lu (0x%08lX) api_version=%lu",
+                    chip_id, chip_id, 0UL);
 
     /* Transition to READY state when chip detection succeeds via GET_SECURITY_INFO */
     if (ctx->state == ESP_STATE_SYNCED) {
