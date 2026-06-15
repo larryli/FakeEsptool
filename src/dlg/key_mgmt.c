@@ -309,8 +309,11 @@ static int GetSelectedKeyBlock(HWND hList, const KEY_BLOCK_INFO **blocks)
  * @hList: Handle to ListView control
  *
  * Updates all items and button states.
+ *
+ * @hList:       Handle to ListView control
+ * @selectIndex: Index of item to select (-1 for no selection)
  */
-static void RefreshListView(HWND hList)
+static void RefreshListView(HWND hList, int selectIndex)
 {
     ListView_DeleteAllItems(hList);
 
@@ -342,6 +345,12 @@ static void RefreshListView(HWND hList)
         WCHAR wSize[16];
         wsprintfW(wSize, L"%d bytes", blocks[i].key_size);
         ListView_SetItemText(hList, idx, 3, wSize);
+    }
+
+    /* Select item */
+    if (selectIndex >= 0 && selectIndex < count) {
+        ListView_SetItemState(hList, selectIndex, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+        ListView_EnsureVisible(hList, selectIndex, FALSE);
     }
 
     /* Update button states */
@@ -423,8 +432,8 @@ static void HandleImport(HWND hDlg, HWND hList)
     WriteKey(&g_device.chip, blocks[sel].efuse_offset, blocks[sel].key_size, key);
     Device_SetModified(&g_device, TRUE);
 
-    /* Refresh list */
-    RefreshListView(hList);
+    /* Refresh list and keep selection */
+    RefreshListView(hList, sel);
 
     /* Update hex display */
     WCHAR hexStr[HEX_STRING_MAX] = {0};
@@ -531,8 +540,8 @@ static void HandleGenerate(HWND hDlg, HWND hList)
     WriteKey(&g_device.chip, blocks[sel].efuse_offset, blocks[sel].key_size, key);
     Device_SetModified(&g_device, TRUE);
 
-    /* Refresh list */
-    RefreshListView(hList);
+    /* Refresh list and keep selection */
+    RefreshListView(hList, sel);
 
     /* Update hex display */
     WCHAR hexStr[HEX_STRING_MAX] = {0};
@@ -576,8 +585,8 @@ static void HandleClear(HWND hDlg, HWND hList)
     WriteKey(&g_device.chip, blocks[sel].efuse_offset, blocks[sel].key_size, key);
     Device_SetModified(&g_device, TRUE);
 
-    /* Refresh list */
-    RefreshListView(hList);
+    /* Refresh list and keep selection */
+    RefreshListView(hList, sel);
 
     /* Clear hex display */
     SetDlgItemTextW(hDlg, IDC_KEY_HEX, L"");
@@ -625,8 +634,8 @@ static void HandleInitDialog(HWND hDlg)
     col.cx = 60;  col.pszText = (LPWSTR)LoadStr(IDS_KEY_MGMT_COLUMN_STATUS);   ListView_InsertColumn(hList, 2, &col);
     col.cx = 70;  col.pszText = (LPWSTR)LoadStr(IDS_KEY_MGMT_COLUMN_SIZE);     ListView_InsertColumn(hList, 3, &col);
 
-    /* Populate list */
-    RefreshListView(hList);
+    /* Populate list and select first item */
+    RefreshListView(hList, 0);
 }
 
 /*

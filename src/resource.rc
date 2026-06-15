@@ -21,7 +21,7 @@ LANGUAGE LANG_ENGLISH,SUBLANG_ENGLISH_US
 
 IDR_MAIN_MENU MENUEX
 {
-  POPUP "&File", 0, 0, 0
+  POPUP "&Device", 0, 0, 0
   {
     MENUITEM "&New Device...       Ctrl+N", IDM_NEW_DEVICE, 0, 0
     MENUITEM "&Open Device...      Ctrl+O", IDM_OPEN_DEVICE, 0, 0
@@ -41,7 +41,7 @@ IDR_MAIN_MENU MENUEX
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "&Disconnect", IDM_DISCONNECT, 0, 0|MFS_GRAYED
   }
-  POPUP "F&lash", 0, 0, 0
+  POPUP "&Storage", 0, 0, 0
   {
     MENUITEM "&Import Flash...", IDM_FLASH_IMPORT, 0, 0
     MENUITEM "&Export Flash...", IDM_FLASH_EXPORT, 0, 0
@@ -78,7 +78,7 @@ CAPTION "Select Port"
 FONT 8, "MS Shell Dlg"
 BEGIN
     COMBOBOX        IDC_PORT_COMBO, 50, 10, 220, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Port:", -1, 10, 13, 35, 8
+    LTEXT           "&Port:", -1, 10, 13, 35, 8
     LTEXT           "Baud Rate: 115200 (Fixed)", -1, 10, 35, 260, 8
     LTEXT           "Data: 8   Parity: None   Stop: 1", -1, 10, 50, 260, 8
     DEFPUSHBUTTON   "OK", IDOK, 100, 75, 50, 14
@@ -102,20 +102,20 @@ STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Device Properties"
 FONT 8, "MS Shell Dlg"
 BEGIN
-    LTEXT           "Chip:", -1, 10, 12, 50, 8
+    LTEXT           "&Chip:", -1, 10, 12, 50, 8
     COMBOBOX        IDC_CHIP_COMBO, 65, 10, 185, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
-    LTEXT           "XTAL:", -1, 10, 30, 50, 8
+    LTEXT           "&XTAL:", -1, 10, 30, 50, 8
     COMBOBOX        IDC_XTAL_FREQ_COMBO, 65, 28, 185, 80, CBS_DROPDOWNLIST | WS_TABSTOP
 
-    LTEXT           "Flash Size:", -1, 10, 48, 50, 8
+    LTEXT           "&Flash Size:", -1, 10, 48, 50, 8
     COMBOBOX        IDC_FLASH_SIZE_COMBO, 65, 46, 185, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
-    LTEXT           "MAC:", -1, 10, 66, 50, 8
+    LTEXT           "&MAC:", -1, 10, 66, 50, 8
     EDITTEXT        IDC_MAC_EDIT, 65, 64, 120, 14, ES_AUTOHSCROLL
-    PUSHBUTTON      "Random", IDC_RANDOM_MAC, 190, 63, 60, 16
+    PUSHBUTTON      "&Random", IDC_RANDOM_MAC, 190, 63, 60, 16
 
-    DEFPUSHBUTTON   "OK", IDOK, 75, 88, 55, 16
+    DEFPUSHBUTTON   "&OK", IDOK, 75, 88, 55, 16
     PUSHBUTTON      "Cancel", IDCANCEL, 140, 88, 55, 16
 END
 
@@ -128,15 +128,15 @@ BEGIN
                     0x0001 | 0x0004 | 0x0008 | 0x00800000 | 0x00100000,
                     10, 10, 360, 140
 
-    LTEXT           "Key Data:", -1, 10, 158, 50, 8
+    LTEXT           "Key &Data:", -1, 10, 158, 50, 8
     EDITTEXT        IDC_KEY_HEX, 65, 156, 305, 14, ES_AUTOHSCROLL | ES_READONLY
 
-    PUSHBUTTON      "Import...", IDC_KEY_IMPORT, 10, 180, 60, 16
-    PUSHBUTTON      "Export...", IDC_KEY_EXPORT, 75, 180, 60, 16
-    PUSHBUTTON      "Generate", IDC_KEY_GENERATE, 140, 180, 60, 16
-    PUSHBUTTON      "Clear", IDC_KEY_CLEAR, 205, 180, 60, 16
+    PUSHBUTTON      "&Import...", IDC_KEY_IMPORT, 10, 180, 60, 16
+    PUSHBUTTON      "E&xport...", IDC_KEY_EXPORT, 75, 180, 60, 16
+    PUSHBUTTON      "&Generate", IDC_KEY_GENERATE, 140, 180, 60, 16
+    PUSHBUTTON      "C&lear", IDC_KEY_CLEAR, 205, 180, 60, 16
 
-    DEFPUSHBUTTON   "Close", IDC_KEY_CLOSE, 160, 205, 60, 16
+    DEFPUSHBUTTON   "&Close", IDC_KEY_CLOSE, 160, 205, 60, 16
 END
 
 STRINGTABLE
@@ -264,7 +264,7 @@ LANGUAGE LANG_CHINESE_SIMPLIFIED,SUBLANG_CHINESE_SIMPLIFIED
 
 IDR_MAIN_MENU MENUEX
 {
-  POPUP "文件(&F)", 0, 0, 0
+  POPUP "设备(&D)", 0, 0, 0
   {
     MENUITEM "新设备(&N)...        Ctrl+N", IDM_NEW_DEVICE, 0, 0
     MENUITEM "打开设备(&O)...      Ctrl+O", IDM_OPEN_DEVICE, 0, 0
@@ -284,7 +284,7 @@ IDR_MAIN_MENU MENUEX
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "断开链接(&D)", IDM_DISCONNECT, 0, 0|MFS_GRAYED
   }
-  POPUP "Flash(&L)", 0, 0, 0
+  POPUP "存储(&T)", 0, 0, 0
   {
     MENUITEM "导入 Flash(&I)...", IDM_FLASH_IMPORT, 0, 0
     MENUITEM "导出 Flash(&E)...", IDM_FLASH_EXPORT, 0, 0
@@ -321,7 +321,7 @@ CAPTION "选择端口"
 FONT 8, "MS Shell Dlg"
 BEGIN
     COMBOBOX        IDC_PORT_COMBO, 50, 10, 220, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "端口：", -1, 10, 13, 35, 8
+    LTEXT           "端口(&P)：", -1, 10, 13, 35, 8
     LTEXT           "波特率：115200（固定）", -1, 10, 35, 260, 8
     LTEXT           "数据位：8   校验：无   停止位：1", -1, 10, 50, 260, 8
     DEFPUSHBUTTON   "确定", IDOK, 100, 75, 50, 14
@@ -345,20 +345,20 @@ STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "设备属性"
 FONT 8, "MS Shell Dlg"
 BEGIN
-    LTEXT           "芯片：", -1, 10, 12, 50, 8
+    LTEXT           "芯片(&C)：", -1, 10, 12, 50, 8
     COMBOBOX        IDC_CHIP_COMBO, 65, 10, 185, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
-    LTEXT           "晶振：", -1, 10, 30, 50, 8
+    LTEXT           "晶振(&X)：", -1, 10, 30, 50, 8
     COMBOBOX        IDC_XTAL_FREQ_COMBO, 65, 28, 185, 80, CBS_DROPDOWNLIST | WS_TABSTOP
 
-    LTEXT           "Flash 大小：", -1, 10, 48, 50, 8
+    LTEXT           "Flash 大小(&F)：", -1, 10, 48, 50, 8
     COMBOBOX        IDC_FLASH_SIZE_COMBO, 65, 46, 185, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
-    LTEXT           "MAC:", -1, 10, 66, 50, 8
+    LTEXT           "MAC(&M)：", -1, 10, 66, 50, 8
     EDITTEXT        IDC_MAC_EDIT, 65, 64, 120, 14, ES_AUTOHSCROLL
-    PUSHBUTTON      "随机", IDC_RANDOM_MAC, 190, 63, 60, 16
+    PUSHBUTTON      "随机(&R)", IDC_RANDOM_MAC, 190, 63, 60, 16
 
-    DEFPUSHBUTTON   "确定", IDOK, 75, 88, 55, 16
+    DEFPUSHBUTTON   "确定(&O)", IDOK, 75, 88, 55, 16
     PUSHBUTTON      "取消", IDCANCEL, 140, 88, 55, 16
 END
 
@@ -371,15 +371,15 @@ BEGIN
                     0x0001 | 0x0004 | 0x0008 | 0x00800000 | 0x00100000,
                     10, 10, 360, 140
 
-    LTEXT           "密钥数据：", -1, 10, 158, 50, 8
+    LTEXT           "密钥数据(&D)：", -1, 10, 158, 50, 8
     EDITTEXT        IDC_KEY_HEX, 65, 156, 305, 14, ES_AUTOHSCROLL | ES_READONLY
 
-    PUSHBUTTON      "导入...", IDC_KEY_IMPORT, 10, 180, 60, 16
-    PUSHBUTTON      "导出...", IDC_KEY_EXPORT, 75, 180, 60, 16
-    PUSHBUTTON      "生成", IDC_KEY_GENERATE, 140, 180, 60, 16
-    PUSHBUTTON      "清除", IDC_KEY_CLEAR, 205, 180, 60, 16
+    PUSHBUTTON      "导入(&I)...", IDC_KEY_IMPORT, 10, 180, 60, 16
+    PUSHBUTTON      "导出(&X)...", IDC_KEY_EXPORT, 75, 180, 60, 16
+    PUSHBUTTON      "生成(&G)", IDC_KEY_GENERATE, 140, 180, 60, 16
+    PUSHBUTTON      "清除(&L)", IDC_KEY_CLEAR, 205, 180, 60, 16
 
-    DEFPUSHBUTTON   "关闭", IDC_KEY_CLOSE, 160, 205, 60, 16
+    DEFPUSHBUTTON   "关闭(&C)", IDC_KEY_CLOSE, 160, 205, 60, 16
 END
 
 STRINGTABLE
