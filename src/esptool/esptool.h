@@ -76,6 +76,18 @@ typedef enum {
 #define ESP_CMD_READ_FLASH      0xD2
 #define ESP_CMD_RUN_USER_CODE   0xD3
 
+/* NAND flash commands (stub-only, ESP32-S3 etc.) */
+#define ESP_CMD_SPI_NAND_ATTACH           0xD5
+#define ESP_CMD_SPI_NAND_READ_SPARE       0xD6
+#define ESP_CMD_SPI_NAND_WRITE_SPARE      0xD7
+#define ESP_CMD_SPI_NAND_READ_FLASH       0xD8
+#define ESP_CMD_SPI_NAND_WRITE_FLASH_BEGIN 0xD9
+#define ESP_CMD_SPI_NAND_WRITE_FLASH_DATA  0xDA
+#define ESP_CMD_SPI_NAND_ERASE_FLASH      0xDB
+#define ESP_CMD_SPI_NAND_ERASE_REGION     0xDC
+#define ESP_CMD_SPI_NAND_READ_PAGE_DEBUG  0xDD
+#define ESP_CMD_SPI_NAND_WRITE_FLASH_END  0xDE
+
 /* SYNC sequence length */
 #define ESP_SYNC_SEQ_LEN    36
 

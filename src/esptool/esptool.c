@@ -44,6 +44,16 @@ static const ESP_CMD_INFO commandTable[256] = {
     [0xD1] = {"ERASE_REGION", "Erase flash region"},
     [0xD2] = {"READ_FLASH", "Read flash"},
     [0xD3] = {"RUN_USER_CODE", "Run user code (soft reset)"},
+    [0xD5] = {"SPI_NAND_ATTACH", "Attach SPI NAND flash"},
+    [0xD6] = {"SPI_NAND_READ_SPARE", "Read NAND spare area"},
+    [0xD7] = {"SPI_NAND_WRITE_SPARE", "Write NAND spare area"},
+    [0xD8] = {"SPI_NAND_READ_FLASH", "Read NAND flash"},
+    [0xD9] = {"SPI_NAND_WRITE_FLASH_BEGIN", "Begin NAND flash write"},
+    [0xDA] = {"SPI_NAND_WRITE_FLASH_DATA", "NAND flash write data"},
+    [0xDB] = {"SPI_NAND_ERASE_FLASH", "Erase entire NAND flash"},
+    [0xDC] = {"SPI_NAND_ERASE_REGION", "Erase NAND flash region"},
+    [0xDD] = {"SPI_NAND_READ_PAGE_DEBUG", "Read NAND page (debug)"},
+    [0xDE] = {"SPI_NAND_WRITE_FLASH_END", "End NAND flash write"},
 };
 
 #define ESP_RESP_BUF_SIZE  8192

@@ -228,8 +228,18 @@ Data 字段: [...payload...][status_byte_1][status_byte_2]
 | 0xD1 | ERASE_REGION | ✗ | ✓ | 擦除 Flash 区域 |
 | 0xD2 | READ_FLASH | ✗ | ✓ | 读取 Flash |
 | 0xD3 | RUN_USER_CODE | ✗ | ✓ | 运行用户代码（软复位） |
+| 0xD5 | SPI_NAND_ATTACH | ✗ | ✓ | 附加 SPI NAND Flash |
+| 0xD6 | SPI_NAND_READ_SPARE | ✗ | ✓ | 读取 NAND 备用区域 |
+| 0xD7 | SPI_NAND_WRITE_SPARE | ✗ | ✓ | 写入 NAND 备用区域 |
+| 0xD8 | SPI_NAND_READ_FLASH | ✗ | ✓ | 读取 NAND Flash |
+| 0xD9 | SPI_NAND_WRITE_FLASH_BEGIN | ✗ | ✓ | NAND Flash 写入开始 |
+| 0xDA | SPI_NAND_WRITE_FLASH_DATA | ✗ | ✓ | NAND Flash 写入数据 |
+| 0xDB | SPI_NAND_ERASE_FLASH | ✗ | ✓ | 擦除整个 NAND Flash |
+| 0xDC | SPI_NAND_ERASE_REGION | ✗ | ✓ | 擦除 NAND Flash 区域 |
+| 0xDD | SPI_NAND_READ_PAGE_DEBUG | ✗ | ✓ | 读取 NAND 页面（调试） |
+| 0xDE | SPI_NAND_WRITE_FLASH_END | ✗ | ✓ | NAND Flash 写入结束 |
 
-**注意：** 标记为 ✗ 的命令在该模式下不支持。ROM 收到不支持的命令会返回 `ROM_INVALID_RECV_MSG (0x05)`。标记为 ✓* 的命令 ESP8266 ROM 不支持（esptool 客户端对 ESP8266 ROM 静默跳过）。
+**注意：** 标记为 ✗ 的命令在该模式下不支持。ROM 收到不支持的命令会返回 `ROM_INVALID_RECV_MSG (0x05)`。标记为 ✓* 的命令 ESP8266 ROM 不支持（esptool 客户端对 ESP8266 ROM 静默跳过）。NAND 命令（0xD5-0xDE）仅用于 ESP32-S3 等支持 NAND Flash 的芯片。
 
 ---
 
@@ -2191,6 +2201,16 @@ UART: TX: C0 4F 48 41 49 C0
 | 0xD1 | ERASE_REGION | ✗ | ✓ | 擦除 Flash 区域 |
 | 0xD2 | READ_FLASH | ✗ | ✓ | 读取 Flash |
 | 0xD3 | RUN_USER_CODE | ✗ | ✓ | 运行用户代码 |
+| 0xD5 | SPI_NAND_ATTACH | ✗ | ✓ | 附加 SPI NAND Flash |
+| 0xD6 | SPI_NAND_READ_SPARE | ✗ | ✓ | 读取 NAND 备用区域 |
+| 0xD7 | SPI_NAND_WRITE_SPARE | ✗ | ✓ | 写入 NAND 备用区域 |
+| 0xD8 | SPI_NAND_READ_FLASH | ✗ | ✓ | 读取 NAND Flash |
+| 0xD9 | SPI_NAND_WRITE_FLASH_BEGIN | ✗ | ✓ | NAND Flash 写入开始 |
+| 0xDA | SPI_NAND_WRITE_FLASH_DATA | ✗ | ✓ | NAND Flash 写入数据 |
+| 0xDB | SPI_NAND_ERASE_FLASH | ✗ | ✓ | 擦除整个 NAND Flash |
+| 0xDC | SPI_NAND_ERASE_REGION | ✗ | ✓ | 擦除 NAND Flash 区域 |
+| 0xDD | SPI_NAND_READ_PAGE_DEBUG | ✗ | ✓ | 读取 NAND 页面（调试） |
+| 0xDE | SPI_NAND_WRITE_FLASH_END | ✗ | ✓ | NAND Flash 写入结束 |
 
 ### J.2 行为差异
 
