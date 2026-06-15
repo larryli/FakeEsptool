@@ -1324,11 +1324,11 @@ BOOL Chip_IsSecureDownloadEnabled(const CHIP_CTX *ctx)
 }
 
 /*
- * Key purpose values (from espefuse)
+ * Key purpose values (from espefuse/efuse/esp32c3/mem_definition.py)
  */
 #define KEY_PURPOSE_USER            0
 #define KEY_PURPOSE_RESERVED        1
-#define KEY_PURPOSE_XTS_AES_128_KEY 2
+#define KEY_PURPOSE_XTS_AES_128_KEY 4
 
 BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block)
 {
