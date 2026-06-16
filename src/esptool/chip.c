@@ -478,54 +478,21 @@ BOOL Chip_SetMac(CHIP_CTX *ctx, const BYTE mac[6])
     /* Update MAC in eFuse at the correct offset for each chip type */
     switch (ctx->type) {
     case CHIP_ESP8266:
-        /* ESP8266 MAC eFuse layout (esptool-js compatible):
-           word0 (MAC_EFUSE_WORD0_ESP8266): NIC[2]=MAC[5] at byte[3]
-           word1 (MAC_EFUSE_WORD1_ESP8266): NIC[0]=MAC[3] at byte[1], NIC[1]=MAC[4] at byte[0]
-           word3 (MAC_EFUSE_WORD3_ESP8266): OUI source */
-        ctx->efuse[0x53] = mac[5];  /* byte[3] of word0: (mac0 >> 24) = MAC[5] */
-        ctx->efuse[0x54] = mac[4];  /* byte[0] of word1: mac1 & 0xFF = MAC[4] */
-        ctx->efuse[0x55] = mac[3];  /* byte[1] of word1: (mac1 >> 8) = MAC[3] */
-        /* word3 for custom OUI */
-        ctx->efuse[0x5C] = mac[2];  /* byte[0] of word3: OUI byte 2 */
-        ctx->efuse[0x5D] = mac[1];  /* byte[1] of word3: OUI byte 1 */
-        ctx->efuse[0x5E] = mac[0];  /* byte[2] of word3: OUI byte 0 */
+        WriteMacEsp8266(ctx);
         break;
     case CHIP_ESP32:
-        /* readEfuse(1)=MAC_EFUSE_WORD1_ESP32: mac[5],mac[4],mac[3],mac[2] */
-        ctx->efuse[4] = mac[5];
-        ctx->efuse[5] = mac[4];
-        ctx->efuse[6] = mac[3];
-        ctx->efuse[7] = mac[2];
-        /* readEfuse(2)=MAC_EFUSE_WORD2_ESP32: mac[1],mac[0],0x00,0x00 */
-        ctx->efuse[8] = mac[1];
-        ctx->efuse[9] = mac[0];
+        WriteMacEsp32(ctx);
         break;
     case CHIP_ESP32S2:
-        /* MAC at EFUSE_BASE_ESP32S2 + 0x044 */
-        ctx->efuse[0x44] = mac[5];
-        ctx->efuse[0x45] = mac[4];
-        ctx->efuse[0x46] = mac[3];
-        ctx->efuse[0x47] = mac[2];
-        ctx->efuse[0x48] = mac[1];
-        ctx->efuse[0x49] = mac[0];
+    case CHIP_ESP32S3:
+    case CHIP_ESP32C3:
+    case CHIP_ESP32C6:
+        WriteMacAt0x44(ctx);
         break;
     case CHIP_ESP32C2:
-        /* MAC at EFUSE_BASE_ESP32C2 + 0x040 */
-        ctx->efuse[0x40] = mac[5];
-        ctx->efuse[0x41] = mac[4];
-        ctx->efuse[0x42] = mac[3];
-        ctx->efuse[0x43] = mac[2];
-        ctx->efuse[0x44] = mac[1];
-        ctx->efuse[0x45] = mac[0];
+        WriteMacAt0x40(ctx);
         break;
     default:
-        /* C3/C6/S3: MAC at EFUSE_BASE + 0x044 */
-        ctx->efuse[0x44] = mac[5];
-        ctx->efuse[0x45] = mac[4];
-        ctx->efuse[0x46] = mac[3];
-        ctx->efuse[0x47] = mac[2];
-        ctx->efuse[0x48] = mac[1];
-        ctx->efuse[0x49] = mac[0];
         break;
     }
 
