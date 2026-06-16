@@ -110,26 +110,37 @@ static DWORD Esptool_EncryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len, DWO
     int key_len = 0;
     int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, &key_len);
 
+    TRACE_FW(TAG, "EncryptInPlace: flash_encrypted=%d key_offset=0x%02X key_len=%d efuse=%p efuse_size=%d",
+             ctx->flash_encrypted, key_offset, key_len, ctx->chip->efuse, ctx->chip->efuse_size);
+
     if (key_offset < 0 || !ctx->chip->efuse ||
         key_offset + key_len > ctx->chip->efuse_size) {
-        TRACE_FW(TAG, "No encryption key available");
+        TRACE_FW(TAG, "EncryptInPlace: No encryption key available");
         Serial_PostLog(ctx->hNotify, L"ERR", L"  No encryption key in eFuse");
         return ESP_FAIL;
     }
 
     const BYTE *key = &ctx->chip->efuse[key_offset];
+    TRACE_FW(TAG, "EncryptInPlace: Key first 8 bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+             key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7]);
+
     ENCRYPT_CTX enc_ctx;
     int ret = Encrypt_Init(&enc_ctx, key, key_len, flash_addr);
+    TRACE_FW(TAG, "EncryptInPlace: Encrypt_Init ret=%d flash_addr=0x%08lX len=%lu key_len=%d",
+             ret, flash_addr, len, key_len);
+
     if (ret == ENCRYPT_OK)
         ret = Encrypt_Data(&enc_ctx, data, data, len);
 
     if (ret == ENCRYPT_OK) {
-        TRACE_PROTO(TAG, "Encrypted %lu bytes at offset 0x%08lX", len, flash_addr);
-        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Encrypted %lu bytes", len);
+        TRACE_FW(TAG, "EncryptInPlace: Success, encrypted %lu bytes at offset 0x%08lX", len, flash_addr);
+        TRACE_FW(TAG, "EncryptInPlace: Output first 8 bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+                 data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Encrypted %lu bytes at offset 0x%08lX", len, flash_addr);
         return ESP_OK;
     }
 
-    TRACE_FW(TAG, "Encryption failed: %d", ret);
+    TRACE_FW(TAG, "EncryptInPlace: Encryption failed ret=%d", ret);
     Serial_PostLogF(ctx->hNotify, L"ERR", L"  Encryption failed: %d", ret);
     return ESP_FAIL;
 }
@@ -511,6 +522,7 @@ static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     TRACE_PROTO(TAG, "MEM_END execute=%lu", execute);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  execute=%lu", execute);
+    TRACE_FW(TAG, "MEM_END: stub_mode before=%d", ctx->stub_mode);
 
     ctx->state = ESP_STATE_READY;
 
@@ -527,7 +539,9 @@ static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         }
         ctx->stub_mode = TRUE;
         Serial_PostLog(ctx->hNotify, L"ESP", L"  Stub mode: OHAI sent");
-        TRACE_PROTO(TAG, "Stub mode activated, OHAI sent");
+        TRACE_FW(TAG, "MEM_END: OHAI sent, stub_mode=TRUE");
+    } else {
+        TRACE_FW(TAG, "MEM_END: stub_mode already TRUE, skipping OHAI");
     }
 }
 
@@ -578,6 +592,26 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
                 uncompressed_size, blocks, bsize, offset, encrypted);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  uncompressed=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
                     uncompressed_size, blocks, bsize, offset, encrypted);
+
+    /* Log encryption state */
+    TRACE_FW(TAG, "FLASH_DEFL_BEGIN: flash_encrypted=%d chip_type=%d stub_mode=%d", encrypted, ctx->chip->type, ctx->stub_mode);
+    TRACE_FW(TAG, "FLASH_DEFL_BEGIN: IsFlashEncryptionEnabled=%d IsDownloadEncryptDisabled=%d",
+             Chip_IsFlashEncryptionEnabled(ctx->chip), Chip_IsDownloadEncryptDisabled(ctx->chip));
+
+    /* Log key availability */
+    {
+        int key_len = 0;
+        int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, &key_len);
+        TRACE_FW(TAG, "FLASH_DEFL_BEGIN: key_offset=0x%02X key_len=%d efuse=%p efuse_size=%d",
+                 key_offset, key_len, ctx->chip->efuse, ctx->chip->efuse_size);
+        if (key_offset >= 0 && ctx->chip->efuse && key_offset + key_len <= ctx->chip->efuse_size) {
+            const BYTE *key = &ctx->chip->efuse[key_offset];
+            TRACE_FW(TAG, "FLASH_DEFL_BEGIN: Key first 8 bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+                     key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7]);
+        } else {
+            TRACE_FW(TAG, "FLASH_DEFL_BEGIN: No encryption key available");
+        }
+    }
 
     /* Flush any pending accumulated data from previous session */
     if (ctx->defl_buf && ctx->defl_buf_size > 0) {
@@ -631,7 +665,8 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     BYTE status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
+    /* Use request's value field (checksum) for response Val, not last_read_val */
+    Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, pkt->value, ESP_OK, status_len, NULL, status_len);
 }
 
 /*
@@ -652,6 +687,8 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD seq = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
                 ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
 
+    TRACE_FW(TAG, "HandleFlashDeflData: seq=%lu data_len=%lu pkt->size=%u state=%d",
+             seq, data_len, pkt->size, ctx->state);
     TRACE_PROTO(TAG, "FLASH_DEFL_DATA seq=%lu len=%lu", seq, data_len);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%lu", seq, data_len);
 
@@ -1035,32 +1072,13 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
         /* Encrypt if encrypted flag was set */
         if (ctx->flash_encrypted) {
-            int key_len = 0;
-            int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, &key_len);
-
-            if (key_offset >= 0 && ctx->chip->efuse &&
-                key_offset + key_len <= ctx->chip->efuse_size) {
-                const BYTE *key = &ctx->chip->efuse[key_offset];
-                BYTE *enc_buf = (BYTE *)HeapAlloc(GetProcessHeap(), 0, data_len);
-                if (enc_buf) {
-                    ENCRYPT_CTX enc_ctx;
-                    int ret = Encrypt_Init(&enc_ctx, key, key_len, ctx->flash_offset);
-                    if (ret == ENCRYPT_OK)
-                        ret = Encrypt_Data(&enc_ctx, payload, enc_buf, data_len);
-                    if (ret == ENCRYPT_OK) {
-                        Flash_Write(ctx->flash, ctx->flash_offset, enc_buf, data_len);
-                        TRACE_PROTO(TAG, "Encrypted %lu bytes at offset 0x%08lX", data_len, ctx->flash_offset);
-                    } else {
-                        Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
-                        TRACE_FW(TAG, "Encryption failed: %d", ret);
-                    }
-                    HeapFree(GetProcessHeap(), 0, enc_buf);
-                } else {
-                    Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
-                }
-            } else {
+            if (Esptool_EncryptInPlace(ctx, (BYTE *)payload, data_len, ctx->flash_offset) == ESP_OK) {
                 Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
-                TRACE_FW(TAG, "No encryption key available");
+            } else {
+                Serial_PostLogF(ctx->hNotify, L"ERR", L"  Encryption failed at offset 0x%08lX", ctx->flash_offset);
+                BYTE status_len = ESP_STATUS_LEN(ctx);
+                Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+                return;
             }
         } else {
             Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
@@ -1094,8 +1112,14 @@ static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG, "FLASH_END reboot=%lu", reboot);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  reboot=%lu", reboot);
 
-    /* Free any pending deflate buffer (mode switch) */
-    Defl_FreeBuffer(ctx);
+    /* Flush any pending deflate buffer (write to flash before freeing) */
+    if (ctx->defl_buf && ctx->defl_buf_size > 0) {
+        TRACE_FW(TAG, "FLASH_END: flushing pending deflate buffer");
+        Serial_PostLog(ctx->hNotify, L"ESP", L"  Flushing pending compressed data");
+        Defl_FlushBuffer(ctx);
+    } else {
+        Defl_FreeBuffer(ctx);
+    }
 
     ctx->state = ESP_STATE_READY;
 
@@ -1459,6 +1483,7 @@ BOOL Esptool_Feed(ESPTOOL_CTX *ctx, const BYTE *data, int len)
             int plen = Slip_GetLength(&ctx->slip);
 
             if (plen >= 8) {
+                TRACE_FW(TAG, "Esptool_Feed: frame cmd=0x%02X len=%d", payload[1], plen);
                 Esptool_ProcessFrame(ctx, payload, plen);
                 got_frame = TRUE;
             }
