@@ -243,6 +243,10 @@ static BOOL InitEsp32S2(CHIP_CTX *ctx)
        major at word3 (BLOCK1 + 12) bits[19:18] = byte 0x51 bits[3:2] */
     ctx->efuse[0x51] |= 0x04;  /* major=1, bits[19:18] = 01 */
 
+    /* eFuse controller register offsets (from EFUSE_BASE 0x3F41A000) */
+    ctx->efuse_conf_ofs = 0x1CC; /* EFUSE_CONF_REG */
+    ctx->efuse_cmd_ofs = 0x1D4;  /* EFUSE_CMD_REG */
+
     return TRUE;
 }
 
@@ -267,6 +271,10 @@ static BOOL InitEsp32S3(CHIP_CTX *ctx)
          = EFUSE_BASE + 0x44 + 0x0C = offset 0x50, byte 0x52 bits[2:0] */
     ctx->efuse[0x6C] |= 0x01;  /* blk_version_major = 1 */
     ctx->efuse[0x52] |= 0x01;  /* blk_version_minor = 1 */
+
+    /* eFuse controller register offsets (from EFUSE_BASE 0x60007000) */
+    ctx->efuse_conf_ofs = 0x1CC; /* EFUSE_CONF_REG */
+    ctx->efuse_cmd_ofs = 0x1D4;  /* EFUSE_CMD_REG */
 
     return TRUE;
 }
@@ -709,13 +717,17 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
      * - Writes to CMD_REG with 0x02 → trigger burn (OR pgm_data into eFuse)
      * - Other writes in EFUSE range → ignored (controller registers, read-only)
      *
-     * For chips without controller (ESP32/S2/S3):
+     * For chips without controller (ESP32):
      * - Writes to EFUSE range → direct OR into eFuse array
      */
     if (ctx->efuse_conf_ofs != 0) {
         /* Chip has eFuse controller - check if address is in EFUSE_BASE range */
         DWORD efuse_base = 0;
-        if (ctx->type == CHIP_ESP32C2 || ctx->type == CHIP_ESP32C3)
+        if (ctx->type == CHIP_ESP32S2)
+            efuse_base = EFUSE_BASE_ESP32S2; /* 0x3F41A000 */
+        else if (ctx->type == CHIP_ESP32S3)
+            efuse_base = EFUSE_BASE_ESP32S3; /* 0x60007000 */
+        else if (ctx->type == CHIP_ESP32C2 || ctx->type == CHIP_ESP32C3)
             efuse_base = EFUSE_BASE_ESP32C2; /* 0x60008800 */
         else if (ctx->type == CHIP_ESP32C6)
             efuse_base = EFUSE_BASE_ESP32C6; /* 0x600B0800 */
@@ -748,7 +760,8 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
                     const DWORD *block_offsets = NULL;
                     int num_blocks = 0;
 
-                    if (ctx->type == CHIP_ESP32C3 || ctx->type == CHIP_ESP32C6) {
+                    if (ctx->type == CHIP_ESP32C3 || ctx->type == CHIP_ESP32C6 ||
+                        ctx->type == CHIP_ESP32S2 || ctx->type == CHIP_ESP32S3) {
                         block_offsets = efuse_block_offsets_c3;
                         num_blocks = (int)(sizeof(efuse_block_offsets_c3) / sizeof(efuse_block_offsets_c3[0]));
                     } else if (ctx->type == CHIP_ESP32C2) {
@@ -1345,6 +1358,8 @@ BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block)
     switch (ctx->type) {
     case CHIP_ESP32C3:
     case CHIP_ESP32C6:
+    case CHIP_ESP32S2:
+    case CHIP_ESP32S3:
         offsets = key_offsets_c3;
         num_keys = (int)(sizeof(key_offsets_c3) / sizeof(key_offsets_c3[0]));
         break;
