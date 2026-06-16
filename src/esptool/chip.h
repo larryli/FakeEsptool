@@ -313,9 +313,10 @@ typedef struct {
     DWORD spi_regs[SPI_REG_COUNT]; /* SPI register file */
 
     /* eFuse controller simulation */
+    DWORD efuse_base;           /* eFuse base address for this chip */
     DWORD pgm_data[32];         /* PGM_DATA staging area for burn (ESP32: 4 blocks × 8 words) */
-    DWORD efuse_conf_ofs;       /* CONF_REG offset from EFUSE_BASE (0 = no controller) */
-    DWORD efuse_cmd_ofs;        /* CMD_REG offset from EFUSE_BASE */
+    DWORD efuse_conf_ofs;       /* CONF_REG offset from efuse_base (0 = no controller) */
+    DWORD efuse_cmd_ofs;        /* CMD_REG offset from efuse_base */
 } CHIP_CTX;
 
 /*
