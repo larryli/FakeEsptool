@@ -63,15 +63,42 @@ XTAL_FREQS = {
     1: "26MHz",
 }
 
-# eFuse encryption key offsets and lengths
-# (key_offset, key_len) for each chip type
-ENCRYPT_KEY_INFO = {
-    1: (0x38, 32),   # ESP32: BLOCK1, 256-bit
-    2: (0x9C, 64),   # ESP32-S2: BLOCK_KEY0, 512-bit
-    3: (0x9C, 64),   # ESP32-S3: BLOCK_KEY0, 512-bit
-    4: (0x60, 32),   # ESP32-C2: BLOCK_KEY0, 256-bit
-    5: (0x9C, 32),   # ESP32-C3: BLOCK_KEY0, 256-bit
-    6: (0x9C, 32),   # ESP32-C6: BLOCK_KEY0, 256-bit
+# KEY_PURPOSE values
+KEY_PURPOSE_USER = 0
+KEY_PURPOSE_XTS_AES_256_KEY_1 = 2
+KEY_PURPOSE_XTS_AES_256_KEY_2 = 3
+KEY_PURPOSE_XTS_AES_128_KEY = 4
+
+# KEY_PURPOSE eFuse field definitions (S2/S3/C3/C6)
+# BLOCK0 base = 0x2C in eFuse array
+# KEY_PURPOSE_0 at BLOCK0 word2 bits[27:24] = offset 0x34, mask 0x0F000000, shift 24
+# KEY_PURPOSE_1 at BLOCK0 word2 bits[31:28] = offset 0x34, mask 0xF0000000, shift 28
+# KEY_PURPOSE_2 at BLOCK0 word3 bits[3:0]   = offset 0x38, mask 0x0000000F, shift 0
+# KEY_PURPOSE_3 at BLOCK0 word3 bits[7:4]   = offset 0x38, mask 0x000000F0, shift 4
+# KEY_PURPOSE_4 at BLOCK0 word3 bits[11:8]  = offset 0x38, mask 0x00000F00, shift 8
+# KEY_PURPOSE_5 at BLOCK0 word3 bits[15:12] = offset 0x38, mask 0x0000F000, shift 12
+KEY_PURPOSE_OFFSETS = [0x34, 0x34, 0x38, 0x38, 0x38, 0x38]
+KEY_PURPOSE_MASKS   = [0x0F000000, 0xF0000000, 0x0000000F, 0x000000F0, 0x00000F00, 0x0000F000]
+KEY_PURPOSE_SHIFTS  = [24, 28, 0, 4, 8, 12]
+
+# Key block read-back offsets in eFuse array
+KEY_BLOCK_OFFSETS = [0x9C, 0xBC, 0xDC, 0xFC, 0x11C, 0x13C]
+
+# SPI_BOOT_CRYPT_CNT eFuse definitions per chip
+# BLOCK0 base = 0x2C
+SPI_BOOT_CRYPT_CNT = {
+    1: (0x00, 0x7F << 20, 20),  # ESP32: word0 bits[26:20]
+    2: (0x34, 7 << 18, 18),     # ESP32-S2: word2 bits[20:18]
+    3: (0x34, 7 << 18, 18),     # ESP32-S3
+    4: (0x30, 7 << 7, 7),       # ESP32-C2: word1 bits[9:7]
+    5: (0x34, 7 << 18, 18),     # ESP32-C3
+    6: (0x34, 7 << 18, 18),     # ESP32-C6
+}
+
+# Fixed key offsets for chips without KEY_PURPOSE fields
+FIXED_KEY_INFO = {
+    1: (0x38, 32),   # ESP32: BLOCK1, 256-bit (no KEY_PURPOSE)
+    4: (0x60, 32),   # ESP32-C2: BLOCK_KEY0, 256-bit (only one key block)
 }
 
 
@@ -122,23 +149,63 @@ def read_flash_data(f, efuse_size, flash_size):
     return flash_data
 
 
+def read_efuse32(efuse_data, offset):
+    """Read a 32-bit little-endian value from eFuse array."""
+    if offset + 4 > len(efuse_data):
+        return 0
+    return struct.unpack('<I', efuse_data[offset:offset + 4])[0]
+
+
+def get_key_purpose(efuse_data, block):
+    """Read KEY_PURPOSE for a key block from eFuse."""
+    if block < 0 or block > 5:
+        return KEY_PURPOSE_USER
+    offset = KEY_PURPOSE_OFFSETS[block]
+    mask = KEY_PURPOSE_MASKS[block]
+    shift = KEY_PURPOSE_SHIFTS[block]
+    val = read_efuse32(efuse_data, offset)
+    return (val & mask) >> shift
+
+
+def is_encryption_enabled(efuse_data, chip_type):
+    """Check if flash encryption is enabled (SPI_BOOT_CRYPT_CNT has odd bits set)."""
+    if chip_type not in SPI_BOOT_CRYPT_CNT:
+        return False
+    offset, mask, shift = SPI_BOOT_CRYPT_CNT[chip_type]
+    val = (read_efuse32(efuse_data, offset) & mask) >> shift
+    # Count set bits - odd number means encryption enabled
+    return bin(val).count('1') % 2 == 1
+
+
 def get_encryption_key(efuse_data, chip_type):
-    """Extract encryption key from eFuse data."""
-    if chip_type not in ENCRYPT_KEY_INFO:
-        raise ValueError(f"Chip {CHIP_TYPES.get(chip_type, 'Unknown')} does not support flash encryption")
+    """Extract encryption key from eFuse by scanning KEY_PURPOSE fields."""
+    if chip_type == 0:  # ESP8266
+        raise ValueError("ESP8266 does not support flash encryption")
 
-    key_offset, key_len = ENCRYPT_KEY_INFO[chip_type]
+    # ESP32 and ESP32-C2: fixed key block assignments
+    if chip_type in FIXED_KEY_INFO:
+        key_offset, key_len = FIXED_KEY_INFO[chip_type]
+        if key_offset + key_len > len(efuse_data):
+            raise ValueError(f"eFuse data too small to extract key")
+        key = efuse_data[key_offset:key_offset + key_len]
+        if all(b == 0 for b in key):
+            raise ValueError("Encryption key not programmed in eFuse (all zeros)")
+        return key
 
-    if key_offset + key_len > len(efuse_data):
-        raise ValueError(f"eFuse data too small to extract key: need {key_offset + key_len} bytes, have {len(efuse_data)}")
+    # S2/S3/C3/C6: scan KEY_PURPOSE fields to find XTS_AES key block
+    for i in range(6):
+        purpose = get_key_purpose(efuse_data, i)
+        if purpose in (KEY_PURPOSE_XTS_AES_128_KEY, KEY_PURPOSE_XTS_AES_256_KEY_1, KEY_PURPOSE_XTS_AES_256_KEY_2):
+            key_offset = KEY_BLOCK_OFFSETS[i]
+            key_len = 32
+            if key_offset + key_len > len(efuse_data):
+                raise ValueError(f"eFuse data too small to extract key from block {i}")
+            key = efuse_data[key_offset:key_offset + key_len]
+            if all(b == 0 for b in key):
+                raise ValueError(f"KEY{i} key not programmed in eFuse (all zeros)")
+            return key
 
-    key = efuse_data[key_offset:key_offset + key_len]
-
-    # Check if key is all zeros (not programmed)
-    if all(b == 0 for b in key):
-        raise ValueError("Encryption key not programmed in eFuse (all zeros)")
-
-    return key
+    raise ValueError("No XTS_AES key found in any KEY_PURPOSE field")
 
 
 def decrypt_flash_data(flash_data, key, flash_addr=0):
@@ -279,6 +346,13 @@ def verify_encrypted_flash(flash_dir, device_file):
         print(f"ERROR: {e}")
         return False
 
+    # Check if encryption is actually enabled
+    enc_enabled = is_encryption_enabled(efuse_data, header['chip_type'])
+    if not enc_enabled:
+        print("WARNING: SPI_BOOT_CRYPT_CNT indicates encryption is NOT enabled.")
+        print("         Flash data may be plaintext (not encrypted).")
+        print()
+
     # Pre-load all segment data
     segment_info = []
     for addr, filepath in segments:
@@ -321,8 +395,15 @@ def verify_encrypted_flash(flash_dir, device_file):
 
     # Print encryption info
     print(f"Encryption:")
+    print(f"  Enabled: {'Yes' if enc_enabled else 'No'}")
     print(f"  Key Length: {key_len * 8} bits ({key_len} bytes)")
     print(f"  Key MD5: {key_md5}")
+
+    # Show KEY_PURPOSE info for S2/S3/C3/C6
+    if header['chip_type'] not in FIXED_KEY_INFO and header['chip_type'] != 0:
+        purposes = [get_key_purpose(efuse_data, i) for i in range(6)]
+        purpose_names = {0: "USER", 2: "XTS-AES-256-1", 3: "XTS-AES-256-2", 4: "XTS-AES-128"}
+        print(f"  Key Purposes: {', '.join(purpose_names.get(p, f'({p})') for p in purposes)}")
     print()
 
     # Verify each segment

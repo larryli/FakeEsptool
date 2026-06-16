@@ -1383,7 +1383,6 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     /* Get key blocks for current chip type */
     typedef struct {
         const char *name;
-        const char *desc;
         int offset;
         int size;
     } KEY_INFO;
@@ -1394,9 +1393,9 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     switch (snap->device.chip.type) {
     case CHIP_ESP32: {
         static const KEY_INFO esp32_keys[] = {
-            { "BLOCK1", "Flash Encryption", 0x38, 32 },
-            { "BLOCK2", "Secure Boot",      0x58, 32 },
-            { "BLOCK3", "User Data",        0x78, 32 },
+            { "BLOCK1", 0x38, 32 },
+            { "BLOCK2", 0x58, 32 },
+            { "BLOCK3", 0x78, 32 },
         };
         keys = esp32_keys;
         key_count = 3;
@@ -1405,12 +1404,12 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     case CHIP_ESP32S2:
     case CHIP_ESP32S3: {
         static const KEY_INFO s2s3_keys[] = {
-            { "KEY0", "XTS-AES-256-1", 0x9C, 32 },
-            { "KEY1", "XTS-AES-256-2", 0xBC, 32 },
-            { "KEY2", "User Key 2",    0xDC, 32 },
-            { "KEY3", "User Key 3",    0xFC, 32 },
-            { "KEY4", "User Key 4",    0x11C, 32 },
-            { "KEY5", "User Key 5",    0x13C, 32 },
+            { "KEY0", 0x9C, 32 },
+            { "KEY1", 0xBC, 32 },
+            { "KEY2", 0xDC, 32 },
+            { "KEY3", 0xFC, 32 },
+            { "KEY4", 0x11C, 32 },
+            { "KEY5", 0x13C, 32 },
         };
         keys = s2s3_keys;
         key_count = 6;
@@ -1418,7 +1417,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     }
     case CHIP_ESP32C2: {
         static const KEY_INFO c2_keys[] = {
-            { "KEY0", "Flash Encryption", 0x60, 32 },
+            { "KEY0", 0x60, 32 },
         };
         keys = c2_keys;
         key_count = 1;
@@ -1427,12 +1426,12 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     case CHIP_ESP32C3:
     case CHIP_ESP32C6: {
         static const KEY_INFO c3c6_keys[] = {
-            { "KEY0", "XTS-AES-128", 0x9C, 32 },
-            { "KEY1", "User Key 1",  0xBC, 32 },
-            { "KEY2", "User Key 2",  0xDC, 32 },
-            { "KEY3", "User Key 3",  0xFC, 32 },
-            { "KEY4", "User Key 4",  0x11C, 32 },
-            { "KEY5", "User Key 5",  0x13C, 32 },
+            { "KEY0", 0x9C, 32 },
+            { "KEY1", 0xBC, 32 },
+            { "KEY2", 0xDC, 32 },
+            { "KEY3", 0xFC, 32 },
+            { "KEY4", 0x11C, 32 },
+            { "KEY5", 0x13C, 32 },
         };
         keys = c3c6_keys;
         key_count = 6;
@@ -1442,8 +1441,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         break;
     }
 
-    fwprintf(f, L"%-10ls %-20ls %-10ls %-10ls\n", L"Block", L"Purpose", L"Status", L"Size");
-    fwprintf(f, L"---------- -------------------- ---------- ----------\n");
+    fwprintf(f, L"%-10ls %-24ls %-10ls %-10ls\n", L"Block", L"Purpose", L"Status", L"Size");
+    fwprintf(f, L"---------- ------------------------ ---------- ----------\n");
 
     for (int i = 0; i < key_count; i++) {
         /* Check if key is programmed (non-zero) */
@@ -1457,13 +1456,30 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
             }
         }
 
-        /* Convert name and desc to wide string */
-        WCHAR wname[16], wdesc[32];
-        MultiByteToWideChar(CP_UTF8, 0, keys[i].name, -1, wname, 16);
-        MultiByteToWideChar(CP_UTF8, 0, keys[i].desc, -1, wdesc, 32);
+        /* Get actual KEY_PURPOSE from eFuse */
+        BYTE purpose = Chip_GetKeyPurpose(&snap->device.chip, i);
+        const WCHAR *purposeStr;
+        switch (purpose) {
+        case KEY_PURPOSE_USER:                purposeStr = L"USER (0)"; break;
+        case KEY_PURPOSE_RESERVED:            purposeStr = L"RESERVED (1)"; break;
+        case KEY_PURPOSE_XTS_AES_256_KEY_1:  purposeStr = L"XTS-AES-256-1 (2)"; break;
+        case KEY_PURPOSE_XTS_AES_256_KEY_2:  purposeStr = L"XTS-AES-256-2 (3)"; break;
+        case KEY_PURPOSE_XTS_AES_128_KEY:    purposeStr = L"XTS-AES-128 (4)"; break;
+        case KEY_PURPOSE_HMAC_DOWN_ALL:      purposeStr = L"HMAC-DOWN-ALL (5)"; break;
+        case KEY_PURPOSE_HMAC_DOWN_JTAG:     purposeStr = L"HMAC-DOWN-JTAG (6)"; break;
+        case KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE: purposeStr = L"HMAC-DOWN-SIG (7)"; break;
+        case KEY_PURPOSE_HMAC_UP:            purposeStr = L"HMAC-UP (8)"; break;
+        case KEY_PURPOSE_SECURE_BOOT_DIGEST0: purposeStr = L"SEC-BOOT-DIG0 (9)"; break;
+        case KEY_PURPOSE_SECURE_BOOT_DIGEST1: purposeStr = L"SEC-BOOT-DIG1 (10)"; break;
+        case KEY_PURPOSE_SECURE_BOOT_DIGEST2: purposeStr = L"SEC-BOOT-DIG2 (11)"; break;
+        default:                              purposeStr = L"UNKNOWN"; break;
+        }
 
-        fwprintf(f, L"%-10ls %-20ls %-10ls %-10ls\n",
-                 wname, wdesc,
+        WCHAR wname[16];
+        MultiByteToWideChar(CP_UTF8, 0, keys[i].name, -1, wname, 16);
+
+        fwprintf(f, L"%-10ls %-24ls %-10ls %-10ls\n",
+                 wname, purposeStr,
                  programmed ? L"Programmed" : L"Empty",
                  keys[i].size == 32 ? L"256-bit" : L"128-bit");
     }
