@@ -13,20 +13,20 @@
 espsecure generate-flash-encryption-key -k 256 key.bin
 
 # 2. 烧录密钥到 eFuse
-espefuse --port COM10 --chip esp32c3 burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
+espefuse burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
 
 # 3. 启用开发模式（加密计数器置 1）
-espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 1
+espefuse burn-efuse SPI_BOOT_CRYPT_CNT 1
 
 # 4. 加密烧录（设备端加密）
-esptool --port COM10 --encrypt write-flash 0x0 firmware.bin
+esptool --encrypt write-flash 0x0 firmware.bin
 
 # 5. 预加密文件烧录（离线加密后直接写入）
 espsecure encrypt-flash-data -k key.bin -a 0x0 -o firmware_enc.bin firmware.bin
-esptool --port COM10 write-flash 0x0 firmware_enc.bin
+esptool write-flash 0x0 firmware_enc.bin
 
 # 6. 关闭加密（FakeEsptool 模拟）
-espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 0
+espefuse burn-efuse SPI_BOOT_CRYPT_CNT 0
 ```
 
 **ESP32 使用 `FLASH_CRYPT_CNT` 替代 `SPI_BOOT_CRYPT_CNT`，且需要 Stub 模式（esptool 自动上传）。**
@@ -42,22 +42,22 @@ espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 0
 espsecure generate-flash-encryption-key -k 256 key.bin
 
 # 2. 烧录密钥到 eFuse
-espefuse --port COM10 --chip esp32c3 burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
+espefuse burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
 
 # 3. 启用开发模式（前置步骤）
-espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 1
+espefuse burn-efuse SPI_BOOT_CRYPT_CNT 1
 
 # 4. 启用产品模式（禁用手动加密）
-espefuse --port COM10 --chip esp32c3 burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
+espefuse burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
 
 # 5. 预加密文件
 espsecure encrypt-flash-data -k key.bin -a 0x0 -o firmware_enc.bin firmware.bin
 
 # 6. 强制烧录预加密文件（--force 跳过产品模式保护检查）
-esptool --port COM10 --force write-flash 0x0 firmware_enc.bin
+esptool --force write-flash 0x0 firmware_enc.bin
 
 # 7. 关闭加密（FakeEsptool 模拟）
-espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 0
+espefuse burn-efuse SPI_BOOT_CRYPT_CNT 0
 ```
 
 **ESP32 使用 `FLASH_CRYPT_CNT` / `DISABLE_DL_ENCRYPT` 替代上述字段。**
@@ -69,8 +69,6 @@ espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 0
 ## 1. 测试前提
 
 启动 FakeEsptool，选择芯片，连接串口进入下载模式。
-
-以下命令中 `COM10` 替换为实际串口号，`--chip esp32c3` 替换为实际芯片类型。
 
 ---
 
@@ -93,7 +91,7 @@ espsecure generate-flash-encryption-key -k 256 key.bin
 **burn-key 语法（ESP32-C3/C2/C6/S2/S3）：**
 
 ```bash
-espefuse --port COM10 --chip esp32c3 burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
+espefuse burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
 ```
 
 参数说明：
@@ -104,7 +102,7 @@ espefuse --port COM10 --chip esp32c3 burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
 **ESP32（语法不同，仅需 2 参数）：**
 
 ```bash
-espefuse --port COM10 burn-key BLOCK1 key.bin
+espefuse burn-key BLOCK1 key.bin
 ```
 
 **验证：** FakeEsptool 日志中应出现多条 `WRITE_REG` 操作，目标地址在芯片 eFuse 密钥块范围内。
@@ -116,7 +114,7 @@ espefuse --port COM10 burn-key BLOCK1 key.bin
 使用 `--encrypt` 参数烧录，客户端发送明文，设备端加密后写入 Flash：
 
 ```bash
-esptool --port COM10 --encrypt write-flash 0x0 firmware.bin
+esptool --encrypt write-flash 0x0 firmware.bin
 ```
 
 **验证：** FakeEsptool 日志中 `FLASH_BEGIN` 或 `FLASH_DEFL_BEGIN` 应显示 `encrypted=1`。
@@ -124,7 +122,7 @@ esptool --port COM10 --encrypt write-flash 0x0 firmware.bin
 对比普通烧录（不加密）：
 
 ```bash
-esptool --port COM10 write-flash 0x0 firmware.bin
+esptool write-flash 0x0 firmware.bin
 ```
 
 日志应显示 `encrypted=0`。
@@ -137,22 +135,16 @@ esptool --port COM10 write-flash 0x0 firmware.bin
 
 烧录加密计数器，启用加密但允许明文烧录：
 
-**ESP32-S2/S3/C3/C6：**
+**ESP32-S2/S3/C2/C3/C6：**
 
 ```bash
-espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 1
+espefuse burn-efuse SPI_BOOT_CRYPT_CNT 1
 ```
 
 **ESP32：**
 
 ```bash
-espefuse --port COM10 burn-efuse FLASH_CRYPT_CNT 1
-```
-
-**ESP32-C2：**
-
-```bash
-espefuse --port COM10 --chip esp32c2 burn-efuse SPI_BOOT_CRYPT_CNT 1
+espefuse burn-efuse FLASH_CRYPT_CNT 1
 ```
 
 **预期状态栏：** `Encrypted (Dev)`
@@ -170,19 +162,19 @@ espefuse --port COM10 --chip esp32c2 burn-efuse SPI_BOOT_CRYPT_CNT 1
 **ESP32：**
 
 ```bash
-espefuse --port COM10 burn-efuse DISABLE_DL_ENCRYPT 1
+espefuse burn-efuse DISABLE_DL_ENCRYPT 1
 ```
 
 **ESP32-S2/S3/C3/C6：**
 
 ```bash
-espefuse --port COM10 --chip esp32c3 burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
+espefuse burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
 ```
 
 **ESP32-C2：**
 
 ```bash
-espefuse --port COM10 --chip esp32c2 burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
+espefuse burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
 ```
 
 **预期状态栏：** `Encrypted (Prod)`
@@ -212,7 +204,7 @@ espsecure encrypt-flash-data -k key.bin -a 0x10000 -o firmware_enc.bin firmware.
 预加密文件 + 不加 `--encrypt` → 设备收到 `encrypted=0`，直接写入 Flash，不做二次加密。✅ 正确。
 
 ```bash
-esptool --port COM10 write-flash 0x10000 firmware_enc.bin
+esptool write-flash 0x10000 firmware_enc.bin
 ```
 
 也可用 `--encrypt` 让设备端加密明文，效果相同。
@@ -224,7 +216,7 @@ esptool --port COM10 write-flash 0x10000 firmware_enc.bin
 正确做法是用 `--force` 跳过 esptool 的保护检查：
 
 ```bash
-esptool --port COM10 --force write-flash 0x10000 firmware_enc.bin
+esptool --force write-flash 0x10000 firmware_enc.bin
 ```
 
 或者产品设备不走串口烧录，使用产线烧录器直接写 Flash。
@@ -245,13 +237,13 @@ esptool --port COM10 --force write-flash 0x10000 firmware_enc.bin
 **ESP32：**
 
 ```bash
-espefuse --port COM10 burn-efuse FLASH_CRYPT_CNT 0
+espefuse burn-efuse FLASH_CRYPT_CNT 0
 ```
 
 **ESP32-S2/S3/C2/C3/C6：**
 
 ```bash
-espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 0
+espefuse burn-efuse SPI_BOOT_CRYPT_CNT 0
 ```
 
 **预期状态栏：** `No Encryption`
@@ -267,13 +259,13 @@ espefuse --port COM10 --chip esp32c3 burn-efuse SPI_BOOT_CRYPT_CNT 0
 **ESP32：**
 
 ```bash
-espefuse --port COM10 burn-efuse UART_DOWNLOAD_DIS 1
+espefuse burn-efuse UART_DOWNLOAD_DIS 1
 ```
 
 **ESP32-S2/S3/C2/C3/C6：**
 
 ```bash
-espefuse --port COM10 --chip esp32c3 burn-efuse DIS_DOWNLOAD_MODE 1
+espefuse burn-efuse DIS_DOWNLOAD_MODE 1
 ```
 
 **预期状态栏：** `Download Disabled`
@@ -290,10 +282,10 @@ espefuse --port COM10 --chip esp32c3 burn-efuse DIS_DOWNLOAD_MODE 1
 
 ```bash
 # 先启用下载模式禁用（安全下载的前提）
-espefuse --port COM10 --chip esp32c3 burn-efuse DIS_DOWNLOAD_MODE 1
+espefuse burn-efuse DIS_DOWNLOAD_MODE 1
 
 # 再启用安全下载
-espefuse --port COM10 --chip esp32c3 burn-efuse ENABLE_SECURITY_DOWNLOAD 1
+espefuse burn-efuse ENABLE_SECURITY_DOWNLOAD 1
 ```
 
 **预期状态栏：** `Download Secure`
