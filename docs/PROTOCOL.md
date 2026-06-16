@@ -1037,6 +1037,8 @@ Data:      security_info[N] + 0x00 0x00 (status=成功)
 
 **注意：** status 字节在 Data 字段**末尾**，不是开头。esptool 客户端使用 `check_command(resp_data_len=N)` 解析，它从 `data[N:N+2]` 读取 status。
 
+**ESP8266/ESP32 不支持：** ESP8266 和 ESP32（ROM 和 stub 模式均不支持）返回正常的 2 字节失败状态响应 `FF 00`，而非 `ROM_INVALID_RECV_MSG` 错误包。esptool 收到失败状态后 fallback 到 `READ_REG (0x40001000)` 读取 magic value 进行芯片识别。
+
 **security_info 结构（因芯片而异）：**
 
 ESP32-S2（12 字节数据 + 2 字节状态 = 14 字节）：
@@ -1078,8 +1080,8 @@ Data: 00 00 00 00 (flags) + 00 (crypt_cnt) + 00 00 00 00 00 00 00 (key_purposes)
 
 | 芯片 | GET_SECURITY_INFO 行为 | 检测方式 |
 |------|------------------------|----------|
-| ESP8266 | 不支持，返回 ROM_INVALID_RECV_MSG 错误 | READ_REG magic value |
-| ESP32 | 不支持，返回 ROM_INVALID_RECV_MSG 错误 | READ_REG magic value |
+| ESP8266 | 不支持，返回 2 字节失败状态 `FF 00` | READ_REG magic value |
+| ESP32 | 不支持（ROM 和 stub 均不支持），返回 2 字节失败状态 `FF 00` | READ_REG magic value |
 | ESP32-S2 | 返回 14 字节（无 chip_id），chip_id=None | READ_REG magic value |
 | ESP32-S3 | 返回 22 字节，chip_id=9 | IMAGE_CHIP_ID |
 | ESP32-C2 | 返回 22 字节，chip_id=12 | IMAGE_CHIP_ID |

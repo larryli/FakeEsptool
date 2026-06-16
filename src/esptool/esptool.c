@@ -1360,23 +1360,14 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG, "GET_SECURITY_INFO");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Get security info");
 
-    /* ESP8266 ROM does not support GET_SECURITY_INFO.
-       Return ROM_INVALID_RECV_MSG error so esptool falls back to magic value.
-       ESP32 ROM also doesn't support it, but stub does. */
-    if (ctx->chip->type == CHIP_ESP8266) {
-        TRACE_PROTO(TAG, "  Not supported on %s, returning error", ctx->chip->name);
+    /* ESP8266/ESP32 ROM and stub do not support GET_SECURITY_INFO.
+       Return normal response with failure status (FF 00), matching real device behavior.
+       esptool sees status != 0 and falls back to magic value detection. */
+    if (ctx->chip->type == CHIP_ESP8266 || ctx->chip->type == CHIP_ESP32) {
+        TRACE_PROTO(TAG, "  Not supported on %s, returning failure", ctx->chip->name);
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  Not supported on %hs", ctx->chip->name);
-        /* Status = ROM_INVALID_RECV_MSG (0x05), status_len=4 for ROM mode */
-        Esptool_SendResponseEx(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, 0x05, 4, NULL, 4);
-        return;
-    }
-
-    /* ESP32 ROM mode: return error so esptool falls back to eFuse register reading.
-       Stub mode: return proper security info. */
-    if (ctx->chip->type == CHIP_ESP32 && !ctx->stub_mode) {
-        TRACE_PROTO(TAG, "  ESP32 ROM: not supported, returning error");
-        Serial_PostLog(ctx->hNotify, L"ESP", L"  ESP32 ROM: not supported");
-        Esptool_SendResponseEx(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, 0x05, 4, NULL, 4);
+        BYTE err[2] = {0xFF, 0x00};
+        Esptool_SendResponseEx(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_FAIL, 2, err, 2);
         return;
     }
 

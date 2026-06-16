@@ -209,7 +209,7 @@ static BOOL InitEsp8266(CHIP_CTX *ctx)
     if (!InitChipCommon(ctx, CHIP_ESP8266))
         return FALSE;
     WriteMacEsp8266(ctx);
-    ctx->efuse_base = 0;  /* ESP8266 uses direct eFuse access */
+    ctx->efuse_base = 0x3FF00000;  /* ESP8266 eFuse register base */
     return TRUE;
 }
 

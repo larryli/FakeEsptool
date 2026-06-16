@@ -224,6 +224,10 @@ ctest --test-dir build_tests --build-config Release
   - ESP32-C2：`efuse_conf_ofs = 0x8C`，`efuse_cmd_ofs = 0x94`
   - ESP32-C3：`efuse_conf_ofs = 0x1CC`，`efuse_cmd_ofs = 0x1D4`
   - ESP32-C6：`efuse_conf_ofs = 0x1CC`，`efuse_cmd_ofs = 0x1D4`
+- 各芯片 eFuse 寄存器基址（`efuse_base`，用于 `Chip_ReadReg` 地址映射）：
+  - ESP8266：`0x3FF00000`（MAC 在偏移 0x50/0x54）
+  - ESP32：`0x3FF5A000`（EFUSE_RD_REG_BASE）
+  - ESP32-S2/S3/C3/C6：各自 EFUSE_BASE
 
 ### 加密烧录支持
 
