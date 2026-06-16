@@ -1721,19 +1721,14 @@ BOOL Chip_IsJtagDisabled(const CHIP_CTX *ctx)
 }
 
 /*
- * Key purpose values (from espefuse/efuse/esp32c3/mem_definition.py)
- */
-#define KEY_PURPOSE_USER            0
-#define KEY_PURPOSE_RESERVED        1
-#define KEY_PURPOSE_XTS_AES_128_KEY 4
-
-/*
  * Chip_GetKeyPurpose - Get key block purpose from eFuse
  *
- * Returns the purpose of the specified key block.
+ * For S2/S3/C3/C6: reads KEY_PURPOSE_N field from eFuse.
+ * For ESP32: hardcoded (BLOCK1=encryption, BLOCK2=secure boot).
+ * For C2: hardcoded (BLOCK_KEY0=encryption, only one key block).
  *
  * @ctx:   Pointer to chip context (const, read-only)
- * @block: Key block index (0 = KEY0, 1 = KEY1, etc.)
+ * @block: Key block index (0 = KEY0/KEY_PURPOSE_0, 1 = KEY1, etc.)
  *
  * Returns key purpose value (KEY_PURPOSE_*).
  */
@@ -1742,84 +1737,124 @@ BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block)
     if (!ctx->efuse || block < 0)
         return KEY_PURPOSE_USER;
 
-    /* Key block offsets in eFuse array (index 0 = KEY0, 1 = KEY1, ...) */
-    static const DWORD key_offsets_c3[] = { 0x09C, 0x0BC, 0x0DC, 0x0FC, 0x11C, 0x13C };
-    static const DWORD key_offsets_c2[] = { 0x060 };
-
-    const DWORD *offsets = NULL;
-    int num_keys = 0;
-
-    switch (ctx->type) {
-    case CHIP_ESP32C3:
-    case CHIP_ESP32C6:
-    case CHIP_ESP32S2:
-    case CHIP_ESP32S3:
-        offsets = key_offsets_c3;
-        num_keys = (int)(sizeof(key_offsets_c3) / sizeof(key_offsets_c3[0]));
-        break;
-    case CHIP_ESP32C2:
-        offsets = key_offsets_c2;
-        num_keys = (int)(sizeof(key_offsets_c2) / sizeof(key_offsets_c2[0]));
-        break;
-    default:
+    /* ESP32: fixed key block assignments (no KEY_PURPOSE fields) */
+    if (ctx->type == CHIP_ESP32) {
+        if (block == 0) return KEY_PURPOSE_XTS_AES_128_KEY;  /* BLOCK1 = flash encryption */
         return KEY_PURPOSE_USER;
     }
 
-    if (block >= num_keys)
+    /* ESP32-C2: only one key block, always flash encryption */
+    if (ctx->type == CHIP_ESP32C2) {
+        if (block == 0) return KEY_PURPOSE_XTS_AES_128_KEY;
         return KEY_PURPOSE_USER;
-
-    int offset = (int)offsets[block];
-    /* Check if key block has any non-zero data (32 bytes = 8 words) */
-    BOOL has_data = FALSE;
-    for (int i = 0; i < 32; i++) {
-        if (offset + i < ctx->efuse_size && ctx->efuse[offset + i] != 0) {
-            has_data = TRUE;
-            break;
-        }
     }
 
-    if (!has_data)
+    /* S2/S3/C3/C6: read KEY_PURPOSE from eFuse */
+    if (block > 5)
         return KEY_PURPOSE_USER;
 
-    /* BLOCK_KEY0 is used for flash encryption */
-    if (block == 0)
-        return KEY_PURPOSE_XTS_AES_128_KEY;
+    static const BYTE purpose_offsets[] = {
+        EFUSE_OFFS_KEY_PURPOSE_0, EFUSE_OFFS_KEY_PURPOSE_1,
+        EFUSE_OFFS_KEY_PURPOSE_2, EFUSE_OFFS_KEY_PURPOSE_3,
+        EFUSE_OFFS_KEY_PURPOSE_4, EFUSE_OFFS_KEY_PURPOSE_5,
+    };
+    static const DWORD purpose_masks[] = {
+        EFUSE_MASK_KEY_PURPOSE_0, EFUSE_MASK_KEY_PURPOSE_1,
+        EFUSE_MASK_KEY_PURPOSE_2, EFUSE_MASK_KEY_PURPOSE_3,
+        EFUSE_MASK_KEY_PURPOSE_4, EFUSE_MASK_KEY_PURPOSE_5,
+    };
+    static const BYTE purpose_shifts[] = { 24, 28, 0, 4, 8, 12 };
 
-    return KEY_PURPOSE_USER;
+    int offset = purpose_offsets[block];
+    DWORD mask = purpose_masks[block];
+    int shift = purpose_shifts[block];
+
+    return (BYTE)(ReadEfuseBits(ctx, offset, mask) >> shift);
+}
+
+/*
+ * Chip_SetKeyPurpose - Set key block purpose in eFuse
+ *
+ * For S2/S3/C3/C6: writes KEY_PURPOSE_N field to eFuse.
+ * For ESP32/C2: no-op (fixed key assignments).
+ *
+ * Simulator only: directly modifies eFuse array.
+ */
+void Chip_SetKeyPurpose(CHIP_CTX *ctx, int block, BYTE purpose)
+{
+    if (!ctx->efuse || block < 0 || block > 5)
+        return;
+
+    /* ESP32/C2: fixed purpose, cannot change */
+    if (ctx->type == CHIP_ESP32 || ctx->type == CHIP_ESP32C2)
+        return;
+
+    /* ESP32-S3: KEY5 cannot have XTS_AES purposes (hardware bug) */
+    if (ctx->type == CHIP_ESP32S3 && block == 5) {
+        if (purpose == KEY_PURPOSE_XTS_AES_128_KEY ||
+            purpose == KEY_PURPOSE_XTS_AES_256_KEY_1 ||
+            purpose == KEY_PURPOSE_XTS_AES_256_KEY_2)
+            return;
+    }
+
+    static const BYTE purpose_offsets[] = {
+        EFUSE_OFFS_KEY_PURPOSE_0, EFUSE_OFFS_KEY_PURPOSE_1,
+        EFUSE_OFFS_KEY_PURPOSE_2, EFUSE_OFFS_KEY_PURPOSE_3,
+        EFUSE_OFFS_KEY_PURPOSE_4, EFUSE_OFFS_KEY_PURPOSE_5,
+    };
+    static const DWORD purpose_masks[] = {
+        EFUSE_MASK_KEY_PURPOSE_0, EFUSE_MASK_KEY_PURPOSE_1,
+        EFUSE_MASK_KEY_PURPOSE_2, EFUSE_MASK_KEY_PURPOSE_3,
+        EFUSE_MASK_KEY_PURPOSE_4, EFUSE_MASK_KEY_PURPOSE_5,
+    };
+
+    int offset = purpose_offsets[block];
+    DWORD mask = purpose_masks[block];
+
+    ClearEfuseBits(ctx, offset, mask);
+    WriteEfuseBits(ctx, offset, mask, purpose);
 }
 
 /*
  * Chip_GetEncryptionKeyOffset - Get eFuse offset and length of flash encryption key
+ *
+ * For ESP32: BLOCK1 at offset 0x38 (fixed).
+ * For C2: BLOCK_KEY0 at offset 0x60 (fixed).
+ * For S2/S3/C3/C6: scans KEY_PURPOSE fields to find XTS_AES key block.
  */
 int Chip_GetEncryptionKeyOffset(const CHIP_CTX *ctx, int *key_len)
 {
     if (!key_len)
         return -1;
 
-    /* Key block offsets within eFuse array (BLOCK_KEY0 read-back address) */
-    switch (ctx->type) {
-    case CHIP_ESP32:
+    /* ESP32: BLOCK1 at fixed offset (no KEY_PURPOSE fields) */
+    if (ctx->type == CHIP_ESP32) {
         *key_len = 32;
-        return 0x38;  /* BLOCK1 at EFUSE_RD_REG_BASE */
-    case CHIP_ESP32S2:
-        *key_len = 64;
-        return 0x9C;  /* BLOCK_KEY0 */
-    case CHIP_ESP32S3:
-        *key_len = 64;
-        return 0x9C;  /* BLOCK_KEY0 */
-    case CHIP_ESP32C2:
-        *key_len = 32;
-        return 0x60;  /* BLOCK_KEY0 */
-    case CHIP_ESP32C3:
-        *key_len = 32;
-        return 0x9C;  /* BLOCK_KEY0 */
-    case CHIP_ESP32C6:
-        *key_len = 32;
-        return 0x9C;  /* BLOCK_KEY0 */
-    default:
-        *key_len = 0;
-        return -1;
+        return 0x38;
     }
+
+    /* ESP32-C2: BLOCK_KEY0 at fixed offset (only one key block) */
+    if (ctx->type == CHIP_ESP32C2) {
+        *key_len = 32;
+        return 0x60;
+    }
+
+    /* S2/S3/C3/C6: scan KEY_PURPOSE fields to find XTS_AES key block */
+    static const DWORD key_block_offsets[] = { 0x9C, 0xBC, 0xDC, 0xFC, 0x11C, 0x13C };
+
+    for (int i = 0; i < 6; i++) {
+        BYTE purpose = Chip_GetKeyPurpose(ctx, i);
+        if (purpose == KEY_PURPOSE_XTS_AES_128_KEY ||
+            purpose == KEY_PURPOSE_XTS_AES_256_KEY_1 ||
+            purpose == KEY_PURPOSE_XTS_AES_256_KEY_2) {
+            *key_len = 32;
+            return (int)key_block_offsets[i];
+        }
+    }
+
+    /* No encryption key found */
+    *key_len = 0;
+    return -1;
 }
 
 /*

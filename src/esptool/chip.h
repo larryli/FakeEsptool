@@ -182,6 +182,50 @@
 #define EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C6    (1UL << 5)
 
 /* ============================================================================
+ * eFuse KEY_PURPOSE fields (S2/S3/C3/C6 share identical layout)
+ *
+ * Each key block (KEY0-KEY5) has a 4-bit purpose field in BLOCK0.
+ * Hardware selects the key block by scanning KEY_PURPOSE values.
+ *
+ * Purpose values:
+ *   0 = USER, 2 = XTS_AES_256_KEY_1, 3 = XTS_AES_256_KEY_2,
+ *   4 = XTS_AES_128_KEY, 5-8 = HMAC_*, 9-11 = SECURE_BOOT_DIGEST
+ * ============================================================================ */
+
+/* KEY_PURPOSE_0 (BLOCK_KEY0) - BLOCK0 word2 bits[27:24] */
+#define EFUSE_OFFS_KEY_PURPOSE_0                0x08
+#define EFUSE_MASK_KEY_PURPOSE_0                (0x0FUL << 24)
+/* KEY_PURPOSE_1 (BLOCK_KEY1) - BLOCK0 word2 bits[31:28] */
+#define EFUSE_OFFS_KEY_PURPOSE_1                0x08
+#define EFUSE_MASK_KEY_PURPOSE_1                (0x0FUL << 28)
+/* KEY_PURPOSE_2 (BLOCK_KEY2) - BLOCK0 word3 bits[3:0] */
+#define EFUSE_OFFS_KEY_PURPOSE_2                0x0C
+#define EFUSE_MASK_KEY_PURPOSE_2                (0x0FUL << 0)
+/* KEY_PURPOSE_3 (BLOCK_KEY3) - BLOCK0 word3 bits[7:4] */
+#define EFUSE_OFFS_KEY_PURPOSE_3                0x0C
+#define EFUSE_MASK_KEY_PURPOSE_3                (0x0FUL << 4)
+/* KEY_PURPOSE_4 (BLOCK_KEY4) - BLOCK0 word3 bits[11:8] */
+#define EFUSE_OFFS_KEY_PURPOSE_4                0x0C
+#define EFUSE_MASK_KEY_PURPOSE_4                (0x0FUL << 8)
+/* KEY_PURPOSE_5 (BLOCK_KEY5) - BLOCK0 word3 bits[15:12] */
+#define EFUSE_OFFS_KEY_PURPOSE_5                0x0C
+#define EFUSE_MASK_KEY_PURPOSE_5                (0x0FUL << 12)
+
+/* Key purpose values */
+#define KEY_PURPOSE_USER                0
+#define KEY_PURPOSE_RESERVED            1
+#define KEY_PURPOSE_XTS_AES_256_KEY_1   2
+#define KEY_PURPOSE_XTS_AES_256_KEY_2   3
+#define KEY_PURPOSE_XTS_AES_128_KEY     4
+#define KEY_PURPOSE_HMAC_DOWN_ALL       5
+#define KEY_PURPOSE_HMAC_DOWN_JTAG      6
+#define KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE 7
+#define KEY_PURPOSE_HMAC_UP             8
+#define KEY_PURPOSE_SECURE_BOOT_DIGEST0 9
+#define KEY_PURPOSE_SECURE_BOOT_DIGEST1 10
+#define KEY_PURPOSE_SECURE_BOOT_DIGEST2 11
+
+/* ============================================================================
  * eFuse JTAG and Secure Boot fields per chip type
  * ============================================================================ */
 
@@ -655,6 +699,16 @@ DWORD Chip_GetUsbJtagFlag(const CHIP_CTX *ctx);
  * BLOCK_KEY0 when programmed, 0 otherwise.
  */
 BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block);
+
+/*
+ * Chip_SetKeyPurpose - Set key block purpose in eFuse
+ *
+ * For S2/S3/C3/C6: writes KEY_PURPOSE_N field.
+ * For ESP32/C2: no-op (fixed key assignments).
+ * ESP32-S3 KEY5: rejects XTS_AES purposes (hardware bug).
+ * Simulator only: directly modifies eFuse array.
+ */
+void Chip_SetKeyPurpose(CHIP_CTX *ctx, int block, BYTE purpose);
 
 /*
  * Chip_GetEncryptionKeyOffset - Get eFuse offset and length of flash encryption key

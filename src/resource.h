@@ -65,7 +65,8 @@
 #define IDC_KEY_EXPORT      3304
 #define IDC_KEY_GENERATE    3305
 #define IDC_KEY_CLEAR       3306
-#define IDC_KEY_CLOSE       3307
+#define IDC_KEY_PURPOSE     3307
+#define IDC_KEY_CLOSE       3308
 
 /* Icon and menu resource IDs */
 #define IDI_APP             5001
