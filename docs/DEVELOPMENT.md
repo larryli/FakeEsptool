@@ -488,9 +488,9 @@ if (ret == DEFLATE_OK) {
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `key` | BYTE[32] | 加密密钥（256-bit） |
-| `key_len` | int | 密钥长度（16 或 32 字节） |
-| `flash_addr` | DWORD | Flash 地址（用于 XTS 偏移） |
+| `key` | BYTE[64] | XTS 密钥（32 或 64 字节） |
+| `key_len` | int | 密钥长度（32 或 64 字节） |
+| `flash_addr` | DWORD | Flash 地址（用于 XTS tweak 计算） |
 
 **常量：**
 
@@ -499,14 +499,17 @@ if (ret == DEFLATE_OK) {
 | `ENCRYPT_OK` | 0 | 成功 |
 | `ENCRYPT_ERROR` | -1 | 通用错误 |
 | `ENCRYPT_BAD_INPUT` | -2 | 输入数据无效 |
+| `ENCRYPT_KEY_LEN_256` | 32 | 256-bit 密钥（XTS-AES-128） |
+| `ENCRYPT_KEY_LEN_512` | 64 | 512-bit 密钥（XTS-AES-256） |
+| `ENCRYPT_BLOCK_SIZE` | 128 | AES-XTS 块大小（1024 位） |
 
 **函数：**
 
 | 函数 | 说明 |
 |------|------|
-| `encrypt_init(ctx, key, key_len, flash_addr)` | 初始化加密上下文 |
-| `encrypt_data(ctx, in_buf, out_buf, len)` | 加密数据 |
-| `decrypt_data(ctx, in_buf, out_buf, len)` | 解密数据 |
+| `Encrypt_Init(ctx, key, key_len, flash_addr)` | 初始化加密上下文 |
+| `Encrypt_Data(ctx, in_buf, out_buf, len)` | 加密数据 |
+| `Decrypt_Data(ctx, in_buf, out_buf, len)` | 解密数据 |
 
 **使用示例：**
 
@@ -518,11 +521,11 @@ BYTE plaintext[4096];
 BYTE ciphertext[4096];
 ENCRYPT_CTX ctx;
 
-encrypt_init(&ctx, key, 32, 0x10000);
-encrypt_data(&ctx, plaintext, ciphertext, sizeof(plaintext));
+Encrypt_Init(&ctx, key, 32, 0x10000);
+Encrypt_Data(&ctx, plaintext, ciphertext, sizeof(plaintext));
 
 // 解密
-decrypt_data(&ctx, ciphertext, plaintext, sizeof(ciphertext));
+Decrypt_Data(&ctx, ciphertext, plaintext, sizeof(ciphertext));
 ```
 
 ### slip.h

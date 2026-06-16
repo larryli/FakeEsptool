@@ -1441,6 +1441,45 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
         return FALSE;
     }
 
+    /* Download mode disabled: ignore all commands (simulate ROM not entering download mode) */
+    if (Chip_IsDownloadModeDisabled(ctx->chip)) {
+        TRACE_PROTO(TAG, "Download mode disabled, ignoring command 0x%02X", pkt->command);
+        Serial_PostLog(ctx->hNotify, L"ESP", L"  Download mode disabled, command ignored");
+        return FALSE;
+    }
+
+    /* Secure download mode: only allow flash-related commands */
+    if (Chip_IsSecureDownloadEnabled(ctx->chip)) {
+        BOOL allowed = FALSE;
+        switch (pkt->command) {
+        case ESP_CMD_SYNC:
+        case ESP_CMD_READ_REG:
+        case ESP_CMD_WRITE_REG:
+        case ESP_CMD_SPI_ATTACH:
+        case ESP_CMD_CHANGE_BAUDRATE:
+        case ESP_CMD_GET_SECURITY_INFO:
+        case ESP_CMD_FLASH_BEGIN:
+        case ESP_CMD_FLASH_DATA:
+        case ESP_CMD_FLASH_END:
+        case ESP_CMD_FLASH_DEFL_BEGIN:
+        case ESP_CMD_FLASH_DEFL_DATA:
+        case ESP_CMD_FLASH_DEFL_END:
+        case ESP_CMD_SPI_SET_PARAMS:
+        case ESP_CMD_SPI_FLASH_MD5:
+            allowed = TRUE;
+            break;
+        default:
+            allowed = FALSE;
+            break;
+        }
+        if (!allowed) {
+            TRACE_PROTO(TAG, "Secure download: command 0x%02X not allowed", pkt->command);
+            Serial_PostLogF(ctx->hNotify, L"ESP", L"  Secure download: command 0x%02X rejected", pkt->command);
+            Esptool_SendResponse(ctx, pkt->command, pkt->value, ESP_FAIL, NULL, 4);
+            return FALSE;
+        }
+    }
+
     /* State validation: check if command is allowed in current state */
     BOOL valid = TRUE;
     switch (pkt->command) {
