@@ -864,6 +864,21 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* Step 1: Send command ACK (2-byte status in command response) */
     Esptool_SendResponseEx(ctx, ESP_CMD_READ_FLASH, ctx->last_read_val, ESP_OK, 2, NULL, 2);
 
+    /* Allocate buffers once before the loop */
+    BYTE *buf = (BYTE *)HeapAlloc(GetProcessHeap(), 0, bsize);
+    if (!buf) {
+        Serial_PostLog(ctx->hNotify, L"ERR", L"  Failed to allocate read buffer");
+        return;
+    }
+
+    DWORD encoded_max = bsize * 2 + 2;
+    BYTE *encoded = (BYTE *)HeapAlloc(GetProcessHeap(), 0, encoded_max);
+    if (!encoded) {
+        HeapFree(GetProcessHeap(), 0, buf);
+        Serial_PostLog(ctx->hNotify, L"ERR", L"  Failed to allocate encode buffer");
+        return;
+    }
+
     /* Step 2: Send flash data as separate SLIP frames */
     DWORD offset = 0;
     while (offset < len) {
@@ -871,41 +886,26 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         if (chunk_size > bsize)
             chunk_size = bsize;
 
-        /* Read flash data into temporary buffer */
-        BYTE *buf = (BYTE *)HeapAlloc(GetProcessHeap(), 0, chunk_size);
-        if (!buf) {
-            Serial_PostLogF(ctx->hNotify, L"ERR", L"  Failed to allocate read buffer: %lu", chunk_size);
-            return;
-        }
-
         if (!Flash_Read(ctx->flash, addr + offset, buf, chunk_size)) {
             Serial_PostLogF(ctx->hNotify, L"ERR", L"  Flash read failed at offset 0x%08lX", addr + offset);
-            HeapFree(GetProcessHeap(), 0, buf);
-            return;
+            break;
         }
 
         /* Decrypt if flash encryption is enabled */
         Esptool_DecryptInPlace(ctx, buf, chunk_size, addr + offset);
 
-        /* SLIP-encode the chunk and send as raw frame (not a command response) */
-        DWORD encoded_max = (DWORD)chunk_size * 2 + 2;
-        BYTE *encoded = (BYTE *)HeapAlloc(GetProcessHeap(), 0, encoded_max);
-        if (!encoded) {
-            Serial_PostLogF(ctx->hNotify, L"ERR", L"  Failed to allocate encode buffer");
-            HeapFree(GetProcessHeap(), 0, buf);
-            return;
-        }
-
+        /* SLIP-encode the chunk and send as raw frame */
         int enc_len = Slip_Encode(buf, (int)chunk_size, encoded, (int)encoded_max);
         if (enc_len > 0 && ctx->onWrite) {
             ctx->onWrite(encoded, (DWORD)enc_len);
         }
 
-        HeapFree(GetProcessHeap(), 0, encoded);
-        HeapFree(GetProcessHeap(), 0, buf);
-
         offset += chunk_size;
     }
+
+    /* Free buffers after the loop */
+    HeapFree(GetProcessHeap(), 0, encoded);
+    HeapFree(GetProcessHeap(), 0, buf);
 
     /* Step 3: Calculate and send 16-byte MD5 digest as final SLIP frame */
     BYTE md5[16];
