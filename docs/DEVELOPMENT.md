@@ -99,6 +99,39 @@ cmake --build build --config Release -j
 
 输出：`build/Release/FakeEsptool.exe`（Release）或 `build/Debug/FakeEsptool.exe`（Debug）
 
+### Pelles C
+
+项目提供 Pelles C 项目文件 `FakeEsptool.ppj`，可使用 Pelles C 14.10 构建。
+
+**环境要求：**
+- Pelles C 14.10 或更高版本
+- 安装路径：`C:\Program Files\PellesC`（默认）
+
+**构建命令：**
+
+```powershell
+# 设置环境变量
+$env:PATH = "C:\Program Files\PellesC\Bin;$env:PATH"
+$env:PellesCDir = "C:\Program Files\PellesC"
+
+# 构建（Release）
+pomake /f FakeEsptool.ppj
+
+# 构建（Debug）
+pomake /f FakeEsptool.ppj "POC_PROJECT_MODE=Debug"
+```
+
+**项目文件：**
+- `FakeEsptool.ppj` - Pelles C 项目文件
+- `FakeEsptool.ppx` - Pelles C 工作区设置
+
+**输出：** `FakeEsptool.exe`（项目根目录）
+
+**注意事项：**
+- Pelles C 使用 `-arch:AVX2` 编译选项，需要支持 AVX2 的 CPU
+- Release 模式启用 `-Ot -Ox -Ob1` 优化
+- Debug 模式启用 `-Zi` 调试信息并定义 `ENABLE_TRACE_FW=1` 和 `ENABLE_TRACE_PROTO=1`
+
 ### 测试
 
 ```powershell
