@@ -69,24 +69,29 @@ KEY_PURPOSE_XTS_AES_256_KEY_1 = 2
 KEY_PURPOSE_XTS_AES_256_KEY_2 = 3
 KEY_PURPOSE_XTS_AES_128_KEY = 4
 
-# KEY_PURPOSE eFuse field definitions (S2/S3/C3/C6)
-# BLOCK0 base = 0x2C in eFuse array
-# KEY_PURPOSE_0 at BLOCK0 word2 bits[27:24] = offset 0x08, mask 0x0F000000, shift 24
-# KEY_PURPOSE_1 at BLOCK0 word2 bits[31:28] = offset 0x08, mask 0xF0000000, shift 28
-# KEY_PURPOSE_2 at BLOCK0 word3 bits[3:0]   = offset 0x0C, mask 0x0000000F, shift 0
-# KEY_PURPOSE_3 at BLOCK0 word3 bits[7:4]   = offset 0x0C, mask 0x000000F0, shift 4
-# KEY_PURPOSE_4 at BLOCK0 word3 bits[11:8]  = offset 0x0C, mask 0x00000F00, shift 8
-# KEY_PURPOSE_5 at BLOCK0 word3 bits[15:12] = offset 0x0C, mask 0x0000F000, shift 12
-KEY_PURPOSE_OFFSETS = [0x08, 0x08, 0x0C, 0x0C, 0x0C, 0x0C]
+# KEY_PURPOSE eFuse field definitions
+# Relative offsets within BLOCK0: word2=0x08, word3=0x0C
+# Masks and shifts are the same for all chips
+KEY_PURPOSE_REL_OFFSETS = [0x08, 0x08, 0x0C, 0x0C, 0x0C, 0x0C]
 KEY_PURPOSE_MASKS   = [0x0F000000, 0xF0000000, 0x0000000F, 0x000000F0, 0x00000F00, 0x0000F000]
 KEY_PURPOSE_SHIFTS  = [24, 28, 0, 4, 8, 12]
+
+# BLOCK0 base offset in eFuse array per chip
+# ESP32: 0x00, ESP8266: 0x00, S2/S3/C2/C3/C6: 0x2C
+BLOCK0_BASE = {
+    1: 0x00,   # ESP32
+    2: 0x2C,   # ESP32-S2
+    3: 0x2C,   # ESP32-S3
+    4: 0x2C,   # ESP32-C2
+    5: 0x2C,   # ESP32-C3
+    6: 0x2C,   # ESP32-C6
+}
 
 # Key block read-back offsets in eFuse array
 KEY_BLOCK_OFFSETS = [0x9C, 0xBC, 0xDC, 0xFC, 0x11C, 0x13C]
 
-# SPI_BOOT_CRYPT_CNT eFuse definitions per chip
-# BLOCK0 at offset 0x00 in eFuse array
-SPI_BOOT_CRYPT_CNT = {
+# SPI_BOOT_CRYPT_CNT: relative offset within BLOCK0, mask, shift
+SPI_BOOT_CRYPT_CNT_REL = {
     1: (0x00, 0x7F << 20, 20),  # ESP32: word0 bits[26:20]
     2: (0x08, 7 << 18, 18),     # ESP32-S2: word2 bits[20:18]
     3: (0x08, 7 << 18, 18),     # ESP32-S3
@@ -156,11 +161,12 @@ def read_efuse32(efuse_data, offset):
     return struct.unpack('<I', efuse_data[offset:offset + 4])[0]
 
 
-def get_key_purpose(efuse_data, block):
+def get_key_purpose(efuse_data, block, chip_type):
     """Read KEY_PURPOSE for a key block from eFuse."""
     if block < 0 or block > 5:
         return KEY_PURPOSE_USER
-    offset = KEY_PURPOSE_OFFSETS[block]
+    base = BLOCK0_BASE.get(chip_type, 0x00)
+    offset = base + KEY_PURPOSE_REL_OFFSETS[block]
     mask = KEY_PURPOSE_MASKS[block]
     shift = KEY_PURPOSE_SHIFTS[block]
     val = read_efuse32(efuse_data, offset)
@@ -169,11 +175,12 @@ def get_key_purpose(efuse_data, block):
 
 def is_encryption_enabled(efuse_data, chip_type):
     """Check if flash encryption is enabled (SPI_BOOT_CRYPT_CNT has odd bits set)."""
-    if chip_type not in SPI_BOOT_CRYPT_CNT:
+    if chip_type not in SPI_BOOT_CRYPT_CNT_REL:
         return False
-    offset, mask, shift = SPI_BOOT_CRYPT_CNT[chip_type]
+    base = BLOCK0_BASE.get(chip_type, 0x00)
+    rel_offset, mask, shift = SPI_BOOT_CRYPT_CNT_REL[chip_type]
+    offset = base + rel_offset
     val = (read_efuse32(efuse_data, offset) & mask) >> shift
-    # Count set bits - odd number means encryption enabled
     return bin(val).count('1') % 2 == 1
 
 
@@ -194,7 +201,7 @@ def get_encryption_key(efuse_data, chip_type):
 
     # S2/S3/C3/C6: scan KEY_PURPOSE fields to find XTS_AES key block
     for i in range(6):
-        purpose = get_key_purpose(efuse_data, i)
+        purpose = get_key_purpose(efuse_data, i, chip_type)
         if purpose in (KEY_PURPOSE_XTS_AES_128_KEY, KEY_PURPOSE_XTS_AES_256_KEY_1, KEY_PURPOSE_XTS_AES_256_KEY_2):
             key_offset = KEY_BLOCK_OFFSETS[i]
             key_len = 32
@@ -401,7 +408,7 @@ def verify_encrypted_flash(flash_dir, device_file):
 
     # Show KEY_PURPOSE info for S2/S3/C3/C6
     if header['chip_type'] not in FIXED_KEY_INFO and header['chip_type'] != 0:
-        purposes = [get_key_purpose(efuse_data, i) for i in range(6)]
+        purposes = [get_key_purpose(efuse_data, i, header['chip_type']) for i in range(6)]
         purpose_names = {0: "USER", 2: "XTS-AES-256-1", 3: "XTS-AES-256-2", 4: "XTS-AES-128"}
         print(f"  Key Purposes: {', '.join(purpose_names.get(p, f'({p})') for p in purposes)}")
     print()

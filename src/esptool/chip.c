@@ -1811,15 +1811,12 @@ BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block)
         return KEY_PURPOSE_USER;
     }
 
-    /* S2/S3/C3/C6: read KEY_PURPOSE from eFuse */
+    /* S2/S3/C3/C6: read KEY_PURPOSE from eFuse.
+       BLOCK0 base varies by chip: ESP32=0x00, S2/S3/C3/C6=0x2C.
+       KEY_PURPOSE offsets are relative to BLOCK0 base. */
     if (block > 5)
         return KEY_PURPOSE_USER;
 
-    static const BYTE purpose_offsets[] = {
-        EFUSE_OFFS_KEY_PURPOSE_0, EFUSE_OFFS_KEY_PURPOSE_1,
-        EFUSE_OFFS_KEY_PURPOSE_2, EFUSE_OFFS_KEY_PURPOSE_3,
-        EFUSE_OFFS_KEY_PURPOSE_4, EFUSE_OFFS_KEY_PURPOSE_5,
-    };
     static const DWORD purpose_masks[] = {
         EFUSE_MASK_KEY_PURPOSE_0, EFUSE_MASK_KEY_PURPOSE_1,
         EFUSE_MASK_KEY_PURPOSE_2, EFUSE_MASK_KEY_PURPOSE_3,
@@ -1827,7 +1824,15 @@ BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block)
     };
     static const BYTE purpose_shifts[] = { 24, 28, 0, 4, 8, 12 };
 
-    int offset = purpose_offsets[block];
+    /* Chip-specific BLOCK0 base offset in eFuse array */
+    int block0_base = (ctx->type == CHIP_ESP32S2 || ctx->type == CHIP_ESP32S3 ||
+                       ctx->type == CHIP_ESP32C3 || ctx->type == CHIP_ESP32C6)
+                      ? 0x2C : 0x00;
+
+    /* KEY_PURPOSE_N offsets relative to BLOCK0: word2=0x08, word3=0x0C */
+    static const BYTE rel_offsets[] = { 0x08, 0x08, 0x0C, 0x0C, 0x0C, 0x0C };
+
+    int offset = block0_base + rel_offsets[block];
     DWORD mask = purpose_masks[block];
     int shift = purpose_shifts[block];
 
@@ -1859,18 +1864,19 @@ void Chip_SetKeyPurpose(CHIP_CTX *ctx, int block, BYTE purpose)
             return;
     }
 
-    static const BYTE purpose_offsets[] = {
-        EFUSE_OFFS_KEY_PURPOSE_0, EFUSE_OFFS_KEY_PURPOSE_1,
-        EFUSE_OFFS_KEY_PURPOSE_2, EFUSE_OFFS_KEY_PURPOSE_3,
-        EFUSE_OFFS_KEY_PURPOSE_4, EFUSE_OFFS_KEY_PURPOSE_5,
-    };
     static const DWORD purpose_masks[] = {
         EFUSE_MASK_KEY_PURPOSE_0, EFUSE_MASK_KEY_PURPOSE_1,
         EFUSE_MASK_KEY_PURPOSE_2, EFUSE_MASK_KEY_PURPOSE_3,
         EFUSE_MASK_KEY_PURPOSE_4, EFUSE_MASK_KEY_PURPOSE_5,
     };
 
-    int offset = purpose_offsets[block];
+    /* Chip-specific BLOCK0 base offset in eFuse array */
+    int block0_base = (ctx->type == CHIP_ESP32S2 || ctx->type == CHIP_ESP32S3 ||
+                       ctx->type == CHIP_ESP32C3 || ctx->type == CHIP_ESP32C6)
+                      ? 0x2C : 0x00;
+    static const BYTE rel_offsets[] = { 0x08, 0x08, 0x0C, 0x0C, 0x0C, 0x0C };
+
+    int offset = block0_base + rel_offsets[block];
     DWORD mask = purpose_masks[block];
 
     ClearEfuseBits(ctx, offset, mask);
