@@ -19,7 +19,7 @@ espefuse burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
 espefuse burn-efuse SPI_BOOT_CRYPT_CNT 1
 
 # 4. 加密烧录（设备端加密）
-esptool --encrypt write-flash 0x0 firmware.bin
+esptool write-flash --encrypt 0x0 firmware.bin
 
 # 5. 预加密文件烧录（离线加密后直接写入）
 espsecure encrypt-flash-data -k key.bin -a 0x0 -o firmware_enc.bin firmware.bin
@@ -114,7 +114,7 @@ espefuse burn-key BLOCK1 key.bin
 使用 `--encrypt` 参数烧录，客户端发送明文，设备端加密后写入 Flash：
 
 ```bash
-esptool --encrypt write-flash 0x0 firmware.bin
+esptool write-flash --encrypt 0x0 firmware.bin
 ```
 
 **验证：** FakeEsptool 日志中 `FLASH_BEGIN` 或 `FLASH_DEFL_BEGIN` 应显示 `encrypted=1`。
