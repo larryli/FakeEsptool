@@ -1218,6 +1218,16 @@ static int CountBits(DWORD val)
     return count;
 }
 
+/*
+ * Chip_GetFlashCryptCnt - Get flash encryption counter value from eFuse
+ *
+ * Returns the raw bitfield value. Check if odd number of 1-bits
+ * to determine if encryption is enabled.
+ *
+ * @ctx: Pointer to chip context (const, read-only)
+ *
+ * Returns raw counter value from eFuse.
+ */
 DWORD Chip_GetFlashCryptCnt(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
@@ -1244,12 +1254,30 @@ DWORD Chip_GetFlashCryptCnt(const CHIP_CTX *ctx)
     }
 }
 
+/*
+ * Chip_IsFlashEncryptionEnabled - Check if flash encryption is active
+ *
+ * Flash encryption is enabled when FLASH_CRYPT_CNT has odd number of 1-bits.
+ *
+ * @ctx: Pointer to chip context (const, read-only)
+ *
+ * Returns TRUE if flash encryption is enabled.
+ */
 BOOL Chip_IsFlashEncryptionEnabled(const CHIP_CTX *ctx)
 {
     DWORD cnt = Chip_GetFlashCryptCnt(ctx);
     return (CountBits(cnt) & 1) != 0;
 }
 
+/*
+ * Chip_IsDownloadEncryptDisabled - Check if download mode encryption is disabled
+ *
+ * When disabled, plaintext data can be written to flash in download mode.
+ *
+ * @ctx: Pointer to chip context (const, read-only)
+ *
+ * Returns TRUE if download encryption is disabled.
+ */
 BOOL Chip_IsDownloadEncryptDisabled(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
@@ -1276,6 +1304,16 @@ BOOL Chip_IsDownloadEncryptDisabled(const CHIP_CTX *ctx)
     }
 }
 
+/*
+ * Chip_IsDownloadDecryptDisabled - Check if download mode decryption is disabled
+ *
+ * When disabled, encrypted flash data is returned as ciphertext in download mode.
+ * Only ESP32 has this field.
+ *
+ * @ctx: Pointer to chip context (const, read-only)
+ *
+ * Returns TRUE if download decryption is disabled.
+ */
 BOOL Chip_IsDownloadDecryptDisabled(const CHIP_CTX *ctx)
 {
     /* Only ESP32 has DISABLE_DL_DECRYPT field */
@@ -1285,6 +1323,15 @@ BOOL Chip_IsDownloadDecryptDisabled(const CHIP_CTX *ctx)
     return FALSE;
 }
 
+/*
+ * Chip_IsDownloadModeDisabled - Check if download mode is disabled via eFuse
+ *
+ * When disabled, chip cannot enter download mode via DTR/RTS signals.
+ *
+ * @ctx: Pointer to chip context (const, read-only)
+ *
+ * Returns TRUE if download mode is disabled.
+ */
 BOOL Chip_IsDownloadModeDisabled(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
@@ -1311,6 +1358,15 @@ BOOL Chip_IsDownloadModeDisabled(const CHIP_CTX *ctx)
     }
 }
 
+/*
+ * Chip_IsSecureDownloadEnabled - Check if secure download mode is enabled
+ *
+ * In secure download mode, only flash-related commands are allowed.
+ *
+ * @ctx: Pointer to chip context (const, read-only)
+ *
+ * Returns TRUE if secure download mode is enabled.
+ */
 BOOL Chip_IsSecureDownloadEnabled(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
@@ -1343,6 +1399,16 @@ BOOL Chip_IsSecureDownloadEnabled(const CHIP_CTX *ctx)
 #define KEY_PURPOSE_RESERVED        1
 #define KEY_PURPOSE_XTS_AES_128_KEY 4
 
+/*
+ * Chip_GetKeyPurpose - Get key block purpose from eFuse
+ *
+ * Returns the purpose of the specified key block.
+ *
+ * @ctx:   Pointer to chip context (const, read-only)
+ * @block: Key block index (0 = KEY0, 1 = KEY1, etc.)
+ *
+ * Returns key purpose value (KEY_PURPOSE_*).
+ */
 BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block)
 {
     if (!ctx->efuse || block < 0)

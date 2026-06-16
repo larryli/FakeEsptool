@@ -269,6 +269,16 @@ static DWORD Defl_FlushBuffer(ESPTOOL_CTX *ctx)
     return ESP_OK;
 }
 
+/*
+ * Esptool_Init - Initialize ESP protocol context
+ *
+ * Binds protocol context to device chip and flash data.
+ * Must be called before any other Esptool_* function.
+ *
+ * @ctx:   Pointer to protocol context to initialize
+ * @chip:  Pointer to chip context (not owned by esptool)
+ * @flash: Pointer to flash context (not owned by esptool)
+ */
 void Esptool_Init(ESPTOOL_CTX *ctx, CHIP_CTX *chip, FLASH_CTX *flash)
 {
     memset(ctx, 0, sizeof(ESPTOOL_CTX));
@@ -286,6 +296,14 @@ void Esptool_Init(ESPTOOL_CTX *ctx, CHIP_CTX *chip, FLASH_CTX *flash)
     ctx->decomp_buf_cap = 0;
 }
 
+/*
+ * Esptool_Close - Release persistent resources
+ *
+ * Frees decompression buffer and any pending deflate buffer.
+ * Call when shutting down the protocol handler.
+ *
+ * @ctx: Pointer to protocol context
+ */
 void Esptool_Close(ESPTOOL_CTX *ctx)
 {
     Defl_FreeBuffer(ctx);
@@ -296,6 +314,14 @@ void Esptool_Close(ESPTOOL_CTX *ctx)
     }
 }
 
+/*
+ * Esptool_ResetState - Reset protocol state machine
+ *
+ * Resets protocol state to IDLE, frees pending deflate buffer,
+ * and clears all session data. Called on download mode entry.
+ *
+ * @ctx: Pointer to protocol context
+ */
 void Esptool_ResetState(ESPTOOL_CTX *ctx)
 {
     /* Free deflate buffer without writing (reset scenario) */
@@ -316,21 +342,51 @@ void Esptool_ResetState(ESPTOOL_CTX *ctx)
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Protocol state reset");
 }
 
+/*
+ * Esptool_SetNotify - Set UI notification window handle
+ *
+ * @ctx:     Pointer to protocol context
+ * @hNotify: Window handle for receiving WM_SERIAL_* messages
+ */
 void Esptool_SetNotify(ESPTOOL_CTX *ctx, HWND hNotify)
 {
     ctx->hNotify = hNotify;
 }
 
+/*
+ * Esptool_SetModifiedCallback - Set device modification callback
+ *
+ * Called when protocol handler modifies device data (eFuse, Flash).
+ *
+ * @ctx: Pointer to protocol context
+ * @cb:  Callback function (or NULL to clear)
+ */
 void Esptool_SetModifiedCallback(ESPTOOL_CTX *ctx, ESP_MODIFIED_CB cb)
 {
     ctx->onModified = cb;
 }
 
+/*
+ * Esptool_SetWriteCallback - Set serial write callback
+ *
+ * Called when protocol handler needs to send response data.
+ *
+ * @ctx: Pointer to protocol context
+ * @cb:  Callback function for writing data to serial port
+ */
 void Esptool_SetWriteCallback(ESPTOOL_CTX *ctx, ESP_WRITE_CB cb)
 {
     ctx->onWrite = cb;
 }
 
+/*
+ * Esptool_SetBaudRateCallback - Set baud rate change callback
+ *
+ * Called when protocol handler receives CHANGE_BAUDRATE command.
+ *
+ * @ctx: Pointer to protocol context
+ * @cb:  Callback function for changing serial port baud rate
+ */
 void Esptool_SetBaudRateCallback(ESPTOOL_CTX *ctx, ESP_BAUDRATE_CB cb)
 {
     ctx->onBaudRate = cb;
@@ -416,11 +472,34 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD sta
     TRACE_PROTO(TAG, "TX cmd=0x%02X status=%lu len=%u", cmd, status, total_data_len);
 }
 
+/*
+ * Esptool_SendResponse - Send protocol response with 4-byte status
+ *
+ * Convenience wrapper for Esptool_SendResponseEx with status_len=4.
+ *
+ * @ctx:      Pointer to protocol context
+ * @cmd:      Command code (response will echo this)
+ * @req_val:  Value field in response
+ * @status:   Status code (ESP_OK or ESP_FAIL)
+ * @data:     Optional data payload (can be NULL)
+ * @data_len: Data payload length
+ */
 void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD status, const BYTE *data, WORD data_len)
 {
     Esptool_SendResponseEx(ctx, cmd, req_val, status, 4, data, data_len);
 }
 
+/*
+ * ParsePacket - Parse raw SLIP frame into ESP_PACKET structure
+ *
+ * Extracts direction, command, size, value, and data fields from frame.
+ *
+ * @frame:     Pointer to decoded SLIP frame data
+ * @frame_len: Length of frame data in bytes
+ * @pkt:       Pointer to packet structure to fill
+ *
+ * Returns TRUE on success, FALSE if frame is too short or malformed.
+ */
 static BOOL ParsePacket(const BYTE *frame, int frame_len, ESP_PACKET *pkt)
 {
     if (frame_len < 8)
@@ -442,6 +521,15 @@ static BOOL ParsePacket(const BYTE *frame, int frame_len, ESP_PACKET *pkt)
     return TRUE;
 }
 
+/*
+ * HandleSync - Handle SYNC command (0x08)
+ *
+ * Synchronizes with esptool client. Transitions state to SYNCED.
+ * Sends 8 consecutive responses as real device does.
+ *
+ * @ctx: Pointer to protocol context
+ * @pkt: Pointer to parsed request packet
+ */
 static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     TRACE_PROTO(TAG, "SYNC received");
@@ -465,6 +553,15 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 }
 
+/*
+ * HandleReadReg - Handle READ_REG command (0x0A)
+ *
+ * Reads a register value. Transitions to READY when chip detection
+ * register (0x40001000) is read.
+ *
+ * @ctx: Pointer to protocol context
+ * @pkt: Pointer to parsed request packet (data = 4-byte address)
+ */
 static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
@@ -490,6 +587,15 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_READ_REG, val, ESP_OK, status_len, NULL, status_len);
 }
 
+/*
+ * HandleWriteReg - Handle WRITE_REG command (0x09)
+ *
+ * Writes a register value with optional mask.
+ * Request format: [addr:4][value:4][mask:4][delay_us:4]
+ *
+ * @ctx: Pointer to protocol context
+ * @pkt: Pointer to parsed request packet
+ */
 static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 8);
@@ -527,6 +633,15 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_WRITE_REG, 0x00000000, ESP_OK, 2, NULL, 2);
 }
 
+/*
+ * HandleChangeBaudrate - Handle CHANGE_BAUDRATE command (0x0F)
+ *
+ * Changes serial port baud rate. Response sent at old rate,
+ * then switches to new rate.
+ *
+ * @ctx: Pointer to protocol context
+ * @pkt: Pointer to parsed request packet (data = [new_baud:4][old_baud:4])
+ */
 static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
@@ -550,6 +665,15 @@ static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 }
 
+/*
+ * HandleMemBegin - Handle MEM_BEGIN command (0x05)
+ *
+ * Starts memory write session for Stub upload.
+ * Transitions state to MEM_WRITING.
+ *
+ * @ctx: Pointer to protocol context
+ * @pkt: Pointer to parsed request packet (data = [total:4][blocks:4][bsize:4][offset:4])
+ */
 static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
@@ -570,6 +694,15 @@ static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_MEM_BEGIN, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
+/*
+ * HandleMemData - Handle MEM_DATA command (0x07)
+ *
+ * Receives a block of data for Stub upload.
+ * Verifies checksum before acknowledging.
+ *
+ * @ctx: Pointer to protocol context
+ * @pkt: Pointer to parsed request packet
+ */
 static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
@@ -598,6 +731,15 @@ static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     Esptool_SendResponseEx(ctx, ESP_CMD_MEM_DATA, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
 }
 
+/*
+ * HandleMemEnd - Handle MEM_END command (0x06)
+ *
+ * Completes memory write session. Sends "OHAI" handshake
+ * to indicate Stub is ready. Transitions state to READY.
+ *
+ * @ctx: Pointer to protocol context
+ * @pkt: Pointer to parsed request packet (data = [execute:4][entry_point:4])
+ */
 static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
@@ -1575,6 +1717,18 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
     return TRUE;
 }
 
+/*
+ * Esptool_Feed - Feed raw serial data to protocol decoder
+ *
+ * Processes incoming bytes through SLIP decoder. When a complete
+ * frame is assembled, dispatches to Esptool_ProcessFrame.
+ *
+ * @ctx: Pointer to protocol context
+ * @data: Pointer to raw serial data
+ * @len:  Number of bytes in data
+ *
+ * Returns TRUE if at least one complete frame was processed.
+ */
 BOOL Esptool_Feed(ESPTOOL_CTX *ctx, const BYTE *data, int len)
 {
     BOOL got_frame = FALSE;
