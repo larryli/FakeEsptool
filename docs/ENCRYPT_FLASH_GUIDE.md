@@ -27,15 +27,19 @@ eFuse 只能将位从 **0 变为 1**，不能从 1 变为 0。这是硬件特性
 
 ### 1.3 各芯片加密字段对照
 
-| 芯片 | 加密计数器 | 位宽 | 禁用明文烧录 | 禁用下载 | 安全下载 | 密钥块 | 密钥长度 |
-|------|-----------|------|-------------|---------|---------|--------|---------|
-| ESP8266 | ❌ 不支持 | - | - | - | - | - | - |
-| ESP32 | `FLASH_CRYPT_CNT` | 7-bit | `DISABLE_DL_ENCRYPT` | `UART_DOWNLOAD_DIS` | ❌ | BLOCK1-3 | 256-bit |
-| ESP32-S2 | `SPI_BOOT_CRYPT_CNT` | 3-bit | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | KEY0-KEY5 | 128/256-bit |
-| ESP32-S3 | `SPI_BOOT_CRYPT_CNT` | 3-bit | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | KEY0-KEY5 | 128/256-bit |
-| ESP32-C2 | `SPI_BOOT_CRYPT_CNT` | 3-bit | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | BLOCK_KEY0 | 256-bit |
-| ESP32-C3 | `SPI_BOOT_CRYPT_CNT` | 3-bit | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | KEY0-KEY5 | 128/256-bit |
-| ESP32-C6 | `SPI_BOOT_CRYPT_CNT` | 3-bit | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | KEY0-KEY5 | 128/256-bit |
+| 芯片 | 加密计数器 | 位宽 | 禁用明文烧录 | 禁用下载解密 | 禁用下载 | 安全下载 | 密钥块 | 密钥长度 |
+|------|-----------|------|-------------|-------------|---------|---------|--------|---------|
+| ESP8266 | ❌ 不支持 | - | - | - | - | - | - | - |
+| ESP32 | `FLASH_CRYPT_CNT` | 7-bit | `DISABLE_DL_ENCRYPT` | `DISABLE_DL_DECRYPT` | `UART_DOWNLOAD_DIS` | ❌ | BLOCK1-3 | 256-bit |
+| ESP32-S2 | `SPI_BOOT_CRYPT_CNT` | 3-bit | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | ❌ | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | KEY0-KEY5 | 128/256-bit |
+| ESP32-S3 | `SPI_BOOT_CRYPT_CNT` | 3-bit | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | ❌ | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | KEY0-KEY5 | 128/256-bit |
+| ESP32-C2 | `SPI_BOOT_CRYPT_CNT` | 3-bit | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | ❌ | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | BLOCK_KEY0 | 256-bit |
+| ESP32-C3 | `SPI_BOOT_CRYPT_CNT` | 3-bit | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | ❌ | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | KEY0-KEY5 | 128/256-bit |
+| ESP32-C6 | `SPI_BOOT_CRYPT_CNT` | 3-bit | `DIS_DOWNLOAD_MANUAL_ENCRYPT` | ❌ | `DIS_DOWNLOAD_MODE` | `ENABLE_SECURITY_DOWNLOAD` | KEY0-KEY5 | 128/256-bit |
+
+**说明**：
+- `DISABLE_DL_DECRYPT`：仅 ESP32 支持，控制 READ_FLASH 是否返回解密数据
+- 其他芯片的 READ_FLASH 解密行为由硬件自动控制（无独立字段）
 
 ### 1.4 密钥长度说明
 
@@ -308,10 +312,12 @@ ESP-IDF 支持两种 NVS 加密方案：
 
 | 方案 | 密钥存储 | 前置条件 | 适用芯片 |
 |------|---------|---------|---------|
-| **Flash Encryption-Based** | Flash NVS Key Partition | 需要启用 Flash 加密 | S2/S3/C2/C3/C6 |
+| **Flash Encryption-Based** | Flash NVS Key Partition | 需要启用 Flash 加密 | ESP32/S2/S3/C2/C3/C6 |
 | **HMAC Peripheral-Based** | eFuse HMAC 密钥（运行时派生） | 不需要 Flash 加密 | S2/S3/C3/C6 |
 
-**注意**：ESP32 不支持 NVS 加密，ESP32-C2 不支持 HMAC 方案。
+**注意**：
+- ESP32-C2 不支持 HMAC 方案（只有 1 个 BLOCK_KEY0，无法同时用于 Flash 加密和 HMAC）
+- ESP32 不支持 HMAC 方案（无 HMAC_UP 用途支持）
 
 ### 4.3 Flash Encryption-Based 方案
 
@@ -396,7 +402,7 @@ CONFIG_NVS_SEC_HMAC_EFUSE_KEY_ID=0
 
 | 芯片 | Flash Encryption-Based | HMAC-Based | NVS Key 存储位置 |
 |------|----------------------|-----------|-----------------|
-| ESP32 | ❌ | ❌ | - |
+| ESP32 | ✅ | ❌ | NVS Key Partition |
 | ESP32-S2 | ✅ | ✅ | NVS Key Partition 或 eFuse HMAC |
 | ESP32-S3 | ✅ | ✅ | NVS Key Partition 或 eFuse HMAC |
 | ESP32-C2 | ✅ | ❌ | NVS Key Partition（唯一方案） |
