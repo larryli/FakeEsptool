@@ -475,6 +475,7 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     g_hStatusbar = CreateWindowExW(0, STATUSCLASSNAMEW, NULL,
         WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
         0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_STATUSBAR, hInst, NULL);
+    CreateStatusTooltip(hWnd);
 
     /* Create RichEdit log display */
     g_hRichEdit = LoadLibraryW(L"riched20.dll");
@@ -986,7 +987,7 @@ static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam)
  */
 static BOOL Main_Init(HINSTANCE hInstance)
 {
-    INITCOMMONCONTROLSEX icex = { .dwSize = sizeof(icex), .dwICC = ICC_BAR_CLASSES };
+    INITCOMMONCONTROLSEX icex = { .dwSize = sizeof(icex), .dwICC = ICC_BAR_CLASSES | ICC_TAB_CLASSES };
     InitCommonControlsEx(&icex);
 
     /* Initialize esptool protocol with pointers to device data */

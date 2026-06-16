@@ -150,6 +150,17 @@
 #define IDS_DOWNLOAD_SECURE      10131  /* "Download Secure" */
 #define IDS_DOWNLOAD_DISABLED    10132  /* "Download Disabled" */
 
+/* Status bar strings */
+#define IDS_SB_SECURE_BOOT_ENABLED   10140  /* "Secure Boot" */
+#define IDS_SB_SECURE_BOOT_DISABLED  10141  /* "No Secure Boot" */
+#define IDS_SB_JTAG_DISABLED         10142  /* "JTAG Disabled" */
+#define IDS_SB_JTAG_ENABLED          10143  /* "JTAG Enabled" */
+#define IDS_SB_JTAG_PARTIAL          10144  /* "JTAG Partial" */
+
+/* Status bar tooltip format strings */
+#define IDS_TIP_XTAL_MAC         10150  /* "%hs AA:BB:CC:DD:EE:FF" */
+#define IDS_TIP_EFUSE_FIELD      10151  /* "%hs = 0x%02X" */
+
 /* Key Management dialog strings */
 #define IDS_KEY_MGMT_TITLE      10200  /* "Key Management - %s" */
 #define IDS_KEY_MGMT_COLUMN_BLOCK    10201  /* "Block" */

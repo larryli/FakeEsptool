@@ -43,6 +43,61 @@ typedef enum {
 static ENCRYPT_STATE g_encryptState = ENCRYPT_STATE_NONE;
 static DOWNLOAD_MODE g_downloadMode = DOWNLOAD_MODE_NORMAL;
 
+/* Status bar tooltip (using TTF_SUBRECT for per-part hit testing) */
+static HWND g_hStatusTip = NULL;
+
+#ifndef TTF_SUBRECT
+#define TTF_SUBRECT 0x0010
+#endif
+
+/*
+ * SetPartTooltip - Set tooltip text for a specific status bar part
+ *
+ * Uses SB_GETRECT to get the part's rectangle, then registers a tool
+ * with TTF_SUBRECT so the tooltip triggers when the mouse is over that area.
+ * Deletes and re-adds the tool to handle text and rect updates.
+ */
+static void SetPartTooltip(int part, const WCHAR *text)
+{
+    if (!g_hStatusTip || !g_hStatusbar)
+        return;
+    RECT rc;
+    if (!SendMessageW(g_hStatusbar, SB_GETRECT, (WPARAM)part, (LPARAM)&rc))
+        return;
+    TOOLINFOW ti = {0};
+    ti.cbSize = sizeof(ti);
+    ti.uFlags = TTF_SUBRECT;
+    ti.hwnd = g_hStatusbar;
+    ti.uId = (UINT_PTR)part;
+    ti.rect = rc;
+    ti.lpszText = (LPWSTR)text;
+    SendMessageW(g_hStatusTip, TTM_DELTOOLW, 0, (LPARAM)&ti);
+    if (!SendMessageW(g_hStatusTip, TTM_ADDTOOLW, 0, (LPARAM)&ti)) {
+        ti.cbSize = sizeof(TOOLINFOW) - sizeof(void *);
+        SendMessageW(g_hStatusTip, TTM_ADDTOOLW, 0, (LPARAM)&ti);
+    }
+}
+
+/*
+ * CreateStatusTooltip - Create balloon tooltip control for status bar
+ *
+ * Creates a topmost balloon tooltip with no parent (to avoid clipping issues).
+ * Called once during Main_OnCreate.
+ */
+void CreateStatusTooltip(HWND hParent)
+{
+    (void)hParent;
+    g_hStatusTip = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, NULL,
+        WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP | TTS_BALLOON,
+        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+        NULL, NULL, GetModuleHandleW(NULL), NULL);
+    if (g_hStatusTip) {
+        SetWindowPos(g_hStatusTip, HWND_TOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        SendMessageW(g_hStatusTip, TTM_SETMAXTIPWIDTH, 0, 250);
+    }
+}
+
 /*
  * PromptDisconnectIfNeeded - Check if serial is connected, prompt to disconnect
  */
@@ -223,6 +278,10 @@ static void UpdateDownloadMenu(HMENU hMenu)
 void Main_CmdEncryptState(HWND hWnd, int state)
 {
     g_encryptState = (ENCRYPT_STATE)state;
+    if (g_device.chip.name[0]) {
+        Chip_SetFlashEncryption(&g_device.chip, state);
+        Device_SetModified(&g_device, TRUE);
+    }
     UpdateEncryptionMenu(GetMenu(hWnd));
     UpdateStatusBar();
 }
@@ -236,6 +295,10 @@ void Main_CmdEncryptState(HWND hWnd, int state)
 void Main_CmdDownloadMode(HWND hWnd, int mode)
 {
     g_downloadMode = (DOWNLOAD_MODE)mode;
+    if (g_device.chip.name[0]) {
+        Chip_SetDownloadMode(&g_device.chip, mode);
+        Device_SetModified(&g_device, TRUE);
+    }
     UpdateDownloadMenu(GetMenu(hWnd));
     UpdateStatusBar();
 }
@@ -307,6 +370,19 @@ void UpdateMenuState(HWND hWnd)
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_RECONNECT, canReconnect);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_KEY_MGMT, canKeyMgmt);
 
+    /* Disable encryption and download mode menus for unsupported chips */
+    {
+        BOOL canEncrypt = g_device.chip.type != CHIP_ESP8266;
+        BOOL canDlMode = g_device.chip.type != CHIP_ESP8266;
+        BOOL canDlSecure = canDlMode && g_device.chip.type != CHIP_ESP32;
+        EnableMenuItem(hMenu, IDM_ENCRYPT_NONE, canEncrypt ? MF_ENABLED : MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_ENCRYPT_DEV, canEncrypt ? MF_ENABLED : MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_ENCRYPT_PROD, canEncrypt ? MF_ENABLED : MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_DOWNLOAD_NORMAL, canDlMode ? MF_ENABLED : MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_DOWNLOAD_SECURE, canDlSecure ? MF_ENABLED : MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_DOWNLOAD_DISABLED, canDlMode ? MF_ENABLED : MF_GRAYED);
+    }
+
     /* Update encryption state and download mode menu check marks */
     UpdateEncryptionMenu(hMenu);
     UpdateDownloadMenu(hMenu);
@@ -366,80 +442,180 @@ void UpdateTitle(HWND hWnd)
 /*
  * UpdateStatusBar - Update status bar display
  *
- * Updates all 5 status bar parts:
- * 1. Chip type (e.g. "ESP32")
- * 2. Flash size (e.g. "4MB")
- * 3. MAC address (e.g. "AA:BB:CC:DD:EE:01")
- * 4. Port name (e.g. "COM10") or "Disconnected"
- * 5. Port config (e.g. "115200,8N1")
+ * Updates 6 status bar parts:
+ * Part 0: Chip type + Flash size (e.g. "ESP32 4MB"), tooltip: XTAL + MAC
+ * Part 1: Encryption status, tooltip: SPI_BOOT_CRYPT_CNT + DIS_DOWNLOAD_MANUAL_ENCRYPT
+ * Part 2: Download mode, tooltip: DIS_DOWNLOAD_MODE
+ * Part 3: Secure Boot status, tooltip: SECURE_BOOT_EN
+ * Part 4: JTAG status, tooltip: DIS_PAD_JTAG
+ * Part 5: Port + config (e.g. "COM10 115200,8N1")
  */
 void UpdateStatusBar(void)
 {
     if (!g_hStatusbar)
         return;
 
-    int parts[7];
-    RECT rc;
-    GetClientRect(GetParent(g_hStatusbar), &rc);
+    int parts[6];
     parts[0] = STATUS_PART1_WIDTH;
     parts[1] = parts[0] + STATUS_PART2_WIDTH;
     parts[2] = parts[1] + STATUS_PART3_WIDTH;
     parts[3] = parts[2] + STATUS_PART4_WIDTH;
     parts[4] = parts[3] + STATUS_PART5_WIDTH;
-    parts[5] = parts[4] + STATUS_PART6_WIDTH;
-    parts[6] = -1;
-    SendMessageW(g_hStatusbar, SB_SETPARTS, 7, (LPARAM)parts);
+    parts[5] = -1;
+    SendMessageW(g_hStatusbar, SB_SETPARTS, 6, (LPARAM)parts);
 
-    /* Part 1: Chip type */
+    /* Part 1: Chip type + Flash size */
     if (g_device.chip.name[0]) {
         WCHAR chipName[32];
         MultiByteToWideChar(CP_UTF8, 0, g_device.chip.name, -1, chipName, 32);
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)chipName);
+        if (g_device.flash.size > 0) {
+            WCHAR buf[48];
+            if (g_device.flash.size >= 1024*1024)
+                wsprintfW(buf, L"%s %luMB", chipName, g_device.flash.size / (1024*1024));
+            else
+                wsprintfW(buf, L"%s %luKB", chipName, g_device.flash.size / 1024);
+            SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)buf);
+        } else {
+            SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)chipName);
+        }
+
+        /* Tooltip: "40MHz AA:BB:CC:DD:EE:FF" */
+        const char *xtal = (g_device.chip.xtal_freq == XTAL_FREQ_26M) ? "26MHz" : "40MHz";
+        const BYTE *mac = Chip_GetMac(&g_device.chip);
+        WCHAR tipBuf[64];
+        wsprintfW(tipBuf, L"%hs %02X:%02X:%02X:%02X:%02X:%02X",
+                  xtal, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        SetPartTooltip(0, tipBuf);
     } else {
         SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)LoadStr(IDS_STATUS_NO_DEVICE));
+        SetPartTooltip(0, L"");
     }
 
-    /* Part 2: Flash size */
-    if (g_device.flash.size > 0) {
-        WCHAR flashSize[32];
-        if (g_device.flash.size >= 1024*1024)
-            wsprintfW(flashSize, L"%luMB", g_device.flash.size / (1024*1024));
-        else
-            wsprintfW(flashSize, L"%luKB", g_device.flash.size / 1024);
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 1, (LPARAM)flashSize);
+    /* Part 2: Encryption status */
+    if (g_device.chip.name[0]) {
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 1, (LPARAM)LoadStr(GetEncryptStateStrId()));
+
+        /* Tooltip: eFuse field values (ESP8266 not supported) */
+        if (g_device.chip.type == CHIP_ESP8266) {
+            SetPartTooltip(1, L"");
+        } else {
+            DWORD crypt = Chip_GetFlashCryptCnt(&g_device.chip);
+            DWORD dlEnc = Chip_GetDlEncryptDisabled(&g_device.chip);
+            const char *f1 = "SPI_BOOT_CRYPT_CNT";
+            const char *f2 = (g_device.chip.type == CHIP_ESP32)
+                             ? "DISABLE_DL_ENCRYPT" : "DIS_DOWNLOAD_MANUAL_ENCRYPT";
+            WCHAR t1[64], t2[64];
+            wsprintfW(t1, LoadStr(IDS_TIP_EFUSE_FIELD), f1, (int)crypt);
+            wsprintfW(t2, LoadStr(IDS_TIP_EFUSE_FIELD), f2, (int)dlEnc);
+            WCHAR tipBuf[128];
+            wsprintfW(tipBuf, L"%s\n%s", t1, t2);
+            SetPartTooltip(1, tipBuf);
+        }
     } else {
         SendMessageW(g_hStatusbar, SB_SETTEXT, 1, (LPARAM)L"");
+        SetPartTooltip(1, L"");
     }
 
-    /* Part 3: MAC address */
+    /* Part 3: Download mode status */
     if (g_device.chip.name[0]) {
-        const BYTE *mac = Chip_GetMac(&g_device.chip);
-        WCHAR macStr[32];
-        wsprintfW(macStr, L"%02X:%02X:%02X:%02X:%02X:%02X",
-                  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)macStr);
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)LoadStr(GetDownloadModeStrId()));
+
+        /* Tooltip: eFuse field value (ESP8266 not supported) */
+        if (g_device.chip.type == CHIP_ESP8266) {
+            SetPartTooltip(2, L"");
+        } else {
+            DWORD dlMode = Chip_GetDlModeDisabled(&g_device.chip);
+            const char *field;
+            switch (g_device.chip.type) {
+            case CHIP_ESP32:   field = "UART_DOWNLOAD_DIS"; break;
+            case CHIP_ESP32S3: field = "DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE"; break;
+            default:           field = "DIS_DOWNLOAD_MODE"; break;
+            }
+            WCHAR tipBuf[64];
+            wsprintfW(tipBuf, LoadStr(IDS_TIP_EFUSE_FIELD), field, (int)dlMode);
+            SetPartTooltip(2, tipBuf);
+        }
     } else {
         SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)L"");
+        SetPartTooltip(2, L"");
     }
 
-    /* Part 4: Encryption status */
+    /* Part 4: Secure Boot status */
     if (g_device.chip.name[0]) {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)LoadStr(GetEncryptStateStrId()));
+        BOOL sb = Chip_IsSecureBootEnabled(&g_device.chip);
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 3,
+                     (LPARAM)LoadStr(sb ? IDS_SB_SECURE_BOOT_ENABLED : IDS_SB_SECURE_BOOT_DISABLED));
+
+        /* Tooltip: eFuse field value */
+        DWORD sbFlag = Chip_GetSecureBootFlag(&g_device.chip);
+        if (g_device.chip.type == CHIP_ESP8266 || g_device.chip.type == CHIP_ESP32C2) {
+            SetPartTooltip(3, L"");
+        } else if (g_device.chip.type == CHIP_ESP32) {
+            WCHAR t1[64], t2[64];
+            wsprintfW(t1, LoadStr(IDS_TIP_EFUSE_FIELD), "ABS_DONE_0", (int)(sbFlag & 1));
+            wsprintfW(t2, LoadStr(IDS_TIP_EFUSE_FIELD), "ABS_DONE_1", (int)((sbFlag >> 1) & 1));
+            WCHAR tipBuf[128];
+            wsprintfW(tipBuf, L"%s\n%s", t1, t2);
+            SetPartTooltip(3, tipBuf);
+        } else {
+            WCHAR tipBuf[64];
+            wsprintfW(tipBuf, LoadStr(IDS_TIP_EFUSE_FIELD), "SECURE_BOOT_EN", (int)sbFlag);
+            SetPartTooltip(3, tipBuf);
+        }
     } else {
         SendMessageW(g_hStatusbar, SB_SETTEXT, 3, (LPARAM)L"");
+        SetPartTooltip(3, L"");
     }
 
-    /* Part 5: Download mode status */
+    /* Part 5: JTAG status */
     if (g_device.chip.name[0]) {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)LoadStr(GetDownloadModeStrId()));
+        int jtagDis = Chip_GetJtagDisabledCount(&g_device.chip);
+        int jtagTotal = Chip_GetJtagTotalCount(&g_device.chip);
+        UINT strId;
+        if (jtagTotal == 0)
+            strId = IDS_SB_JTAG_ENABLED;
+        else if (jtagDis == 0)
+            strId = IDS_SB_JTAG_ENABLED;
+        else if (jtagDis >= jtagTotal)
+            strId = IDS_SB_JTAG_DISABLED;
+        else
+            strId = IDS_SB_JTAG_PARTIAL;
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)LoadStr(strId));
+
+        /* Tooltip: all JTAG eFuse fields */
+        if (jtagTotal == 0) {
+            SetPartTooltip(4, L"");
+        } else {
+            WCHAR lines[4][64];
+            int n = 0;
+            if (g_device.chip.type == CHIP_ESP32) {
+                wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
+                          "JTAG_DISABLE", (int)Chip_GetJtagFlag(&g_device.chip));
+            } else {
+                wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
+                          "DIS_PAD_JTAG", (int)Chip_GetJtagFlag(&g_device.chip));
+                wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
+                          "SOFT_DIS_JTAG", (int)Chip_GetSoftJtagFlag(&g_device.chip));
+                if (jtagTotal >= 3) {
+                    wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
+                              "DIS_USB_JTAG", (int)Chip_GetUsbJtagFlag(&g_device.chip));
+                }
+            }
+            WCHAR tipBuf[192];
+            lstrcpyW(tipBuf, lines[0]);
+            for (int i = 1; i < n; i++) {
+                lstrcatW(tipBuf, L"\n");
+                lstrcatW(tipBuf, lines[i]);
+            }
+            SetPartTooltip(4, tipBuf);
+        }
     } else {
         SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)L"");
+        SetPartTooltip(4, L"");
     }
 
-    /* Part 6 & 7: Serial port and config */
+    /* Part 6: Serial port + config */
     if (Serial_IsOpen(&g_serial)) {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 5, (LPARAM)g_szPort);
-
         DWORD baudRate = 115200;
         BYTE dataBits = 8, parity = NOPARITY, stopBits = ONESTOPBIT;
         Serial_GetConfig(&g_serial, &baudRate, &dataBits, &parity, &stopBits);
@@ -460,12 +636,11 @@ void UpdateStatusBar(void)
         case TWOSTOPBITS: stopStr = L"2"; break;
         }
 
-        WCHAR configBuf[32];
-        wsprintfW(configBuf, L"%lu,%d%s%s", baudRate, dataBits, parityStr, stopStr);
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 6, (LPARAM)configBuf);
+        WCHAR buf[48];
+        wsprintfW(buf, L"%s %lu,%d%s%s", g_szPort, baudRate, dataBits, parityStr, stopStr);
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 5, (LPARAM)buf);
     } else {
         SendMessageW(g_hStatusbar, SB_SETTEXT, 5, (LPARAM)LoadStr(IDS_DISCONNECTED));
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 6, (LPARAM)L"");
     }
 }
 

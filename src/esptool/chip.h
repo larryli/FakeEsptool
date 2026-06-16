@@ -561,6 +561,90 @@ BOOL Chip_IsDownloadModeDisabled(const CHIP_CTX *ctx);
 BOOL Chip_IsSecureDownloadEnabled(const CHIP_CTX *ctx);
 
 /*
+ * Chip_GetDlEncryptDisabled - Get raw eFuse value for download encrypt disabled
+ *
+ * Returns raw eFuse bit value (0 or 1) for DISABLE_DL_ENCRYPT / DIS_DOWNLOAD_MANUAL_ENCRYPT.
+ */
+DWORD Chip_GetDlEncryptDisabled(const CHIP_CTX *ctx);
+
+/*
+ * Chip_GetDlModeDisabled - Get raw eFuse value for download mode disabled
+ *
+ * Returns raw eFuse bit value (0 or 1) for UART_DOWNLOAD_DIS / DIS_DOWNLOAD_MODE.
+ */
+DWORD Chip_GetDlModeDisabled(const CHIP_CTX *ctx);
+
+/*
+ * Chip_GetSecureBootFlag - Get raw eFuse value for secure boot
+ *
+ * ESP32: returns ABS_DONE_0 | (ABS_DONE_1 << 1).
+ * Others: returns SECURE_BOOT_EN bit value.
+ */
+DWORD Chip_GetSecureBootFlag(const CHIP_CTX *ctx);
+
+/*
+ * Chip_GetJtagFlag - Get raw eFuse value for JTAG disable
+ *
+ * Returns raw eFuse bit value (0 or 1) for JTAG_DISABLE / DIS_PAD_JTAG.
+ */
+DWORD Chip_GetJtagFlag(const CHIP_CTX *ctx);
+
+/*
+ * Chip_IsSecureBootEnabled - Check if secure boot is enabled
+ *
+ * ESP32: ABS_DONE_0 or ABS_DONE_1 (Secure Boot V1/V2).
+ * ESP32-S2/S3/C3/C6: SECURE_BOOT_EN.
+ * ESP8266/C2: not supported, returns FALSE.
+ */
+BOOL Chip_IsSecureBootEnabled(const CHIP_CTX *ctx);
+
+/*
+ * Chip_IsJtagDisabled - Check if JTAG is disabled via eFuse
+ *
+ * ESP32: JTAG_DISABLE.
+ * ESP32-S2/S3/C3/C6: DIS_PAD_JTAG.
+ * ESP8266/C2: not supported, returns FALSE.
+ */
+BOOL Chip_IsJtagDisabled(const CHIP_CTX *ctx);
+
+/*
+ * Chip_GetJtagDisabledCount - Get number of disabled JTAG interfaces
+ *
+ * Returns count of active JTAG disable bits:
+ * ESP32: 0 or 1 (JTAG_DISABLE).
+ * ESP32-S2: 0-2 (DIS_PAD_JTAG + SOFT_DIS_JTAG).
+ * ESP32-S3/C3/C6: 0-3 (DIS_PAD_JTAG + SOFT_DIS_JTAG + DIS_USB_JTAG).
+ * ESP8266/C2: 0.
+ *
+ * Use with Chip_GetJtagTotalCount() to determine partial/full disable.
+ */
+int Chip_GetJtagDisabledCount(const CHIP_CTX *ctx);
+
+/*
+ * Chip_GetJtagTotalCount - Get total number of JTAG interfaces
+ *
+ * ESP32: 1. ESP32-S2: 2. ESP32-S3/C3/C6: 3. Others: 0.
+ */
+int Chip_GetJtagTotalCount(const CHIP_CTX *ctx);
+
+/*
+ * Chip_GetSoftJtagFlag - Get raw eFuse value for SOFT_DIS_JTAG
+ *
+ * ESP32-S2: single bit (0 or 1).
+ * ESP32-S3/C3/C6: 3-bit counter.
+ * Others: 0.
+ */
+DWORD Chip_GetSoftJtagFlag(const CHIP_CTX *ctx);
+
+/*
+ * Chip_GetUsbJtagFlag - Get raw eFuse value for DIS_USB_JTAG
+ *
+ * ESP32-S3/C3/C6: single bit (0 or 1).
+ * Others: 0.
+ */
+DWORD Chip_GetUsbJtagFlag(const CHIP_CTX *ctx);
+
+/*
  * Chip_GetKeyPurpose - Get key purpose for a key block
  *
  * @ctx:   Chip context
@@ -582,5 +666,21 @@ BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block);
  * the chip type has no encryption key defined.
  */
 int Chip_GetEncryptionKeyOffset(const CHIP_CTX *ctx, int *key_len);
+
+/*
+ * Chip_SetFlashEncryption - Set flash encryption state via eFuse
+ *
+ * @mode: 0 = no encryption, 1 = dev, 2 = prod
+ * Simulator only: directly modifies eFuse array.
+ */
+void Chip_SetFlashEncryption(CHIP_CTX *ctx, int mode);
+
+/*
+ * Chip_SetDownloadMode - Set download mode state via eFuse
+ *
+ * @mode: 0 = normal, 1 = secure, 2 = disabled
+ * Simulator only: directly modifies eFuse array.
+ */
+void Chip_SetDownloadMode(CHIP_CTX *ctx, int mode);
 
 #endif

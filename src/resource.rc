@@ -223,6 +223,13 @@ STRINGTABLE
     IDS_DOWNLOAD_NORMAL     "Download Normal"
     IDS_DOWNLOAD_SECURE     "Download Secure"
     IDS_DOWNLOAD_DISABLED   "Download Disabled"
+    IDS_SB_SECURE_BOOT_ENABLED  "Secure Boot"
+    IDS_SB_SECURE_BOOT_DISABLED "No Secure Boot"
+    IDS_SB_JTAG_DISABLED        "JTAG Disabled"
+    IDS_SB_JTAG_ENABLED         "JTAG Enabled"
+    IDS_SB_JTAG_PARTIAL         "JTAG Partial"
+    IDS_TIP_XTAL_MAC        "%hs %02X:%02X:%02X:%02X:%02X:%02X"
+    IDS_TIP_EFUSE_FIELD     "%hs = 0x%02X"
 }
 
 STRINGTABLE
@@ -484,6 +491,13 @@ STRINGTABLE
     IDS_DOWNLOAD_NORMAL     "下载正常"
     IDS_DOWNLOAD_SECURE     "下载安全"
     IDS_DOWNLOAD_DISABLED   "下载禁用"
+    IDS_SB_SECURE_BOOT_ENABLED  "安全启动"
+    IDS_SB_SECURE_BOOT_DISABLED "无安全启动"
+    IDS_SB_JTAG_DISABLED        "JTAG 已禁用"
+    IDS_SB_JTAG_ENABLED         "JTAG 可用"
+    IDS_SB_JTAG_PARTIAL         "JTAG 部分可用"
+    IDS_TIP_XTAL_MAC        "%hs %02X:%02X:%02X:%02X:%02X:%02X"
+    IDS_TIP_EFUSE_FIELD     "%hs = 0x%02X"
 }
 
 STRINGTABLE

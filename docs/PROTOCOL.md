@@ -228,6 +228,7 @@ Data 字段: [...payload...][status_byte_1][status_byte_2]
 | 0xD1 | ERASE_REGION | ✗ | ✓ | 擦除 Flash 区域 |
 | 0xD2 | READ_FLASH | ✗ | ✓ | 读取 Flash |
 | 0xD3 | RUN_USER_CODE | ✗ | ✓ | 运行用户代码（软复位） |
+| 0xD4 | FLASH_ENCRYPT_DATA | ✗ | ✓ | 加密数据写入 Flash（仅 Stub） |
 | 0xD5 | SPI_NAND_ATTACH | ✗ | ✓ | 附加 SPI NAND Flash |
 | 0xD6 | SPI_NAND_READ_SPARE | ✗ | ✓ | 读取 NAND 备用区域 |
 | 0xD7 | SPI_NAND_WRITE_SPARE | ✗ | ✓ | 写入 NAND 备用区域 |
@@ -1445,6 +1446,7 @@ Stub 上传成功后，设备行为发生变化：
 | 命令码 | 名称 | 说明 |
 |--------|------|------|
 | 0x0E | READ_FLASH_SLOW | 慢速读取 Flash（已废弃） |
+| 0xD4 | FLASH_ENCRYPT_DATA | 加密数据写入 Flash（仅 Stub，esptool 已定义但未使用） |
 | 0xD5 | SPI_NAND_ATTACH | 附加 SPI NAND Flash（仅 Stub） |
 | 0xD6 | SPI_NAND_READ_SPARE | 读取 NAND 备用区域（仅 Stub） |
 | 0xD7 | SPI_NAND_WRITE_SPARE | 写入 NAND 备用区域（仅 Stub） |
@@ -3002,4 +3004,41 @@ ESP 芯片的 ROM bootloader 支持自动波特率检测。当芯片收到 SYNC 
    - 串口噪声干扰
    - 信号质量差
    - 芯片未正确进入下载模式
-   - 复位时序不正确
+    - 复位时序不正确
+
+---
+
+## 附录 Q：eFuse 控制器模拟
+
+ESP32-C2/C3/C6 具有 eFuse 控制器，通过寄存器操作完成 eFuse 烧录。FakeEsptool 在协议层模拟了这一流程。
+
+### Q.1 eFuse 控制器寄存器
+
+| 寄存器 | 偏移 | 说明 |
+|--------|------|------|
+| PGM_DATA0-7 | +0x00..+0x1F | 烧录数据暂存区（8 个 DWORD） |
+| CONF_REG | 见芯片定义 | 解锁码寄存器 |
+| CMD_REG | 见芯片定义 | 命令寄存器（bit1=烧录触发） |
+
+**各芯片偏移：**
+
+| 芯片 | EFUSE_BASE | CONF_REG 偏移 | CMD_REG 偏移 |
+|------|-----------|---------------|-------------|
+| ESP32-C2 | 0x600B4800 | 0x8C | 0x94 |
+| ESP32-C3 | 0x600B0800 | 0x1CC | 0x1D4 |
+| ESP32-C6 | 0x600B4800 | 0x1CC | 0x1D4 |
+
+### Q.2 烧录流程（协议层模拟）
+
+```
+1. 写入 PGM_DATA0-7   → 数据暂存到 pgm_data[8]
+2. 写入 CONF_REG       → 记录解锁码
+3. 写入 CMD_REG (bit1) → 触发烧录：
+   根据 block 编号将 pgm_data[] OR 写入 eFuse 数组的对应位置
+```
+
+**注意：** 协议层严格模拟 OR 写入行为（eFuse 只能置 1，不能清 0）。GUI 层的 eFuse 修改（`Chip_SetFlashEncryption` 等）不经过此路径，直接操作内存数组。
+
+### Q.3 无控制器的芯片
+
+ESP32、ESP32-S2、ESP32-S3 没有 eFuse 控制器。这些芯片的 eFuse 写入通过 espefuse 工具直接操作寄存器完成，FakeEsptool 的协议层通过 `Chip_WriteReg` 对 eFuse 地址范围的写入执行 OR 操作模拟。

@@ -370,6 +370,25 @@ Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 | `Chip_GetEfuseSize(ctx)` | 获取efuse大小 |
 | `Chip_GetBootBaudRate(ctx)` | 获取启动日志波特率 |
 | `Chip_GetBootMessage(ctx, download_mode, reset_cause)` | 获取启动日志文本 |
+| `Chip_IsFlashEncryptionEnabled(ctx)` | 检查 Flash 加密是否启用 |
+| `Chip_IsDownloadEncryptDisabled(ctx)` | 检查下载模式加密是否禁用（生产模式） |
+| `Chip_IsDownloadModeDisabled(ctx)` | 检查下载模式是否禁用 |
+| `Chip_IsSecureDownloadEnabled(ctx)` | 检查安全下载模式是否启用 |
+| `Chip_IsSecureBootEnabled(ctx)` | 检查安全启动是否启用 |
+| `Chip_IsJtagDisabled(ctx)` | 检查 JTAG 是否禁用（DIS_PAD_JTAG） |
+| `Chip_GetJtagDisabledCount(ctx)` | 获取已禁用的 JTAG 接口数 |
+| `Chip_GetJtagTotalCount(ctx)` | 获取 JTAG 接口总数 |
+| `Chip_GetFlashCryptCnt(ctx)` | 获取 SPI_BOOT_CRYPT_CNT 原始值 |
+| `Chip_GetDlEncryptDisabled(ctx)` | 获取 DIS_DOWNLOAD_MANUAL_ENCRYPT 原始值 |
+| `Chip_GetDlModeDisabled(ctx)` | 获取 DIS_DOWNLOAD_MODE 原始值 |
+| `Chip_GetSecureBootFlag(ctx)` | 获取安全启动 eFuse 原始值 |
+| `Chip_GetJtagFlag(ctx)` | 获取 DIS_PAD_JTAG 原始值 |
+| `Chip_GetSoftJtagFlag(ctx)` | 获取 SOFT_DIS_JTAG 原始值 |
+| `Chip_GetUsbJtagFlag(ctx)` | 获取 DIS_USB_JTAG 原始值 |
+| `Chip_GetKeyPurpose(ctx, block)` | 获取密钥块用途 |
+| `Chip_GetEncryptionKeyOffset(ctx, key_len)` | 获取加密密钥 eFuse 偏移和长度 |
+| `Chip_SetFlashEncryption(ctx, mode)` | **GUI 层**：设置加密状态（0=无, 1=开发, 2=生产） |
+| `Chip_SetDownloadMode(ctx, mode)` | **GUI 层**：设置下载模式（0=正常, 1=安全, 2=禁用） |
 
 **Chip_WriteReg eFuse 控制器行为：**
 - 对于有控制器的芯片（C2/C3/C6，`efuse_conf_ofs != 0`）：
@@ -609,6 +628,28 @@ Decrypt_Data(&ctx, ciphertext, plaintext, sizeof(ciphertext));
 - `FlushFileBuffers` 只保证数据到达 USB 串口芯片的内部 FIFO，不保证 FIFO 已物理发出
 - 切换波特率前需等待 FIFO 排空，否则 FIFO 中剩余字节以错误波特率发送导致数据损坏
 - 当前实现按 `256 * 10 / BaudRate` 计算延迟（256 字节 FIFO + 起止位），com0com 等虚拟串口不受影响
+
+### app_commands.h (状态栏与菜单)
+
+**状态栏函数：**
+
+| 函数 | 说明 |
+|------|------|
+| `UpdateStatusBar()` | 更新状态栏 6 栏内容和 Tooltip |
+| `CreateStatusTooltip(hParent)` | 创建状态栏 Tooltip 控件（TTS_BALLOON，父窗口 NULL） |
+
+**菜单命令函数：**
+
+| 函数 | 说明 |
+|------|------|
+| `Main_CmdEncryptState(hWnd, state)` | 切换加密状态（0=无, 1=开发, 2=生产），修改 eFuse |
+| `Main_CmdDownloadMode(hWnd, mode)` | 切换下载模式（0=正常, 1=安全, 2=禁用），修改 eFuse |
+
+**状态栏 Tooltip 实现：**
+- 使用独立 Tooltip 控件（非 `SBARS_TOOLTIPS`）
+- `TTF_SUBRECT` (0x0010) 按栏位矩形命中测试
+- `TTM_DELTOOL` + `TTM_ADDTOOL` 更新文本
+- 父窗口设为 NULL 避免裁剪问题
 
 ## 实现说明
 

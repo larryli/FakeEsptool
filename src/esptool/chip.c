@@ -1206,6 +1206,48 @@ static DWORD ReadEfuseBits(const CHIP_CTX *ctx, int offset, DWORD mask)
 }
 
 /*
+ * WriteEfuseBits - Write (set) bits in eFuse by offset and mask
+ *
+ * @ctx:    Chip context
+ * @offset: Byte offset within eFuse array
+ * @mask:   Bit mask identifying the field
+ * @value:  Value to write (will be shifted to mask position)
+ *
+ * Performs OR-write: only sets bits, never clears.
+ */
+static void WriteEfuseBits(CHIP_CTX *ctx, int offset, DWORD mask, DWORD value)
+{
+    if (!ctx->efuse || offset + 3 >= ctx->efuse_size)
+        return;
+    int shift = 0;
+    DWORD m = mask;
+    while (m && !(m & 1)) { shift++; m >>= 1; }
+    DWORD shifted = (value << shift) & mask;
+    for (int i = 0; i < 4; i++) {
+        DWORD byte_mask = (mask >> (i * 8)) & 0xFF;
+        if (byte_mask)
+            ctx->efuse[offset + i] |= (BYTE)(shifted >> (i * 8)) & (BYTE)byte_mask;
+    }
+}
+
+/*
+ * ClearEfuseBits - Clear bits in eFuse by offset and mask
+ *
+ * Used by the simulator to allow toggling eFuse state for testing.
+ * Real eFuse cannot be cleared.
+ */
+static void ClearEfuseBits(CHIP_CTX *ctx, int offset, DWORD mask)
+{
+    if (!ctx->efuse || offset + 3 >= ctx->efuse_size)
+        return;
+    for (int i = 0; i < 4; i++) {
+        DWORD byte_mask = (mask >> (i * 8)) & 0xFF;
+        if (byte_mask)
+            ctx->efuse[offset + i] &= ~(BYTE)byte_mask;
+    }
+}
+
+/*
  * CountBits - Count number of 1-bits in a value
  */
 static int CountBits(DWORD val)
@@ -1393,6 +1435,292 @@ BOOL Chip_IsSecureDownloadEnabled(const CHIP_CTX *ctx)
 }
 
 /*
+ * Chip_GetDlEncryptDisabled - Get raw eFuse value for download encrypt disabled
+ */
+DWORD Chip_GetDlEncryptDisabled(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DISABLE_DL_ENCRYPT_ESP32,
+                             EFUSE_BIT_DISABLE_DL_ENCRYPT_ESP32) != 0;
+    case CHIP_ESP32S2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32S2,
+                             EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32S2) != 0;
+    case CHIP_ESP32S3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32S3,
+                             EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32S3) != 0;
+    case CHIP_ESP32C2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C2,
+                             EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C2) != 0;
+    case CHIP_ESP32C3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C3,
+                             EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C3) != 0;
+    case CHIP_ESP32C6:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C6,
+                             EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C6) != 0;
+    default:
+        return 0;
+    }
+}
+
+/*
+ * Chip_GetDlModeDisabled - Get raw eFuse value for download mode disabled
+ */
+DWORD Chip_GetDlModeDisabled(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_UART_DOWNLOAD_DIS_ESP32,
+                             EFUSE_BIT_UART_DOWNLOAD_DIS_ESP32) != 0;
+    case CHIP_ESP32S2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32S2,
+                             EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32S2) != 0;
+    case CHIP_ESP32S3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32S3,
+                             EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32S3) != 0;
+    case CHIP_ESP32C2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C2,
+                             EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C2) != 0;
+    case CHIP_ESP32C3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C3,
+                             EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C3) != 0;
+    case CHIP_ESP32C6:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C6,
+                             EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C6) != 0;
+    default:
+        return 0;
+    }
+}
+
+/*
+ * Chip_GetSecureBootFlag - Get raw eFuse value for secure boot
+ *
+ * ESP32: returns ABS_DONE_0 | (ABS_DONE_1 << 1).
+ * Others: returns SECURE_BOOT_EN bit value.
+ */
+DWORD Chip_GetSecureBootFlag(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32: {
+        DWORD v0 = ReadEfuseBits(ctx, EFUSE_OFFS_ABS_DONE_0_ESP32,
+                                 EFUSE_BIT_ABS_DONE_0_ESP32) != 0;
+        DWORD v1 = ReadEfuseBits(ctx, EFUSE_OFFS_ABS_DONE_1_ESP32,
+                                 EFUSE_BIT_ABS_DONE_1_ESP32) != 0;
+        return v0 | (v1 << 1);
+    }
+    case CHIP_ESP32S2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SECURE_BOOT_EN_ESP32S2,
+                             EFUSE_BIT_SECURE_BOOT_EN_ESP32S2) != 0;
+    case CHIP_ESP32S3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SECURE_BOOT_EN_ESP32S3,
+                             EFUSE_BIT_SECURE_BOOT_EN_ESP32S3) != 0;
+    case CHIP_ESP32C3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SECURE_BOOT_EN_ESP32C3,
+                             EFUSE_BIT_SECURE_BOOT_EN_ESP32C3) != 0;
+    case CHIP_ESP32C6:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SECURE_BOOT_EN_ESP32C6,
+                             EFUSE_BIT_SECURE_BOOT_EN_ESP32C6) != 0;
+    default:
+        return 0;
+    }
+}
+
+/*
+ * Chip_GetJtagFlag - Get raw eFuse value for JTAG disable
+ */
+DWORD Chip_GetJtagFlag(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_JTAG_DISABLE_ESP32,
+                             EFUSE_BIT_JTAG_DISABLE_ESP32) != 0;
+    case CHIP_ESP32S2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32S2,
+                             EFUSE_BIT_DIS_PAD_JTAG_ESP32S2) != 0;
+    case CHIP_ESP32S3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32S3,
+                             EFUSE_BIT_DIS_PAD_JTAG_ESP32S3) != 0;
+    case CHIP_ESP32C3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32C3,
+                             EFUSE_BIT_DIS_PAD_JTAG_ESP32C3) != 0;
+    case CHIP_ESP32C6:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32C6,
+                             EFUSE_BIT_DIS_PAD_JTAG_ESP32C6) != 0;
+    default:
+        return 0;
+    }
+}
+
+/*
+ * Chip_GetJtagDisabledCount - Get number of disabled JTAG interfaces
+ */
+int Chip_GetJtagDisabledCount(const CHIP_CTX *ctx)
+{
+    int count = 0;
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        count += ReadEfuseBits(ctx, EFUSE_OFFS_JTAG_DISABLE_ESP32,
+                               EFUSE_BIT_JTAG_DISABLE_ESP32) != 0;
+        break;
+    case CHIP_ESP32S2:
+        count += ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32S2,
+                               EFUSE_BIT_DIS_PAD_JTAG_ESP32S2) != 0;
+        count += ReadEfuseBits(ctx, EFUSE_OFFS_SOFT_DIS_JTAG_ESP32S2,
+                               EFUSE_BIT_SOFT_DIS_JTAG_ESP32S2) != 0;
+        break;
+    case CHIP_ESP32S3:
+        count += ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32S3,
+                               EFUSE_BIT_DIS_PAD_JTAG_ESP32S3) != 0;
+        count += ReadEfuseBits(ctx, EFUSE_OFFS_SOFT_DIS_JTAG_ESP32S3,
+                               EFUSE_MASK_SOFT_DIS_JTAG_ESP32S3) != 0;
+        count += ReadEfuseBits(ctx, EFUSE_OFFS_DIS_USB_JTAG_ESP32S3,
+                               EFUSE_BIT_DIS_USB_JTAG_ESP32S3) != 0;
+        break;
+    case CHIP_ESP32C3:
+        count += ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32C3,
+                               EFUSE_BIT_DIS_PAD_JTAG_ESP32C3) != 0;
+        count += ReadEfuseBits(ctx, EFUSE_OFFS_SOFT_DIS_JTAG_ESP32C3,
+                               EFUSE_MASK_SOFT_DIS_JTAG_ESP32C3) != 0;
+        count += ReadEfuseBits(ctx, EFUSE_OFFS_DIS_USB_JTAG_ESP32C3,
+                               EFUSE_BIT_DIS_USB_JTAG_ESP32C3) != 0;
+        break;
+    case CHIP_ESP32C6:
+        count += ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32C6,
+                               EFUSE_BIT_DIS_PAD_JTAG_ESP32C6) != 0;
+        count += ReadEfuseBits(ctx, EFUSE_OFFS_SOFT_DIS_JTAG_ESP32C6,
+                               EFUSE_MASK_SOFT_DIS_JTAG_ESP32C6) != 0;
+        count += ReadEfuseBits(ctx, EFUSE_OFFS_DIS_USB_JTAG_ESP32C6,
+                               EFUSE_BIT_DIS_USB_JTAG_ESP32C6) != 0;
+        break;
+    default:
+        break;
+    }
+    return count;
+}
+
+/*
+ * Chip_GetJtagTotalCount - Get total number of JTAG interfaces
+ */
+int Chip_GetJtagTotalCount(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32:   return 1;
+    case CHIP_ESP32S2: return 2;
+    case CHIP_ESP32S3:
+    case CHIP_ESP32C3:
+    case CHIP_ESP32C6: return 3;
+    default:           return 0;
+    }
+}
+
+/*
+ * Chip_GetSoftJtagFlag - Get raw eFuse value for SOFT_DIS_JTAG
+ */
+DWORD Chip_GetSoftJtagFlag(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32S2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SOFT_DIS_JTAG_ESP32S2,
+                             EFUSE_BIT_SOFT_DIS_JTAG_ESP32S2) != 0;
+    case CHIP_ESP32S3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SOFT_DIS_JTAG_ESP32S3,
+                             EFUSE_MASK_SOFT_DIS_JTAG_ESP32S3) >> 16;
+    case CHIP_ESP32C3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SOFT_DIS_JTAG_ESP32C3,
+                             EFUSE_MASK_SOFT_DIS_JTAG_ESP32C3) >> 16;
+    case CHIP_ESP32C6:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SOFT_DIS_JTAG_ESP32C6,
+                             EFUSE_MASK_SOFT_DIS_JTAG_ESP32C6) >> 16;
+    default:
+        return 0;
+    }
+}
+
+/*
+ * Chip_GetUsbJtagFlag - Get raw eFuse value for DIS_USB_JTAG
+ */
+DWORD Chip_GetUsbJtagFlag(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32S3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_USB_JTAG_ESP32S3,
+                             EFUSE_BIT_DIS_USB_JTAG_ESP32S3) != 0;
+    case CHIP_ESP32C3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_USB_JTAG_ESP32C3,
+                             EFUSE_BIT_DIS_USB_JTAG_ESP32C3) != 0;
+    case CHIP_ESP32C6:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_USB_JTAG_ESP32C6,
+                             EFUSE_BIT_DIS_USB_JTAG_ESP32C6) != 0;
+    default:
+        return 0;
+    }
+}
+
+/*
+ * Chip_IsSecureBootEnabled - Check if secure boot is enabled
+ *
+ * ESP32: ABS_DONE_0 (Secure Boot V1) or ABS_DONE_1 (Secure Boot V2).
+ * ESP32-S2/S3/C3/C6: SECURE_BOOT_EN.
+ * ESP8266/C2: not supported.
+ */
+BOOL Chip_IsSecureBootEnabled(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32: {
+        BOOL v1 = ReadEfuseBits(ctx, EFUSE_OFFS_ABS_DONE_0_ESP32,
+                                EFUSE_BIT_ABS_DONE_0_ESP32) != 0;
+        BOOL v2 = ReadEfuseBits(ctx, EFUSE_OFFS_ABS_DONE_1_ESP32,
+                                EFUSE_BIT_ABS_DONE_1_ESP32) != 0;
+        return v1 || v2;
+    }
+    case CHIP_ESP32S2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SECURE_BOOT_EN_ESP32S2,
+                             EFUSE_BIT_SECURE_BOOT_EN_ESP32S2) != 0;
+    case CHIP_ESP32S3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SECURE_BOOT_EN_ESP32S3,
+                             EFUSE_BIT_SECURE_BOOT_EN_ESP32S3) != 0;
+    case CHIP_ESP32C3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SECURE_BOOT_EN_ESP32C3,
+                             EFUSE_BIT_SECURE_BOOT_EN_ESP32C3) != 0;
+    case CHIP_ESP32C6:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_SECURE_BOOT_EN_ESP32C6,
+                             EFUSE_BIT_SECURE_BOOT_EN_ESP32C6) != 0;
+    default:
+        return FALSE;
+    }
+}
+
+/*
+ * Chip_IsJtagDisabled - Check if JTAG is disabled via eFuse
+ *
+ * ESP32: JTAG_DISABLE.
+ * ESP32-S2/S3/C3/C6: DIS_PAD_JTAG.
+ * ESP8266/C2: not supported.
+ */
+BOOL Chip_IsJtagDisabled(const CHIP_CTX *ctx)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_JTAG_DISABLE_ESP32,
+                             EFUSE_BIT_JTAG_DISABLE_ESP32) != 0;
+    case CHIP_ESP32S2:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32S2,
+                             EFUSE_BIT_DIS_PAD_JTAG_ESP32S2) != 0;
+    case CHIP_ESP32S3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32S3,
+                             EFUSE_BIT_DIS_PAD_JTAG_ESP32S3) != 0;
+    case CHIP_ESP32C3:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32C3,
+                             EFUSE_BIT_DIS_PAD_JTAG_ESP32C3) != 0;
+    case CHIP_ESP32C6:
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32C6,
+                             EFUSE_BIT_DIS_PAD_JTAG_ESP32C6) != 0;
+    default:
+        return FALSE;
+    }
+}
+
+/*
  * Key purpose values (from espefuse/efuse/esp32c3/mem_definition.py)
  */
 #define KEY_PURPOSE_USER            0
@@ -1491,5 +1819,105 @@ int Chip_GetEncryptionKeyOffset(const CHIP_CTX *ctx, int *key_len)
     default:
         *key_len = 0;
         return -1;
+    }
+}
+
+/*
+ * Chip_SetFlashEncryption - Set flash encryption state via eFuse
+ *
+ * @mode: 0 = no encryption, 1 = dev (encrypted), 2 = prod (encrypted + no manual encrypt)
+ *
+ * Simulator only: directly modifies eFuse array (clears then sets bits).
+ */
+void Chip_SetFlashEncryption(CHIP_CTX *ctx, int mode)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        ClearEfuseBits(ctx, 0x00, EFUSE_MASK_FLASH_CRYPT_CNT_ESP32);
+        ClearEfuseBits(ctx, 0x18, EFUSE_BIT_DISABLE_DL_ENCRYPT_ESP32);
+        if (mode >= 1) WriteEfuseBits(ctx, 0x00, EFUSE_MASK_FLASH_CRYPT_CNT_ESP32, 1);
+        if (mode >= 2) WriteEfuseBits(ctx, 0x18, EFUSE_BIT_DISABLE_DL_ENCRYPT_ESP32, 1);
+        break;
+    case CHIP_ESP32S2:
+        ClearEfuseBits(ctx, 0x34, EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32S2);
+        ClearEfuseBits(ctx, 0x30, EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32S2);
+        if (mode >= 1) WriteEfuseBits(ctx, 0x34, EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32S2, 1);
+        if (mode >= 2) WriteEfuseBits(ctx, 0x30, EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32S2, 1);
+        break;
+    case CHIP_ESP32S3:
+        ClearEfuseBits(ctx, 0x34, EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32S3);
+        ClearEfuseBits(ctx, 0x30, EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32S3);
+        if (mode >= 1) WriteEfuseBits(ctx, 0x34, EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32S3, 1);
+        if (mode >= 2) WriteEfuseBits(ctx, 0x30, EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32S3, 1);
+        break;
+    case CHIP_ESP32C2:
+        ClearEfuseBits(ctx, 0x30, EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C2);
+        ClearEfuseBits(ctx, 0x30, EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C2);
+        if (mode >= 1) WriteEfuseBits(ctx, 0x30, EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C2, 1);
+        if (mode >= 2) WriteEfuseBits(ctx, 0x30, EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C2, 1);
+        break;
+    case CHIP_ESP32C3:
+        ClearEfuseBits(ctx, 0x34, EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C3);
+        ClearEfuseBits(ctx, 0x30, EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C3);
+        if (mode >= 1) WriteEfuseBits(ctx, 0x34, EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C3, 1);
+        if (mode >= 2) WriteEfuseBits(ctx, 0x30, EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C3, 1);
+        break;
+    case CHIP_ESP32C6:
+        ClearEfuseBits(ctx, 0x34, EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C6);
+        ClearEfuseBits(ctx, 0x30, EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C6);
+        if (mode >= 1) WriteEfuseBits(ctx, 0x34, EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C6, 1);
+        if (mode >= 2) WriteEfuseBits(ctx, 0x30, EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C6, 1);
+        break;
+    default:
+        break;
+    }
+}
+
+/*
+ * Chip_SetDownloadMode - Set download mode state via eFuse
+ *
+ * @mode: 0 = normal, 1 = secure, 2 = disabled
+ *
+ * Simulator only: directly modifies eFuse array (clears then sets bits).
+ */
+void Chip_SetDownloadMode(CHIP_CTX *ctx, int mode)
+{
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        ClearEfuseBits(ctx, 0x00, EFUSE_BIT_UART_DOWNLOAD_DIS_ESP32);
+        if (mode >= 2) WriteEfuseBits(ctx, 0x00, EFUSE_BIT_UART_DOWNLOAD_DIS_ESP32, 1);
+        break;
+    case CHIP_ESP32S2:
+        ClearEfuseBits(ctx, 0x3C, EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32S2);
+        ClearEfuseBits(ctx, 0x3C, EFUSE_BIT_ENABLE_SECURITY_DL_ESP32S2);
+        if (mode >= 1) WriteEfuseBits(ctx, 0x3C, EFUSE_BIT_ENABLE_SECURITY_DL_ESP32S2, 1);
+        if (mode >= 2) WriteEfuseBits(ctx, 0x3C, EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32S2, 1);
+        break;
+    case CHIP_ESP32S3:
+        ClearEfuseBits(ctx, 0x3C, EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32S3);
+        ClearEfuseBits(ctx, 0x3C, EFUSE_BIT_ENABLE_SECURITY_DL_ESP32S3);
+        if (mode >= 1) WriteEfuseBits(ctx, 0x3C, EFUSE_BIT_ENABLE_SECURITY_DL_ESP32S3, 1);
+        if (mode >= 2) WriteEfuseBits(ctx, 0x3C, EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32S3, 1);
+        break;
+    case CHIP_ESP32C2:
+        ClearEfuseBits(ctx, 0x30, EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C2);
+        ClearEfuseBits(ctx, 0x30, EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C2);
+        if (mode >= 1) WriteEfuseBits(ctx, 0x30, EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C2, 1);
+        if (mode >= 2) WriteEfuseBits(ctx, 0x30, EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C2, 1);
+        break;
+    case CHIP_ESP32C3:
+        ClearEfuseBits(ctx, 0x3C, EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C3);
+        ClearEfuseBits(ctx, 0x3C, EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C3);
+        if (mode >= 1) WriteEfuseBits(ctx, 0x3C, EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C3, 1);
+        if (mode >= 2) WriteEfuseBits(ctx, 0x3C, EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C3, 1);
+        break;
+    case CHIP_ESP32C6:
+        ClearEfuseBits(ctx, 0x3C, EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C6);
+        ClearEfuseBits(ctx, 0x3C, EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C6);
+        if (mode >= 1) WriteEfuseBits(ctx, 0x3C, EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C6, 1);
+        if (mode >= 2) WriteEfuseBits(ctx, 0x3C, EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C6, 1);
+        break;
+    default:
+        break;
     }
 }

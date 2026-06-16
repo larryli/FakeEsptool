@@ -30,13 +30,11 @@ extern HWND g_hStatusbar;
 #define DEFAULT_FONT_SIZE 10
 
 /* Status bar part widths */
-#define STATUS_PART1_WIDTH  100  /* Chip model */
-#define STATUS_PART2_WIDTH  80   /* Flash size */
-#define STATUS_PART3_WIDTH  150  /* MAC address */
-#define STATUS_PART4_WIDTH  140  /* Encryption status */
-#define STATUS_PART5_WIDTH  120  /* UART status */
-#define STATUS_PART6_WIDTH  120  /* Port name */
-#define STATUS_PART7_WIDTH  140  /* Port config */
+#define STATUS_PART1_WIDTH  100  /* Chip + Flash size */
+#define STATUS_PART2_WIDTH  110  /* Encryption status */
+#define STATUS_PART3_WIDTH  110  /* Download mode */
+#define STATUS_PART4_WIDTH  110  /* Secure Boot status */
+#define STATUS_PART5_WIDTH  100  /* JTAG status */
 
 /* Message size limit */
 #define MAX_MSG_SIZE        65536
@@ -75,6 +73,11 @@ void UpdateTitle(HWND hWnd);
  * UpdateStatusBar - Update status bar display
  */
 void UpdateStatusBar(void);
+
+/*
+ * CreateStatusTooltip - Create tooltip control for status bar
+ */
+void CreateStatusTooltip(HWND hParent);
 
 /*
  * PromptDisconnectIfNeeded - Check if serial is connected, prompt to disconnect
