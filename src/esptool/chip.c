@@ -101,7 +101,7 @@ static BOOL InitChipCommon(CHIP_CTX *ctx, CHIP_TYPE type)
 
     ctx->efuse = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ctx->efuse_size);
     if (!ctx->efuse) {
-        TRACE_FW(TAG, "Failed to allocate eFuse for %s", cfg->name);
+        TRACE_PROTO(TAG, "Failed to allocate eFuse for %s", cfg->name);
         return FALSE;
     }
 
@@ -220,7 +220,23 @@ static BOOL InitEsp32(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32))
         return FALSE;
+
+    /* Set BLOCK0 default values matching real ESP32 hardware.
+       BLOCK0 is at offset 0x00 in the eFuse array (EFUSE_RD_REG_BASE mapping).
+       Word0 (offset 0x00): CHIP_CPU_FREQ_RATED(bit31) + CONSOLE_DEBUG_DISABLE(bit12)
+       Word5 (offset 0x14): FLASH_CRYPT_CONFIG default = 0xF (all tweak bits) */
+    ctx->efuse[0x00] = 0x00;
+    ctx->efuse[0x01] = 0x10;
+    ctx->efuse[0x02] = 0x00;
+    ctx->efuse[0x03] = 0x80;  /* word0 = 0x80001000 */
+    ctx->efuse[0x17] = 0xF0;  /* FLASH_CRYPT_CONFIG = 0xF at word5 bits[31:28] */
+    TRACE_PROTO(TAG, "InitEsp32: BLOCK0 defaults set, word0=%02X%02X%02X%02X, crypt_cfg=%02X, efuse=%p",
+             ctx->efuse[0x03], ctx->efuse[0x02], ctx->efuse[0x01], ctx->efuse[0x00],
+             ctx->efuse[0x14], ctx->efuse);
+
     WriteMacEsp32(ctx);
+    TRACE_PROTO(TAG, "InitEsp32: After MAC write, word0=%02X%02X%02X%02X",
+             ctx->efuse[0x03], ctx->efuse[0x02], ctx->efuse[0x01], ctx->efuse[0x00]);
     /* ESP32 chip detection uses magic value at 0x40001000 (CHIP_DETECT_REG),
        not eFuse. Do NOT call WriteChipIdToEfuse as it would overlap with
        BLOCK1 (key area at 0x38-0x57). */
@@ -231,6 +247,42 @@ static BOOL InitEsp32(CHIP_CTX *ctx)
     ctx->efuse_cmd_ofs = 0x104;  /* EFUSE_REG_CMD */
 
     return TRUE;
+}
+
+/*
+ * Chip_ApplyBlock0Defaults - Apply BLOCK0 defaults for missing eFuse fields
+ *
+ * Fills zero-valued BLOCK0 bytes with chip-specific defaults.
+ * Used when loading old .esp files that may not have all BLOCK0 fields.
+ * Only writes to bytes that are zero to avoid overwriting user data.
+ */
+void Chip_ApplyBlock0Defaults(CHIP_CTX *ctx)
+{
+    if (!ctx->efuse)
+        return;
+
+    TRACE_PROTO(TAG, "ApplyBlock0Defaults: word0=%02X%02X%02X%02X, crypt_cfg=%02X",
+             ctx->efuse[0x03], ctx->efuse[0x02], ctx->efuse[0x01], ctx->efuse[0x00],
+             ctx->efuse[0x14]);
+
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        /* word0: CHIP_CPU_FREQ_RATED + CONSOLE_DEBUG_DISABLE */
+        if (ctx->efuse[0x00] == 0 && ctx->efuse[0x01] == 0 &&
+            ctx->efuse[0x02] == 0 && ctx->efuse[0x03] == 0) {
+            ctx->efuse[0x01] = 0x10;
+            ctx->efuse[0x03] = 0x80;
+            TRACE_PROTO(TAG, "ApplyBlock0Defaults: word0 defaults applied");
+        }
+        /* word5: FLASH_CRYPT_CONFIG at bits[31:28] */
+        if (ctx->efuse[0x17] == 0) {
+            ctx->efuse[0x17] = 0xF0;
+            TRACE_FW(TAG, "ApplyBlock0Defaults: FLASH_CRYPT_CONFIG set to 0xF");
+        }
+        break;
+    default:
+        break;
+    }
 }
 
 /*
@@ -414,7 +466,7 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
     case CHIP_ESP32C3: if (!InitEsp32C3(ctx)) goto fail; break;
     case CHIP_ESP32C6: if (!InitEsp32C6(ctx)) goto fail; break;
     default:
-        TRACE_FW(TAG, "Unknown chip type: %d", type);
+        TRACE_PROTO(TAG, "Unknown chip type: %d", type);
         return FALSE;
     }
 
@@ -424,7 +476,7 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
     /* Initialize SPI register defaults */
     ctx->spi_regs[SPI_CMD_OFFS / 4] = 0;
 
-    TRACE_FW(TAG, "Chip: %s, eFuse: %d bytes, Flash: %lu KB, SPI_BASE: 0x%08lX, SPI_W0: 0x%02X", 
+    TRACE_PROTO(TAG, "Chip: %s, eFuse: %d bytes, Flash: %lu KB, SPI_BASE: 0x%08lX, SPI_W0: 0x%02X", 
              ctx->name, ctx->efuse_size, ctx->flash_size / 1024, ctx->spi_reg_base, ctx->spi_offs->w0);
     return TRUE;
 
@@ -696,7 +748,7 @@ static const DWORD efuse_block_wr_offsets_esp32[] = {
 static void EfuseWrite32(CHIP_CTX *ctx, int offset, DWORD val)
 {
     if (offset + 3 < ctx->efuse_size) {
-#ifdef ENABLE_TRACE_FW
+#ifdef ENABLE_TRACE_PROTO
         BYTE b0 = ctx->efuse[offset];
         BYTE b1 = ctx->efuse[offset + 1];
         BYTE b2 = ctx->efuse[offset + 2];
@@ -706,7 +758,7 @@ static void EfuseWrite32(CHIP_CTX *ctx, int offset, DWORD val)
         ctx->efuse[offset + 1] |= (BYTE)((val >> 8) & 0xFF);
         ctx->efuse[offset + 2] |= (BYTE)((val >> 16) & 0xFF);
         ctx->efuse[offset + 3] |= (BYTE)((val >> 24) & 0xFF);
-        TRACE_FW(TAG, "eFuse write: offset=0x%X val=0x%08lX before=%02X%02X%02X%02X after=%02X%02X%02X%02X",
+        TRACE_PROTO(TAG, "eFuse write: offset=0x%X val=0x%08lX before=%02X%02X%02X%02X after=%02X%02X%02X%02X",
                  offset, val, b3,b2,b1,b0,
                  ctx->efuse[offset+3], ctx->efuse[offset+2],
                  ctx->efuse[offset+1], ctx->efuse[offset]);
@@ -727,7 +779,7 @@ static BOOL Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, DWORD val)
             int word_idx = (offset - wr_ofs) / 4;
             if (word_idx < 8) {
                 ctx->pgm_data[blk * 8 + word_idx] = val;
-                TRACE_FW(TAG, "ESP32 BLOCK%d PGM_DATA%d = 0x%08lX", blk, word_idx, val);
+                TRACE_PROTO(TAG, "ESP32 BLOCK%d PGM_DATA%d = 0x%08lX", blk, word_idx, val);
             }
             return TRUE;
         }
@@ -735,13 +787,13 @@ static BOOL Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, DWORD val)
 
     /* CONF_REG */
     if (offset == (int)ctx->efuse_conf_ofs) {
-        TRACE_FW(TAG, "EFUSE_CONF = 0x%08lX", val);
+        TRACE_PROTO(TAG, "EFUSE_CONF = 0x%08lX", val);
         return TRUE;
     }
 
     /* CMD_REG */
     if (offset == (int)ctx->efuse_cmd_ofs) {
-        TRACE_FW(TAG, "EFUSE_CMD = 0x%08lX", val);
+        TRACE_PROTO(TAG, "EFUSE_CMD = 0x%08lX", val);
         if (val == 0x1) {
             /* EFUSE_CMD_READ: Copy write registers to read registers */
             for (int blk = 0; blk < num_blocks; blk++) {
@@ -756,7 +808,7 @@ static BOOL Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, DWORD val)
                 for (int i = 0; i < block_len; i++) {
                     EfuseWrite32(ctx, block_offset + i * 4, blk_pgm[i]);
                 }
-                TRACE_FW(TAG, "ESP32 eFuse BURN block%d at offset 0x%X (%d words)", blk, block_offset, block_len);
+                TRACE_PROTO(TAG, "ESP32 eFuse BURN block%d at offset 0x%X (%d words)", blk, block_offset, block_len);
             }
             memset(ctx->pgm_data, 0, sizeof(ctx->pgm_data));
         }
@@ -778,20 +830,20 @@ static BOOL Chip_WriteRegModern(CHIP_CTX *ctx, int offset, DWORD val)
         int idx = offset / 4;
         if (idx < 8) {
             ctx->pgm_data[idx] = val;
-            TRACE_FW(TAG, "PGM_DATA%d = 0x%08lX", idx, val);
+            TRACE_PROTO(TAG, "PGM_DATA%d = 0x%08lX", idx, val);
         }
         return TRUE;
     }
 
     /* CONF_REG */
     if (offset == (int)ctx->efuse_conf_ofs) {
-        TRACE_FW(TAG, "EFUSE_CONF = 0x%08lX", val);
+        TRACE_PROTO(TAG, "EFUSE_CONF = 0x%08lX", val);
         return TRUE;
     }
 
     /* CMD_REG */
     if (offset == (int)ctx->efuse_cmd_ofs) {
-        TRACE_FW(TAG, "EFUSE_CMD = 0x%08lX", val);
+        TRACE_PROTO(TAG, "EFUSE_CMD = 0x%08lX", val);
         if (val & 0x02) {
             int block = (int)((val >> 2) & 0xF);
             const DWORD *block_offsets = NULL;
@@ -821,7 +873,7 @@ static BOOL Chip_WriteRegModern(CHIP_CTX *ctx, int offset, DWORD val)
                 for (int i = 0; i < 8; i++) {
                     EfuseWrite32(ctx, block_offset + i * 4, ctx->pgm_data[i]);
                 }
-                TRACE_FW(TAG, "eFuse BURN block%d at offset 0x%X", block, block_offset);
+                TRACE_PROTO(TAG, "eFuse BURN block%d at offset 0x%X", block, block_offset);
             }
         }
         return TRUE;
@@ -832,7 +884,7 @@ static BOOL Chip_WriteRegModern(CHIP_CTX *ctx, int offset, DWORD val)
 
 BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
 {
-    /* 1. eFuse controller write */
+    /* 1. eFuse controller write (EFUSE_RD_REG_BASE range) */
     if (ctx->efuse_base != 0 && ctx->efuse_conf_ofs != 0 &&
         addr >= ctx->efuse_base && addr < ctx->efuse_base + ctx->efuse_size) {
         int offset = (int)(addr - ctx->efuse_base);
@@ -841,6 +893,16 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
             return Chip_WriteRegEsp32(ctx, offset, val);
         else
             return Chip_WriteRegModern(ctx, offset, val);
+    }
+
+    /* 1b. ESP32: eFuse controller writes at EFUSE_BASE (0x3FF42000) range.
+       espefuse sends PGM_DATA and CMD_REG writes to this address range.
+       Translate to EFUSE_RD_REG_BASE offset (-0x10) for Chip_WriteRegEsp32.
+       Must be checked BEFORE SPI register handler (same address range). */
+    if (ctx->type == CHIP_ESP32 && ctx->efuse_conf_ofs != 0 &&
+        addr >= SPI_REG_BASE_ESP32 && addr < SPI_REG_BASE_ESP32 + 0x100) {
+        int offset = (int)(addr - SPI_REG_BASE_ESP32) - 0x10;
+        return Chip_WriteRegEsp32(ctx, offset, val);
     }
 
     /* 2. SPI register write */
@@ -858,7 +920,7 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
 
                 if (cmd == SPIFLASH_RDID) {
                     ctx->spi_regs[ctx->spi_offs->w0 / 4] = ctx->flash_id;
-                    TRACE_FW(TAG, "SPI RDID: flash_id=0x%08lX", ctx->flash_id);
+                    TRACE_PROTO(TAG, "SPI RDID: flash_id=0x%08lX", ctx->flash_id);
                 }
 
                 ctx->spi_regs[SPI_CMD_OFFS / 4] &= ~SPI_CMD_USR;

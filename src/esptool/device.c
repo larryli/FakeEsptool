@@ -30,7 +30,7 @@ BOOL Device_Init(DEVICE_CTX *ctx, CHIP_TYPE chipType, DWORD flashSize, const BYT
     memset(ctx, 0, sizeof(DEVICE_CTX));
 
     if (!Chip_Init(&ctx->chip, chipType)) {
-        TRACE_FW(TAG, "Chip_Init failed");
+        TRACE_PROTO(TAG, "Chip_Init failed");
         return FALSE;
     }
 
@@ -39,14 +39,19 @@ BOOL Device_Init(DEVICE_CTX *ctx, CHIP_TYPE chipType, DWORD flashSize, const BYT
     if (mac)
         Chip_SetMac(&ctx->chip, mac);
 
+    TRACE_PROTO(TAG, "Device_Init: After init, word0=%02X%02X%02X%02X, crypt_cfg=%02X, efuse=%p",
+             ctx->chip.efuse[0x03], ctx->chip.efuse[0x02],
+             ctx->chip.efuse[0x01], ctx->chip.efuse[0x00],
+             ctx->chip.efuse[0x14], ctx->chip.efuse);
+
     if (!Flash_Init(&ctx->flash, flashSize)) {
-        TRACE_FW(TAG, "Flash_Init failed");
+        TRACE_PROTO(TAG, "Flash_Init failed");
         Chip_Close(&ctx->chip);
         return FALSE;
     }
 
     ctx->modified = FALSE;
-    TRACE_FW(TAG, "Device created: %s, %lu MB", ctx->chip.name, flashSize / (1024*1024));
+    TRACE_PROTO(TAG, "Device created: %s, %lu MB", ctx->chip.name, flashSize / (1024*1024));
     return TRUE;
 }
 
@@ -79,7 +84,7 @@ BOOL Device_Save(DEVICE_CTX *ctx, const WCHAR *filename)
     HANDLE hFile = CreateFileW(filename, GENERIC_WRITE, 0, NULL,
                                CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
-        TRACE_FW(TAG, "CreateFile failed: %lu", GetLastError());
+        TRACE_PROTO(TAG, "CreateFile failed: %lu", GetLastError());
         return FALSE;
     }
 
@@ -115,7 +120,7 @@ BOOL Device_Save(DEVICE_CTX *ctx, const WCHAR *filename)
     /* Flash data (variable) */
     if (flashSize > 0) {
         if (!ctx->flash.data) {
-            TRACE_FW(TAG, "Device save failed: flash data is NULL");
+            TRACE_PROTO(TAG, "Device save failed: flash data is NULL");
             CloseHandle(hFile);
             DeleteFileW(filename);
             return FALSE;
@@ -126,7 +131,7 @@ BOOL Device_Save(DEVICE_CTX *ctx, const WCHAR *filename)
     CloseHandle(hFile);
 
     if (!ok) {
-        TRACE_FW(TAG, "Device save failed: write error");
+        TRACE_PROTO(TAG, "Device save failed: write error");
         DeleteFileW(filename);
         return FALSE;
     }
@@ -134,7 +139,7 @@ BOOL Device_Save(DEVICE_CTX *ctx, const WCHAR *filename)
     lstrcpyW(ctx->filename, filename);
     ctx->modified = FALSE;
 
-    TRACE_FW(TAG, "Device saved: %S", filename);
+    TRACE_PROTO(TAG, "Device saved: %S", filename);
     return TRUE;
 }
 
@@ -154,7 +159,7 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     HANDLE hFile = CreateFileW(filename, GENERIC_READ, 0, NULL,
                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
-        TRACE_FW(TAG, "CreateFile failed: %lu", GetLastError());
+        TRACE_PROTO(TAG, "CreateFile failed: %lu", GetLastError());
         return FALSE;
     }
 
@@ -170,21 +175,21 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     ok = ok && ReadFile(hFile, &magic, 4, &read, NULL) && read == 4;
     if (!ok || magic != DEVICE_MAGIC) {
         CloseHandle(hFile);
-        TRACE_FW(TAG, "Invalid magic");
+        TRACE_PROTO(TAG, "Invalid magic");
         return FALSE;
     }
 
     ok = ok && ReadFile(hFile, &version, 4, &read, NULL) && read == 4;
     if (!ok || version != DEVICE_VERSION) {
         CloseHandle(hFile);
-        TRACE_FW(TAG, "Unsupported version: %lu", version);
+        TRACE_PROTO(TAG, "Unsupported version: %lu", version);
         return FALSE;
     }
 
     ok = ok && ReadFile(hFile, &chipType, 4, &read, NULL) && read == 4;
     if (!ok || chipType >= CHIP_COUNT) {
         CloseHandle(hFile);
-        TRACE_FW(TAG, "Invalid chip type: %lu", chipType);
+        TRACE_PROTO(TAG, "Invalid chip type: %lu", chipType);
         return FALSE;
     }
 
@@ -200,7 +205,7 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
 
     if (!ok) {
         CloseHandle(hFile);
-        TRACE_FW(TAG, "Failed to read header");
+        TRACE_PROTO(TAG, "Failed to read header");
         return FALSE;
     }
 
@@ -218,7 +223,7 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     ok = ReadFile(hFile, &efuseSize, 4, &read, NULL) && read == 4;
     if (!ok) {
         CloseHandle(hFile);
-        TRACE_FW(TAG, "Failed to read efuse size");
+        TRACE_PROTO(TAG, "Failed to read efuse size");
         Chip_Close(&ctx->chip);
         return FALSE;
     }
@@ -228,16 +233,20 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
             ok = ReadFile(hFile, ctx->chip.efuse, efuseSize, &read, NULL) && read == efuseSize;
             if (!ok) {
                 CloseHandle(hFile);
-                TRACE_FW(TAG, "Failed to read efuse data");
+                TRACE_PROTO(TAG, "Failed to read efuse data");
                 Chip_Close(&ctx->chip);
                 return FALSE;
             }
         } else {
             /* Skip excess eFuse data */
             SetFilePointer(hFile, efuseSize, NULL, FILE_CURRENT);
-            TRACE_FW(TAG, "Warning: efuse size mismatch (file=%lu, chip=%d)", efuseSize, ctx->chip.efuse_size);
+            TRACE_PROTO(TAG, "Warning: efuse size mismatch (file=%lu, chip=%d)", efuseSize, ctx->chip.efuse_size);
         }
     }
+
+    /* Apply BLOCK0 defaults for fields that old .esp files may not have.
+       Only fills zero-valued bytes to avoid overwriting user data. */
+    Chip_ApplyBlock0Defaults(&ctx->chip);
 
     /* Flash init and data */
     if (!Flash_Init(&ctx->flash, flashSize)) {
@@ -249,7 +258,7 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     if (flashSize > 0) {
         ok = ReadFile(hFile, ctx->flash.data, flashSize, &read, NULL) && read == flashSize;
         if (!ok) {
-            TRACE_FW(TAG, "Failed to read flash data (expected %lu, got %lu)", flashSize, read);
+            TRACE_PROTO(TAG, "Failed to read flash data (expected %lu, got %lu)", flashSize, read);
             CloseHandle(hFile);
             Flash_Close(&ctx->flash);
             Chip_Close(&ctx->chip);
@@ -262,7 +271,7 @@ BOOL Device_Load(DEVICE_CTX *ctx, const WCHAR *filename)
     lstrcpyW(ctx->filename, filename);
     ctx->modified = FALSE;
 
-    TRACE_FW(TAG, "Device loaded: %s, %lu MB", ctx->chip.name, flashSize / (1024*1024));
+    TRACE_PROTO(TAG, "Device loaded: %s, %lu MB", ctx->chip.name, flashSize / (1024*1024));
     return TRUE;
 }
 

@@ -193,22 +193,22 @@
  * ============================================================================ */
 
 /* KEY_PURPOSE_0 (BLOCK_KEY0) - BLOCK0 word2 bits[27:24] */
-#define EFUSE_OFFS_KEY_PURPOSE_0                0x34
+#define EFUSE_OFFS_KEY_PURPOSE_0                0x08
 #define EFUSE_MASK_KEY_PURPOSE_0                (0x0FUL << 24)
 /* KEY_PURPOSE_1 (BLOCK_KEY1) - BLOCK0 word2 bits[31:28] */
-#define EFUSE_OFFS_KEY_PURPOSE_1                0x34
+#define EFUSE_OFFS_KEY_PURPOSE_1                0x08
 #define EFUSE_MASK_KEY_PURPOSE_1                (0x0FUL << 28)
 /* KEY_PURPOSE_2 (BLOCK_KEY2) - BLOCK0 word3 bits[3:0] */
-#define EFUSE_OFFS_KEY_PURPOSE_2                0x38
+#define EFUSE_OFFS_KEY_PURPOSE_2                0x0C
 #define EFUSE_MASK_KEY_PURPOSE_2                (0x0FUL << 0)
 /* KEY_PURPOSE_3 (BLOCK_KEY3) - BLOCK0 word3 bits[7:4] */
-#define EFUSE_OFFS_KEY_PURPOSE_3                0x38
+#define EFUSE_OFFS_KEY_PURPOSE_3                0x0C
 #define EFUSE_MASK_KEY_PURPOSE_3                (0x0FUL << 4)
 /* KEY_PURPOSE_4 (BLOCK_KEY4) - BLOCK0 word3 bits[11:8] */
-#define EFUSE_OFFS_KEY_PURPOSE_4                0x38
+#define EFUSE_OFFS_KEY_PURPOSE_4                0x0C
 #define EFUSE_MASK_KEY_PURPOSE_4                (0x0FUL << 8)
 /* KEY_PURPOSE_5 (BLOCK_KEY5) - BLOCK0 word3 bits[15:12] */
-#define EFUSE_OFFS_KEY_PURPOSE_5                0x38
+#define EFUSE_OFFS_KEY_PURPOSE_5                0x0C
 #define EFUSE_MASK_KEY_PURPOSE_5                (0x0FUL << 12)
 
 /* Key purpose values */
@@ -736,5 +736,13 @@ void Chip_SetFlashEncryption(CHIP_CTX *ctx, int mode);
  * Simulator only: directly modifies eFuse array.
  */
 void Chip_SetDownloadMode(CHIP_CTX *ctx, int mode);
+
+/*
+ * Chip_ApplyBlock0Defaults - Apply BLOCK0 defaults for missing eFuse fields
+ *
+ * Fills zero-valued BLOCK0 bytes with chip-specific defaults.
+ * Used when loading old .esp files that may not have all BLOCK0 fields.
+ */
+void Chip_ApplyBlock0Defaults(CHIP_CTX *ctx);
 
 #endif

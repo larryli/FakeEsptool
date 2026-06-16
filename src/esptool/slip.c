@@ -52,7 +52,7 @@ BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b)
 
     if (ctx->escaped) {
         if (ctx->len >= SLIP_MAX_FRAME) {
-            TRACE_FW(TAG, "Frame overflow");
+            TRACE_PROTO(TAG, "Frame overflow");
             ctx->in_frame = FALSE;
             ctx->len = 0;
             return FALSE;
@@ -65,7 +65,7 @@ BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b)
             ctx->buf[ctx->len++] = SLIP_ESC;
             break;
         default:
-            TRACE_FW(TAG, "Invalid escape: 0x%02X", b);
+            TRACE_PROTO(TAG, "Invalid escape: 0x%02X", b);
             ctx->in_frame = FALSE;
             ctx->len = 0;
             return FALSE;
@@ -75,7 +75,7 @@ BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b)
         ctx->escaped = TRUE;
     } else {
         if (ctx->len >= SLIP_MAX_FRAME) {
-            TRACE_FW(TAG, "Frame overflow");
+            TRACE_PROTO(TAG, "Frame overflow");
             ctx->in_frame = FALSE;
             ctx->len = 0;
             return FALSE;

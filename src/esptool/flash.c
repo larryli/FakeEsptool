@@ -32,14 +32,14 @@ BOOL Flash_Init(FLASH_CTX *ctx, DWORD size)
 
     ctx->data = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
     if (!ctx->data) {
-        TRACE_FW(TAG, "Failed to allocate %lu bytes", size);
+        TRACE_PROTO(TAG, "Failed to allocate %lu bytes", size);
         return FALSE;
     }
 
     memset(ctx->data, FLASH_ERASE_PATTERN, size);
     ctx->size = size;
 
-    TRACE_FW(TAG, "Initialized %lu KB flash", size / 1024);
+    TRACE_PROTO(TAG, "Initialized %lu KB flash", size / 1024);
     return TRUE;
 }
 
@@ -128,7 +128,7 @@ BOOL Flash_Erase(FLASH_CTX *ctx, DWORD addr, DWORD len)
 
     DWORD aligned_len = end_sector - start_sector;
 
-    TRACE_FW(TAG, "Erase: addr=0x%08lX len=%lu -> aligned: 0x%08lX len=%lu",
+    TRACE_PROTO(TAG, "Erase: addr=0x%08lX len=%lu -> aligned: 0x%08lX len=%lu",
              addr, len, start_sector, aligned_len);
 
     memset(ctx->data + start_sector, FLASH_ERASE_PATTERN, aligned_len);

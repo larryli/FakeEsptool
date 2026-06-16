@@ -71,13 +71,13 @@ KEY_PURPOSE_XTS_AES_128_KEY = 4
 
 # KEY_PURPOSE eFuse field definitions (S2/S3/C3/C6)
 # BLOCK0 base = 0x2C in eFuse array
-# KEY_PURPOSE_0 at BLOCK0 word2 bits[27:24] = offset 0x34, mask 0x0F000000, shift 24
-# KEY_PURPOSE_1 at BLOCK0 word2 bits[31:28] = offset 0x34, mask 0xF0000000, shift 28
-# KEY_PURPOSE_2 at BLOCK0 word3 bits[3:0]   = offset 0x38, mask 0x0000000F, shift 0
-# KEY_PURPOSE_3 at BLOCK0 word3 bits[7:4]   = offset 0x38, mask 0x000000F0, shift 4
-# KEY_PURPOSE_4 at BLOCK0 word3 bits[11:8]  = offset 0x38, mask 0x00000F00, shift 8
-# KEY_PURPOSE_5 at BLOCK0 word3 bits[15:12] = offset 0x38, mask 0x0000F000, shift 12
-KEY_PURPOSE_OFFSETS = [0x34, 0x34, 0x38, 0x38, 0x38, 0x38]
+# KEY_PURPOSE_0 at BLOCK0 word2 bits[27:24] = offset 0x08, mask 0x0F000000, shift 24
+# KEY_PURPOSE_1 at BLOCK0 word2 bits[31:28] = offset 0x08, mask 0xF0000000, shift 28
+# KEY_PURPOSE_2 at BLOCK0 word3 bits[3:0]   = offset 0x0C, mask 0x0000000F, shift 0
+# KEY_PURPOSE_3 at BLOCK0 word3 bits[7:4]   = offset 0x0C, mask 0x000000F0, shift 4
+# KEY_PURPOSE_4 at BLOCK0 word3 bits[11:8]  = offset 0x0C, mask 0x00000F00, shift 8
+# KEY_PURPOSE_5 at BLOCK0 word3 bits[15:12] = offset 0x0C, mask 0x0000F000, shift 12
+KEY_PURPOSE_OFFSETS = [0x08, 0x08, 0x0C, 0x0C, 0x0C, 0x0C]
 KEY_PURPOSE_MASKS   = [0x0F000000, 0xF0000000, 0x0000000F, 0x000000F0, 0x00000F00, 0x0000F000]
 KEY_PURPOSE_SHIFTS  = [24, 28, 0, 4, 8, 12]
 
@@ -85,14 +85,14 @@ KEY_PURPOSE_SHIFTS  = [24, 28, 0, 4, 8, 12]
 KEY_BLOCK_OFFSETS = [0x9C, 0xBC, 0xDC, 0xFC, 0x11C, 0x13C]
 
 # SPI_BOOT_CRYPT_CNT eFuse definitions per chip
-# BLOCK0 base = 0x2C
+# BLOCK0 at offset 0x00 in eFuse array
 SPI_BOOT_CRYPT_CNT = {
     1: (0x00, 0x7F << 20, 20),  # ESP32: word0 bits[26:20]
-    2: (0x34, 7 << 18, 18),     # ESP32-S2: word2 bits[20:18]
-    3: (0x34, 7 << 18, 18),     # ESP32-S3
-    4: (0x30, 7 << 7, 7),       # ESP32-C2: word1 bits[9:7]
-    5: (0x34, 7 << 18, 18),     # ESP32-C3
-    6: (0x34, 7 << 18, 18),     # ESP32-C6
+    2: (0x08, 7 << 18, 18),     # ESP32-S2: word2 bits[20:18]
+    3: (0x08, 7 << 18, 18),     # ESP32-S3
+    4: (0x04, 7 << 7, 7),       # ESP32-C2: word1 bits[9:7]
+    5: (0x08, 7 << 18, 18),     # ESP32-C3
+    6: (0x08, 7 << 18, 18),     # ESP32-C6
 }
 
 # Fixed key offsets for chips without KEY_PURPOSE fields
