@@ -1378,3 +1378,37 @@ BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block)
 
     return KEY_PURPOSE_USER;
 }
+
+/*
+ * Chip_GetEncryptionKeyOffset - Get eFuse offset and length of flash encryption key
+ */
+int Chip_GetEncryptionKeyOffset(const CHIP_CTX *ctx, int *key_len)
+{
+    if (!key_len)
+        return -1;
+
+    /* Key block offsets within eFuse array (BLOCK_KEY0 read-back address) */
+    switch (ctx->type) {
+    case CHIP_ESP32:
+        *key_len = 32;
+        return 0x38;  /* BLOCK1 at EFUSE_RD_REG_BASE */
+    case CHIP_ESP32S2:
+        *key_len = 64;
+        return 0x9C;  /* BLOCK_KEY0 */
+    case CHIP_ESP32S3:
+        *key_len = 64;
+        return 0x9C;  /* BLOCK_KEY0 */
+    case CHIP_ESP32C2:
+        *key_len = 32;
+        return 0x60;  /* BLOCK_KEY0 */
+    case CHIP_ESP32C3:
+        *key_len = 32;
+        return 0x9C;  /* BLOCK_KEY0 */
+    case CHIP_ESP32C6:
+        *key_len = 32;
+        return 0x9C;  /* BLOCK_KEY0 */
+    default:
+        *key_len = 0;
+        return -1;
+    }
+}

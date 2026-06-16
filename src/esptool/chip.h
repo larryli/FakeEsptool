@@ -447,10 +447,21 @@ BOOL Chip_IsSecureDownloadEnabled(const CHIP_CTX *ctx);
  * @ctx:   Chip context
  * @block: Key block index (0 = KEY0, 1 = KEY1, etc.)
  *
- * Returns key purpose value (0 = empty/USER, 2 = XTS_AES_128_KEY).
+ * Returns key purpose value (0 = empty/USER, 4 = XTS_AES_128_KEY).
  * Checks if the key block has non-zero data; returns XTS_AES_128_KEY for
  * BLOCK_KEY0 when programmed, 0 otherwise.
  */
 BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block);
+
+/*
+ * Chip_GetEncryptionKeyOffset - Get eFuse offset and length of flash encryption key
+ *
+ * @ctx:      Chip context
+ * @key_len:  Output parameter receiving key length in bytes (16 or 32)
+ *
+ * Returns byte offset within eFuse array for the encryption key, or -1 if
+ * the chip type has no encryption key defined.
+ */
+int Chip_GetEncryptionKeyOffset(const CHIP_CTX *ctx, int *key_len);
 
 #endif

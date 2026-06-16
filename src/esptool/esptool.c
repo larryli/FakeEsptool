@@ -92,6 +92,48 @@ static void Defl_FreeBuffer(ESPTOOL_CTX *ctx)
     ctx->defl_buf_cap = 0;
 }
 
+/*
+ * Esptool_EncryptInPlace - Encrypt data in-place using flash encryption key
+ *
+ * @ctx:        Esptool context
+ * @data:       Data buffer to encrypt in-place
+ * @len:        Data length in bytes
+ * @flash_addr: Flash address for tweak calculation
+ *
+ * Returns ESP_OK on success or if encryption not enabled, ESP_FAIL on error.
+ */
+static DWORD Esptool_EncryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len, DWORD flash_addr)
+{
+    if (!ctx->flash_encrypted)
+        return ESP_OK;
+
+    int key_len = 0;
+    int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, &key_len);
+
+    if (key_offset < 0 || !ctx->chip->efuse ||
+        key_offset + key_len > ctx->chip->efuse_size) {
+        TRACE_FW(TAG, "No encryption key available");
+        Serial_PostLog(ctx->hNotify, L"ERR", L"  No encryption key in eFuse");
+        return ESP_FAIL;
+    }
+
+    const BYTE *key = &ctx->chip->efuse[key_offset];
+    ENCRYPT_CTX enc_ctx;
+    int ret = Encrypt_Init(&enc_ctx, key, key_len, flash_addr);
+    if (ret == ENCRYPT_OK)
+        ret = Encrypt_Data(&enc_ctx, data, data, len);
+
+    if (ret == ENCRYPT_OK) {
+        TRACE_PROTO(TAG, "Encrypted %lu bytes at offset 0x%08lX", len, flash_addr);
+        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Encrypted %lu bytes", len);
+        return ESP_OK;
+    }
+
+    TRACE_FW(TAG, "Encryption failed: %d", ret);
+    Serial_PostLogF(ctx->hNotify, L"ERR", L"  Encryption failed: %d", ret);
+    return ESP_FAIL;
+}
+
 /* Flush deflate accumulation buffer: decompress and write to flash.
    Returns ESP_OK on success, ESP_FAIL on failure. */
 static DWORD Defl_FlushBuffer(ESPTOOL_CTX *ctx)
@@ -132,44 +174,10 @@ static DWORD Defl_FlushBuffer(ESPTOOL_CTX *ctx)
                     ctx->defl_buf_size, decomp_size, ctx->defl_offset);
 
     /* Encrypt if encrypted flag was set */
-    if (ctx->flash_encrypted) {
-        int key_offset = -1;
-        int key_len = 32;
-        switch (ctx->chip->type) {
-        case CHIP_ESP32:   key_offset = 0x38; break;
-        case CHIP_ESP32S2: key_offset = 0x9C; key_len = 64; break;
-        case CHIP_ESP32S3: key_offset = 0x9C; key_len = 64; break;
-        case CHIP_ESP32C2: key_offset = 0x60; break;
-        case CHIP_ESP32C3: key_offset = 0x9C; break;
-        case CHIP_ESP32C6: key_offset = 0x9C; break;
-        default: break;
-        }
-
-        if (key_offset >= 0 && ctx->chip->efuse &&
-            key_offset + key_len <= ctx->chip->efuse_size) {
-            const BYTE *key = &ctx->chip->efuse[key_offset];
-            ENCRYPT_CTX enc_ctx;
-            ret = Encrypt_Init(&enc_ctx, key, key_len, ctx->defl_offset);
-            if (ret == ENCRYPT_OK) {
-                ret = Encrypt_Data(&enc_ctx, decomp_buf, decomp_buf, decomp_size);
-            }
-            if (ret == ENCRYPT_OK) {
-                TRACE_PROTO(TAG, "Encrypted %lu bytes at offset 0x%08lX", decomp_size, ctx->defl_offset);
-                Serial_PostLogF(ctx->hNotify, L"ESP", L"  Encrypted %lu bytes", decomp_size);
-            } else {
-                TRACE_FW(TAG, "Encryption failed: %d", ret);
-                Serial_PostLogF(ctx->hNotify, L"ERR", L"  Encryption failed: %d", ret);
-                HeapFree(GetProcessHeap(), 0, decomp_buf);
-                Defl_FreeBuffer(ctx);
-                return ESP_FAIL;
-            }
-        } else {
-            TRACE_FW(TAG, "No encryption key available");
-            Serial_PostLog(ctx->hNotify, L"ERR", L"  No encryption key in eFuse");
-            HeapFree(GetProcessHeap(), 0, decomp_buf);
-            Defl_FreeBuffer(ctx);
-            return ESP_FAIL;
-        }
+    if (Esptool_EncryptInPlace(ctx, decomp_buf, decomp_size, ctx->defl_offset) != ESP_OK) {
+        HeapFree(GetProcessHeap(), 0, decomp_buf);
+        Defl_FreeBuffer(ctx);
+        return ESP_FAIL;
     }
 
     /* Write to flash */
@@ -1027,17 +1035,8 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
         /* Encrypt if encrypted flag was set */
         if (ctx->flash_encrypted) {
-            int key_offset = -1;
-            int key_len = 32;
-            switch (ctx->chip->type) {
-            case CHIP_ESP32:   key_offset = 0x38; break;
-            case CHIP_ESP32S2: key_offset = 0x9C; key_len = 64; break;
-            case CHIP_ESP32S3: key_offset = 0x9C; key_len = 64; break;
-            case CHIP_ESP32C2: key_offset = 0x60; break;
-            case CHIP_ESP32C3: key_offset = 0x9C; break;
-            case CHIP_ESP32C6: key_offset = 0x9C; break;
-            default: break;
-            }
+            int key_len = 0;
+            int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, &key_len);
 
             if (key_offset >= 0 && ctx->chip->efuse &&
                 key_offset + key_len <= ctx->chip->efuse_size) {
