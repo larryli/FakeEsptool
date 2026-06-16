@@ -73,6 +73,18 @@ static const char *GetCmdName(BYTE cmd)
     return name ? name : "UNKNOWN";
 }
 
+/* Little-endian byte readers */
+static inline WORD ReadLE16(const BYTE *p)
+{
+    return (WORD)p[0] | ((WORD)p[1] << 8);
+}
+
+static inline DWORD ReadLE32(const BYTE *p)
+{
+    return (DWORD)p[0] | ((DWORD)p[1] << 8) |
+           ((DWORD)p[2] << 16) | ((DWORD)p[3] << 24);
+}
+
 /* SYNC response Val field prefix: {0x07, 0x07, 0x12}.
    The 4th byte (0x55) comes from request padding, not this array.
    Full response data is all zeros (4-byte status). */
@@ -388,9 +400,8 @@ static BOOL ParsePacket(const BYTE *frame, int frame_len, ESP_PACKET *pkt)
 
     pkt->direction = frame[0];
     pkt->command = frame[1];
-    pkt->size = frame[2] | ((WORD)frame[3] << 8);
-    pkt->value = frame[4] | ((DWORD)frame[5] << 8) |
-                 ((DWORD)frame[6] << 16) | ((DWORD)frame[7] << 24);
+    pkt->size = ReadLE16(frame + 2);
+    pkt->value = ReadLE32(frame + 4);
 
     if (pkt->size > 0) {
         if (frame_len < 8 + pkt->size)
@@ -429,8 +440,7 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
-    DWORD addr = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                 ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
+    DWORD addr = ReadLE32(pkt->data);
     DWORD val = Chip_ReadReg(ctx->chip, addr);
 
     TRACE_PROTO(TAG, "READ_REG addr=0x%08lX val=0x%08lX", addr, val);
@@ -457,21 +467,15 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     CHECK_PKT_SIZE(pkt, 8);
     /* WRITE_REG request format (16 bytes = 4 x 32-bit words):
        [addr:4][value:4][mask:4][delay_us:4] */
-    DWORD addr = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                 ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-    DWORD val = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
-                ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
+    DWORD addr = ReadLE32(pkt->data);
+    DWORD val = ReadLE32(pkt->data + 4);
     DWORD mask = 0xFFFFFFFF;
     DWORD delayUs = 0;
 
-    if (pkt->size >= 12) {
-        mask = pkt->data[8] | ((DWORD)pkt->data[9] << 8) |
-               ((DWORD)pkt->data[10] << 16) | ((DWORD)pkt->data[11] << 24);
-    }
-    if (pkt->size >= 16) {
-        delayUs = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
-                  ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
-    }
+    if (pkt->size >= 12)
+        mask = ReadLE32(pkt->data + 8);
+    if (pkt->size >= 16)
+        delayUs = ReadLE32(pkt->data + 12);
 
     TRACE_PROTO(TAG, "WRITE_REG addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr, val, mask, delayUs);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr, val, mask, delayUs);
@@ -498,13 +502,11 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
-    DWORD new_baud = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                     ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
+    DWORD new_baud = ReadLE32(pkt->data);
     DWORD old_baud = 115200;
 
     if (pkt->size >= 8)
-        old_baud = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
-                   ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
+        old_baud = ReadLE32(pkt->data + 4);
 
     TRACE_PROTO(TAG, "CHANGE_BAUDRATE old=%lu new=%lu", old_baud, new_baud);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  old=%lu new=%lu", old_baud, new_baud);
@@ -523,14 +525,10 @@ static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
-    DWORD total = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                  ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-    DWORD blocks = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
-                   ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
-    DWORD bsize = pkt->data[8] | ((DWORD)pkt->data[9] << 8) |
-                  ((DWORD)pkt->data[10] << 16) | ((DWORD)pkt->data[11] << 24);
-    DWORD offset = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
-                   ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
+    DWORD total = ReadLE32(pkt->data);
+    DWORD blocks = ReadLE32(pkt->data + 4);
+    DWORD bsize = ReadLE32(pkt->data + 8);
+    DWORD offset = ReadLE32(pkt->data + 12);
 
     TRACE_PROTO(TAG, "MEM_BEGIN total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
                 total, blocks, bsize, offset);
@@ -547,8 +545,7 @@ static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
-    DWORD seq = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
+    DWORD seq = ReadLE32(pkt->data);
 
     TRACE_PROTO(TAG, "MEM_DATA seq=%lu len=%u", seq, pkt->size);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%u", seq, pkt->size);
@@ -576,8 +573,7 @@ static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
-    DWORD execute = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                    ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
+    DWORD execute = ReadLE32(pkt->data);
 
     TRACE_PROTO(TAG, "MEM_END execute=%lu", execute);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  execute=%lu", execute);
@@ -622,21 +618,15 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     CHECK_PKT_SIZE(pkt, 16);
     /* FLASH_DEFL_BEGIN format:
        [uncompressed_size:4][num_blocks:4][block_size:4][offset:4] */
-    DWORD uncompressed_size = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                              ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-    DWORD blocks = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
-                   ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
-    DWORD bsize = pkt->data[8] | ((DWORD)pkt->data[9] << 8) |
-                  ((DWORD)pkt->data[10] << 16) | ((DWORD)pkt->data[11] << 24);
-    DWORD offset = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
-                   ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
+    DWORD uncompressed_size = ReadLE32(pkt->data);
+    DWORD blocks = ReadLE32(pkt->data + 4);
+    DWORD bsize = ReadLE32(pkt->data + 8);
+    DWORD offset = ReadLE32(pkt->data + 12);
 
     /* ROM mode sends extra 4 bytes for encrypted flag */
     DWORD encrypted = 0;
-    if (pkt->size >= 20) {
-        encrypted = pkt->data[16] | ((DWORD)pkt->data[17] << 8) |
-                    ((DWORD)pkt->data[18] << 16) | ((DWORD)pkt->data[19] << 24);
-    }
+    if (pkt->size >= 20)
+        encrypted = ReadLE32(pkt->data + 16);
 
     /* Product mode: reject plaintext writes when encryption is active */
     if (!encrypted && Chip_IsFlashEncryptionEnabled(ctx->chip) &&
@@ -743,10 +733,8 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
-    DWORD data_len = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                     ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-    DWORD seq = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
-                ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
+    DWORD data_len = ReadLE32(pkt->data);
+    DWORD seq = ReadLE32(pkt->data + 4);
 
     TRACE_FW(TAG, "HandleFlashDeflData: seq=%lu data_len=%lu pkt->size=%u state=%d",
              seq, data_len, pkt->size, ctx->state);
@@ -852,14 +840,10 @@ static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
-    DWORD addr = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                 ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-    DWORD len = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
-                ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
-    DWORD bsize = pkt->data[8] | ((DWORD)pkt->data[9] << 8) |
-                  ((DWORD)pkt->data[10] << 16) | ((DWORD)pkt->data[11] << 24);
-    DWORD psize = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
-                  ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
+    DWORD addr = ReadLE32(pkt->data);
+    DWORD len = ReadLE32(pkt->data + 4);
+    DWORD bsize = ReadLE32(pkt->data + 8);
+    DWORD psize = ReadLE32(pkt->data + 12);
 
     (void)psize;
 
@@ -957,10 +941,8 @@ static void HandleEraseFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 8);
-    DWORD offset = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                   ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-    DWORD len = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
-                ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
+    DWORD offset = ReadLE32(pkt->data);
+    DWORD len = ReadLE32(pkt->data + 4);
 
     TRACE_PROTO(TAG, "ERASE_BLOCK offset=0x%08lX len=%lu", offset, len);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  offset=0x%08lX len=%lu", offset, len);
@@ -991,10 +973,8 @@ static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 8);
-    DWORD addr = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                 ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-    DWORD len = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
-                ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
+    DWORD addr = ReadLE32(pkt->data);
+    DWORD len = ReadLE32(pkt->data + 4);
 
     TRACE_PROTO(TAG, "FLASH_MD5 addr=0x%08lX len=%lu", addr, len);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX len=%lu", addr, len);
@@ -1042,21 +1022,15 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
-    DWORD erase_size = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                       ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-    DWORD num_blocks = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
-                       ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
-    DWORD block_size = pkt->data[8] | ((DWORD)pkt->data[9] << 8) |
-                       ((DWORD)pkt->data[10] << 16) | ((DWORD)pkt->data[11] << 24);
-    DWORD offset = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
-                   ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
+    DWORD erase_size = ReadLE32(pkt->data);
+    DWORD num_blocks = ReadLE32(pkt->data + 4);
+    DWORD block_size = ReadLE32(pkt->data + 8);
+    DWORD offset = ReadLE32(pkt->data + 12);
 
     /* ROM mode sends extra 4 bytes for encrypted flag */
     DWORD encrypted = 0;
-    if (pkt->size >= 20) {
-        encrypted = pkt->data[16] | ((DWORD)pkt->data[17] << 8) |
-                    ((DWORD)pkt->data[18] << 16) | ((DWORD)pkt->data[19] << 24);
-    }
+    if (pkt->size >= 20)
+        encrypted = ReadLE32(pkt->data + 16);
 
     /* Product mode: reject plaintext writes when encryption is active */
     if (!encrypted && Chip_IsFlashEncryptionEnabled(ctx->chip) &&
@@ -1108,10 +1082,8 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
-    DWORD data_len = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                     ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-    DWORD seq = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
-                ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
+    DWORD data_len = ReadLE32(pkt->data);
+    DWORD seq = ReadLE32(pkt->data + 4);
 
     TRACE_PROTO(TAG, "FLASH_DATA seq=%lu len=%lu", seq, data_len);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%lu", seq, data_len);
@@ -1175,8 +1147,7 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
-    DWORD reboot = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                   ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
+    DWORD reboot = ReadLE32(pkt->data);
 
     TRACE_PROTO(TAG, "FLASH_END reboot=%lu", reboot);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  reboot=%lu", reboot);
@@ -1334,18 +1305,12 @@ static void HandleSpiSetParams(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD fl_id = 0, total_size = 0, block_size = 0, sector_size = 0, page_size = 0, status_mask = 0;
 
     if (pkt->size >= 24) {
-        fl_id = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
-                ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
-        total_size = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
-                     ((DWORD)pkt->data[6] << 16) | ((DWORD)pkt->data[7] << 24);
-        block_size = pkt->data[8] | ((DWORD)pkt->data[9] << 8) |
-                     ((DWORD)pkt->data[10] << 16) | ((DWORD)pkt->data[11] << 24);
-        sector_size = pkt->data[12] | ((DWORD)pkt->data[13] << 8) |
-                      ((DWORD)pkt->data[14] << 16) | ((DWORD)pkt->data[15] << 24);
-        page_size = pkt->data[16] | ((DWORD)pkt->data[17] << 8) |
-                    ((DWORD)pkt->data[18] << 16) | ((DWORD)pkt->data[19] << 24);
-        status_mask = pkt->data[20] | ((DWORD)pkt->data[21] << 8) |
-                      ((DWORD)pkt->data[22] << 16) | ((DWORD)pkt->data[23] << 24);
+        fl_id = ReadLE32(pkt->data);
+        total_size = ReadLE32(pkt->data + 4);
+        block_size = ReadLE32(pkt->data + 8);
+        sector_size = ReadLE32(pkt->data + 12);
+        page_size = ReadLE32(pkt->data + 16);
+        status_mask = ReadLE32(pkt->data + 20);
     }
 
     TRACE_PROTO(TAG, "SPI_SET_PARAMS fl_id=0x%08lX total=%lu block=%lu sector=%lu page=%lu mask=0x%08lX",

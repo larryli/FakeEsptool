@@ -544,7 +544,7 @@ esptool --port COM10 read-mac
 
 ## 11. 验证检查点
 
-### 10.1 状态栏验证
+### 11.1 状态栏验证
 
 | 操作 | 预期状态栏 |
 |------|-----------|
@@ -554,7 +554,7 @@ esptool --port COM10 read-mac
 | burn-efuse DIS_DOWNLOAD_MODE 1 | `*`, `Download Disabled` |
 | burn-efuse ENABLE_SECURITY_DOWNLOAD 1 | `*`, `Download Secure` |
 
-### 10.2 日志验证
+### 11.2 日志验证
 
 | 场景 | 预期日志 |
 |------|---------|
@@ -563,7 +563,7 @@ esptool --port COM10 read-mac
 | 生产模式拒绝明文 | `Production mode: plaintext flash disabled` |
 | 预加密文件 | `encrypted=0`, 直接写入 |
 
-### 10.3 Flash 内容验证
+### 11.3 Flash 内容验证
 
 | 场景 | Flash 内容 |
 |------|-----------|
