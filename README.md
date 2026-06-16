@@ -120,6 +120,7 @@ FakeEsptool/
 ├── docs/                       # 文档
 │   ├── REQUIREMENTS.md         # 需求规格
 │   ├── DEVELOPMENT.md          # 开发文档
+│   ├── API.md                  # API 参考
 │   ├── PROTOCOL.md             # 协议规范
 │   ├── WRITE_FLASH_GUIDE.md    # 烧录流程指南
 │   ├── ENCRYPT_FLASH_GUIDE.md  # 加密烧录指南
@@ -133,6 +134,7 @@ FakeEsptool/
 
 - [需求规格说明](docs/REQUIREMENTS.md)
 - [开发文档](docs/DEVELOPMENT.md)
+- [API 参考](docs/API.md)
 - [协议规范](docs/PROTOCOL.md)
 - [烧录流程指南](docs/WRITE_FLASH_GUIDE.md)
 - [加密烧录指南](docs/ENCRYPT_FLASH_GUIDE.md)
