@@ -126,6 +126,8 @@
 #define EFUSE_MASK_FLASH_CRYPT_CNT_ESP32        (0x7FUL << 20)
 #define EFUSE_OFFS_DISABLE_DL_ENCRYPT_ESP32     0x18    /* BLOCK0 word6 */
 #define EFUSE_BIT_DISABLE_DL_ENCRYPT_ESP32      (1UL << 7)
+#define EFUSE_OFFS_DISABLE_DL_DECRYPT_ESP32     0x18    /* BLOCK0 word6 */
+#define EFUSE_BIT_DISABLE_DL_DECRYPT_ESP32      (1UL << 8)
 #define EFUSE_OFFS_UART_DOWNLOAD_DIS_ESP32      0x00    /* BLOCK0 word0 */
 #define EFUSE_BIT_UART_DOWNLOAD_DIS_ESP32       (1UL << 27)
 
@@ -178,6 +180,106 @@
 #define EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C6     (1UL << 0)
 #define EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C6   0x3C    /* BLOCK0 word4 */
 #define EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C6    (1UL << 5)
+
+/* ============================================================================
+ * eFuse JTAG and Secure Boot fields per chip type
+ * ============================================================================ */
+
+/* ESP32 JTAG and Secure Boot fields */
+#define EFUSE_OFFS_JTAG_DISABLE_ESP32           0x18    /* BLOCK0 word6 */
+#define EFUSE_BIT_JTAG_DISABLE_ESP32            (1UL << 6)
+#define EFUSE_OFFS_ABS_DONE_0_ESP32             0x18    /* BLOCK0 word6 */
+#define EFUSE_BIT_ABS_DONE_0_ESP32              (1UL << 4)
+#define EFUSE_OFFS_ABS_DONE_1_ESP32             0x18    /* BLOCK0 word6 */
+#define EFUSE_BIT_ABS_DONE_1_ESP32              (1UL << 5)
+
+/* ESP32-S2 JTAG and Secure Boot fields */
+#define EFUSE_OFFS_DIS_PAD_JTAG_ESP32S2         0x30    /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_PAD_JTAG_ESP32S2          (1UL << 19)
+#define EFUSE_OFFS_SOFT_DIS_JTAG_ESP32S2        0x30    /* BLOCK0 word1 */
+#define EFUSE_BIT_SOFT_DIS_JTAG_ESP32S2         (1UL << 17)
+#define EFUSE_OFFS_DIS_FORCE_DOWNLOAD_ESP32S2   0x30    /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_FORCE_DOWNLOAD_ESP32S2    (1UL << 12)
+#define EFUSE_OFFS_SEC_BOOT_KEY_REVOKE0_ESP32S2 0x34    /* BLOCK0 word2 */
+#define EFUSE_BIT_SEC_BOOT_KEY_REVOKE0_ESP32S2  (1UL << 21)
+#define EFUSE_OFFS_SEC_BOOT_KEY_REVOKE1_ESP32S2 0x34    /* BLOCK0 word2 */
+#define EFUSE_BIT_SEC_BOOT_KEY_REVOKE1_ESP32S2  (1UL << 22)
+#define EFUSE_OFFS_SEC_BOOT_KEY_REVOKE2_ESP32S2 0x34    /* BLOCK0 word2 */
+#define EFUSE_BIT_SEC_BOOT_KEY_REVOKE2_ESP32S2  (1UL << 23)
+#define EFUSE_OFFS_SECURE_BOOT_EN_ESP32S2       0x38    /* BLOCK0 word3 */
+#define EFUSE_BIT_SECURE_BOOT_EN_ESP32S2        (1UL << 20)
+#define EFUSE_OFFS_SEC_BOOT_AGG_REVOKE_ESP32S2  0x38    /* BLOCK0 word3 */
+#define EFUSE_BIT_SEC_BOOT_AGG_REVOKE_ESP32S2   (1UL << 21)
+
+/* ESP32-S3 JTAG and Secure Boot fields */
+#define EFUSE_OFFS_DIS_PAD_JTAG_ESP32S3         0x30    /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_PAD_JTAG_ESP32S3          (1UL << 19)
+#define EFUSE_OFFS_SOFT_DIS_JTAG_ESP32S3        0x30    /* BLOCK0 word1 */
+#define EFUSE_MASK_SOFT_DIS_JTAG_ESP32S3        (7UL << 16)
+#define EFUSE_OFFS_DIS_FORCE_DOWNLOAD_ESP32S3   0x30    /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_FORCE_DOWNLOAD_ESP32S3    (1UL << 12)
+#define EFUSE_OFFS_DIS_USB_JTAG_ESP32S3         0x38    /* BLOCK0 word3 */
+#define EFUSE_BIT_DIS_USB_JTAG_ESP32S3          (1UL << 22)
+#define EFUSE_OFFS_DIS_USB_SER_JTAG_ROM_ESP32S3 0x3C    /* BLOCK0 word4 */
+#define EFUSE_BIT_DIS_USB_SER_JTAG_ROM_ESP32S3  (1UL << 2)
+#define EFUSE_OFFS_SEC_BOOT_KEY_REVOKE0_ESP32S3 0x34    /* BLOCK0 word2 */
+#define EFUSE_BIT_SEC_BOOT_KEY_REVOKE0_ESP32S3  (1UL << 21)
+#define EFUSE_OFFS_SEC_BOOT_KEY_REVOKE1_ESP32S3 0x34    /* BLOCK0 word2 */
+#define EFUSE_BIT_SEC_BOOT_KEY_REVOKE1_ESP32S3  (1UL << 22)
+#define EFUSE_OFFS_SEC_BOOT_KEY_REVOKE2_ESP32S3 0x34    /* BLOCK0 word2 */
+#define EFUSE_BIT_SEC_BOOT_KEY_REVOKE2_ESP32S3  (1UL << 23)
+#define EFUSE_OFFS_SECURE_BOOT_EN_ESP32S3       0x38    /* BLOCK0 word3 */
+#define EFUSE_BIT_SECURE_BOOT_EN_ESP32S3        (1UL << 20)
+#define EFUSE_OFFS_SEC_BOOT_AGG_REVOKE_ESP32S3  0x38    /* BLOCK0 word3 */
+#define EFUSE_BIT_SEC_BOOT_AGG_REVOKE_ESP32S3   (1UL << 21)
+
+/* ESP32-C2 JTAG and Secure Boot fields (limited support) */
+#define EFUSE_OFFS_DIS_FORCE_DOWNLOAD_ESP32C2   0x30    /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_FORCE_DOWNLOAD_ESP32C2    (1UL << 14)
+
+/* ESP32-C3 JTAG and Secure Boot fields */
+#define EFUSE_OFFS_DIS_PAD_JTAG_ESP32C3         0x30    /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_PAD_JTAG_ESP32C3          (1UL << 19)
+#define EFUSE_OFFS_SOFT_DIS_JTAG_ESP32C3        0x30    /* BLOCK0 word1 */
+#define EFUSE_MASK_SOFT_DIS_JTAG_ESP32C3        (7UL << 16)
+#define EFUSE_OFFS_DIS_USB_JTAG_ESP32C3         0x30    /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_USB_JTAG_ESP32C3          (1UL << 9)
+#define EFUSE_OFFS_DIS_FORCE_DOWNLOAD_ESP32C3   0x30    /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_FORCE_DOWNLOAD_ESP32C3    (1UL << 12)
+#define EFUSE_OFFS_DIS_USB_SER_JTAG_ROM_ESP32C3 0x3C    /* BLOCK0 word4 */
+#define EFUSE_BIT_DIS_USB_SER_JTAG_ROM_ESP32C3  (1UL << 2)
+#define EFUSE_OFFS_SEC_BOOT_KEY_REVOKE0_ESP32C3 0x34    /* BLOCK0 word2 */
+#define EFUSE_BIT_SEC_BOOT_KEY_REVOKE0_ESP32C3  (1UL << 21)
+#define EFUSE_OFFS_SEC_BOOT_KEY_REVOKE1_ESP32C3 0x34    /* BLOCK0 word2 */
+#define EFUSE_BIT_SEC_BOOT_KEY_REVOKE1_ESP32C3  (1UL << 22)
+#define EFUSE_OFFS_SEC_BOOT_KEY_REVOKE2_ESP32C3 0x34    /* BLOCK0 word2 */
+#define EFUSE_BIT_SEC_BOOT_KEY_REVOKE2_ESP32C3  (1UL << 23)
+#define EFUSE_OFFS_SECURE_BOOT_EN_ESP32C3       0x38    /* BLOCK0 word3 */
+#define EFUSE_BIT_SECURE_BOOT_EN_ESP32C3        (1UL << 20)
+#define EFUSE_OFFS_SEC_BOOT_AGG_REVOKE_ESP32C3  0x38    /* BLOCK0 word3 */
+#define EFUSE_BIT_SEC_BOOT_AGG_REVOKE_ESP32C3   (1UL << 21)
+
+/* ESP32-C6 JTAG and Secure Boot fields */
+#define EFUSE_OFFS_DIS_PAD_JTAG_ESP32C6         0x30    /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_PAD_JTAG_ESP32C6          (1UL << 19)
+#define EFUSE_OFFS_SOFT_DIS_JTAG_ESP32C6        0x30    /* BLOCK0 word1 */
+#define EFUSE_MASK_SOFT_DIS_JTAG_ESP32C6        (7UL << 16)
+#define EFUSE_OFFS_DIS_USB_JTAG_ESP32C6         0x30    /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_USB_JTAG_ESP32C6          (1UL << 9)
+#define EFUSE_OFFS_DIS_FORCE_DOWNLOAD_ESP32C6   0x30    /* BLOCK0 word1 */
+#define EFUSE_BIT_DIS_FORCE_DOWNLOAD_ESP32C6    (1UL << 12)
+#define EFUSE_OFFS_DIS_USB_SER_JTAG_ROM_ESP32C6 0x3C    /* BLOCK0 word4 */
+#define EFUSE_BIT_DIS_USB_SER_JTAG_ROM_ESP32C6  (1UL << 2)
+#define EFUSE_OFFS_SEC_BOOT_KEY_REVOKE0_ESP32C6 0x34    /* BLOCK0 word2 */
+#define EFUSE_BIT_SEC_BOOT_KEY_REVOKE0_ESP32C6  (1UL << 21)
+#define EFUSE_OFFS_SEC_BOOT_KEY_REVOKE1_ESP32C6 0x34    /* BLOCK0 word2 */
+#define EFUSE_BIT_SEC_BOOT_KEY_REVOKE1_ESP32C6  (1UL << 22)
+#define EFUSE_OFFS_SEC_BOOT_KEY_REVOKE2_ESP32C6 0x34    /* BLOCK0 word2 */
+#define EFUSE_BIT_SEC_BOOT_KEY_REVOKE2_ESP32C6  (1UL << 23)
+#define EFUSE_OFFS_SECURE_BOOT_EN_ESP32C6       0x38    /* BLOCK0 word3 */
+#define EFUSE_BIT_SECURE_BOOT_EN_ESP32C6        (1UL << 20)
+#define EFUSE_OFFS_SEC_BOOT_AGG_REVOKE_ESP32C6  0x38    /* BLOCK0 word3 */
+#define EFUSE_BIT_SEC_BOOT_AGG_REVOKE_ESP32C6   (1UL << 21)
 
 /* ============================================================================
  * eFuse controller command registers per chip type
@@ -426,6 +528,14 @@ BOOL Chip_IsFlashEncryptionEnabled(const CHIP_CTX *ctx);
  * Returns TRUE if DISABLE_DL_ENCRYPT / DIS_DOWNLOAD_MANUAL_ENCRYPT is set.
  */
 BOOL Chip_IsDownloadEncryptDisabled(const CHIP_CTX *ctx);
+
+/*
+ * Chip_IsDownloadDecryptDisabled - Check if flash decryption is disabled in download mode
+ *
+ * Returns TRUE if DISABLE_DL_DECRYPT is set (ESP32 only).
+ * Other chips do not have this field, always returns FALSE.
+ */
+BOOL Chip_IsDownloadDecryptDisabled(const CHIP_CTX *ctx);
 
 /*
  * Chip_IsDownloadModeDisabled - Check if download mode is disabled

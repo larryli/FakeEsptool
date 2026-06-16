@@ -1305,6 +1305,15 @@ BOOL Chip_IsDownloadEncryptDisabled(const CHIP_CTX *ctx)
     }
 }
 
+BOOL Chip_IsDownloadDecryptDisabled(const CHIP_CTX *ctx)
+{
+    /* Only ESP32 has DISABLE_DL_DECRYPT field */
+    if (ctx->type == CHIP_ESP32)
+        return ReadEfuseBits(ctx, EFUSE_OFFS_DISABLE_DL_DECRYPT_ESP32,
+                             EFUSE_BIT_DISABLE_DL_DECRYPT_ESP32) != 0;
+    return FALSE;
+}
+
 BOOL Chip_IsDownloadModeDisabled(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {

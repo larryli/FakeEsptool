@@ -1024,6 +1024,270 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     else
         fwprintf(f, L"Size:       %luKB (%lu bytes)\n\n", snap->flashSize / 1024, snap->flashSize);
 
+    /* Write eFuse security fields (raw values) */
+    fwprintf(f, L"[eFuse Security Fields]\n");
+
+    /* Helper to read bits from eFuse data */
+    #define READ_EFUSE_BITS(offset, mask) \
+        ((*(DWORD *)(snap->efuse + (offset)) & (mask)))
+
+    /* Count set bits in a value */
+    #define COUNT_BITS(v) __popcnt(v)
+
+    switch (snap->device.chip.type) {
+    case CHIP_ESP32: {
+        DWORD flash_crypt_cnt = READ_EFUSE_BITS(0x00, 0x7FUL << 20) >> 20;
+        DWORD dl_encrypt = READ_EFUSE_BITS(0x18, 1UL << 7) >> 7;
+        DWORD dl_decrypt = READ_EFUSE_BITS(0x18, 1UL << 8) >> 8;
+        DWORD dl_cache = READ_EFUSE_BITS(0x18, 1UL << 9) >> 9;
+        DWORD uart_dis = READ_EFUSE_BITS(0x00, 1UL << 27) >> 27;
+        fwprintf(f, L"FLASH_CRYPT_CNT:     0x%02X (%d bits set)\n", flash_crypt_cnt, COUNT_BITS(flash_crypt_cnt));
+        fwprintf(f, L"DISABLE_DL_ENCRYPT:  %lu\n", dl_encrypt);
+        fwprintf(f, L"DISABLE_DL_DECRYPT:  %lu\n", dl_decrypt);
+        fwprintf(f, L"DISABLE_DL_CACHE:    %lu\n", dl_cache);
+        fwprintf(f, L"UART_DOWNLOAD_DIS:   %lu\n", uart_dis);
+        break;
+    }
+    case CHIP_ESP32S2: {
+        DWORD crypt_cnt = READ_EFUSE_BITS(0x34, 7UL << 18) >> 18;
+        DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 20) >> 20;
+        DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 4) >> 4;
+        DWORD sec_dl = READ_EFUSE_BITS(0x3C, 1UL << 5) >> 5;
+        fwprintf(f, L"SPI_BOOT_CRYPT_CNT:          0x%02X (%d bits set)\n", crypt_cnt, COUNT_BITS(crypt_cnt));
+        fwprintf(f, L"DIS_DOWNLOAD_MANUAL_ENCRYPT: %lu\n", dl_encrypt);
+        fwprintf(f, L"DIS_DOWNLOAD_MODE:           %lu\n", dl_mode);
+        fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:    %lu\n", sec_dl);
+        break;
+    }
+    case CHIP_ESP32S3: {
+        DWORD crypt_cnt = READ_EFUSE_BITS(0x34, 7UL << 18) >> 18;
+        DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 20) >> 20;
+        DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 4) >> 4;
+        DWORD sec_dl = READ_EFUSE_BITS(0x3C, 1UL << 5) >> 5;
+        fwprintf(f, L"SPI_BOOT_CRYPT_CNT:                0x%02X (%d bits set)\n", crypt_cnt, COUNT_BITS(crypt_cnt));
+        fwprintf(f, L"DIS_DOWNLOAD_MANUAL_ENCRYPT:       %lu\n", dl_encrypt);
+        fwprintf(f, L"DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE: %lu\n", dl_mode);
+        fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:          %lu\n", sec_dl);
+        break;
+    }
+    case CHIP_ESP32C2: {
+        DWORD crypt_cnt = READ_EFUSE_BITS(0x30, 7UL << 7) >> 7;
+        DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 6) >> 6;
+        DWORD dl_mode = READ_EFUSE_BITS(0x30, 1UL << 14) >> 14;
+        DWORD sec_dl = READ_EFUSE_BITS(0x30, 1UL << 16) >> 16;
+        fwprintf(f, L"SPI_BOOT_CRYPT_CNT:          0x%02X (%d bits set)\n", crypt_cnt, COUNT_BITS(crypt_cnt));
+        fwprintf(f, L"DIS_DOWNLOAD_MANUAL_ENCRYPT: %lu\n", dl_encrypt);
+        fwprintf(f, L"DIS_DOWNLOAD_MODE:           %lu\n", dl_mode);
+        fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:    %lu\n", sec_dl);
+        break;
+    }
+    case CHIP_ESP32C3:
+    case CHIP_ESP32C6: {
+        DWORD crypt_cnt = READ_EFUSE_BITS(0x34, 7UL << 18) >> 18;
+        DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 20) >> 20;
+        DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 4) >> 4;
+        DWORD sec_dl = READ_EFUSE_BITS(0x3C, 1UL << 5) >> 5;
+        fwprintf(f, L"SPI_BOOT_CRYPT_CNT:                0x%02X (%d bits set)\n", crypt_cnt, COUNT_BITS(crypt_cnt));
+        fwprintf(f, L"DIS_DOWNLOAD_MANUAL_ENCRYPT:       %lu\n", dl_encrypt);
+        fwprintf(f, L"DIS_DOWNLOAD_MODE:                 %lu\n", dl_mode);
+        fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:          %lu\n", sec_dl);
+        break;
+    }
+    default:
+        fwprintf(f, L"(not available for this chip)\n");
+        break;
+    }
+
+    fwprintf(f, L"\n");
+
+    /* Write JTAG and Secure Boot fields */
+    fwprintf(f, L"[JTAG & Secure Boot]\n");
+
+    switch (snap->device.chip.type) {
+    case CHIP_ESP32: {
+        DWORD jtag_dis = READ_EFUSE_BITS(0x18, 1UL << 6) >> 6;
+        DWORD abs_done0 = READ_EFUSE_BITS(0x18, 1UL << 4) >> 4;
+        DWORD abs_done1 = READ_EFUSE_BITS(0x18, 1UL << 5) >> 5;
+        fwprintf(f, L"JTAG_DISABLE:    %lu\n", jtag_dis);
+        fwprintf(f, L"ABS_DONE_0:      %lu (Secure Boot V1)\n", abs_done0);
+        fwprintf(f, L"ABS_DONE_1:      %lu (Secure Boot V2)\n", abs_done1);
+        break;
+    }
+    case CHIP_ESP32S2: {
+        DWORD pad_jtag = READ_EFUSE_BITS(0x30, 1UL << 19) >> 19;
+        DWORD soft_jtag = READ_EFUSE_BITS(0x30, 1UL << 17) >> 17;
+        DWORD force_dl = READ_EFUSE_BITS(0x30, 1UL << 12) >> 12;
+        DWORD sb_en = READ_EFUSE_BITS(0x38, 1UL << 20) >> 20;
+        DWORD sb_agg = READ_EFUSE_BITS(0x38, 1UL << 21) >> 21;
+        DWORD revoke0 = READ_EFUSE_BITS(0x34, 1UL << 21) >> 21;
+        DWORD revoke1 = READ_EFUSE_BITS(0x34, 1UL << 22) >> 22;
+        DWORD revoke2 = READ_EFUSE_BITS(0x34, 1UL << 23) >> 23;
+        fwprintf(f, L"DIS_PAD_JTAG:               %lu\n", pad_jtag);
+        fwprintf(f, L"SOFT_DIS_JTAG:              %lu\n", soft_jtag);
+        fwprintf(f, L"DIS_FORCE_DOWNLOAD:         %lu\n", force_dl);
+        fwprintf(f, L"SECURE_BOOT_EN:             %lu\n", sb_en);
+        fwprintf(f, L"SECURE_BOOT_AGGRESSIVE:     %lu\n", sb_agg);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE0:    %lu\n", revoke0);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE1:    %lu\n", revoke1);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE2:    %lu\n", revoke2);
+        break;
+    }
+    case CHIP_ESP32S3: {
+        DWORD pad_jtag = READ_EFUSE_BITS(0x30, 1UL << 19) >> 19;
+        DWORD soft_jtag = (READ_EFUSE_BITS(0x30, 7UL << 16) >> 16);
+        DWORD usb_jtag = READ_EFUSE_BITS(0x38, 1UL << 22) >> 22;
+        DWORD force_dl = READ_EFUSE_BITS(0x30, 1UL << 12) >> 12;
+        DWORD usb_print = READ_EFUSE_BITS(0x3C, 1UL << 2) >> 2;
+        DWORD sb_en = READ_EFUSE_BITS(0x38, 1UL << 20) >> 20;
+        DWORD sb_agg = READ_EFUSE_BITS(0x38, 1UL << 21) >> 21;
+        DWORD revoke0 = READ_EFUSE_BITS(0x34, 1UL << 21) >> 21;
+        DWORD revoke1 = READ_EFUSE_BITS(0x34, 1UL << 22) >> 22;
+        DWORD revoke2 = READ_EFUSE_BITS(0x34, 1UL << 23) >> 23;
+        fwprintf(f, L"DIS_PAD_JTAG:               %lu\n", pad_jtag);
+        fwprintf(f, L"SOFT_DIS_JTAG:              %lu (%d bits set)\n", soft_jtag, COUNT_BITS(soft_jtag));
+        fwprintf(f, L"DIS_USB_JTAG:               %lu\n", usb_jtag);
+        fwprintf(f, L"DIS_FORCE_DOWNLOAD:         %lu\n", force_dl);
+        fwprintf(f, L"DIS_USB_SERIAL_JTAG_PRINT:  %lu\n", usb_print);
+        fwprintf(f, L"SECURE_BOOT_EN:             %lu\n", sb_en);
+        fwprintf(f, L"SECURE_BOOT_AGGRESSIVE:     %lu\n", sb_agg);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE0:    %lu\n", revoke0);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE1:    %lu\n", revoke1);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE2:    %lu\n", revoke2);
+        break;
+    }
+    case CHIP_ESP32C2: {
+        DWORD force_dl = READ_EFUSE_BITS(0x30, 1UL << 14) >> 14;
+        fwprintf(f, L"DIS_FORCE_DOWNLOAD:         %lu\n", force_dl);
+        fwprintf(f, L"(JTAG and Secure Boot not supported)\n");
+        break;
+    }
+    case CHIP_ESP32C3:
+    case CHIP_ESP32C6: {
+        DWORD pad_jtag = READ_EFUSE_BITS(0x30, 1UL << 19) >> 19;
+        DWORD soft_jtag = (READ_EFUSE_BITS(0x30, 7UL << 16) >> 16);
+        DWORD usb_jtag = READ_EFUSE_BITS(0x30, 1UL << 9) >> 9;
+        DWORD force_dl = READ_EFUSE_BITS(0x30, 1UL << 12) >> 12;
+        DWORD usb_print = READ_EFUSE_BITS(0x3C, 1UL << 2) >> 2;
+        DWORD sb_en = READ_EFUSE_BITS(0x38, 1UL << 20) >> 20;
+        DWORD sb_agg = READ_EFUSE_BITS(0x38, 1UL << 21) >> 21;
+        DWORD revoke0 = READ_EFUSE_BITS(0x34, 1UL << 21) >> 21;
+        DWORD revoke1 = READ_EFUSE_BITS(0x34, 1UL << 22) >> 22;
+        DWORD revoke2 = READ_EFUSE_BITS(0x34, 1UL << 23) >> 23;
+        fwprintf(f, L"DIS_PAD_JTAG:               %lu\n", pad_jtag);
+        fwprintf(f, L"SOFT_DIS_JTAG:              %lu (%d bits set)\n", soft_jtag, COUNT_BITS(soft_jtag));
+        fwprintf(f, L"DIS_USB_JTAG:               %lu\n", usb_jtag);
+        fwprintf(f, L"DIS_FORCE_DOWNLOAD:         %lu\n", force_dl);
+        fwprintf(f, L"DIS_USB_SERIAL_JTAG_PRINT:  %lu\n", usb_print);
+        fwprintf(f, L"SECURE_BOOT_EN:             %lu\n", sb_en);
+        fwprintf(f, L"SECURE_BOOT_AGGRESSIVE:     %lu\n", sb_agg);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE0:    %lu\n", revoke0);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE1:    %lu\n", revoke1);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE2:    %lu\n", revoke2);
+        break;
+    }
+    default:
+        fwprintf(f, L"(not available for this chip)\n");
+        break;
+    }
+
+    #undef READ_EFUSE_BITS
+    #undef COUNT_BITS
+
+    fwprintf(f, L"\n");
+
+    /* Write key management info */
+    fwprintf(f, L"[Key Management]\n");
+
+    /* Get key blocks for current chip type */
+    typedef struct {
+        const char *name;
+        const char *desc;
+        int offset;
+        int size;
+    } KEY_INFO;
+
+    const KEY_INFO *keys = NULL;
+    int key_count = 0;
+
+    switch (snap->device.chip.type) {
+    case CHIP_ESP32: {
+        static const KEY_INFO esp32_keys[] = {
+            { "BLOCK1", "Flash Encryption", 0x38, 32 },
+            { "BLOCK2", "Secure Boot",      0x58, 32 },
+            { "BLOCK3", "User Data",        0x78, 32 },
+        };
+        keys = esp32_keys;
+        key_count = 3;
+        break;
+    }
+    case CHIP_ESP32S2:
+    case CHIP_ESP32S3: {
+        static const KEY_INFO s2s3_keys[] = {
+            { "KEY0", "XTS-AES-256-1", 0x9C, 32 },
+            { "KEY1", "XTS-AES-256-2", 0xBC, 32 },
+            { "KEY2", "User Key 2",    0xDC, 32 },
+            { "KEY3", "User Key 3",    0xFC, 32 },
+            { "KEY4", "User Key 4",    0x11C, 32 },
+            { "KEY5", "User Key 5",    0x13C, 32 },
+        };
+        keys = s2s3_keys;
+        key_count = 6;
+        break;
+    }
+    case CHIP_ESP32C2: {
+        static const KEY_INFO c2_keys[] = {
+            { "KEY0", "Flash Encryption", 0x60, 32 },
+        };
+        keys = c2_keys;
+        key_count = 1;
+        break;
+    }
+    case CHIP_ESP32C3:
+    case CHIP_ESP32C6: {
+        static const KEY_INFO c3c6_keys[] = {
+            { "KEY0", "XTS-AES-128", 0x9C, 32 },
+            { "KEY1", "User Key 1",  0xBC, 32 },
+            { "KEY2", "User Key 2",  0xDC, 32 },
+            { "KEY3", "User Key 3",  0xFC, 32 },
+            { "KEY4", "User Key 4",  0x11C, 32 },
+            { "KEY5", "User Key 5",  0x13C, 32 },
+        };
+        keys = c3c6_keys;
+        key_count = 6;
+        break;
+    }
+    default:
+        break;
+    }
+
+    fwprintf(f, L"%-10s %-20s %-10s %-10s\n", L"Block", L"Purpose", L"Status", L"Size");
+    fwprintf(f, L"---------- -------------------- ---------- ----------\n");
+
+    for (int i = 0; i < key_count; i++) {
+        /* Check if key is programmed (non-zero) */
+        BOOL programmed = FALSE;
+        if (keys[i].offset + keys[i].size <= (int)snap->efuseSize) {
+            for (int j = 0; j < keys[i].size; j++) {
+                if (snap->efuse[keys[i].offset + j] != 0) {
+                    programmed = TRUE;
+                    break;
+                }
+            }
+        }
+
+        /* Convert name and desc to wide string */
+        WCHAR wname[16], wdesc[32];
+        MultiByteToWideChar(CP_UTF8, 0, keys[i].name, -1, wname, 16);
+        MultiByteToWideChar(CP_UTF8, 0, keys[i].desc, -1, wdesc, 32);
+
+        fwprintf(f, L"%-10s %-20s %-10s %-10s\n",
+                 wname, wdesc,
+                 programmed ? L"Programmed" : L"Empty",
+                 keys[i].size == 32 ? L"256-bit" : L"128-bit");
+    }
+
+    fwprintf(f, L"\n");
+
     /* Write eFuse data */
     fwprintf(f, L"[eFuse] (%lu bytes)\n", snap->efuseSize);
     fwprintf(f, L"Offset    00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F  ASCII\n");

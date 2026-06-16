@@ -190,6 +190,12 @@ static DWORD Esptool_DecryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len, DWO
     if (!Chip_IsFlashEncryptionEnabled(ctx->chip))
         return ESP_OK;
 
+    /* ESP32: DISABLE_DL_DECRYPT disables decryption in download mode */
+    if (Chip_IsDownloadDecryptDisabled(ctx->chip)) {
+        TRACE_FW(TAG, "DecryptInPlace: DISABLE_DL_DECRYPT set, returning ciphertext");
+        return ESP_OK;
+    }
+
     int key_len = 0;
     int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, &key_len);
 

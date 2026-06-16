@@ -71,13 +71,13 @@ eFuse 只能将位从 **0 变为 1**，不能从 1 变为 0。这是硬件特性
 |------|----------------|-------------------|------|
 | **无加密** | 偶数 (0, 2, 4...) | 0 | 允许明文烧录，允许加密烧录 |
 | **开发模式** | 奇数 (1, 3, 5...) | 0 | 已加密，但允许明文烧录 |
-| **产品模式** | 奇数 (1, 3, 5...) | 1 | 已加密，禁止明文烧录 |
+| **生产模式** | 奇数 (1, 3, 5...) | 1 | 已加密，禁止明文烧录 |
 
-### 2.1 开发模式 → 产品模式（不可逆）
+### 2.1 开发模式 → 生产模式（不可逆）
 
 ```
 1. burn-efuse SPI_BOOT_CRYPT_CNT 1    # 0→1，启用加密（开发模式）
-2. burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1  # 启用产品模式
+2. burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1  # 启用生产模式
 ```
 
 ### 2.2 开发模式关闭加密（可逆）
@@ -91,9 +91,9 @@ eFuse 只能将位从 **0 变为 1**，不能从 1 变为 0。这是硬件特性
 
 **无法通过烧录将奇数变为偶数**，只能新建设备（eFuse 全 0）来测试未加密状态。
 
-### 2.3 产品模式下无法操作加密计数器
+### 2.3 生产模式下无法操作加密计数器
 
-产品模式下（`DIS_DOWNLOAD_MANUAL_ENCRYPT=1`），加密计数器被保护，无法通过 `burn-efuse` 修改。
+生产模式下（`DIS_DOWNLOAD_MANUAL_ENCRYPT=1`），加密计数器被保护，无法通过 `burn-efuse` 修改。
 
 ---
 
@@ -132,9 +132,9 @@ esptool --port COM10 write-flash 0x0 firmware_enc.bin
 # 验证：Flash 内容为预加密数据（不解密）
 ```
 
-### 3.2 ESP32-C3/C6/S2/S3 产品模式测试
+### 3.2 ESP32-C3/C6/S2/S3 生产模式测试
 
-**测试目标**：验证产品模式下的加密烧录限制
+**测试目标**：验证生产模式下的加密烧录限制
 
 ```bash
 # 1. 新建设备
@@ -146,7 +146,7 @@ espefuse --port COM10 burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
 # 3. 启用开发模式
 espefuse --port COM10 burn-efuse SPI_BOOT_CRYPT_CNT 1
 
-# 4. 启用产品模式（不可逆）
+# 4. 启用生产模式（不可逆）
 espefuse --port COM10 burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
 
 # 5. 验证状态栏显示 "Encrypted (Prod)"
@@ -192,9 +192,9 @@ esptool --port COM10 write-flash 0x0 firmware.bin
 # 验证：日志显示 encrypted=0
 ```
 
-### 3.4 ESP32 产品模式测试
+### 3.4 ESP32 生产模式测试
 
-**测试目标**：验证 ESP32 产品模式的加密烧录限制
+**测试目标**：验证 ESP32 生产模式的加密烧录限制
 
 ```bash
 # 1. 新建设备（ESP32）
@@ -206,7 +206,7 @@ espefuse --port COM10 burn-key BLOCK1 key.bin
 # 3. 启用开发模式
 espefuse --port COM10 burn-efuse FLASH_CRYPT_CNT 1
 
-# 4. 启用产品模式
+# 4. 启用生产模式
 espefuse --port COM10 burn-efuse DISABLE_DL_ENCRYPT 1
 
 # 5. 验证状态栏显示 "Encrypted (Prod)"
@@ -217,7 +217,7 @@ esptool --port COM10 write-flash 0x0 firmware.bin
 
 # 7. 测试加密烧录（ESP32 Stub 模式支持）
 esptool --port COM10 write-flash --encrypt 0x0 firmware.bin
-# 验证：烧录成功（Stub 模式绕过产品模式检查）
+# 验证：烧录成功（Stub 模式绕过生产模式检查）
 
 # 8. 测试预加密文件 + --force
 espsecure encrypt-flash-data -k key.bin -a 0x0 -o firmware_enc.bin firmware.bin
@@ -252,9 +252,9 @@ esptool --port COM10 write-flash 0x0 firmware.bin
 # 验证：日志显示 encrypted=0
 ```
 
-### 3.6 ESP32-C2 产品模式测试
+### 3.6 ESP32-C2 生产模式测试
 
-**测试目标**：验证 ESP32-C2 产品模式的加密烧录限制
+**测试目标**：验证 ESP32-C2 生产模式的加密烧录限制
 
 ```bash
 # 1. 新建设备（ESP32-C2）
@@ -266,7 +266,7 @@ espefuse --port COM10 burn-key BLOCK_KEY0 key.bin XTS_AES_128_KEY
 # 3. 启用开发模式
 espefuse --port COM10 burn-efuse SPI_BOOT_CRYPT_CNT 1
 
-# 4. 启用产品模式
+# 4. 启用生产模式
 espefuse --port COM10 burn-efuse DIS_DOWNLOAD_MANUAL_ENCRYPT 1
 
 # 5. 验证状态栏显示 "Encrypted (Prod)"
@@ -433,7 +433,7 @@ esptool --port COM10 read-mac
 |------|---------|
 | 加密烧录 | `encrypted=1`, `Encrypted X bytes` |
 | 明文烧录 | `encrypted=0`, 无加密日志 |
-| 产品模式拒绝明文 | `Production mode: plaintext flash disabled` |
+| 生产模式拒绝明文 | `Production mode: plaintext flash disabled` |
 | 预加密文件 | `encrypted=0`, 直接写入 |
 
 ### 10.3 Flash 内容验证
