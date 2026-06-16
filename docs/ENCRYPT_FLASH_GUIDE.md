@@ -417,7 +417,7 @@ esptool --port COM10 read-mac
 
 ## 10. 验证检查点
 
-### 7.1 状态栏验证
+### 10.1 状态栏验证
 
 | 操作 | 预期状态栏 |
 |------|-----------|
@@ -427,7 +427,7 @@ esptool --port COM10 read-mac
 | burn-efuse DIS_DOWNLOAD_MODE 1 | `*`, `Download Disabled` |
 | burn-efuse ENABLE_SECURITY_DOWNLOAD 1 | `*`, `Download Secure` |
 
-### 7.2 日志验证
+### 10.2 日志验证
 
 | 场景 | 预期日志 |
 |------|---------|
@@ -436,43 +436,10 @@ esptool --port COM10 read-mac
 | 产品模式拒绝明文 | `Production mode: plaintext flash disabled` |
 | 预加密文件 | `encrypted=0`, 直接写入 |
 
-### 7.3 Flash 内容验证
+### 10.3 Flash 内容验证
 
 | 场景 | Flash 内容 |
 |------|-----------|
 | 明文烧录 | 原始固件数据 |
 | 加密烧录 | 加密后的数据（非原始数据） |
 | 预加密文件 | 预加密数据（不解密） |
-
----
-
-## 11. 故障排除
-
-### 8.1 burn-efuse 报错 "Protected?"
-
-**原因**：尝试将 1 清零为 0，eFuse 不支持此操作。
-
-**解决**：新建设备（eFuse 全 0）来测试不同状态。
-
-### 8.2 加密烧录后 Flash 全 FF
-
-**原因**：加密失败，数据未写入。
-
-**检查**：
-- 密钥是否已烧录到 eFuse
-- 日志中是否有 `Encrypted X bytes`
-- 日志中是否有错误信息
-
-### 8.3 产品模式下无法烧录
-
-**原因**：产品模式禁用明文烧录。
-
-**解决**：
-- 使用 `--encrypt` 参数（如果设备允许）
-- 使用预加密文件 + `--force`
-
-### 8.4 ESP32 加密烧录失败
-
-**原因**：ESP32 ROM 不支持加密烧录，需要 Stub 模式。
-
-**解决**：esptool 会自动上传 Stub，确保串口连接正常。
