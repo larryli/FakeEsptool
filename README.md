@@ -122,6 +122,7 @@ FakeEsptool/
 │   ├── DEVELOPMENT.md          # 开发文档
 │   ├── PROTOCOL.md             # 协议规范
 │   ├── WRITE_FLASH_GUIDE.md    # 烧录流程指南
+│   ├── ENCRYPT_FLASH_GUIDE.md  # 加密烧录指南
 │   └── TODO.md                 # 待办改进项
 ├── CHANGELOG.md                # 变更记录
 ├── LICENSE                     # MIT 许可证
@@ -134,6 +135,7 @@ FakeEsptool/
 - [开发文档](docs/DEVELOPMENT.md)
 - [协议规范](docs/PROTOCOL.md)
 - [烧录流程指南](docs/WRITE_FLASH_GUIDE.md)
+- [加密烧录指南](docs/ENCRYPT_FLASH_GUIDE.md)
 - [变更记录](CHANGELOG.md)
 - [待办改进项](docs/TODO.md)
 
