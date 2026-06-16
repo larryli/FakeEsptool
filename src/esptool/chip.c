@@ -748,7 +748,7 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
                     const DWORD *block_offsets = NULL;
                     int num_blocks = 0;
 
-                    if (ctx->type == CHIP_ESP32C3) {
+                    if (ctx->type == CHIP_ESP32C3 || ctx->type == CHIP_ESP32C6) {
                         block_offsets = efuse_block_offsets_c3;
                         num_blocks = (int)(sizeof(efuse_block_offsets_c3) / sizeof(efuse_block_offsets_c3[0]));
                     } else if (ctx->type == CHIP_ESP32C2) {
