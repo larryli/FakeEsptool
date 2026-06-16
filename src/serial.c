@@ -14,6 +14,7 @@
 #include <setupapi.h>
 #include <devguid.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <wchar.h>
 #include <wctype.h>
 
@@ -62,6 +63,25 @@ typedef struct {
 
 static PORT_INFO g_portInfo[MAX_PORTS];
 static int g_portCount = 0;
+
+/* Combo box item for sorting */
+typedef struct {
+    WCHAR text[128];
+    int portIdx;
+} COMBO_ITEM;
+
+/*
+ * ComboItemCompare - Comparison function for qsort
+ *
+ * Compares combo box items by port name using natural sort order.
+ */
+static int ComboItemCompare(const void *a, const void *b)
+{
+    const COMBO_ITEM *ia = (const COMBO_ITEM *)a;
+    const COMBO_ITEM *ib = (const COMBO_ITEM *)b;
+    return NaturalCompare(g_portInfo[ia->portIdx].portName,
+                          g_portInfo[ib->portIdx].portName);
+}
 
 /*
  * Serial_EnumPorts - Enumerate available serial ports with friendly names
@@ -124,11 +144,6 @@ BOOL Serial_EnumPorts(HWND hCombo)
         int count = (int)SendMessageW(hCombo, CB_GETCOUNT, 0, 0);
         if (count > 1) {
             /* Collect items into temporary array */
-            typedef struct {
-                WCHAR text[128];
-                int portIdx;
-            } COMBO_ITEM;
-            
             COMBO_ITEM *items = (COMBO_ITEM *)HeapAlloc(GetProcessHeap(), 0, count * sizeof(COMBO_ITEM));
             if (items) {
                 for (int i = 0; i < count; i++) {
@@ -136,17 +151,8 @@ BOOL Serial_EnumPorts(HWND hCombo)
                     items[i].portIdx = (int)SendMessageW(hCombo, CB_GETITEMDATA, i, 0);
                 }
 
-                /* Sort using bubble sort with natural compare on port name */
-                for (int i = 0; i < count - 1; i++) {
-                    for (int j = 0; j < count - 1 - i; j++) {
-                        if (NaturalCompare(g_portInfo[items[j].portIdx].portName,
-                                          g_portInfo[items[j + 1].portIdx].portName) > 0) {
-                            COMBO_ITEM temp = items[j];
-                            items[j] = items[j + 1];
-                            items[j + 1] = temp;
-                        }
-                    }
-                }
+                /* Sort using qsort with natural compare on port name */
+                qsort(items, count, sizeof(COMBO_ITEM), ComboItemCompare);
 
                 /* Clear and repopulate combo box in sorted order */
                 SendMessageW(hCombo, CB_RESETCONTENT, 0, 0);
