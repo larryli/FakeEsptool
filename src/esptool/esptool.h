@@ -148,12 +148,19 @@ typedef struct {
     DWORD     defl_offset;    /* Flash offset for current deflate session */
     DWORD     defl_unc_size;  /* Uncompressed size for current deflate session */
     BOOL      flash_encrypted; /* Current flash session uses encryption (encrypted=1) */
+    BYTE      *decomp_buf;    /* Persistent decompression buffer */
+    DWORD     decomp_buf_cap; /* Decompression buffer capacity */
 } ESPTOOL_CTX;
 
 /*
  * Esptool_Init - Initialize ESP protocol context with device data
  */
 void Esptool_Init(ESPTOOL_CTX *ctx, CHIP_CTX *chip, FLASH_CTX *flash);
+
+/*
+ * Esptool_Close - Release persistent resources (decompression buffer)
+ */
+void Esptool_Close(ESPTOOL_CTX *ctx);
 
 /*
  * Esptool_ResetState - Reset protocol state (called on download mode entry)

@@ -964,6 +964,7 @@ static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam)
         g_hDevNotify = NULL;
     }
     Serial_Close(&g_serial);
+    Esptool_Close(&g_esptool);
     Device_Close(&g_device);
     if (g_hRichEdit) {
         FreeLibrary(g_hRichEdit);

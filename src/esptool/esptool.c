@@ -219,26 +219,33 @@ static DWORD Defl_FlushBuffer(ESPTOOL_CTX *ctx)
         return ESP_OK;
     }
 
-    /* Allocate decompression buffer */
-    BYTE *decomp_buf = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ctx->defl_unc_size);
-    if (!decomp_buf) {
-        TRACE_FW(TAG, "Failed to allocate decompression buffer");
-        Serial_PostLog(ctx->hNotify, L"ERR", L"  Failed to allocate decompression buffer");
-        Defl_FreeBuffer(ctx);
-        return ESP_FAIL;
+    /* Reuse or allocate decompression buffer */
+    if (ctx->decomp_buf && ctx->decomp_buf_cap < ctx->defl_unc_size) {
+        HeapFree(GetProcessHeap(), 0, ctx->decomp_buf);
+        ctx->decomp_buf = NULL;
+        ctx->decomp_buf_cap = 0;
+    }
+    if (!ctx->decomp_buf) {
+        ctx->decomp_buf = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ctx->defl_unc_size);
+        if (!ctx->decomp_buf) {
+            TRACE_FW(TAG, "Failed to allocate decompression buffer");
+            Serial_PostLog(ctx->hNotify, L"ERR", L"  Failed to allocate decompression buffer");
+            Defl_FreeBuffer(ctx);
+            return ESP_FAIL;
+        }
+        ctx->decomp_buf_cap = ctx->defl_unc_size;
     }
 
     /* Initialize decompressor */
     DEFLATE_CTX deflate_ctx;
     deflate_init(&deflate_ctx, ctx->defl_buf, ctx->defl_buf_size,
-                 decomp_buf, ctx->defl_unc_size);
+                 ctx->decomp_buf, ctx->decomp_buf_cap);
 
     /* Decompress */
     int ret = deflate_decompress(&deflate_ctx);
     if (ret != DEFLATE_OK) {
         TRACE_FW(TAG, "Decompression failed: %d", ret);
         Serial_PostLogF(ctx->hNotify, L"ERR", L"  Decompression failed: %d", ret);
-        HeapFree(GetProcessHeap(), 0, decomp_buf);
         Defl_FreeBuffer(ctx);
         return ESP_FAIL;
     }
@@ -250,16 +257,14 @@ static DWORD Defl_FlushBuffer(ESPTOOL_CTX *ctx)
                     ctx->defl_buf_size, decomp_size, ctx->defl_offset);
 
     /* Encrypt if encrypted flag was set */
-    if (Esptool_EncryptInPlace(ctx, decomp_buf, decomp_size, ctx->defl_offset) != ESP_OK) {
-        HeapFree(GetProcessHeap(), 0, decomp_buf);
+    if (Esptool_EncryptInPlace(ctx, ctx->decomp_buf, decomp_size, ctx->defl_offset) != ESP_OK) {
         Defl_FreeBuffer(ctx);
         return ESP_FAIL;
     }
 
     /* Write to flash */
-    Flash_Write(ctx->flash, ctx->defl_offset, decomp_buf, decomp_size);
+    Flash_Write(ctx->flash, ctx->defl_offset, ctx->decomp_buf, decomp_size);
 
-    HeapFree(GetProcessHeap(), 0, decomp_buf);
     Defl_FreeBuffer(ctx);
     return ESP_OK;
 }
@@ -277,6 +282,18 @@ void Esptool_Init(ESPTOOL_CTX *ctx, CHIP_CTX *chip, FLASH_CTX *flash)
     ctx->defl_buf = NULL;
     ctx->defl_buf_size = 0;
     ctx->defl_buf_cap = 0;
+    ctx->decomp_buf = NULL;
+    ctx->decomp_buf_cap = 0;
+}
+
+void Esptool_Close(ESPTOOL_CTX *ctx)
+{
+    Defl_FreeBuffer(ctx);
+    if (ctx->decomp_buf) {
+        HeapFree(GetProcessHeap(), 0, ctx->decomp_buf);
+        ctx->decomp_buf = NULL;
+        ctx->decomp_buf_cap = 0;
+    }
 }
 
 void Esptool_ResetState(ESPTOOL_CTX *ctx)
