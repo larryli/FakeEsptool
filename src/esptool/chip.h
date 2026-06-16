@@ -121,12 +121,12 @@
  * the BLOCK0 region. Offsets are from the chip's eFuse base address.
  * ============================================================================ */
 
-/* ESP32 eFuse encryption fields (EFUSE_RD_REG_BASE = 0x3FF5A000, BLOCK0 at +0x2C) */
-#define EFUSE_OFFS_FLASH_CRYPT_CNT_ESP32        0x2C    /* BLOCK0 word0 */
+/* ESP32 eFuse encryption fields (EFUSE_RD_REG_BASE = 0x3FF5A000, BLOCK0 at +0x00) */
+#define EFUSE_OFFS_FLASH_CRYPT_CNT_ESP32        0x00    /* BLOCK0 word0 */
 #define EFUSE_MASK_FLASH_CRYPT_CNT_ESP32        (0x7FUL << 20)
-#define EFUSE_OFFS_DISABLE_DL_ENCRYPT_ESP32     0x44    /* BLOCK0 word6 */
+#define EFUSE_OFFS_DISABLE_DL_ENCRYPT_ESP32     0x18    /* BLOCK0 word6 */
 #define EFUSE_BIT_DISABLE_DL_ENCRYPT_ESP32      (1UL << 7)
-#define EFUSE_OFFS_UART_DOWNLOAD_DIS_ESP32      0x2C    /* BLOCK0 word0 */
+#define EFUSE_OFFS_UART_DOWNLOAD_DIS_ESP32      0x00    /* BLOCK0 word0 */
 #define EFUSE_BIT_UART_DOWNLOAD_DIS_ESP32       (1UL << 27)
 
 /* ESP32-S2 eFuse encryption fields (EFUSE_BASE = 0x3F41A000, BLOCK0 at +0x2C) */
@@ -186,9 +186,9 @@
  * programs the eFuse and then clears the command register.
  * ============================================================================ */
 
-/* ESP32 eFuse controller */
-#define EFUSE_CONF_REG_ESP32        (EFUSE_BASE_ESP32 + 0x03C)
-#define EFUSE_CMD_REG_ESP32         (EFUSE_BASE_ESP32 + 0x040)
+/* ESP32 eFuse controller (registers at EFUSE_RD_REG_BASE, not EFUSE_BASE) */
+#define EFUSE_CONF_REG_ESP32        (EFUSE_RD_REG_BASE_ESP32 + 0x0FC)
+#define EFUSE_CMD_REG_ESP32         (EFUSE_RD_REG_BASE_ESP32 + 0x104)
 #define EFUSE_CONF_WRITE_ESP32      0x5A5A
 #define EFUSE_CONF_READ_ESP32       0x5AA5
 #define EFUSE_CMD_WRITE_ESP32       0x2
