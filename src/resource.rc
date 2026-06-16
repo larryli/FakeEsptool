@@ -257,8 +257,8 @@ STRINGTABLE
 }
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 2026,6,14,0
-PRODUCTVERSION 2026,6,14,0
+FILEVERSION 2026,6,17,0
+PRODUCTVERSION 2026,6,17,0
 FILEFLAGSMASK 0x3F
 FILEFLAGS 0x0
 FILEOS VOS__WINDOWS32
@@ -270,10 +270,10 @@ FILESUBTYPE VFT2_UNKNOWN
     BLOCK "040904B0"
     {
       VALUE "FileDescription", "ESP Chip Device Simulator\0"
-      VALUE "FileVersion", "2026.6.14.0\0"
+      VALUE "FileVersion", "2026.6.17.0\0"
       VALUE "LegalCopyright", "Copyright (c) 2025 - 2026 Larry Li\0"
       VALUE "ProductName", "FakeEsptool\0"
-      VALUE "ProductVersion", "2026.6.14.0\0"
+      VALUE "ProductVersion", "2026.6.17.0\0"
     }
   }
   BLOCK "VarFileInfo"
@@ -526,8 +526,8 @@ STRINGTABLE
 }
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 2026,6,14,0
-PRODUCTVERSION 2026,6,14,0
+FILEVERSION 2026,6,17,0
+PRODUCTVERSION 2026,6,17,0
 FILEFLAGSMASK 0x3F
 FILEFLAGS 0x0
 FILEOS VOS__WINDOWS32
@@ -539,10 +539,10 @@ FILESUBTYPE VFT2_UNKNOWN
     BLOCK "080404B0"
     {
       VALUE "FileDescription", "ESP 芯片设备模拟器\0"
-      VALUE "FileVersion", "2026.6.14.0\0"
+      VALUE "FileVersion", "2026.6.17.0\0"
       VALUE "LegalCopyright", "版权所有 (c) 2025 - 2026 Larry Li\0"
       VALUE "ProductName", "FakeEsptool\0"
-      VALUE "ProductVersion", "2026.6.14.0\0"
+      VALUE "ProductVersion", "2026.6.17.0\0"
     }
   }
   BLOCK "VarFileInfo"
