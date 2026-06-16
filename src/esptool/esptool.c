@@ -1125,13 +1125,23 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG, "GET_SECURITY_INFO");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  Get security info");
 
-    /* ESP8266 and ESP32 ROM does not support GET_SECURITY_INFO.
-       Return ROM_INVALID_RECV_MSG error so esptool falls back to magic value. */
-    if (ctx->chip->type == CHIP_ESP8266 || ctx->chip->type == CHIP_ESP32) {
+    /* ESP8266 ROM does not support GET_SECURITY_INFO.
+       Return ROM_INVALID_RECV_MSG error so esptool falls back to magic value.
+       ESP32 ROM also doesn't support it, but stub does. */
+    if (ctx->chip->type == CHIP_ESP8266) {
         TRACE_PROTO(TAG, "  Not supported on %s, returning error", ctx->chip->name);
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  Not supported on %hs", ctx->chip->name);
-        BYTE err_data[4] = {0x01, 0x05, 0x00, 0x00};
-        Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, ESP_OK, err_data, 4);
+        /* Status = ROM_INVALID_RECV_MSG (0x05), status_len=4 for ROM mode */
+        Esptool_SendResponseEx(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, 0x05, 4, NULL, 4);
+        return;
+    }
+
+    /* ESP32 ROM mode: return error so esptool falls back to eFuse register reading.
+       Stub mode: return proper security info. */
+    if (ctx->chip->type == CHIP_ESP32 && !ctx->stub_mode) {
+        TRACE_PROTO(TAG, "  ESP32 ROM: not supported, returning error");
+        Serial_PostLog(ctx->hNotify, L"ESP", L"  ESP32 ROM: not supported");
+        Esptool_SendResponseEx(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val, 0x05, 4, NULL, 4);
         return;
     }
 
@@ -1158,9 +1168,10 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         return;
     }
 
-    /* ESP32-S3, C2, C3, C6: Return 22-byte response with IMAGE_CHIP_ID.
-       [flags:4][flash_crypt_cnt:1][key_purposes:7][chip_id:4][api_version:4][status:2] */
-    DWORD chip_id = ctx->chip->security_chip_id;
+    /* ESP32 stub, ESP32-S3, C2, C3, C6: Return 22-byte response with IMAGE_CHIP_ID.
+       [flags:4][flash_crypt_cnt:1][key_purposes:7][chip_id:4][api_version:4][status:2]
+       For ESP32 stub, chip_id = EFUSE_CHIP_ID (0x00F01D83). */
+    DWORD chip_id = (ctx->chip->type == CHIP_ESP32) ? ctx->chip->chip_id : ctx->chip->security_chip_id;
     DWORD flash_crypt_cnt = Chip_GetFlashCryptCnt(ctx->chip);
 
     BYTE sec_data[22] = {0};
