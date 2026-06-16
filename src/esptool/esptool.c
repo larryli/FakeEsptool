@@ -59,6 +59,14 @@ static const ESP_CMD_INFO commandTable[256] = {
 
 #define ESP_RESP_BUF_SIZE  8192
 
+/* Minimum packet size check macro */
+#define CHECK_PKT_SIZE(pkt, min_size) \
+    if ((pkt)->size < (min_size)) { \
+        TRACE_FW(TAG, "Packet too small: cmd=0x%02X size=%u min=%u", \
+                 (pkt)->command, (pkt)->size, (min_size)); \
+        return; \
+    }
+
 /* Get command name safely */
 static const char *GetCmdName(BYTE cmd)
 {
@@ -142,6 +150,46 @@ static DWORD Esptool_EncryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len, DWO
 
     TRACE_FW(TAG, "EncryptInPlace: Encryption failed ret=%d", ret);
     Serial_PostLogF(ctx->hNotify, L"ERR", L"  Encryption failed: %d", ret);
+    return ESP_FAIL;
+}
+
+/*
+ * Esptool_DecryptInPlace - Decrypt data in-place using flash encryption key
+ *
+ * @ctx:        Esptool context
+ * @data:       Data buffer to decrypt in-place
+ * @len:        Data length in bytes
+ * @flash_addr: Flash address for tweak calculation
+ *
+ * Returns ESP_OK on success or if decryption not needed, ESP_FAIL on error.
+ */
+static DWORD Esptool_DecryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len, DWORD flash_addr)
+{
+    if (!Chip_IsFlashEncryptionEnabled(ctx->chip))
+        return ESP_OK;
+
+    int key_len = 0;
+    int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, &key_len);
+
+    if (key_offset < 0 || !ctx->chip->efuse ||
+        key_offset + key_len > ctx->chip->efuse_size) {
+        TRACE_FW(TAG, "DecryptInPlace: No encryption key available");
+        return ESP_FAIL;
+    }
+
+    const BYTE *key = &ctx->chip->efuse[key_offset];
+    ENCRYPT_CTX enc_ctx;
+    int ret = Encrypt_Init(&enc_ctx, key, key_len, flash_addr);
+
+    if (ret == ENCRYPT_OK)
+        ret = Decrypt_Data(&enc_ctx, data, data, len);
+
+    if (ret == ENCRYPT_OK) {
+        TRACE_FW(TAG, "DecryptInPlace: Success, decrypted %lu bytes at offset 0x%08lX", len, flash_addr);
+        return ESP_OK;
+    }
+
+    TRACE_FW(TAG, "DecryptInPlace: Decryption failed ret=%d", ret);
     return ESP_FAIL;
 }
 
@@ -375,6 +423,7 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
 static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 4);
     DWORD addr = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                  ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
     DWORD val = Chip_ReadReg(ctx->chip, addr);
@@ -400,6 +449,7 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
 static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 8);
     /* WRITE_REG request format (16 bytes = 4 x 32-bit words):
        [addr:4][value:4][mask:4][delay_us:4] */
     DWORD addr = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
@@ -442,6 +492,7 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
 static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 4);
     DWORD new_baud = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                      ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
     DWORD old_baud = 115200;
@@ -466,6 +517,7 @@ static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
 static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 16);
     DWORD total = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                   ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
     DWORD blocks = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
@@ -489,6 +541,7 @@ static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
 static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 16);
     DWORD seq = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                 ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
 
@@ -517,6 +570,7 @@ static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
 static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 4);
     DWORD execute = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                     ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
 
@@ -560,6 +614,7 @@ static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 16);
     /* FLASH_DEFL_BEGIN format:
        [uncompressed_size:4][num_blocks:4][block_size:4][offset:4] */
     DWORD uncompressed_size = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
@@ -682,6 +737,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 16);
     DWORD data_len = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                      ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
     DWORD seq = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
@@ -738,7 +794,6 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         ctx->flash_seq = seq + 1;
     }
 
-    if (ctx->onModified) ctx->onModified();
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     BYTE status_len = ESP_STATUS_LEN(ctx);
     Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
@@ -754,6 +809,7 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 4);
     TRACE_PROTO(TAG, "FLASH_DEFL_END");
     Serial_PostLog(ctx->hNotify, L"ESP", L"  End compressed flash download");
 
@@ -790,6 +846,7 @@ static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 16);
     DWORD addr = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                  ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
     DWORD len = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
@@ -826,6 +883,9 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             HeapFree(GetProcessHeap(), 0, buf);
             return;
         }
+
+        /* Decrypt if flash encryption is enabled */
+        Esptool_DecryptInPlace(ctx, buf, chunk_size, addr + offset);
 
         /* SLIP-encode the chunk and send as raw frame (not a command response) */
         DWORD encoded_max = (DWORD)chunk_size * 2 + 2;
@@ -891,6 +951,7 @@ static void HandleEraseFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 8);
     DWORD offset = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                    ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
     DWORD len = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
@@ -924,6 +985,7 @@ static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 8);
     DWORD addr = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                  ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
     DWORD len = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
@@ -951,7 +1013,7 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         /* ROM mode: return 32-byte ASCII hex MD5 + 2-byte status */
         BYTE resp[34];
         for (int i = 0; i < 16; i++)
-            sprintf((char *)&resp[i * 2], "%02x", md5[i]);
+            snprintf((char *)&resp[i * 2], 3, "%02x", md5[i]);
         resp[32] = 0x00;  /* status byte 1 (success) */
         resp[33] = 0x00;  /* status byte 2 (success) */
         TRACE_PROTO(TAG, "  MD5=%.*s", 32, resp);
@@ -974,6 +1036,7 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 16);
     DWORD erase_size = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                        ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
     DWORD num_blocks = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
@@ -1023,7 +1086,7 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     BYTE status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_BEGIN, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
+    Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_BEGIN, pkt->value, ESP_OK, status_len, NULL, status_len);
 }
 
 /*
@@ -1039,6 +1102,7 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 16);
     DWORD data_len = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                      ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
     DWORD seq = pkt->data[4] | ((DWORD)pkt->data[5] << 8) |
@@ -1071,18 +1135,13 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         }
 
         /* Encrypt if encrypted flag was set */
-        if (ctx->flash_encrypted) {
-            if (Esptool_EncryptInPlace(ctx, (BYTE *)payload, data_len, ctx->flash_offset) == ESP_OK) {
-                Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
-            } else {
-                Serial_PostLogF(ctx->hNotify, L"ERR", L"  Encryption failed at offset 0x%08lX", ctx->flash_offset);
-                BYTE status_len = ESP_STATUS_LEN(ctx);
-                Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
-                return;
-            }
-        } else {
-            Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
+        if (Esptool_EncryptInPlace(ctx, (BYTE *)payload, data_len, ctx->flash_offset) != ESP_OK) {
+            Serial_PostLogF(ctx->hNotify, L"ERR", L"  Encryption failed at offset 0x%08lX", ctx->flash_offset);
+            BYTE status_len = ESP_STATUS_LEN(ctx);
+            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+            return;
         }
+        Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
 
         ctx->flash_offset += data_len;
         ctx->flash_seq = seq + 1;
@@ -1106,6 +1165,7 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
+    CHECK_PKT_SIZE(pkt, 4);
     DWORD reboot = pkt->data[0] | ((DWORD)pkt->data[1] << 8) |
                    ((DWORD)pkt->data[2] << 16) | ((DWORD)pkt->data[3] << 24);
 
@@ -1125,7 +1185,7 @@ static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     BYTE status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_END, ctx->last_read_val, ESP_OK, status_len, NULL, status_len);
+    Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_END, pkt->value, ESP_OK, status_len, NULL, status_len);
 }
 
 /*
