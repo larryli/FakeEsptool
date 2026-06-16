@@ -994,7 +994,7 @@ All flash segments verified successfully.
 | `HandleFlashDeflData` | 积累数据到缓冲区，不立即解压 |
 | `HandleFlashDeflEnd` | 调用 `Defl_FlushBuffer()` 解压并写入 |
 | `HandleFlashBegin` | **不释放**缓冲区（等待后续 `FLASH_DEFL_END`） |
-| `HandleFlashEnd` | 调用 `Defl_FreeBuffer()` 释放缓冲区 |
+| `HandleFlashEnd` | 检查并 flush 未处理的缓冲区（ROM 模式场景） |
 | `HandleEraseFlash` | 调用 `Defl_FreeBuffer()` 释放缓冲区 |
 | `HandleEraseBlock` | 调用 `Defl_FreeBuffer()` 释放缓冲区 |
 
@@ -1002,10 +1002,10 @@ All flash segments verified successfully.
 
 | 检查点 | 操作 | 原因 |
 |--------|------|------|
-| `FLASH_DEFL_END` | Flush + Free | 正常结束压缩写入 |
+| `FLASH_DEFL_END` | Flush + Free | 正常结束压缩写入（Stub 模式） |
 | `FLASH_DEFL_BEGIN`（重复） | Flush + Free | ROM 模式多文件烧录不发 END |
 | `FLASH_BEGIN` | **不释放** | 客户端可能在 `FLASH_DEFL_DATA` 后发送 `FLASH_BEGIN`，再发送 `FLASH_DEFL_END` |
-| `FLASH_END` | Free | 非压缩写入结束，释放未处理的缓冲区 |
+| `FLASH_END` | Flush（如有）+ Free | ROM 模式可能直接发 `FLASH_END` 结束压缩烧录 |
 | `ERASE_FLASH` | Free | 擦除操作中断烧录 |
 | `ERASE_REGION` | Free | 擦除操作中断烧录 |
 | `RUN_USER_CODE` | Free | 软复位 |

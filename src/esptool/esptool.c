@@ -19,42 +19,41 @@ static const char *TAG = "ESP";
 /* Command info structure */
 typedef struct {
     const char *name;
-    const char *desc;
 } ESP_CMD_INFO;
 
 /* Command table for protocol logging */
 static const ESP_CMD_INFO commandTable[256] = {
-    [0x02] = {"FLASH_BEGIN", "Begin flash download"},
-    [0x03] = {"FLASH_DATA", "Flash download data"},
-    [0x04] = {"FLASH_END", "End flash download"},
-    [0x05] = {"MEM_BEGIN", "Begin memory download"},
-    [0x06] = {"MEM_END", "End memory download"},
-    [0x07] = {"MEM_DATA", "Memory download data"},
-    [0x08] = {"SYNC", "Sync handshake"},
-    [0x09] = {"WRITE_REG", "Write register"},
-    [0x0A] = {"READ_REG", "Read register"},
-    [0x0B] = {"SPI_SET_PARAMS", "Set SPI flash parameters"},
-    [0x0D] = {"SPI_ATTACH", "Attach SPI flash"},
-    [0x0F] = {"CHANGE_BAUDRATE", "Change baud rate"},
-    [0x10] = {"FLASH_DEFL_BEGIN", "Begin compressed flash download"},
-    [0x11] = {"FLASH_DEFL_DATA", "Compressed flash download data"},
-    [0x12] = {"FLASH_DEFL_END", "End compressed flash download"},
-    [0x13] = {"SPI_FLASH_MD5", "Calculate flash MD5"},
-    [0x14] = {"GET_SECURITY_INFO", "Get security info"},
-    [0xD0] = {"ERASE_FLASH", "Erase entire flash"},
-    [0xD1] = {"ERASE_REGION", "Erase flash region"},
-    [0xD2] = {"READ_FLASH", "Read flash"},
-    [0xD3] = {"RUN_USER_CODE", "Run user code (soft reset)"},
-    [0xD5] = {"SPI_NAND_ATTACH", "Attach SPI NAND flash"},
-    [0xD6] = {"SPI_NAND_READ_SPARE", "Read NAND spare area"},
-    [0xD7] = {"SPI_NAND_WRITE_SPARE", "Write NAND spare area"},
-    [0xD8] = {"SPI_NAND_READ_FLASH", "Read NAND flash"},
-    [0xD9] = {"SPI_NAND_WRITE_FLASH_BEGIN", "Begin NAND flash write"},
-    [0xDA] = {"SPI_NAND_WRITE_FLASH_DATA", "NAND flash write data"},
-    [0xDB] = {"SPI_NAND_ERASE_FLASH", "Erase entire NAND flash"},
-    [0xDC] = {"SPI_NAND_ERASE_REGION", "Erase NAND flash region"},
-    [0xDD] = {"SPI_NAND_READ_PAGE_DEBUG", "Read NAND page (debug)"},
-    [0xDE] = {"SPI_NAND_WRITE_FLASH_END", "End NAND flash write"},
+    [0x02] = {"FLASH_BEGIN"},
+    [0x03] = {"FLASH_DATA"},
+    [0x04] = {"FLASH_END"},
+    [0x05] = {"MEM_BEGIN"},
+    [0x06] = {"MEM_END"},
+    [0x07] = {"MEM_DATA"},
+    [0x08] = {"SYNC"},
+    [0x09] = {"WRITE_REG"},
+    [0x0A] = {"READ_REG"},
+    [0x0B] = {"SPI_SET_PARAMS"},
+    [0x0D] = {"SPI_ATTACH"},
+    [0x0F] = {"CHANGE_BAUDRATE"},
+    [0x10] = {"FLASH_DEFL_BEGIN"},
+    [0x11] = {"FLASH_DEFL_DATA"},
+    [0x12] = {"FLASH_DEFL_END"},
+    [0x13] = {"SPI_FLASH_MD5"},
+    [0x14] = {"GET_SECURITY_INFO"},
+    [0xD0] = {"ERASE_FLASH"},
+    [0xD1] = {"ERASE_REGION"},
+    [0xD2] = {"READ_FLASH"},
+    [0xD3] = {"RUN_USER_CODE"},
+    [0xD5] = {"SPI_NAND_ATTACH"},
+    [0xD6] = {"SPI_NAND_READ_SPARE"},
+    [0xD7] = {"SPI_NAND_WRITE_SPARE"},
+    [0xD8] = {"SPI_NAND_READ_FLASH"},
+    [0xD9] = {"SPI_NAND_WRITE_FLASH_BEGIN"},
+    [0xDA] = {"SPI_NAND_WRITE_FLASH_DATA"},
+    [0xDB] = {"SPI_NAND_ERASE_FLASH"},
+    [0xDC] = {"SPI_NAND_ERASE_REGION"},
+    [0xDD] = {"SPI_NAND_READ_PAGE_DEBUG"},
+    [0xDE] = {"SPI_NAND_WRITE_FLASH_END"},
 };
 
 #define ESP_RESP_BUF_SIZE  8192
@@ -98,6 +97,29 @@ static void Defl_FreeBuffer(ESPTOOL_CTX *ctx)
     }
     ctx->defl_buf_size = 0;
     ctx->defl_buf_cap = 0;
+}
+
+/*
+ * Esptool_GetEncryptionKey - Get encryption key from eFuse
+ *
+ * @ctx:      Esptool context
+ * @key:      Output pointer to key data
+ * @key_len:  Output key length
+ *
+ * Returns TRUE if key is available, FALSE otherwise.
+ */
+static BOOL Esptool_GetEncryptionKey(ESPTOOL_CTX *ctx, const BYTE **key, int *key_len)
+{
+    *key_len = 0;
+    int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, key_len);
+
+    if (key_offset < 0 || !ctx->chip->efuse ||
+        key_offset + *key_len > ctx->chip->efuse_size) {
+        return FALSE;
+    }
+
+    *key = &ctx->chip->efuse[key_offset];
+    return TRUE;
 }
 
 /*
@@ -680,10 +702,8 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
             return;
         }
-    } else {
-        /* Free any leftover buffer */
-        Defl_FreeBuffer(ctx);
     }
+    /* Note: Defl_FreeBuffer is called inside Defl_FlushBuffer on both success and failure */
 
     /* Save deflate session info */
     ctx->defl_offset = offset;
@@ -1161,7 +1181,11 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  *
  * Request format: [reboot:4] (0=don't reboot, 1=reboot)
  *
- * Also frees any pending deflate buffer (mode switch scenario).
+ * This command can be received in two scenarios:
+ * 1. After normal FLASH_DATA blocks (no deflate buffer)
+ * 2. After FLASH_DEFL_DATA blocks when ROM mode doesn't send FLASH_DEFL_END
+ *
+ * In scenario 2, we need to flush the pending deflate buffer.
  */
 static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
@@ -1172,13 +1196,14 @@ static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG, "FLASH_END reboot=%lu", reboot);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"  reboot=%lu", reboot);
 
-    /* Flush any pending deflate buffer (write to flash before freeing) */
+    /* Flush any pending deflate buffer (ROM mode scenario) */
     if (ctx->defl_buf && ctx->defl_buf_size > 0) {
-        TRACE_FW(TAG, "FLASH_END: flushing pending deflate buffer");
+        TRACE_FW(TAG, "FLASH_END: flushing pending deflate buffer (%lu bytes)", ctx->defl_buf_size);
         Serial_PostLog(ctx->hNotify, L"ESP", L"  Flushing pending compressed data");
-        Defl_FlushBuffer(ctx);
-    } else {
-        Defl_FreeBuffer(ctx);
+        if (Defl_FlushBuffer(ctx) != ESP_OK) {
+            TRACE_FW(TAG, "FLASH_END: flush failed");
+            Serial_PostLog(ctx->hNotify, L"ERR", L"  Failed to flush compressed data");
+        }
     }
 
     ctx->state = ESP_STATE_READY;
