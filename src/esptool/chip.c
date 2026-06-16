@@ -718,6 +718,14 @@ static const DWORD efuse_block_offsets_esp32[] = {
     0x078, /* BLOCK3/user_data (8 words) */
 };
 
+/* ESP32 eFuse block lengths in words */
+static const BYTE efuse_block_lengths_esp32[] = {
+    7, /* BLOCK0 */
+    8, /* BLOCK1 */
+    8, /* BLOCK2 */
+    8, /* BLOCK3 */
+};
+
 /* ESP32 eFuse block write offsets (from EFUSE_RD_REG_BASE 0x3FF5A000) */
 static const DWORD efuse_block_wr_offsets_esp32[] = {
     0x01C, /* BLOCK0 write */
@@ -763,7 +771,8 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
                     if (offset >= wr_ofs && offset < wr_ofs + 32 && (offset & 3) == 0) {
                         int word_idx = (offset - wr_ofs) / 4;
                         if (word_idx < 8) {
-                            ctx->pgm_data[word_idx] = val;
+                            /* Store in block-specific pgm_data */
+                            ctx->pgm_data[blk * 8 + word_idx] = val;
                             TRACE_FW(TAG, "ESP32 BLOCK%d PGM_DATA%d = 0x%08lX", blk, word_idx, val);
                         }
                         return TRUE;
@@ -785,20 +794,31 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
                     if (val == 0x1) {
                         /* EFUSE_CMD_READ: Copy write registers to read registers
                          * This is where actual burn happens in espefuse */
-                        int num_blocks = (int)(sizeof(efuse_block_offsets_esp32) / sizeof(efuse_block_offsets_esp32[0]));
-                        for (int blk = 1; blk < num_blocks; blk++) {
+                        for (int blk = 0; blk < num_blocks; blk++) {
                             int block_offset = (int)efuse_block_offsets_esp32[blk];
-                            /* OR pgm_data[0-7] into eFuse at block's read location */
-                            for (int i = 0; i < 8; i++) {
-                                int eoffset = block_offset + i * 4;
-                                if (eoffset + 3 < ctx->efuse_size) {
-                                    ctx->efuse[eoffset] |= (BYTE)(ctx->pgm_data[i] & 0xFF);
-                                    ctx->efuse[eoffset + 1] |= (BYTE)((ctx->pgm_data[i] >> 8) & 0xFF);
-                                    ctx->efuse[eoffset + 2] |= (BYTE)((ctx->pgm_data[i] >> 16) & 0xFF);
-                                    ctx->efuse[eoffset + 3] |= (BYTE)((ctx->pgm_data[i] >> 24) & 0xFF);
+                            int block_len = (int)efuse_block_lengths_esp32[blk];
+                            DWORD *blk_pgm = &ctx->pgm_data[blk * 8];
+                            /* Check if this block has data */
+                            BOOL has_data = FALSE;
+                            for (int i = 0; i < block_len; i++) {
+                                if (blk_pgm[i] != 0) {
+                                    has_data = TRUE;
+                                    break;
                                 }
                             }
-                            TRACE_FW(TAG, "ESP32 eFuse BURN block%d at offset 0x%X", blk, block_offset);
+                            if (!has_data)
+                                continue;
+                            /* OR pgm_data[0..block_len-1] into eFuse at block's read location */
+                            for (int i = 0; i < block_len; i++) {
+                                int eoffset = block_offset + i * 4;
+                                if (eoffset + 3 < ctx->efuse_size) {
+                                    ctx->efuse[eoffset] |= (BYTE)(blk_pgm[i] & 0xFF);
+                                    ctx->efuse[eoffset + 1] |= (BYTE)((blk_pgm[i] >> 8) & 0xFF);
+                                    ctx->efuse[eoffset + 2] |= (BYTE)((blk_pgm[i] >> 16) & 0xFF);
+                                    ctx->efuse[eoffset + 3] |= (BYTE)((blk_pgm[i] >> 24) & 0xFF);
+                                }
+                            }
+                            TRACE_FW(TAG, "ESP32 eFuse BURN block%d at offset 0x%X (%d words)", blk, block_offset, block_len);
                         }
                         memset(ctx->pgm_data, 0, sizeof(ctx->pgm_data));
                     } else if (val == 0x2) {
