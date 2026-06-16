@@ -364,12 +364,22 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD sta
     }
     pos += data_len;
 
-    /* SLIP encoding: worst case each byte needs escaping (2 bytes) + 2 frame markers */
+    /* SLIP encoding: worst case each byte needs escaping (2 bytes) + 2 frame markers.
+       Use stack buffer for typical responses (<256 bytes encoded). */
+    BYTE encoded_stack[256];
     DWORD encoded_max = (DWORD)pos * 2 + 2;
-    BYTE *encoded = (BYTE *)HeapAlloc(GetProcessHeap(), 0, encoded_max);
-    if (!encoded) {
-        TRACE_FW(TAG, "Failed to allocate encoded buffer (%lu bytes)", encoded_max);
-        return;
+    BYTE *encoded;
+    BOOL used_heap = FALSE;
+
+    if (encoded_max <= sizeof(encoded_stack)) {
+        encoded = encoded_stack;
+    } else {
+        encoded = (BYTE *)HeapAlloc(GetProcessHeap(), 0, encoded_max);
+        if (!encoded) {
+            TRACE_FW(TAG, "Failed to allocate encoded buffer (%lu bytes)", encoded_max);
+            return;
+        }
+        used_heap = TRUE;
     }
 
     int enc_len = Slip_Encode(resp, pos, encoded, encoded_max);
@@ -379,7 +389,8 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD sta
         }
     }
 
-    HeapFree(GetProcessHeap(), 0, encoded);
+    if (used_heap)
+        HeapFree(GetProcessHeap(), 0, encoded);
 
     const char *cmdName = GetCmdName(cmd);
     Serial_PostLogF(ctx->hNotify, L"ESP", L"[RES] %hs size=%u status=0x%08lX",
