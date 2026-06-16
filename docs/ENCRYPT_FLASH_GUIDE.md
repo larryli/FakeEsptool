@@ -287,7 +287,134 @@ esptool --port COM10 --force write-flash 0x0 firmware_enc.bin
 
 ---
 
-## 4. 压缩 + 加密烧录测试
+## 4. NVS 加密
+
+### 4.1 NVS 加密概述
+
+NVS (Non-Volatile Storage) 加密是 ESP-IDF 的独立安全功能，用于加密 NVS 分区中的敏感数据（如 WiFi 凭证、证书等）。
+
+**与 Flash 加密的区别**：
+
+| 特性 | Flash 加密 | NVS 加密 |
+|------|-----------|----------|
+| 加密范围 | 整个 Flash | 仅 NVS 分区 |
+| 加密方式 | 透明（硬件自动） | NVS 库内部处理 |
+| 密钥来源 | eFuse 中的 Flash 加密密钥 | NVS Key Partition 或 eFuse HMAC 密钥 |
+| 解密时机 | 读取时自动解密 | NVS 库读取条目时解密 |
+
+### 4.2 NVS 加密方案
+
+ESP-IDF 支持两种 NVS 加密方案：
+
+| 方案 | 密钥存储 | 前置条件 | 适用芯片 |
+|------|---------|---------|---------|
+| **Flash Encryption-Based** | Flash NVS Key Partition | 需要启用 Flash 加密 | S2/S3/C2/C3/C6 |
+| **HMAC Peripheral-Based** | eFuse HMAC 密钥（运行时派生） | 不需要 Flash 加密 | S2/S3/C3/C6 |
+
+**注意**：ESP32 不支持 NVS 加密，ESP32-C2 不支持 HMAC 方案。
+
+### 4.3 Flash Encryption-Based 方案
+
+**工作原理**：
+
+```
+eFuse (Flash 加密密钥)
+    │
+    ▼
+Flash 加密 ──────────────► 保护整个 Flash
+    │
+    ▼
+NVS Key Partition (加密存储) ──► 存储 NVS XTS 密钥
+    │
+    ▼
+NVS 数据分区 (加密存储) ──────► 存储用户数据
+```
+
+**NVS Key Partition 结构**：
+
+```
++---------------------------------------------+
+|         XTS encryption key (32 字节)         |
++---------------------------------------------+
+|            XTS tweak key (32 字节)           |
++---------------------------------------------+
+|                 CRC32 (4 字节)               |
++---------------------------------------------+
+```
+
+**分区表配置**：
+
+```
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     0x9000,  0x6000,
+nvs_key,  data, nvs_keys,0xf000,  0x1000, encrypted
+```
+
+**密钥生成方式**：
+
+1. **芯片自动生成**：首次启动时 `nvs_flash_init()` 自动生成并存储
+2. **预生成**：使用 `nvs_partition_gen.py` 生成 NVS Key Partition
+
+### 4.4 HMAC Peripheral-Based 方案
+
+**工作原理**：
+
+```
+eFuse (HMAC_UP 密钥)
+    │
+    ▼
+HMAC 派生 ──────────────► NVS XTS 密钥（运行时）
+    │
+    ▼
+NVS 数据分区 (加密存储) ──► 存储用户数据
+```
+
+**优势**：
+- 不需要启用 Flash 加密
+- 不需要 NVS Key Partition
+- 密钥不存储在 Flash 中（更安全）
+
+**eFuse 密钥配置**：
+
+```bash
+# 生成 HMAC 密钥
+openssl rand -out hmac_key.bin 32
+
+# 烧录到 eFuse（使用 HMAC_UP 用途）
+espefuse --port COM10 burn-key BLOCK_KEY0 hmac_key.bin HMAC_UP
+```
+
+**sdkconfig 配置**：
+
+```
+CONFIG_NVS_ENCRYPTION=y
+CONFIG_NVS_SEC_KEY_PROTECTION_SCHEME_HMAC=y
+CONFIG_NVS_SEC_HMAC_EFUSE_KEY_ID=0
+```
+
+### 4.5 各芯片 NVS 加密支持
+
+| 芯片 | Flash Encryption-Based | HMAC-Based | NVS Key 存储位置 |
+|------|----------------------|-----------|-----------------|
+| ESP32 | ❌ | ❌ | - |
+| ESP32-S2 | ✅ | ✅ | NVS Key Partition 或 eFuse HMAC |
+| ESP32-S3 | ✅ | ✅ | NVS Key Partition 或 eFuse HMAC |
+| ESP32-C2 | ✅ | ❌ | NVS Key Partition（唯一方案） |
+| ESP32-C3 | ✅ | ✅ | NVS Key Partition 或 eFuse HMAC |
+| ESP32-C6 | ✅ | ✅ | NVS Key Partition 或 eFuse HMAC |
+
+### 4.6 FakeEsptool 支持说明
+
+FakeEsptool 的 Flash 加密实现已足够支持 NVS 加密：
+
+- **Flash Encryption-Based**：NVS Key Partition 是 Flash 中的普通分区，受 Flash 加密保护
+- **HMAC-Based**：NVS 密钥在运行时派生，FakeEsptool 无需特殊处理
+
+**Dump 输出**：NVS Key Partition 的内容会包含在 Flash dump 中（已加密状态）。
+
+---
+
+## 5. 压缩 + 加密烧录测试
 
 **测试目标**：验证压缩和加密同时启用的场景
 
@@ -312,7 +439,7 @@ esptool --port COM10 write-flash --compress 0x0 firmware.bin
 
 ---
 
-## 5. READ_FLASH 解密行为
+## 6. READ_FLASH 解密行为
 
 **测试目标**：验证读取加密 Flash 时自动解密
 
@@ -333,7 +460,7 @@ esptool --port COM10 read-flash 0x0 0x1000 flash_read.bin
 
 ---
 
-## 6. Dump/Export 行为
+## 7. Dump/Export 行为
 
 | 操作 | 输出内容 | 说明 |
 |------|---------|------|
@@ -346,7 +473,7 @@ esptool --port COM10 read-flash 0x0 0x1000 flash_read.bin
 
 ---
 
-## 7. 多密钥块测试（ESP32-S2/S3/C3/C6）
+## 8. 多密钥块测试（ESP32-S2/S3/C3/C6）
 
 **测试目标**：验证使用不同密钥块进行加密烧录
 
@@ -373,7 +500,7 @@ esptool --port COM10 write-flash --encrypt 0x0 firmware.bin
 
 ---
 
-## 8. 禁用下载模式测试
+## 9. 禁用下载模式测试
 
 **测试目标**：验证禁用下载模式后设备不响应命令
 
@@ -392,7 +519,7 @@ esptool --port COM10 read-mac
 
 ---
 
-## 9. 安全下载模式测试
+## 10. 安全下载模式测试
 
 **测试目标**：验证安全下载模式下命令限制
 
@@ -415,7 +542,7 @@ esptool --port COM10 read-mac
 
 ---
 
-## 10. 验证检查点
+## 11. 验证检查点
 
 ### 10.1 状态栏验证
 
