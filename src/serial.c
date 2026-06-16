@@ -596,28 +596,31 @@ void Serial_SetReceiveCallback(SERIAL_CTX *ctx, SERIAL_RX_CB cb)
 
 /*
  * Serial_PostLog - Post a custom log message to the UI thread
+ *
+ * Allocates a single buffer containing both tag and text strings
+ * to reduce HeapAlloc calls from 2 to 1.
  */
 void Serial_PostLog(HWND hNotify, const WCHAR *tag, const WCHAR *text)
 {
     if (!hNotify || !IsWindow(hNotify) || !tag || !text)
         return;
 
-    /* Allocate copies for the message */
-    size_t tagLen = (lstrlenW(tag) + 1) * sizeof(WCHAR);
-    size_t textLen = (lstrlenW(text) + 1) * sizeof(WCHAR);
-    WCHAR *tagCopy = (WCHAR *)HeapAlloc(GetProcessHeap(), 0, tagLen);
-    WCHAR *textCopy = (WCHAR *)HeapAlloc(GetProcessHeap(), 0, textLen);
+    /* Allocate single buffer for both tag and text */
+    size_t tagLen = lstrlenW(tag) + 1;
+    size_t textLen = lstrlenW(text) + 1;
+    size_t totalSize = (tagLen + textLen) * sizeof(WCHAR);
+    WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), 0, totalSize);
+    if (!buf)
+        return;
 
-    if (tagCopy && textCopy) {
-        CopyMemory(tagCopy, tag, tagLen);
-        CopyMemory(textCopy, text, textLen);
-        if (!PostMessage(hNotify, WM_SERIAL_LOG, (WPARAM)tagCopy, (LPARAM)textCopy)) {
-            HeapFree(GetProcessHeap(), 0, tagCopy);
-            HeapFree(GetProcessHeap(), 0, textCopy);
-        }
-    } else {
-        if (tagCopy) HeapFree(GetProcessHeap(), 0, tagCopy);
-        if (textCopy) HeapFree(GetProcessHeap(), 0, textCopy);
+    /* Copy tag at beginning, text after tag */
+    WCHAR *tagCopy = buf;
+    WCHAR *textCopy = buf + tagLen;
+    CopyMemory(tagCopy, tag, tagLen * sizeof(WCHAR));
+    CopyMemory(textCopy, text, textLen * sizeof(WCHAR));
+
+    if (!PostMessage(hNotify, WM_SERIAL_LOG, (WPARAM)tagCopy, (LPARAM)textCopy)) {
+        HeapFree(GetProcessHeap(), 0, buf);
     }
 }
 

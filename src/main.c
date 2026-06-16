@@ -669,6 +669,7 @@ static LRESULT Main_OnSerialError(HWND hWnd, WPARAM wParam, LPARAM lParam)
  * Main_OnSerialLog - Handle WM_SERIAL_LOG
  *
  * Custom log message from protocol layer.
+ * Tag and text are in a single allocation; free only the tag pointer.
  */
 static LRESULT Main_OnSerialLog(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
@@ -676,8 +677,7 @@ static LRESULT Main_OnSerialLog(HWND hWnd, WPARAM wParam, LPARAM lParam)
     WCHAR *text = (WCHAR *)lParam;
     if (tag && text) {
         Main_AppendCustomLog(hWnd, tag, text);
-        HeapFree(GetProcessHeap(), 0, tag);
-        HeapFree(GetProcessHeap(), 0, text);
+        HeapFree(GetProcessHeap(), 0, tag);  /* tag points to start of combined buffer */
     }
     return 0;
 }
