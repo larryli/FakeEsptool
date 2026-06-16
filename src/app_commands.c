@@ -20,6 +20,13 @@
 static const char *TAG = "CMD";
 #endif
 
+/* Helper function to count set bits in a value */
+static int count_set_bits(DWORD v) {
+    int count = 0;
+    while (v) { count += v & 1; v >>= 1; }
+    return count;
+}
+
 /* Encryption state and download mode for testing */
 typedef enum {
     ENCRYPT_STATE_NONE = 0,
@@ -1032,7 +1039,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         ((*(DWORD *)(snap->efuse + (offset)) & (mask)))
 
     /* Count set bits in a value */
-    #define COUNT_BITS(v) __popcnt(v)
+    #define COUNT_BITS(v) count_set_bits(v)
 
     switch (snap->device.chip.type) {
     case CHIP_ESP32: {
@@ -1260,7 +1267,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         break;
     }
 
-    fwprintf(f, L"%-10s %-20s %-10s %-10s\n", L"Block", L"Purpose", L"Status", L"Size");
+    fwprintf(f, L"%-10ls %-20ls %-10ls %-10ls\n", L"Block", L"Purpose", L"Status", L"Size");
     fwprintf(f, L"---------- -------------------- ---------- ----------\n");
 
     for (int i = 0; i < key_count; i++) {
@@ -1280,7 +1287,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         MultiByteToWideChar(CP_UTF8, 0, keys[i].name, -1, wname, 16);
         MultiByteToWideChar(CP_UTF8, 0, keys[i].desc, -1, wdesc, 32);
 
-        fwprintf(f, L"%-10s %-20s %-10s %-10s\n",
+        fwprintf(f, L"%-10ls %-20ls %-10ls %-10ls\n",
                  wname, wdesc,
                  programmed ? L"Programmed" : L"Empty",
                  keys[i].size == 32 ? L"256-bit" : L"128-bit");

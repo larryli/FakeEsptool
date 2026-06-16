@@ -100,29 +100,6 @@ static void Defl_FreeBuffer(ESPTOOL_CTX *ctx)
 }
 
 /*
- * Esptool_GetEncryptionKey - Get encryption key from eFuse
- *
- * @ctx:      Esptool context
- * @key:      Output pointer to key data
- * @key_len:  Output key length
- *
- * Returns TRUE if key is available, FALSE otherwise.
- */
-static BOOL Esptool_GetEncryptionKey(ESPTOOL_CTX *ctx, const BYTE **key, int *key_len)
-{
-    *key_len = 0;
-    int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, key_len);
-
-    if (key_offset < 0 || !ctx->chip->efuse ||
-        key_offset + *key_len > ctx->chip->efuse_size) {
-        return FALSE;
-    }
-
-    *key = &ctx->chip->efuse[key_offset];
-    return TRUE;
-}
-
-/*
  * Esptool_EncryptInPlace - Encrypt data in-place using flash encryption key
  *
  * @ctx:        Esptool context
@@ -682,6 +659,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
              Chip_IsFlashEncryptionEnabled(ctx->chip), Chip_IsDownloadEncryptDisabled(ctx->chip));
 
     /* Log key availability */
+#ifdef ENABLE_TRACE_FW
     {
         int key_len = 0;
         int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, &key_len);
@@ -695,6 +673,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             TRACE_FW(TAG, "FLASH_DEFL_BEGIN: No encryption key available");
         }
     }
+#endif
 
     /* Flush any pending accumulated data from previous session */
     if (ctx->defl_buf && ctx->defl_buf_size > 0) {

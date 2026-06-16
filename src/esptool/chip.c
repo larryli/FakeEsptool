@@ -729,10 +729,12 @@ static const DWORD efuse_block_wr_offsets_esp32[] = {
 static void EfuseWrite32(CHIP_CTX *ctx, int offset, DWORD val)
 {
     if (offset + 3 < ctx->efuse_size) {
+#ifdef ENABLE_TRACE_FW
         BYTE b0 = ctx->efuse[offset];
         BYTE b1 = ctx->efuse[offset + 1];
         BYTE b2 = ctx->efuse[offset + 2];
         BYTE b3 = ctx->efuse[offset + 3];
+#endif
         ctx->efuse[offset] |= (BYTE)(val & 0xFF);
         ctx->efuse[offset + 1] |= (BYTE)((val >> 8) & 0xFF);
         ctx->efuse[offset + 2] |= (BYTE)((val >> 16) & 0xFF);
