@@ -501,11 +501,19 @@ DWORD Chip_GetBootBaudRate(const CHIP_CTX *ctx);
 /*
  * Chip_GetBootMessage - Get boot message text for reset
  *
- * Returns multi-line ASCII string with \r\n line endings.
+ * Writes chip-specific boot message to caller-provided buffer.
  * download_mode: TRUE for download mode entry, FALSE for normal flash boot
  * reset_cause: 0x01=POWERON, 0x02=EXT, 0x03=WDT
+ *
+ * @ctx:           Pointer to chip context
+ * @download_mode: TRUE for download, FALSE for normal boot
+ * @reset_cause:   Reset cause code
+ * @buf:           Output buffer
+ * @buf_size:      Size of output buffer
+ *
+ * Returns pointer to buf, or empty string if buffer is too small.
  */
-const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE reset_cause);
+const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE reset_cause, char *buf, size_t buf_size);
 
 /*
  * Chip_GetFlashCryptCnt - Get flash encryption counter value from eFuse

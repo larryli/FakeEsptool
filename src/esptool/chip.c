@@ -1020,9 +1020,10 @@ static const char *ResetCauseStr(BYTE cause)
 /*
  * Chip_GetBootMessage - Get ROM bootloader boot message
  *
- * Returns chip-specific boot message text that the ROM bootloader
- * outputs on UART after reset. The message format depends on whether
- * the chip enters download mode or performs a normal SPI flash boot.
+ * Writes chip-specific boot message text to caller-provided buffer.
+ * The ROM bootloader outputs this on UART after reset.
+ * The message format depends on whether the chip enters download mode
+ * or performs a normal SPI flash boot.
  *
  * Download mode messages include "waiting for download".
  * Normal boot messages include SPI config and segment loading info.
@@ -1030,20 +1031,21 @@ static const char *ResetCauseStr(BYTE cause)
  * @ctx:           Pointer to chip context
  * @download_mode: TRUE for download mode entry, FALSE for normal flash boot
  * @reset_cause:   Reset cause code (0x01=POWERON, 0x02=EXT, 0x03=WDT)
+ * @buf:           Output buffer for message
+ * @buf_size:      Size of output buffer
  *
- * Returns pointer to static buffer containing multi-line ASCII string
- * with \r\n line endings. Buffer is valid until next call to this function.
+ * Returns pointer to buf containing multi-line ASCII string
+ * with \r\n line endings, or empty string if buffer is too small.
  */
-const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE reset_cause)
+const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE reset_cause, char *buf, size_t buf_size)
 {
     const char *rst = ResetCauseStr(reset_cause);
-    static char buf[512];
 
     if (download_mode) {
         /* Download mode: ROM waits for UART sync from esptool */
         switch (ctx->type) {
         case CHIP_ESP8266:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ets_main.c 542 \r\n"
                 "ets_main.c 543 \r\n"
                 "rst:0x%02X (%s),boot:0x3 (DOWNLOAD(UART0/1/2))\r\n"
@@ -1051,7 +1053,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
                 reset_cause, rst);
             break;
         case CHIP_ESP32:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ESP-ROM:esp32-20210719\r\n"
                 "Build:Jul 19 2021\r\n"
                 "rst:0x%02X (%s),boot:0x3 (DOWNLOAD(UART0/1/2))\r\n"
@@ -1059,7 +1061,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
                 reset_cause, rst);
             break;
         case CHIP_ESP32S2:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ESP-ROM:esp32s2-20210719\r\n"
                 "Build:Jul 19 2021\r\n"
                 "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
@@ -1067,7 +1069,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
                 reset_cause, rst);
             break;
         case CHIP_ESP32S3:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ESP-ROM:esp32s3-20210719\r\n"
                 "Build:Jul 19 2021\r\n"
                 "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
@@ -1075,7 +1077,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
                 reset_cause, rst);
             break;
         case CHIP_ESP32C2:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ESP-ROM:esp8684-api2-20220127\r\n"
                 "Build:Jan 27 2022\r\n"
                 "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
@@ -1083,7 +1085,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
                 reset_cause, rst);
             break;
         case CHIP_ESP32C3:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ESP-ROM:esp32c3-20210719\r\n"
                 "Build:Jul 19 2021\r\n"
                 "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
@@ -1091,7 +1093,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
                 reset_cause, rst);
             break;
         case CHIP_ESP32C6:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ESP-ROM:esp32c6-20210719\r\n"
                 "Build:Jul 19 2021\r\n"
                 "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
@@ -1106,7 +1108,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
         /* Normal SPI flash boot: ROM loads firmware from flash */
         switch (ctx->type) {
         case CHIP_ESP8266:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ets Jan  8 2014,rst cause %d, boot mode:(3,7)\r\n"
                 "\r\n"
                 "load 0x40100000, len 24236, room 16 \r\n"
@@ -1123,7 +1125,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
                 reset_cause);
             break;
         case CHIP_ESP32:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ESP-ROM:esp32-20210719\r\n"
                 "Build:Jul 19 2021\r\n"
                 "rst:0x%02X (%s),boot:0x13 (SPI_FAST_FLASH_BOOT)\r\n"
@@ -1138,7 +1140,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
                 reset_cause, rst);
             break;
         case CHIP_ESP32S2:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ESP-ROM:esp32s2-20210719\r\n"
                 "Build:Jul 19 2021\r\n"
                 "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
@@ -1152,7 +1154,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
                 reset_cause, rst);
             break;
         case CHIP_ESP32S3:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ESP-ROM:esp32s3-20210719\r\n"
                 "Build:Jul 19 2021\r\n"
                 "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
@@ -1166,7 +1168,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
                 reset_cause, rst);
             break;
         case CHIP_ESP32C2:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ESP-ROM:esp8684-api2-20220127\r\n"
                 "Build:Jan 27 2022\r\n"
                 "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
@@ -1180,7 +1182,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
                 reset_cause, rst);
             break;
         case CHIP_ESP32C3:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ESP-ROM:esp32c3-20210719\r\n"
                 "Build:Jul 19 2021\r\n"
                 "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
@@ -1194,7 +1196,7 @@ const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode, BYTE re
                 reset_cause, rst);
             break;
         case CHIP_ESP32C6:
-            snprintf(buf, sizeof(buf),
+            snprintf(buf, buf_size,
                 "ESP-ROM:esp32c6-20210719\r\n"
                 "Build:Jul 19 2021\r\n"
                 "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"

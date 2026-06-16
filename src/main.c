@@ -205,7 +205,8 @@ static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode, BYTE reset_ca
     Serial_SetBaudRate(ctx, bootBaud);
     Serial_PostLogF(hNotify, L"CFG", L"Baud rate: %lu", bootBaud);
 
-    const char *msg = Chip_GetBootMessage(&g_device.chip, download_mode, reset_cause);
+    char boot_msg_buf[512];
+    const char *msg = Chip_GetBootMessage(&g_device.chip, download_mode, reset_cause, boot_msg_buf, sizeof(boot_msg_buf));
     if (msg[0]) {
         Serial_WriteData(ctx, (const BYTE *)msg, (DWORD)strlen(msg), hNotify);
 
