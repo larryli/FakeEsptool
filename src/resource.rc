@@ -158,13 +158,18 @@ STRINGTABLE
     IDS_APP_NAME        "FakeEsptool"
     IDS_DISCONNECTED    "Disconnected"
     IDS_TITLE_FORMAT    "FakeEsptool - %s"
+    IDS_TIP_NEW_DEVICE  "New Device"
+    IDS_TIP_OPEN_DEVICE "Open Device"
+    IDS_TIP_SAVE_DEVICE "Save Device"
+    IDS_TIP_DEVPROPS    "Device Properties"
     IDS_TIP_CONNECT     "Connect"
     IDS_TIP_DISCONNECT  "Disconnect"
     IDS_TIP_RECONNECT   "Reconnect"
+    IDS_TIP_FLASH_IMPORT "Import Flash"
+    IDS_TIP_FLASH_EXPORT "Export Flash"
+    IDS_TIP_KEY_MGMT    "Key Management"
     IDS_TIP_CLEAR       "Clear Log"
     IDS_TIP_SAVEAS      "Save Log As"
-    IDS_TIP_DEVPROPS    "Device Properties"
-    IDS_TIP_KEY_MGMT    "Key Management"
 }
 
 STRINGTABLE
@@ -427,13 +432,18 @@ STRINGTABLE
     IDS_APP_NAME        "FakeEsptool"
     IDS_DISCONNECTED    "已断开连接"
     IDS_TITLE_FORMAT    "FakeEsptool - %s"
+    IDS_TIP_NEW_DEVICE  "新建设备"
+    IDS_TIP_OPEN_DEVICE "打开设备"
+    IDS_TIP_SAVE_DEVICE "保存设备"
+    IDS_TIP_DEVPROPS    "设备属性"
     IDS_TIP_CONNECT     "连接"
     IDS_TIP_DISCONNECT  "断开连接"
     IDS_TIP_RECONNECT   "重新连接"
+    IDS_TIP_FLASH_IMPORT "导入 Flash"
+    IDS_TIP_FLASH_EXPORT "导出 Flash"
+    IDS_TIP_KEY_MGMT    "密钥管理"
     IDS_TIP_CLEAR       "清除日志"
     IDS_TIP_SAVEAS      "日志另存为"
-    IDS_TIP_DEVPROPS    "设备属性"
-    IDS_TIP_KEY_MGMT    "密钥管理"
 }
 
 STRINGTABLE

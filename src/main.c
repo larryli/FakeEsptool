@@ -1,4 +1,4 @@
-/*
+﻿/*
  * main.c - FakeEsptool Application
  *
  * Main entry point, GUI implementation with toolbar, status bar,
@@ -588,6 +588,15 @@ static LRESULT Main_OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
         NMTTDISPINFOW *ttt = (NMTTDISPINFOW *)lParam;
         ttt->hinst = GetModuleHandleW(NULL);
         switch (ttt->hdr.idFrom) {
+        case IDM_NEW_DEVICE:
+            ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_NEW_DEVICE);
+            return 0;
+        case IDM_OPEN_DEVICE:
+            ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_OPEN_DEVICE);
+            return 0;
+        case IDM_SAVE_DEVICE:
+            ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_SAVE_DEVICE);
+            return 0;
         case IDM_DEVICE_PROPS:
             ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_DEVPROPS);
             return 0;
@@ -599,6 +608,12 @@ static LRESULT Main_OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
             return 0;
         case IDM_RECONNECT:
             ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_RECONNECT);
+            return 0;
+        case IDM_FLASH_IMPORT:
+            ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_FLASH_IMPORT);
+            return 0;
+        case IDM_FLASH_EXPORT:
+            ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_FLASH_EXPORT);
             return 0;
         case IDM_KEY_MGMT:
             ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_KEY_MGMT);

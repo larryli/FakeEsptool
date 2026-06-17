@@ -82,13 +82,18 @@
 #define IDS_TITLE_FORMAT    10003  /* "FakeEsptool - %s" */
 
 /* Tooltip strings */
-#define IDS_TIP_CONNECT     10030
-#define IDS_TIP_DISCONNECT  10031
-#define IDS_TIP_RECONNECT   10032
-#define IDS_TIP_CLEAR       10033
-#define IDS_TIP_SAVEAS      10034
-#define IDS_TIP_DEVPROPS    10035
-#define IDS_TIP_KEY_MGMT    10036
+#define IDS_TIP_NEW_DEVICE  10031
+#define IDS_TIP_OPEN_DEVICE 10032
+#define IDS_TIP_SAVE_DEVICE 10033
+#define IDS_TIP_DEVPROPS    10034
+#define IDS_TIP_CONNECT     10035
+#define IDS_TIP_DISCONNECT  10036
+#define IDS_TIP_RECONNECT   10037
+#define IDS_TIP_FLASH_IMPORT 10038
+#define IDS_TIP_FLASH_EXPORT 10039
+#define IDS_TIP_KEY_MGMT    10040
+#define IDS_TIP_CLEAR       10041
+#define IDS_TIP_SAVEAS      10042
 
 /* Message strings */
 #define IDS_MSG_CONN_TITLE  10061
