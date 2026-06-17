@@ -1268,7 +1268,7 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 
     if (pkt->size >= 16 && data_len <= (DWORD)(pkt->size - 16)) {
-        const BYTE *payload = &pkt->data[16];
+        BYTE *payload = (BYTE *)&pkt->data[16];
 
         /* Verify checksum */
         BYTE expected = Esptool_CalcChecksum(payload, (int)data_len);
@@ -1282,7 +1282,7 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         }
 
         /* Encrypt if encrypted flag was set */
-        if (Esptool_EncryptInPlace(ctx, (BYTE *)payload, data_len, ctx->flash_offset) != ESP_OK) {
+        if (Esptool_EncryptInPlace(ctx, payload, data_len, ctx->flash_offset) != ESP_OK) {
             Serial_PostLogF(ctx->hNotify, L"ERR", L"  Encryption failed at offset 0x%08lX", ctx->flash_offset);
             BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
@@ -1586,7 +1586,8 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
         if (!allowed) {
             TRACE_PROTO(TAG, "Secure download: command 0x%02X not allowed", pkt->command);
             Serial_PostLogF(ctx->hNotify, L"ESP", L"  Secure download: command 0x%02X rejected", pkt->command);
-            Esptool_SendResponse(ctx, pkt->command, pkt->value, ESP_FAIL, NULL, 4);
+            BYTE status_len = ESP_STATUS_LEN(ctx);
+            Esptool_SendResponseEx(ctx, pkt->command, pkt->value, ESP_FAIL, status_len, NULL, status_len);
             return FALSE;
         }
     }
@@ -1667,7 +1668,8 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
         TRACE_PROTO(TAG, "Command 0x%02X not allowed in state %d", pkt->command, ctx->state);
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  Command 0x%02X rejected (state=%d)",
                         pkt->command, ctx->state);
-        Esptool_SendResponse(ctx, pkt->command, pkt->value, ESP_FAIL, NULL, 4);
+        BYTE status_len = ESP_STATUS_LEN(ctx);
+        Esptool_SendResponseEx(ctx, pkt->command, pkt->value, ESP_FAIL, status_len, NULL, status_len);
         return FALSE;
     }
 
@@ -1700,7 +1702,8 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
         {
             /* Response format: [status_byte_1 != 0][ROM_INVALID_RECV_MSG] + padding */
             BYTE err_data[4] = {0x01, 0x05, 0x00, 0x00};
-            Esptool_SendResponse(ctx, pkt->command, pkt->value, ESP_OK, err_data, 4);
+            BYTE status_len = ESP_STATUS_LEN(ctx);
+            Esptool_SendResponseEx(ctx, pkt->command, pkt->value, ESP_OK, status_len, err_data, 4);
         }
         return FALSE;
     }

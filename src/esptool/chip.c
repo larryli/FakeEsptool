@@ -823,7 +823,7 @@ static BOOL Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, DWORD val)
  */
 static BOOL Chip_WriteRegModern(CHIP_CTX *ctx, int offset, DWORD val)
 {
-    #define EFUSE_PGM_DATA_SIZE  44
+#define EFUSE_PGM_DATA_SIZE  44
 
     /* PGM_DATA registers */
     if (offset < EFUSE_PGM_DATA_SIZE && (offset & 3) == 0) {
@@ -878,6 +878,8 @@ static BOOL Chip_WriteRegModern(CHIP_CTX *ctx, int offset, DWORD val)
         }
         return TRUE;
     }
+
+#undef EFUSE_PGM_DATA_SIZE
 
     return TRUE;
 }
