@@ -1,0 +1,83 @@
+name: Bug Report
+description: Report a bug in FakeEsptool
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: chip
+    attributes:
+      label: Chip Type
+      options:
+        - ESP8266
+        - ESP32
+        - ESP32-S2
+        - ESP32-S3
+        - ESP32-C2
+        - ESP32-C3
+        - ESP32-C6
+    validations:
+      required: true
+
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection Method
+      options:
+        - com0com virtual serial port
+        - Physical serial port pair
+    validations:
+      required: true
+
+  - type: input
+    id: esptool-version
+    attributes:
+      label: esptool Version
+      description: "Output of `esptool.py version` or `esptool version`"
+      placeholder: "e.g. v4.8.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the behavior.
+      placeholder: |
+        1. Create a new ESP32 device
+        2. Connect to COM10
+        3. Run `esptool.py write_flash 0x0 firmware.bin`
+        4. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: FakeEsptool Log
+      description: Paste the HEX log or trace log from FakeEsptool (enable trace in build if needed).
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, or .esp device file info.
+    validations:
+      required: false
