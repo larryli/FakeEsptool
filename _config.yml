@@ -1,0 +1,5 @@
+title: FakeEsptool
+description: ESP 芯片设备端模拟器 —— 支持虚拟串口的 esptool 协议模拟工具
+theme: jekyll-theme-primer
+plugins:
+  - jekyll-seo-tag
