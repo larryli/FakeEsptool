@@ -175,6 +175,7 @@ FakeEsptool/
 本项目使用 AI 辅助开发，感谢以下 AI 助手的贡献：
 
 - **OpenCode** - 由 [Anomaly](https://github.com/anomalyco) 开发的交互式 CLI 工具，基于小米大模型（mimo-v2.5-pro），在代码分析、架构设计、协议实现等方面提供了重要支持。
+- **Mimo Code** - 由 [Xiaomi MiMo Team](https://github.com/XiaomiMiMo) 开发的 AI 编程助手，基于 mimo-auto 模型，持续辅助本项目的开发与维护工作。
 
 ## 许可证
 
