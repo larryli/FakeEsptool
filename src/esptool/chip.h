@@ -705,7 +705,7 @@ BYTE Chip_GetKeyPurpose(const CHIP_CTX *ctx, int block);
  *
  * For S2/S3/C3/C6: writes KEY_PURPOSE_N field.
  * For ESP32/C2: no-op (fixed key assignments).
- * ESP32-S3 KEY5: rejects XTS_AES purposes (hardware bug).
+ * ESP32-S3/C3/C6 KEY5: rejects XTS_AES purposes (hardware bug).
  * Simulator only: directly modifies eFuse array.
  */
 void Chip_SetKeyPurpose(CHIP_CTX *ctx, int block, BYTE purpose);

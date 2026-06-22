@@ -1858,8 +1858,8 @@ void Chip_SetKeyPurpose(CHIP_CTX *ctx, int block, BYTE purpose)
     if (ctx->type == CHIP_ESP32 || ctx->type == CHIP_ESP32C2)
         return;
 
-    /* ESP32-S3: KEY5 cannot have XTS_AES purposes (hardware bug) */
-    if (ctx->type == CHIP_ESP32S3 && block == 5) {
+    /* ESP32-S3/C3/C6: KEY5 cannot have XTS_AES purposes (hardware bug) */
+    if ((ctx->type == CHIP_ESP32S3 || ctx->type == CHIP_ESP32C3 || ctx->type == CHIP_ESP32C6) && block == 5) {
         if (purpose == KEY_PURPOSE_XTS_AES_128_KEY ||
             purpose == KEY_PURPOSE_XTS_AES_256_KEY_1 ||
             purpose == KEY_PURPOSE_XTS_AES_256_KEY_2)

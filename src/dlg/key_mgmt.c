@@ -644,7 +644,7 @@ static void HandlePurpose(HWND hDlg, HWND hList)
 
     /* Build purpose list */
     BYTE currentPurpose = Chip_GetKeyPurpose(&g_device.chip, sel);
-    BOOL isS3Key5 = (g_device.chip.type == CHIP_ESP32S3 && sel == 5);
+    BOOL isS3Key5 = ((g_device.chip.type == CHIP_ESP32S3 || g_device.chip.type == CHIP_ESP32C3 || g_device.chip.type == CHIP_ESP32C6) && sel == 5);
 
     /* Simple dialog using MessageBox with choices isn't ideal;
        use a combo box in a dialog. For simplicity, use a track popup menu. */
@@ -661,7 +661,7 @@ static void HandlePurpose(HWND hDlg, HWND hList)
         BYTE p = purposes[i];
         UINT flags = MF_STRING;
         if (p == currentPurpose) flags |= MF_CHECKED;
-        /* ESP32-S3 KEY5: disable XTS_AES purposes */
+        /* ESP32-S3/C3/C6 KEY5: disable XTS_AES purposes */
         if (isS3Key5 && (p == KEY_PURPOSE_XTS_AES_128_KEY ||
                          p == KEY_PURPOSE_XTS_AES_256_KEY_1 ||
                          p == KEY_PURPOSE_XTS_AES_256_KEY_2))
