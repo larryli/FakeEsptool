@@ -193,7 +193,7 @@ void Main_CmdKeyMgmt(HWND hWnd);
  * Main_CmdEncryptState - Handle encryption state menu command
  *
  * @hWnd: Main window handle
- * @state: New encryption state (0=none, 1=dev, 2=prod)
+ * @state: New encryption state (0=none, 1=dev, 2=release)
  */
 void Main_CmdEncryptState(HWND hWnd, int state);
 

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * main.c - FakeEsptool Application
  *
  * Main entry point, GUI implementation with toolbar, status bar,
@@ -568,7 +568,7 @@ static LRESULT Main_OnCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
         break;
     case IDM_ENCRYPT_NONE:   Main_CmdEncryptState(hWnd, 0); break;
     case IDM_ENCRYPT_DEV:    Main_CmdEncryptState(hWnd, 1); break;
-    case IDM_ENCRYPT_PROD:   Main_CmdEncryptState(hWnd, 2); break;
+    case IDM_ENCRYPT_RELEASE:   Main_CmdEncryptState(hWnd, 2); break;
     case IDM_DOWNLOAD_NORMAL:   Main_CmdDownloadMode(hWnd, 0); break;
     case IDM_DOWNLOAD_SECURE:   Main_CmdDownloadMode(hWnd, 1); break;
     case IDM_DOWNLOAD_DISABLED: Main_CmdDownloadMode(hWnd, 2); break;

@@ -798,11 +798,11 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     if (pkt->size >= 20)
         encrypted = ReadLE32(pkt->data + 16);
 
-    /* Product mode: reject plaintext writes when encryption is active */
+    /* Release mode: reject plaintext writes when encryption is active */
     if (!encrypted && Chip_IsFlashEncryptionEnabled(ctx->chip) &&
         Chip_IsDownloadEncryptDisabled(ctx->chip)) {
-        TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN rejected: production mode, plaintext not allowed");
-        Serial_PostLog(ctx->hNotify, L"ERR", L"  Production mode: plaintext flash disabled");
+        TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN rejected: release mode, plaintext not allowed");
+        Serial_PostLog(ctx->hNotify, L"ERR", L"  Release mode: plaintext flash disabled");
         BYTE status_len = ESP_STATUS_LEN(ctx);
         Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
         return;
@@ -1202,11 +1202,11 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     if (pkt->size >= 20)
         encrypted = ReadLE32(pkt->data + 16);
 
-    /* Product mode: reject plaintext writes when encryption is active */
+    /* Release mode: reject plaintext writes when encryption is active */
     if (!encrypted && Chip_IsFlashEncryptionEnabled(ctx->chip) &&
         Chip_IsDownloadEncryptDisabled(ctx->chip)) {
-        TRACE_PROTO(TAG, "FLASH_BEGIN rejected: production mode, plaintext not allowed");
-        Serial_PostLog(ctx->hNotify, L"ERR", L"  Production mode: plaintext flash disabled");
+        TRACE_PROTO(TAG, "FLASH_BEGIN rejected: release mode, plaintext not allowed");
+        Serial_PostLog(ctx->hNotify, L"ERR", L"  Release mode: plaintext flash disabled");
         BYTE status_len = ESP_STATUS_LEN(ctx);
         Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_BEGIN, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
         return;

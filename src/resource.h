@@ -32,7 +32,7 @@
 /* Encryption state menu IDs */
 #define IDM_ENCRYPT_NONE    2020
 #define IDM_ENCRYPT_DEV     2021
-#define IDM_ENCRYPT_PROD    2022
+#define IDM_ENCRYPT_RELEASE 2022
 
 /* Download mode menu IDs */
 #define IDM_DOWNLOAD_NORMAL 2030
@@ -149,7 +149,7 @@
 /* Encryption status strings */
 #define IDS_ENCRYPT_NONE         10120  /* "No Encryption" */
 #define IDS_ENCRYPT_DEV          10121  /* "Encrypted (Dev)" */
-#define IDS_ENCRYPT_PROD         10122  /* "Encrypted (Prod)" */
+#define IDS_ENCRYPT_RELEASE      10122  /* "Encrypted (Release)" */
 
 /* Download mode status strings */
 #define IDS_DOWNLOAD_NORMAL      10130  /* "Download Normal" */

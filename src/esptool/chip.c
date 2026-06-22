@@ -1930,7 +1930,7 @@ int Chip_GetEncryptionKeyOffset(const CHIP_CTX *ctx, int *key_len)
 /*
  * Chip_SetFlashEncryption - Set flash encryption state via eFuse
  *
- * @mode: 0 = no encryption, 1 = dev (encrypted), 2 = prod (encrypted + no manual encrypt)
+ * @mode: 0 = no encryption, 1 = dev (encrypted), 2 = release (encrypted + no manual encrypt)
  *
  * Simulator only: directly modifies eFuse array (clears then sets bits).
  */

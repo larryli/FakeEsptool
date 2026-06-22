@@ -52,7 +52,7 @@ IDR_MAIN_MENU MENUEX
     {
       MENUITEM "&No Encryption", IDM_ENCRYPT_NONE, 0, 0
       MENUITEM "Encrypted (&Dev)", IDM_ENCRYPT_DEV, 0, 0
-      MENUITEM "Encrypted (&Prod)", IDM_ENCRYPT_PROD, 0, 0
+      MENUITEM "Encrypted (&Release)", IDM_ENCRYPT_RELEASE, 0, 0
     }
     POPUP "&Download Mode", 0, 0, 0
     {
@@ -225,7 +225,7 @@ STRINGTABLE
     IDS_STATUS_NO_DEVICE    "No Device"
     IDS_ENCRYPT_NONE        "No Encryption"
     IDS_ENCRYPT_DEV         "Encrypted (Dev)"
-    IDS_ENCRYPT_PROD        "Encrypted (Prod)"
+    IDS_ENCRYPT_RELEASE     "Encrypted (Release)"
     IDS_DOWNLOAD_NORMAL     "Download Normal"
     IDS_DOWNLOAD_SECURE     "Download Secure"
     IDS_DOWNLOAD_DISABLED   "Download Disabled"
@@ -326,7 +326,7 @@ IDR_MAIN_MENU MENUEX
     {
       MENUITEM "未加密(&N)", IDM_ENCRYPT_NONE, 0, 0
       MENUITEM "加密（开发）(&D)", IDM_ENCRYPT_DEV, 0, 0
-      MENUITEM "加密（生产）(&P)", IDM_ENCRYPT_PROD, 0, 0
+      MENUITEM "加密（量产）(&R)", IDM_ENCRYPT_RELEASE, 0, 0
     }
     POPUP "下载模式(&M)", 0, 0, 0
     {
@@ -499,7 +499,7 @@ STRINGTABLE
     IDS_STATUS_NO_DEVICE    "无设备"
     IDS_ENCRYPT_NONE        "未加密"
     IDS_ENCRYPT_DEV         "加密（开发）"
-    IDS_ENCRYPT_PROD        "加密（生产）"
+    IDS_ENCRYPT_RELEASE     "加密（量产）"
     IDS_DOWNLOAD_NORMAL     "下载正常"
     IDS_DOWNLOAD_SECURE     "下载安全"
     IDS_DOWNLOAD_DISABLED   "下载禁用"

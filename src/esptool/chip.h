@@ -575,7 +575,7 @@ DWORD Chip_GetFlashCryptCnt(const CHIP_CTX *ctx);
 BOOL Chip_IsFlashEncryptionEnabled(const CHIP_CTX *ctx);
 
 /*
- * Chip_IsDownloadEncryptDisabled - Check if manual encrypt is disabled (production mode)
+ * Chip_IsDownloadEncryptDisabled - Check if manual encrypt is disabled (release mode)
  *
  * Returns TRUE if DISABLE_DL_ENCRYPT / DIS_DOWNLOAD_MANUAL_ENCRYPT is set.
  */
@@ -724,7 +724,7 @@ int Chip_GetEncryptionKeyOffset(const CHIP_CTX *ctx, int *key_len);
 /*
  * Chip_SetFlashEncryption - Set flash encryption state via eFuse
  *
- * @mode: 0 = no encryption, 1 = dev, 2 = prod
+ * @mode: 0 = no encryption, 1 = dev, 2 = release
  * Simulator only: directly modifies eFuse array.
  */
 void Chip_SetFlashEncryption(CHIP_CTX *ctx, int mode);

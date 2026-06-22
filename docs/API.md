@@ -143,7 +143,7 @@
 | `Chip_GetBootBaudRate(ctx)` | 获取启动日志波特率 |
 | `Chip_GetBootMessage(ctx, download_mode, reset_cause)` | 获取启动日志文本 |
 | `Chip_IsFlashEncryptionEnabled(ctx)` | 检查 Flash 加密是否启用 |
-| `Chip_IsDownloadEncryptDisabled(ctx)` | 检查下载模式加密是否禁用（生产模式） |
+| `Chip_IsDownloadEncryptDisabled(ctx)` | 检查下载模式加密是否禁用（量产模式） |
 | `Chip_IsDownloadModeDisabled(ctx)` | 检查下载模式是否禁用 |
 | `Chip_IsSecureDownloadEnabled(ctx)` | 检查安全下载模式是否启用 |
 | `Chip_IsSecureBootEnabled(ctx)` | 检查安全启动是否启用 |
@@ -159,7 +159,7 @@
 | `Chip_GetUsbJtagFlag(ctx)` | 获取 DIS_USB_JTAG 原始值 |
 | `Chip_GetKeyPurpose(ctx, block)` | 获取密钥块用途 |
 | `Chip_GetEncryptionKeyOffset(ctx, key_len)` | 获取加密密钥 eFuse 偏移和长度 |
-| `Chip_SetFlashEncryption(ctx, mode)` | **GUI 层**：设置加密状态（0=无, 1=开发, 2=生产） |
+| `Chip_SetFlashEncryption(ctx, mode)` | **GUI 层**：设置加密状态（0=无, 1=开发, 2=量产） |
 | `Chip_SetDownloadMode(ctx, mode)` | **GUI 层**：设置下载模式（0=正常, 1=安全, 2=禁用） |
 
 **Chip_WriteReg eFuse 控制器行为：**
@@ -428,7 +428,7 @@ Decrypt_Data(&ctx, ciphertext, plaintext, sizeof(ciphertext));
 
 | 函数 | 说明 |
 |------|------|
-| `Main_CmdEncryptState(hWnd, state)` | 切换加密状态（0=无, 1=开发, 2=生产），修改 eFuse |
+| `Main_CmdEncryptState(hWnd, state)` | 切换加密状态（0=无, 1=开发, 2=量产），修改 eFuse |
 | `Main_CmdDownloadMode(hWnd, mode)` | 切换下载模式（0=正常, 1=安全, 2=禁用），修改 eFuse |
 
 **状态栏 Tooltip 实现：**

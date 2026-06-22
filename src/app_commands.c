@@ -31,7 +31,7 @@ static int count_set_bits(DWORD v) {
 typedef enum {
     ENCRYPT_STATE_NONE = 0,
     ENCRYPT_STATE_DEV = 1,
-    ENCRYPT_STATE_PROD = 2,
+    ENCRYPT_STATE_RELEASE = 2,
 } ENCRYPT_STATE;
 
 typedef enum {
@@ -231,8 +231,8 @@ static void UpdateEncryptionMenu(HMENU hMenu)
     ENCRYPT_STATE state = g_encryptState;
     if (g_device.chip.name[0]) {
         BOOL encrypted = Chip_IsFlashEncryptionEnabled(&g_device.chip);
-        BOOL prod = Chip_IsDownloadEncryptDisabled(&g_device.chip);
-        if (encrypted && prod) state = ENCRYPT_STATE_PROD;
+        BOOL release = Chip_IsDownloadEncryptDisabled(&g_device.chip);
+        if (encrypted && release) state = ENCRYPT_STATE_RELEASE;
         else if (encrypted) state = ENCRYPT_STATE_DEV;
         else state = ENCRYPT_STATE_NONE;
     }
@@ -240,8 +240,8 @@ static void UpdateEncryptionMenu(HMENU hMenu)
         state == ENCRYPT_STATE_NONE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
     CheckMenuItem(hMenu, IDM_ENCRYPT_DEV, 
         state == ENCRYPT_STATE_DEV ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
-    CheckMenuItem(hMenu, IDM_ENCRYPT_PROD, 
-        state == ENCRYPT_STATE_PROD ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+    CheckMenuItem(hMenu, IDM_ENCRYPT_RELEASE, 
+        state == ENCRYPT_STATE_RELEASE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
 }
 
 /*
@@ -273,7 +273,7 @@ static void UpdateDownloadMenu(HMENU hMenu)
  * Main_CmdEncryptState - Handle encryption state menu command
  *
  * @hWnd: Main window handle
- * @state: New encryption state (0=none, 1=dev, 2=prod)
+ * @state: New encryption state (0=none, 1=dev, 2=release)
  */
 void Main_CmdEncryptState(HWND hWnd, int state)
 {
@@ -312,14 +312,14 @@ static UINT GetEncryptStateStrId(void)
 {
     if (g_device.chip.name[0]) {
         BOOL encrypted = Chip_IsFlashEncryptionEnabled(&g_device.chip);
-        BOOL prod = Chip_IsDownloadEncryptDisabled(&g_device.chip);
-        if (encrypted && prod) return IDS_ENCRYPT_PROD;
+        BOOL release = Chip_IsDownloadEncryptDisabled(&g_device.chip);
+        if (encrypted && release) return IDS_ENCRYPT_RELEASE;
         if (encrypted) return IDS_ENCRYPT_DEV;
         return IDS_ENCRYPT_NONE;
     }
     switch (g_encryptState) {
     case ENCRYPT_STATE_DEV:  return IDS_ENCRYPT_DEV;
-    case ENCRYPT_STATE_PROD: return IDS_ENCRYPT_PROD;
+    case ENCRYPT_STATE_RELEASE: return IDS_ENCRYPT_RELEASE;
     default:                 return IDS_ENCRYPT_NONE;
     }
 }
@@ -377,7 +377,7 @@ void UpdateMenuState(HWND hWnd)
         BOOL canDlSecure = canDlMode && g_device.chip.type != CHIP_ESP32;
         EnableMenuItem(hMenu, IDM_ENCRYPT_NONE, canEncrypt ? MF_ENABLED : MF_GRAYED);
         EnableMenuItem(hMenu, IDM_ENCRYPT_DEV, canEncrypt ? MF_ENABLED : MF_GRAYED);
-        EnableMenuItem(hMenu, IDM_ENCRYPT_PROD, canEncrypt ? MF_ENABLED : MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_ENCRYPT_RELEASE, canEncrypt ? MF_ENABLED : MF_GRAYED);
         EnableMenuItem(hMenu, IDM_DOWNLOAD_NORMAL, canDlMode ? MF_ENABLED : MF_GRAYED);
         EnableMenuItem(hMenu, IDM_DOWNLOAD_SECURE, canDlSecure ? MF_ENABLED : MF_GRAYED);
         EnableMenuItem(hMenu, IDM_DOWNLOAD_DISABLED, canDlMode ? MF_ENABLED : MF_GRAYED);
