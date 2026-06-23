@@ -27,7 +27,7 @@ static LARGE_INTEGER g_lastTraceCounter = {0}; /* Last performance counter value
 void Trace_Init(void)
 {
     InitializeCriticalSection(&g_csTrace);
-    
+
     /* Initialize high-precision timing */
     QueryPerformanceFrequency(&g_traceFreq);
     QueryPerformanceCounter(&g_lastTraceCounter);

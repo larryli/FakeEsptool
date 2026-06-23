@@ -56,7 +56,7 @@ static BOOL g_initialized = FALSE;
 static void AddEntry(LOG_ENTRY *entry)
 {
     EnterCriticalSection(&g_logLock);
-    
+
     entry->next = NULL;
     if (g_logTail) {
         g_logTail->next = entry;
@@ -65,7 +65,7 @@ static void AddEntry(LOG_ENTRY *entry)
     }
     g_logTail = entry;
     g_logCount++;
-    
+
     LeaveCriticalSection(&g_logLock);
 }
 
@@ -77,12 +77,12 @@ static void AddEntry(LOG_ENTRY *entry)
 static LOG_ENTRY *RemoveAllEntries(void)
 {
     EnterCriticalSection(&g_logLock);
-    
+
     LOG_ENTRY *head = g_logHead;
     g_logHead = NULL;
     g_logTail = NULL;
     g_logCount = 0;
-    
+
     LeaveCriticalSection(&g_logLock);
     return head;
 }
@@ -176,20 +176,20 @@ void LogView_Init(HWND hWnd)
 {
     if (g_initialized)
         return;
-    
+
     InitializeCriticalSection(&g_logLock);
     InitializeCriticalSection(&g_tsLock);
     g_hMainWnd = hWnd;
     g_logHead = NULL;
     g_logTail = NULL;
     g_logCount = 0;
-    
+
     /* Initialize high-precision timing */
     QueryPerformanceFrequency(&g_freq);
     QueryPerformanceCounter(&g_lastCounter);
-    
+
     g_initialized = TRUE;
-    
+
     /* Start flush timer */
     SetTimer(hWnd, LOG_FLUSH_TIMER_ID, LOG_FLUSH_INTERVAL_MS, NULL);
 }
@@ -201,14 +201,14 @@ void LogView_Close(void)
 {
     if (!g_initialized)
         return;
-    
+
     /* Stop timer */
     if (g_hMainWnd)
         KillTimer(g_hMainWnd, LOG_FLUSH_TIMER_ID);
-    
+
     /* Flush remaining entries */
     LogView_Flush();
-    
+
     /* Free locks */
     DeleteCriticalSection(&g_logLock);
     DeleteCriticalSection(&g_tsLock);
@@ -222,15 +222,15 @@ void LogView_FlushTimer(void)
 {
     if (!g_hEdit || g_logCount == 0)
         return;
-    
+
     /* Remove all pending entries */
     LOG_ENTRY *head = RemoveAllEntries();
     if (!head)
         return;
-    
+
     /* Disable redraw for batch update */
     SendMessageW(g_hEdit, WM_SETREDRAW, FALSE, 0);
-    
+
     /* Append all entries */
     LOG_ENTRY *entry = head;
     while (entry) {
@@ -239,16 +239,16 @@ void LogView_FlushTimer(void)
         }
         entry = entry->next;
     }
-    
+
     /* Re-enable redraw and invalidate */
     SendMessageW(g_hEdit, WM_SETREDRAW, TRUE, 0);
     InvalidateRect(g_hEdit, NULL, TRUE);
-    
+
     /* Scroll to end */
     int textLen = GetWindowTextLengthW(g_hEdit);
     SendMessageW(g_hEdit, EM_SETSEL, textLen, textLen);
     SendMessageW(g_hEdit, EM_SCROLLCARET, 0, 0);
-    
+
     /* Free entries */
     FreeEntryChain(head);
 }
@@ -388,14 +388,14 @@ void Main_AppendCustomLog(HWND hMainWnd, const WCHAR *tag, const WCHAR *text)
     (void)hMainWnd;
     if (!g_initialized || !tag || !text)
         return;
-    
+
     /* Build formatted text: timestamp + tag + text + newline */
     int textLen = lstrlenW(text);
     int maxLen = 64 + 64 + textLen + 4;
     WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, maxLen * sizeof(WCHAR));
     if (!buf)
         return;
-    
+
     int pos = 0;
     pos += FormatTimestamp(buf + pos, maxLen - pos);
     pos += wsprintfW(buf + pos, L"[%s] ", tag);
@@ -404,7 +404,7 @@ void Main_AppendCustomLog(HWND hMainWnd, const WCHAR *tag, const WCHAR *text)
     buf[pos++] = L'\r';
     buf[pos++] = L'\n';
     buf[pos] = L'\0';
-    
+
     LOG_ENTRY *entry = (LOG_ENTRY *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(LOG_ENTRY));
     if (entry) {
         entry->type = LOG_TYPE_CUSTOM;
@@ -424,14 +424,14 @@ void Main_AppendSignalLog(const WCHAR *tag, const WCHAR *text, COLORREF tagColor
 {
     if (!g_initialized || !tag || !text)
         return;
-    
+
     /* Build formatted text: timestamp + tag + text + newline */
     int textLen = lstrlenW(text);
     int maxLen = 64 + 64 + textLen + 4;
     WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, maxLen * sizeof(WCHAR));
     if (!buf)
         return;
-    
+
     int pos = 0;
     pos += FormatTimestamp(buf + pos, maxLen - pos);
     pos += wsprintfW(buf + pos, L"[%s] ", tag);
@@ -440,7 +440,7 @@ void Main_AppendSignalLog(const WCHAR *tag, const WCHAR *text, COLORREF tagColor
     buf[pos++] = L'\r';
     buf[pos++] = L'\n';
     buf[pos] = L'\0';
-    
+
     LOG_ENTRY *entry = (LOG_ENTRY *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(LOG_ENTRY));
     if (entry) {
         entry->type = LOG_TYPE_SIGNAL;

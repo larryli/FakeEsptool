@@ -67,19 +67,19 @@ static void aes_key_expand_128(AES_CTX *ctx, const BYTE key[16])
 {
     BYTE words[44][4];
     int i, j;
-    
+
     ctx->nr = 10;
-    
+
     /* Copy key to first 4 words */
     for (i = 0; i < 4; i++)
         for (j = 0; j < 4; j++)
             words[i][j] = key[i * 4 + j];
-    
+
     /* Generate remaining words */
     for (i = 4; i < 44; i++) {
         BYTE temp[4];
         memcpy(temp, words[i - 1], 4);
-        
+
         if (i % 4 == 0) {
             /* RotWord */
             BYTE t = temp[0];
@@ -87,21 +87,21 @@ static void aes_key_expand_128(AES_CTX *ctx, const BYTE key[16])
             temp[1] = temp[2];
             temp[2] = temp[3];
             temp[3] = t;
-            
+
             /* SubWord */
             temp[0] = sbox[temp[0]];
             temp[1] = sbox[temp[1]];
             temp[2] = sbox[temp[2]];
             temp[3] = sbox[temp[3]];
-            
+
             /* XOR with Rcon */
             temp[0] ^= rcon[i / 4 - 1];
         }
-        
+
         for (j = 0; j < 4; j++)
             words[i][j] = words[i - 4][j] ^ temp[j];
     }
-    
+
     /* Convert words to round keys */
     for (i = 0; i < 11; i++)
         for (j = 0; j < 16; j++)
@@ -115,19 +115,19 @@ static void aes_key_expand_256(AES_CTX *ctx, const BYTE key[32])
 {
     BYTE words[60][4];
     int i, j;
-    
+
     ctx->nr = 14;
-    
+
     /* Copy key to first 8 words */
     for (i = 0; i < 8; i++)
         for (j = 0; j < 4; j++)
             words[i][j] = key[i * 4 + j];
-    
+
     /* Generate remaining words */
     for (i = 8; i < 60; i++) {
         BYTE temp[4];
         memcpy(temp, words[i - 1], 4);
-        
+
         if (i % 8 == 0) {
             /* RotWord */
             BYTE t = temp[0];
@@ -135,13 +135,13 @@ static void aes_key_expand_256(AES_CTX *ctx, const BYTE key[32])
             temp[1] = temp[2];
             temp[2] = temp[3];
             temp[3] = t;
-            
+
             /* SubWord */
             temp[0] = sbox[temp[0]];
             temp[1] = sbox[temp[1]];
             temp[2] = sbox[temp[2]];
             temp[3] = sbox[temp[3]];
-            
+
             /* XOR with Rcon */
             temp[0] ^= rcon[i / 8 - 1];
         } else if (i % 8 == 4) {
@@ -151,11 +151,11 @@ static void aes_key_expand_256(AES_CTX *ctx, const BYTE key[32])
             temp[2] = sbox[temp[2]];
             temp[3] = sbox[temp[3]];
         }
-        
+
         for (j = 0; j < 4; j++)
             words[i][j] = words[i - 8][j] ^ temp[j];
     }
-    
+
     /* Convert words to round keys */
     for (i = 0; i < 15; i++)
         for (j = 0; j < 16; j++)
@@ -191,24 +191,24 @@ static void aes_ecb_encrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
 {
     BYTE state[4][4];
     int round, row, col;
-    
+
     /* Convert input to state (column-major) */
     for (row = 0; row < 4; row++)
         for (col = 0; col < 4; col++)
             state[row][col] = in[row + col * 4];
-    
+
     /* Round 0: AddRoundKey */
     for (col = 0; col < 4; col++)
         for (row = 0; row < 4; row++)
             state[row][col] ^= ctx->round_key[row + col * 4];
-    
+
     /* Rounds 1 to nr-1 */
     for (round = 1; round < ctx->nr; round++) {
         /* SubBytes */
         for (row = 0; row < 4; row++)
             for (col = 0; col < 4; col++)
                 state[row][col] = sbox[state[row][col]];
-        
+
         /* ShiftRows */
         {
             BYTE temp;
@@ -232,7 +232,7 @@ static void aes_ecb_encrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
             state[3][1] = state[3][0];
             state[3][0] = temp;
         }
-        
+
         /* MixColumns */
         for (col = 0; col < 4; col++) {
             BYTE s0 = state[0][col];
@@ -244,19 +244,19 @@ static void aes_ecb_encrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
             state[2][col] = s0 ^ s1 ^ gmul(2, s2) ^ gmul(3, s3);
             state[3][col] = gmul(3, s0) ^ s1 ^ s2 ^ gmul(2, s3);
         }
-        
+
         /* AddRoundKey */
         for (col = 0; col < 4; col++)
             for (row = 0; row < 4; row++)
                 state[row][col] ^= ctx->round_key[round * 16 + row + col * 4];
     }
-    
+
     /* Final round: SubBytes, ShiftRows, AddRoundKey (no MixColumns) */
     /* SubBytes */
     for (row = 0; row < 4; row++)
         for (col = 0; col < 4; col++)
             state[row][col] = sbox[state[row][col]];
-    
+
     /* ShiftRows */
     {
         BYTE temp;
@@ -277,12 +277,12 @@ static void aes_ecb_encrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
         state[3][1] = state[3][0];
         state[3][0] = temp;
     }
-    
+
     /* AddRoundKey */
     for (col = 0; col < 4; col++)
         for (row = 0; row < 4; row++)
             state[row][col] ^= ctx->round_key[ctx->nr * 16 + row + col * 4];
-    
+
     /* Convert state to output (column-major) */
     for (row = 0; row < 4; row++)
         for (col = 0; col < 4; col++)
@@ -296,17 +296,17 @@ static void aes_ecb_decrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
 {
     BYTE state[4][4];
     int round, row, col;
-    
+
     /* Convert input to state (column-major) */
     for (row = 0; row < 4; row++)
         for (col = 0; col < 4; col++)
             state[row][col] = in[row + col * 4];
-    
+
     /* AddRoundKey (final round) */
     for (col = 0; col < 4; col++)
         for (row = 0; row < 4; row++)
             state[row][col] ^= ctx->round_key[ctx->nr * 16 + row + col * 4];
-    
+
     /* InvShiftRows */
     {
         BYTE temp;
@@ -327,19 +327,19 @@ static void aes_ecb_decrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
         state[3][2] = state[3][3];
         state[3][3] = temp;
     }
-    
+
     /* InvSubBytes */
     for (row = 0; row < 4; row++)
         for (col = 0; col < 4; col++)
             state[row][col] = inv_sbox[state[row][col]];
-    
+
     /* Rounds nr-1 to 1 */
     for (round = ctx->nr - 1; round > 0; round--) {
         /* AddRoundKey */
         for (col = 0; col < 4; col++)
             for (row = 0; row < 4; row++)
                 state[row][col] ^= ctx->round_key[round * 16 + row + col * 4];
-        
+
         /* InvMixColumns */
         for (col = 0; col < 4; col++) {
             BYTE s0 = state[0][col];
@@ -351,7 +351,7 @@ static void aes_ecb_decrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
             state[2][col] = gmul(13, s0) ^ gmul(9, s1) ^ gmul(14, s2) ^ gmul(11, s3);
             state[3][col] = gmul(11, s0) ^ gmul(13, s1) ^ gmul(9, s2) ^ gmul(14, s3);
         }
-        
+
         /* InvShiftRows */
         {
             BYTE temp;
@@ -372,18 +372,18 @@ static void aes_ecb_decrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
             state[3][2] = state[3][3];
             state[3][3] = temp;
         }
-        
+
         /* InvSubBytes */
         for (row = 0; row < 4; row++)
             for (col = 0; col < 4; col++)
                 state[row][col] = inv_sbox[state[row][col]];
     }
-    
+
     /* AddRoundKey (round 0) */
     for (col = 0; col < 4; col++)
         for (row = 0; row < 4; row++)
             state[row][col] ^= ctx->round_key[row + col * 4];
-    
+
     /* Convert state to output (column-major) */
     for (row = 0; row < 4; row++)
         for (col = 0; col < 4; col++)

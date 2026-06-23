@@ -85,7 +85,7 @@ static void WriteChipIdToEfuse(CHIP_CTX *ctx)
 static BOOL InitChipCommon(CHIP_CTX *ctx, CHIP_TYPE type)
 {
     const CHIP_CONFIG *cfg = &chip_configs[type];
-    
+
     strcpy(ctx->name, cfg->name);
     ctx->chip_id = cfg->chip_id;
     ctx->security_chip_id = cfg->security_chip_id;
@@ -322,7 +322,7 @@ static BOOL InitEsp32S3(CHIP_CTX *ctx)
        ESP32-S3's is_eco0() checks:
          (minor_raw & 0x7) == 0 AND blk_version_major == 1 AND blk_version_minor == 1
        When is_eco0() returns True, get_major_chip_version() returns 0.
-       
+
        blk_version_major at BLOCK2 word4 bits[1:0] (EFUSE_BLOCK2_ADDR + 16)
          = EFUSE_BASE + 0x5C + 0x10 = offset 0x6C, byte 0x6C bits[1:0]
        blk_version_minor at BLOCK1 word3 bits[26:24] (EFUSE_BLOCK1_ADDR + 12)
@@ -476,7 +476,7 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
     /* Initialize SPI register defaults */
     ctx->spi_regs[SPI_CMD_OFFS / 4] = 0;
 
-    TRACE_PROTO(TAG, "Chip: %s, eFuse: %d bytes, Flash: %lu KB, SPI_BASE: 0x%08lX, SPI_W0: 0x%02X", 
+    TRACE_PROTO(TAG, "Chip: %s, eFuse: %d bytes, Flash: %lu KB, SPI_BASE: 0x%08lX, SPI_W0: 0x%02X",
              ctx->name, ctx->efuse_size, ctx->flash_size / 1024, ctx->spi_reg_base, ctx->spi_offs->w0);
     return TRUE;
 

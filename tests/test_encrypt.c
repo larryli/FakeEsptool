@@ -71,10 +71,10 @@ static void test_basic_encrypt_decrypt(void)
                                0x31, 0x31, 0x98, 0xA2, 0xE0, 0x37, 0x07, 0x34};
     BYTE nist_expected[16] = {0x39, 0x25, 0x84, 0x1D, 0x02, 0xDC, 0x09, 0xFB,
                               0xDC, 0x11, 0x85, 0x97, 0x19, 0x6A, 0x0B, 0x32};
-    
+
     /* Test NIST vector with single 16-byte key (for AES-128) */
     /* We'll use this to verify our AES implementation */
-    
+
     BYTE ciphertext[16] = {0};
     BYTE decrypted[16] = {0};
     ENCRYPT_CTX ctx;

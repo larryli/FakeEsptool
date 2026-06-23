@@ -236,11 +236,11 @@ static void UpdateEncryptionMenu(HMENU hMenu)
         else if (encrypted) state = ENCRYPT_STATE_DEV;
         else state = ENCRYPT_STATE_NONE;
     }
-    CheckMenuItem(hMenu, IDM_ENCRYPT_NONE, 
+    CheckMenuItem(hMenu, IDM_ENCRYPT_NONE,
         state == ENCRYPT_STATE_NONE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
-    CheckMenuItem(hMenu, IDM_ENCRYPT_DEV, 
+    CheckMenuItem(hMenu, IDM_ENCRYPT_DEV,
         state == ENCRYPT_STATE_DEV ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
-    CheckMenuItem(hMenu, IDM_ENCRYPT_RELEASE, 
+    CheckMenuItem(hMenu, IDM_ENCRYPT_RELEASE,
         state == ENCRYPT_STATE_RELEASE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
 }
 
@@ -261,11 +261,11 @@ static void UpdateDownloadMenu(HMENU hMenu)
         else if (secure) mode = DOWNLOAD_MODE_SECURE;
         else mode = DOWNLOAD_MODE_NORMAL;
     }
-    CheckMenuItem(hMenu, IDM_DOWNLOAD_NORMAL, 
+    CheckMenuItem(hMenu, IDM_DOWNLOAD_NORMAL,
         mode == DOWNLOAD_MODE_NORMAL ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
-    CheckMenuItem(hMenu, IDM_DOWNLOAD_SECURE, 
+    CheckMenuItem(hMenu, IDM_DOWNLOAD_SECURE,
         mode == DOWNLOAD_MODE_SECURE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
-    CheckMenuItem(hMenu, IDM_DOWNLOAD_DISABLED, 
+    CheckMenuItem(hMenu, IDM_DOWNLOAD_DISABLED,
         mode == DOWNLOAD_MODE_DISABLED ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
 }
 
