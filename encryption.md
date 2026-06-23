@@ -90,13 +90,13 @@ eFuse 只能将位从 **0 变为 1**，不能从 1 变为 0。这是硬件特性
 ### 2.2 开发模式关闭加密（可逆）
 
 ```
-当前: SPI_BOOT_CRYPT_CNT = 0b001 (1，奇数，加密启用)
-操作: burn-efuse SPI_BOOT_CRYPT_CNT 2  # 0b001 → 0b011 (3，奇数，仍启用)
-操作: burn-efuse SPI_BOOT_CRYPT_CNT 4  # 0b011 → 0b111 (7，奇数，仍启用)
+当前: SPI_BOOT_CRYPT_CNT = 0b001 (1，奇数个 1 ，加密启用)
+操作: burn-efuse SPI_BOOT_CRYPT_CNT 3  # 0b001 → 0b011 (3，偶数个 1，加密禁用)
+操作: burn-efuse SPI_BOOT_CRYPT_CNT 7  # 0b011 → 0b111 (7，奇数个 1，加密启用)
 操作: burn-efuse SPI_BOOT_CRYPT_CNT 6  # 0b111 → 0b111 (7，无变化)
 ```
 
-**无法通过烧录将奇数变为偶数**，只能新建设备（eFuse 全 0）来测试未加密状态。
+**无法通过烧录将已烧录 1 的位变为 0**，只能有限次的切换加密状态。
 
 ### 2.3 生产模式下无法操作加密计数器
 
