@@ -8,8 +8,8 @@
 
 #include "lang.h"
 
-#define STR_POOL_SIZE   4
-#define STR_BUF_LEN     256
+#define STR_POOL_SIZE 4
+#define STR_BUF_LEN 256
 
 static WCHAR g_pool[STR_POOL_SIZE][STR_BUF_LEN];
 static int g_idx = 0;
@@ -24,7 +24,8 @@ const WCHAR *LoadStr(UINT id)
     g_idx = (g_idx + 1) % STR_POOL_SIZE;
 
     int len = LoadStringW(GetModuleHandleW(NULL), id, buf, STR_BUF_LEN);
-    if (len > 0)
+    if (len > 0) {
         return buf;
+    }
     return L"";
 }

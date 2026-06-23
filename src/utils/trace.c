@@ -5,9 +5,9 @@
  * Log file is created in the same directory as the executable.
  */
 
-#include <wchar.h>
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
+#include <wchar.h>
 
 #if defined(ENABLE_TRACE_FW) || defined(ENABLE_TRACE_PROTO)
 
@@ -15,8 +15,9 @@
 
 static HANDLE g_hTraceFile = INVALID_HANDLE_VALUE;
 static CRITICAL_SECTION g_csTrace;
-static LARGE_INTEGER g_traceFreq = {0};        /* Performance counter frequency */
-static LARGE_INTEGER g_lastTraceCounter = {0}; /* Last performance counter value */
+static LARGE_INTEGER g_traceFreq = {0}; /* Performance counter frequency */
+static LARGE_INTEGER g_lastTraceCounter = {
+    0}; /* Last performance counter value */
 
 /*
  * Trace_Init - Initialize trace logging
@@ -37,8 +38,9 @@ void Trace_Init(void)
 
     /* Replace .exe with .log */
     WCHAR *ext = wcsrchr(path, L'.');
-    if (ext)
+    if (ext) {
         lstrcpyW(ext, L".log");
+    }
 
     g_hTraceFile = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, NULL,
                                CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -77,8 +79,9 @@ void Trace_Close(void)
  */
 void Trace_Write(const char *tag, const char *fmt, ...)
 {
-    if (g_hTraceFile == INVALID_HANDLE_VALUE)
+    if (g_hTraceFile == INVALID_HANDLE_VALUE) {
         return;
+    }
 
     EnterCriticalSection(&g_csTrace);
 
@@ -96,10 +99,10 @@ void Trace_Write(const char *tag, const char *fmt, ...)
     g_lastTraceCounter = now;
 
     char buf[4096];
-    int len = snprintf(buf, sizeof(buf), "%02d:%02d:%02d.%03d +%lu.%03lu [%lu] [%s] ",
-                       st.wHour, st.wMinute, st.wSecond, st.wMilliseconds,
-                       deltaMs / 1000, deltaMs % 1000,
-                       GetCurrentThreadId(), tag ? tag : "?");
+    int len = snprintf(buf, sizeof(buf),
+                       "%02d:%02d:%02d.%03d +%lu.%03lu [%lu] [%s] ", st.wHour,
+                       st.wMinute, st.wSecond, st.wMilliseconds, deltaMs / 1000,
+                       deltaMs % 1000, GetCurrentThreadId(), tag ? tag : "?");
 
     va_list args;
     va_start(args, fmt);
@@ -110,8 +113,9 @@ void Trace_Write(const char *tag, const char *fmt, ...)
        Clamp len to actual buffer size to prevent out-of-bounds access. */
     if (msgLen >= 0) {
         len += msgLen;
-        if (len >= (int)sizeof(buf))
+        if (len >= (int)sizeof(buf)) {
             len = (int)sizeof(buf) - 1;
+        }
     }
 
     if (len > 0 && len < (int)sizeof(buf) - 2) {

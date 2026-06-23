@@ -6,12 +6,12 @@
 
 #include "app_commands.h"
 #include "app_logview.h"
+#include "esptool/chip.h"
+#include "esptool/device.h"
 #include "main.h"
 #include "resource.h"
-#include "esptool/device.h"
-#include "esptool/chip.h"
-#include <richedit.h>
 #include <commdlg.h>
+#include <richedit.h>
 #include <stdio.h>
 #include <string.h>
 #include <wchar.h>
@@ -21,9 +21,13 @@ static const char *TAG = "CMD";
 #endif
 
 /* Helper function to count set bits in a value */
-static int count_set_bits(DWORD v) {
+static int count_set_bits(DWORD v)
+{
     int count = 0;
-    while (v) { count += v & 1; v >>= 1; }
+    while (v) {
+        count += v & 1;
+        v >>= 1;
+    }
     return count;
 }
 
@@ -59,11 +63,13 @@ static HWND g_hStatusTip = NULL;
  */
 static void SetPartTooltip(int part, const WCHAR *text)
 {
-    if (!g_hStatusTip || !g_hStatusbar)
+    if (!g_hStatusTip || !g_hStatusbar) {
         return;
+    }
     RECT rc;
-    if (!SendMessageW(g_hStatusbar, SB_GETRECT, (WPARAM)part, (LPARAM)&rc))
+    if (!SendMessageW(g_hStatusbar, SB_GETRECT, (WPARAM)part, (LPARAM)&rc)) {
         return;
+    }
     TOOLINFOW ti = {0};
     ti.cbSize = sizeof(ti);
     ti.uFlags = TTF_SUBRECT;
@@ -87,10 +93,11 @@ static void SetPartTooltip(int part, const WCHAR *text)
 void CreateStatusTooltip(HWND hParent)
 {
     (void)hParent;
-    g_hStatusTip = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, NULL,
-        WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP | TTS_BALLOON,
-        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
-        NULL, NULL, GetModuleHandleW(NULL), NULL);
+    g_hStatusTip = CreateWindowExW(
+        WS_EX_TOPMOST, TOOLTIPS_CLASSW, NULL,
+        WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP | TTS_BALLOON, CW_USEDEFAULT,
+        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL,
+        GetModuleHandleW(NULL), NULL);
     if (g_hStatusTip) {
         SetWindowPos(g_hStatusTip, HWND_TOPMOST, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -103,15 +110,16 @@ void CreateStatusTooltip(HWND hParent)
  */
 BOOL PromptDisconnectIfNeeded(HWND hWnd)
 {
-    if (!Serial_IsOpen(&g_serial))
+    if (!Serial_IsOpen(&g_serial)) {
         return TRUE;
+    }
 
-    int ret = MessageBoxW(hWnd,
-                          LoadStr(IDS_MSG_CONFIRM_DISCONN),
-                          LoadStr(IDS_MSG_DISCONN_CAP),
-                          MB_YESNO | MB_ICONQUESTION);
-    if (ret != IDYES)
+    int ret =
+        MessageBoxW(hWnd, LoadStr(IDS_MSG_CONFIRM_DISCONN),
+                    LoadStr(IDS_MSG_DISCONN_CAP), MB_YESNO | MB_ICONQUESTION);
+    if (ret != IDYES) {
         return FALSE;
+    }
 
     Serial_Close(&g_serial);
     UpdateTitle(hWnd);
@@ -133,12 +141,13 @@ static void GenerateDefaultFilename(WCHAR *buf)
     MultiByteToWideChar(CP_UTF8, 0, g_device.chip.name, -1, chipName, 32);
 
     DWORD flashSize = g_device.flash.size;
-    if (flashSize >= 1024 * 1024)
+    if (flashSize >= 1024 * 1024) {
         wsprintfW(buf, L"%s-%luMB", chipName, flashSize / (1024 * 1024));
-    else if (flashSize > 0)
+    } else if (flashSize > 0) {
         wsprintfW(buf, L"%s-%luKB", chipName, flashSize / 1024);
-    else
+    } else {
         lstrcpyW(buf, chipName);
+    }
 }
 
 /*
@@ -146,44 +155,46 @@ static void GenerateDefaultFilename(WCHAR *buf)
  */
 BOOL PromptSaveIfNeeded(HWND hWnd)
 {
-    if (!Device_IsModified(&g_device))
+    if (!Device_IsModified(&g_device)) {
         return TRUE;
+    }
 
-    int ret = MessageBoxW(hWnd,
-                          LoadStr(IDS_MSG_CONFIRM_SAVE),
+    int ret = MessageBoxW(hWnd, LoadStr(IDS_MSG_CONFIRM_SAVE),
                           LoadStr(IDS_MSG_SAVE_CAP),
                           MB_YESNOCANCEL | MB_ICONQUESTION);
     switch (ret) {
-    case IDYES:
-        {
-            const WCHAR *filename = Device_GetFilename(&g_device);
-            if (filename[0]) {
-                if (Device_Save(&g_device, filename)) {
-                    Config_SetLastDeviceFile(filename);
-                } else {
-                    MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
-                }
+    case IDYES: {
+        const WCHAR *filename = Device_GetFilename(&g_device);
+        if (filename[0]) {
+            if (Device_Save(&g_device, filename)) {
+                Config_SetLastDeviceFile(filename);
             } else {
-                OPENFILENAMEW ofn = {0};
-                WCHAR szFile[MAX_PATH] = {0};
-                GenerateDefaultFilename(szFile);
-                ofn.lStructSize = sizeof(ofn);
-                ofn.hwndOwner = hWnd;
-                ofn.lpstrFilter = LoadStr(IDS_DEVICE_FILTER);
-                ofn.lpstrFile = szFile;
-                ofn.nMaxFile = MAX_PATH;
-                ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
-                ofn.lpstrDefExt = L"esp";
-                if (!GetSaveFileNameW(&ofn))
-                    return FALSE;
-                if (Device_Save(&g_device, szFile)) {
-                    Config_SetLastDeviceFile(szFile);
-                } else {
-                    MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
-                }
+                MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV),
+                            LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
             }
-            UpdateTitle(hWnd);
+        } else {
+            OPENFILENAMEW ofn = {0};
+            WCHAR szFile[MAX_PATH] = {0};
+            GenerateDefaultFilename(szFile);
+            ofn.lStructSize = sizeof(ofn);
+            ofn.hwndOwner = hWnd;
+            ofn.lpstrFilter = LoadStr(IDS_DEVICE_FILTER);
+            ofn.lpstrFile = szFile;
+            ofn.nMaxFile = MAX_PATH;
+            ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+            ofn.lpstrDefExt = L"esp";
+            if (!GetSaveFileNameW(&ofn)) {
+                return FALSE;
+            }
+            if (Device_Save(&g_device, szFile)) {
+                Config_SetLastDeviceFile(szFile);
+            } else {
+                MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV),
+                            LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            }
         }
+        UpdateTitle(hWnd);
+    }
         return TRUE;
     case IDNO:
         return TRUE;
@@ -201,8 +212,9 @@ BOOL IsPortAvailable(const WCHAR *portName)
     wsprintfW(fullPort, L"\\\\.\\%s", portName);
     HANDLE hPort = CreateFileW(fullPort, GENERIC_READ | GENERIC_WRITE, 0, NULL,
                                OPEN_EXISTING, 0, NULL);
-    if (hPort == INVALID_HANDLE_VALUE)
+    if (hPort == INVALID_HANDLE_VALUE) {
         return FALSE;
+    }
     CloseHandle(hPort);
     return TRUE;
 }
@@ -212,10 +224,12 @@ BOOL IsPortAvailable(const WCHAR *portName)
  */
 BOOL CanReconnect(void)
 {
-    if (Serial_IsOpen(&g_serial))
+    if (Serial_IsOpen(&g_serial)) {
         return FALSE;
-    if (!g_szPort[0])
+    }
+    if (!g_szPort[0]) {
         return FALSE;
+    }
     return IsPortAvailable(g_szPort);
 }
 
@@ -232,16 +246,23 @@ static void UpdateEncryptionMenu(HMENU hMenu)
     if (g_device.chip.name[0]) {
         BOOL encrypted = Chip_IsFlashEncryptionEnabled(&g_device.chip);
         BOOL release = Chip_IsDownloadEncryptDisabled(&g_device.chip);
-        if (encrypted && release) state = ENCRYPT_STATE_RELEASE;
-        else if (encrypted) state = ENCRYPT_STATE_DEV;
-        else state = ENCRYPT_STATE_NONE;
+        if (encrypted && release) {
+            state = ENCRYPT_STATE_RELEASE;
+        } else if (encrypted) {
+            state = ENCRYPT_STATE_DEV;
+        } else {
+            state = ENCRYPT_STATE_NONE;
+        }
     }
     CheckMenuItem(hMenu, IDM_ENCRYPT_NONE,
-        state == ENCRYPT_STATE_NONE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+                  state == ENCRYPT_STATE_NONE ? (MF_CHECKED | MFT_RADIOCHECK)
+                                              : MF_UNCHECKED);
     CheckMenuItem(hMenu, IDM_ENCRYPT_DEV,
-        state == ENCRYPT_STATE_DEV ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+                  state == ENCRYPT_STATE_DEV ? (MF_CHECKED | MFT_RADIOCHECK)
+                                             : MF_UNCHECKED);
     CheckMenuItem(hMenu, IDM_ENCRYPT_RELEASE,
-        state == ENCRYPT_STATE_RELEASE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+                  state == ENCRYPT_STATE_RELEASE ? (MF_CHECKED | MFT_RADIOCHECK)
+                                                 : MF_UNCHECKED);
 }
 
 /*
@@ -257,16 +278,23 @@ static void UpdateDownloadMenu(HMENU hMenu)
     if (g_device.chip.name[0]) {
         BOOL dl_disabled = Chip_IsDownloadModeDisabled(&g_device.chip);
         BOOL secure = Chip_IsSecureDownloadEnabled(&g_device.chip);
-        if (dl_disabled) mode = DOWNLOAD_MODE_DISABLED;
-        else if (secure) mode = DOWNLOAD_MODE_SECURE;
-        else mode = DOWNLOAD_MODE_NORMAL;
+        if (dl_disabled) {
+            mode = DOWNLOAD_MODE_DISABLED;
+        } else if (secure) {
+            mode = DOWNLOAD_MODE_SECURE;
+        } else {
+            mode = DOWNLOAD_MODE_NORMAL;
+        }
     }
     CheckMenuItem(hMenu, IDM_DOWNLOAD_NORMAL,
-        mode == DOWNLOAD_MODE_NORMAL ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+                  mode == DOWNLOAD_MODE_NORMAL ? (MF_CHECKED | MFT_RADIOCHECK)
+                                               : MF_UNCHECKED);
     CheckMenuItem(hMenu, IDM_DOWNLOAD_SECURE,
-        mode == DOWNLOAD_MODE_SECURE ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+                  mode == DOWNLOAD_MODE_SECURE ? (MF_CHECKED | MFT_RADIOCHECK)
+                                               : MF_UNCHECKED);
     CheckMenuItem(hMenu, IDM_DOWNLOAD_DISABLED,
-        mode == DOWNLOAD_MODE_DISABLED ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED);
+                  mode == DOWNLOAD_MODE_DISABLED ? (MF_CHECKED | MFT_RADIOCHECK)
+                                                 : MF_UNCHECKED);
 }
 
 /*
@@ -313,14 +341,21 @@ static UINT GetEncryptStateStrId(void)
     if (g_device.chip.name[0]) {
         BOOL encrypted = Chip_IsFlashEncryptionEnabled(&g_device.chip);
         BOOL release = Chip_IsDownloadEncryptDisabled(&g_device.chip);
-        if (encrypted && release) return IDS_ENCRYPT_RELEASE;
-        if (encrypted) return IDS_ENCRYPT_DEV;
+        if (encrypted && release) {
+            return IDS_ENCRYPT_RELEASE;
+        }
+        if (encrypted) {
+            return IDS_ENCRYPT_DEV;
+        }
         return IDS_ENCRYPT_NONE;
     }
     switch (g_encryptState) {
-    case ENCRYPT_STATE_DEV:  return IDS_ENCRYPT_DEV;
-    case ENCRYPT_STATE_RELEASE: return IDS_ENCRYPT_RELEASE;
-    default:                 return IDS_ENCRYPT_NONE;
+    case ENCRYPT_STATE_DEV:
+        return IDS_ENCRYPT_DEV;
+    case ENCRYPT_STATE_RELEASE:
+        return IDS_ENCRYPT_RELEASE;
+    default:
+        return IDS_ENCRYPT_NONE;
     }
 }
 
@@ -334,14 +369,21 @@ static UINT GetDownloadModeStrId(void)
     if (g_device.chip.name[0]) {
         BOOL dl_disabled = Chip_IsDownloadModeDisabled(&g_device.chip);
         BOOL secure = Chip_IsSecureDownloadEnabled(&g_device.chip);
-        if (dl_disabled) return IDS_DOWNLOAD_DISABLED;
-        if (secure) return IDS_DOWNLOAD_SECURE;
+        if (dl_disabled) {
+            return IDS_DOWNLOAD_DISABLED;
+        }
+        if (secure) {
+            return IDS_DOWNLOAD_SECURE;
+        }
         return IDS_DOWNLOAD_NORMAL;
     }
     switch (g_downloadMode) {
-    case DOWNLOAD_MODE_SECURE:   return IDS_DOWNLOAD_SECURE;
-    case DOWNLOAD_MODE_DISABLED: return IDS_DOWNLOAD_DISABLED;
-    default:                     return IDS_DOWNLOAD_NORMAL;
+    case DOWNLOAD_MODE_SECURE:
+        return IDS_DOWNLOAD_SECURE;
+    case DOWNLOAD_MODE_DISABLED:
+        return IDS_DOWNLOAD_DISABLED;
+    default:
+        return IDS_DOWNLOAD_NORMAL;
     }
 }
 
@@ -375,12 +417,18 @@ void UpdateMenuState(HWND hWnd)
         BOOL canEncrypt = g_device.chip.type != CHIP_ESP8266;
         BOOL canDlMode = g_device.chip.type != CHIP_ESP8266;
         BOOL canDlSecure = canDlMode && g_device.chip.type != CHIP_ESP32;
-        EnableMenuItem(hMenu, IDM_ENCRYPT_NONE, canEncrypt ? MF_ENABLED : MF_GRAYED);
-        EnableMenuItem(hMenu, IDM_ENCRYPT_DEV, canEncrypt ? MF_ENABLED : MF_GRAYED);
-        EnableMenuItem(hMenu, IDM_ENCRYPT_RELEASE, canEncrypt ? MF_ENABLED : MF_GRAYED);
-        EnableMenuItem(hMenu, IDM_DOWNLOAD_NORMAL, canDlMode ? MF_ENABLED : MF_GRAYED);
-        EnableMenuItem(hMenu, IDM_DOWNLOAD_SECURE, canDlSecure ? MF_ENABLED : MF_GRAYED);
-        EnableMenuItem(hMenu, IDM_DOWNLOAD_DISABLED, canDlMode ? MF_ENABLED : MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_ENCRYPT_NONE,
+                       canEncrypt ? MF_ENABLED : MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_ENCRYPT_DEV,
+                       canEncrypt ? MF_ENABLED : MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_ENCRYPT_RELEASE,
+                       canEncrypt ? MF_ENABLED : MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_DOWNLOAD_NORMAL,
+                       canDlMode ? MF_ENABLED : MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_DOWNLOAD_SECURE,
+                       canDlSecure ? MF_ENABLED : MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_DOWNLOAD_DISABLED,
+                       canDlMode ? MF_ENABLED : MF_GRAYED);
     }
 
     /* Update encryption state and download mode menu check marks */
@@ -444,16 +492,17 @@ void UpdateTitle(HWND hWnd)
  *
  * Updates 6 status bar parts:
  * Part 0: Chip type + Flash size (e.g. "ESP32 4MB"), tooltip: XTAL + MAC
- * Part 1: Encryption status, tooltip: SPI_BOOT_CRYPT_CNT + DIS_DOWNLOAD_MANUAL_ENCRYPT
- * Part 2: Download mode, tooltip: DIS_DOWNLOAD_MODE
+ * Part 1: Encryption status, tooltip: SPI_BOOT_CRYPT_CNT +
+ * DIS_DOWNLOAD_MANUAL_ENCRYPT Part 2: Download mode, tooltip: DIS_DOWNLOAD_MODE
  * Part 3: Secure Boot status, tooltip: SECURE_BOOT_EN
  * Part 4: JTAG status, tooltip: DIS_PAD_JTAG
  * Part 5: Port + config (e.g. "COM10 115200,8N1")
  */
 void UpdateStatusBar(void)
 {
-    if (!g_hStatusbar)
+    if (!g_hStatusbar) {
         return;
+    }
 
     int parts[6];
     parts[0] = STATUS_PART1_WIDTH;
@@ -470,30 +519,36 @@ void UpdateStatusBar(void)
         MultiByteToWideChar(CP_UTF8, 0, g_device.chip.name, -1, chipName, 32);
         if (g_device.flash.size > 0) {
             WCHAR buf[48];
-            if (g_device.flash.size >= 1024*1024)
-                wsprintfW(buf, L"%s %luMB", chipName, g_device.flash.size / (1024*1024));
-            else
-                wsprintfW(buf, L"%s %luKB", chipName, g_device.flash.size / 1024);
+            if (g_device.flash.size >= 1024 * 1024) {
+                wsprintfW(buf, L"%s %luMB", chipName,
+                          g_device.flash.size / (1024 * 1024));
+            } else {
+                wsprintfW(buf, L"%s %luKB", chipName,
+                          g_device.flash.size / 1024);
+            }
             SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)buf);
         } else {
             SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)chipName);
         }
 
         /* Tooltip: "40MHz AA:BB:CC:DD:EE:FF" */
-        const char *xtal = (g_device.chip.xtal_freq == XTAL_FREQ_26M) ? "26MHz" : "40MHz";
+        const char *xtal =
+            (g_device.chip.xtal_freq == XTAL_FREQ_26M) ? "26MHz" : "40MHz";
         const BYTE *mac = Chip_GetMac(&g_device.chip);
         WCHAR tipBuf[64];
-        wsprintfW(tipBuf, L"%hs %02X:%02X:%02X:%02X:%02X:%02X",
-                  xtal, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        wsprintfW(tipBuf, L"%hs %02X:%02X:%02X:%02X:%02X:%02X", xtal, mac[0],
+                  mac[1], mac[2], mac[3], mac[4], mac[5]);
         SetPartTooltip(0, tipBuf);
     } else {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)LoadStr(IDS_STATUS_NO_DEVICE));
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 0,
+                     (LPARAM)LoadStr(IDS_STATUS_NO_DEVICE));
         SetPartTooltip(0, L"");
     }
 
     /* Part 2: Encryption status */
     if (g_device.chip.name[0]) {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 1, (LPARAM)LoadStr(GetEncryptStateStrId()));
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 1,
+                     (LPARAM)LoadStr(GetEncryptStateStrId()));
 
         /* Tooltip: eFuse field values (ESP8266 not supported) */
         if (g_device.chip.type == CHIP_ESP8266) {
@@ -503,7 +558,8 @@ void UpdateStatusBar(void)
             DWORD dlEnc = Chip_GetDlEncryptDisabled(&g_device.chip);
             const char *f1 = "SPI_BOOT_CRYPT_CNT";
             const char *f2 = (g_device.chip.type == CHIP_ESP32)
-                             ? "DISABLE_DL_ENCRYPT" : "DIS_DOWNLOAD_MANUAL_ENCRYPT";
+                                 ? "DISABLE_DL_ENCRYPT"
+                                 : "DIS_DOWNLOAD_MANUAL_ENCRYPT";
             WCHAR t1[64], t2[64];
             wsprintfW(t1, LoadStr(IDS_TIP_EFUSE_FIELD), f1, (int)crypt);
             wsprintfW(t2, LoadStr(IDS_TIP_EFUSE_FIELD), f2, (int)dlEnc);
@@ -518,7 +574,8 @@ void UpdateStatusBar(void)
 
     /* Part 3: Download mode status */
     if (g_device.chip.name[0]) {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 2, (LPARAM)LoadStr(GetDownloadModeStrId()));
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 2,
+                     (LPARAM)LoadStr(GetDownloadModeStrId()));
 
         /* Tooltip: eFuse field value (ESP8266 not supported) */
         if (g_device.chip.type == CHIP_ESP8266) {
@@ -527,9 +584,15 @@ void UpdateStatusBar(void)
             DWORD dlMode = Chip_GetDlModeDisabled(&g_device.chip);
             const char *field;
             switch (g_device.chip.type) {
-            case CHIP_ESP32:   field = "UART_DOWNLOAD_DIS"; break;
-            case CHIP_ESP32S3: field = "DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE"; break;
-            default:           field = "DIS_DOWNLOAD_MODE"; break;
+            case CHIP_ESP32:
+                field = "UART_DOWNLOAD_DIS";
+                break;
+            case CHIP_ESP32S3:
+                field = "DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE";
+                break;
+            default:
+                field = "DIS_DOWNLOAD_MODE";
+                break;
             }
             WCHAR tipBuf[64];
             wsprintfW(tipBuf, LoadStr(IDS_TIP_EFUSE_FIELD), field, (int)dlMode);
@@ -544,22 +607,27 @@ void UpdateStatusBar(void)
     if (g_device.chip.name[0]) {
         BOOL sb = Chip_IsSecureBootEnabled(&g_device.chip);
         SendMessageW(g_hStatusbar, SB_SETTEXT, 3,
-                     (LPARAM)LoadStr(sb ? IDS_SB_SECURE_BOOT_ENABLED : IDS_SB_SECURE_BOOT_DISABLED));
+                     (LPARAM)LoadStr(sb ? IDS_SB_SECURE_BOOT_ENABLED
+                                        : IDS_SB_SECURE_BOOT_DISABLED));
 
         /* Tooltip: eFuse field value */
         DWORD sbFlag = Chip_GetSecureBootFlag(&g_device.chip);
-        if (g_device.chip.type == CHIP_ESP8266 || g_device.chip.type == CHIP_ESP32C2) {
+        if (g_device.chip.type == CHIP_ESP8266 ||
+            g_device.chip.type == CHIP_ESP32C2) {
             SetPartTooltip(3, L"");
         } else if (g_device.chip.type == CHIP_ESP32) {
             WCHAR t1[64], t2[64];
-            wsprintfW(t1, LoadStr(IDS_TIP_EFUSE_FIELD), "ABS_DONE_0", (int)(sbFlag & 1));
-            wsprintfW(t2, LoadStr(IDS_TIP_EFUSE_FIELD), "ABS_DONE_1", (int)((sbFlag >> 1) & 1));
+            wsprintfW(t1, LoadStr(IDS_TIP_EFUSE_FIELD), "ABS_DONE_0",
+                      (int)(sbFlag & 1));
+            wsprintfW(t2, LoadStr(IDS_TIP_EFUSE_FIELD), "ABS_DONE_1",
+                      (int)((sbFlag >> 1) & 1));
             WCHAR tipBuf[128];
             wsprintfW(tipBuf, L"%s\n%s", t1, t2);
             SetPartTooltip(3, tipBuf);
         } else {
             WCHAR tipBuf[64];
-            wsprintfW(tipBuf, LoadStr(IDS_TIP_EFUSE_FIELD), "SECURE_BOOT_EN", (int)sbFlag);
+            wsprintfW(tipBuf, LoadStr(IDS_TIP_EFUSE_FIELD), "SECURE_BOOT_EN",
+                      (int)sbFlag);
             SetPartTooltip(3, tipBuf);
         }
     } else {
@@ -572,14 +640,15 @@ void UpdateStatusBar(void)
         int jtagDis = Chip_GetJtagDisabledCount(&g_device.chip);
         int jtagTotal = Chip_GetJtagTotalCount(&g_device.chip);
         UINT strId;
-        if (jtagTotal == 0)
+        if (jtagTotal == 0) {
             strId = IDS_SB_JTAG_ENABLED;
-        else if (jtagDis == 0)
+        } else if (jtagDis == 0) {
             strId = IDS_SB_JTAG_ENABLED;
-        else if (jtagDis >= jtagTotal)
+        } else if (jtagDis >= jtagTotal) {
             strId = IDS_SB_JTAG_DISABLED;
-        else
+        } else {
             strId = IDS_SB_JTAG_PARTIAL;
+        }
         SendMessageW(g_hStatusbar, SB_SETTEXT, 4, (LPARAM)LoadStr(strId));
 
         /* Tooltip: all JTAG eFuse fields */
@@ -590,15 +659,19 @@ void UpdateStatusBar(void)
             int n = 0;
             if (g_device.chip.type == CHIP_ESP32) {
                 wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
-                          "JTAG_DISABLE", (int)Chip_GetJtagFlag(&g_device.chip));
+                          "JTAG_DISABLE",
+                          (int)Chip_GetJtagFlag(&g_device.chip));
             } else {
                 wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
-                          "DIS_PAD_JTAG", (int)Chip_GetJtagFlag(&g_device.chip));
+                          "DIS_PAD_JTAG",
+                          (int)Chip_GetJtagFlag(&g_device.chip));
                 wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
-                          "SOFT_DIS_JTAG", (int)Chip_GetSoftJtagFlag(&g_device.chip));
+                          "SOFT_DIS_JTAG",
+                          (int)Chip_GetSoftJtagFlag(&g_device.chip));
                 if (jtagTotal >= 3) {
                     wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
-                              "DIS_USB_JTAG", (int)Chip_GetUsbJtagFlag(&g_device.chip));
+                              "DIS_USB_JTAG",
+                              (int)Chip_GetUsbJtagFlag(&g_device.chip));
                 }
             }
             WCHAR tipBuf[192];
@@ -622,25 +695,43 @@ void UpdateStatusBar(void)
 
         const WCHAR *parityStr = L"N";
         switch (parity) {
-        case NOPARITY: parityStr = L"N"; break;
-        case ODDPARITY: parityStr = L"O"; break;
-        case EVENPARITY: parityStr = L"E"; break;
-        case MARKPARITY: parityStr = L"M"; break;
-        case SPACEPARITY: parityStr = L"S"; break;
+        case NOPARITY:
+            parityStr = L"N";
+            break;
+        case ODDPARITY:
+            parityStr = L"O";
+            break;
+        case EVENPARITY:
+            parityStr = L"E";
+            break;
+        case MARKPARITY:
+            parityStr = L"M";
+            break;
+        case SPACEPARITY:
+            parityStr = L"S";
+            break;
         }
 
         const WCHAR *stopStr = L"1";
         switch (stopBits) {
-        case ONESTOPBIT: stopStr = L"1"; break;
-        case ONE5STOPBITS: stopStr = L"1.5"; break;
-        case TWOSTOPBITS: stopStr = L"2"; break;
+        case ONESTOPBIT:
+            stopStr = L"1";
+            break;
+        case ONE5STOPBITS:
+            stopStr = L"1.5";
+            break;
+        case TWOSTOPBITS:
+            stopStr = L"2";
+            break;
         }
 
         WCHAR buf[48];
-        wsprintfW(buf, L"%s %lu,%d%s%s", g_szPort, baudRate, dataBits, parityStr, stopStr);
+        wsprintfW(buf, L"%s %lu,%d%s%s", g_szPort, baudRate, dataBits,
+                  parityStr, stopStr);
         SendMessageW(g_hStatusbar, SB_SETTEXT, 5, (LPARAM)buf);
     } else {
-        SendMessageW(g_hStatusbar, SB_SETTEXT, 5, (LPARAM)LoadStr(IDS_DISCONNECTED));
+        SendMessageW(g_hStatusbar, SB_SETTEXT, 5,
+                     (LPARAM)LoadStr(IDS_DISCONNECTED));
     }
 }
 
@@ -655,7 +746,7 @@ void ApplyFontToEdit(HWND hEdit, LOGFONTW *plf)
     CHARFORMAT2W cf = {0};
     cf.cbSize = sizeof(CHARFORMAT2W);
     cf.dwMask = CFM_FACE | CFM_SIZE | CFM_WEIGHT;
-    cf.yHeight = plf->lfHeight * 15;  /* Convert to twips (1/1440 inch) */
+    cf.yHeight = plf->lfHeight * 15; /* Convert to twips (1/1440 inch) */
     cf.wWeight = (WORD)plf->lfWeight;
     lstrcpyW(cf.szFaceName, plf->lfFaceName);
     SendMessageW(hEdit, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
@@ -673,7 +764,8 @@ void InitDefaultFont(void)
     if (!Config_GetFont(&g_logFont)) {
         /* Use default if not in config */
         HDC hdc = GetDC(NULL);
-        g_logFont.lfHeight = -MulDiv(DEFAULT_FONT_SIZE, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+        g_logFont.lfHeight =
+            -MulDiv(DEFAULT_FONT_SIZE, GetDeviceCaps(hdc, LOGPIXELSY), 72);
         ReleaseDC(NULL, hdc);
         g_logFont.lfWeight = FW_NORMAL;
         g_logFont.lfCharSet = DEFAULT_CHARSET;
@@ -695,10 +787,12 @@ void InitDefaultFont(void)
  */
 void Main_CmdNewDevice(HWND hWnd)
 {
-    if (!PromptDisconnectIfNeeded(hWnd))
+    if (!PromptDisconnectIfNeeded(hWnd)) {
         return;
-    if (!PromptSaveIfNeeded(hWnd))
+    }
+    if (!PromptSaveIfNeeded(hWnd)) {
         return;
+    }
 
     /* Create default device: ESP32, 40MHz, 4MB */
     static const BYTE defaultMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0x01};
@@ -711,7 +805,8 @@ void Main_CmdNewDevice(HWND hWnd)
         UpdateTitle(hWnd);
         SetWindowTextW(g_hEdit, L"");
     } else {
-        MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_CREATE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_CREATE_DEV),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
     }
 }
 
@@ -725,10 +820,12 @@ void Main_CmdNewDevice(HWND hWnd)
  */
 void Main_CmdOpenDevice(HWND hWnd)
 {
-    if (!PromptDisconnectIfNeeded(hWnd))
+    if (!PromptDisconnectIfNeeded(hWnd)) {
         return;
-    if (!PromptSaveIfNeeded(hWnd))
+    }
+    if (!PromptSaveIfNeeded(hWnd)) {
         return;
+    }
     OPENFILENAMEW ofn = {0};
     WCHAR szFile[MAX_PATH] = {0};
     ofn.lStructSize = sizeof(ofn);
@@ -747,7 +844,8 @@ void Main_CmdOpenDevice(HWND hWnd)
             UpdateTitle(hWnd);
             SetWindowTextW(g_hEdit, L"");
         } else {
-            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_LOAD_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_LOAD_DEV),
+                        LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         }
     }
 }
@@ -765,10 +863,12 @@ void Main_CmdOpenDevice(HWND hWnd)
  */
 BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath)
 {
-    if (!PromptDisconnectIfNeeded(hWnd))
+    if (!PromptDisconnectIfNeeded(hWnd)) {
         return FALSE;
-    if (!PromptSaveIfNeeded(hWnd))
+    }
+    if (!PromptSaveIfNeeded(hWnd)) {
         return FALSE;
+    }
 
     Device_Close(&g_device);
     if (Device_Load(&g_device, filePath)) {
@@ -780,7 +880,8 @@ BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath)
         SetWindowTextW(g_hEdit, L"");
         return TRUE;
     } else {
-        MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_LOAD_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_LOAD_DEV),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return FALSE;
     }
 }
@@ -800,7 +901,8 @@ void Main_CmdSaveDevice(HWND hWnd)
             Config_SetLastDeviceFile(filename);
             UpdateTitle(hWnd);
         } else {
-            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV),
+                        LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         }
     } else {
         /* No filename, do Save As */
@@ -832,7 +934,8 @@ void Main_CmdSaveDeviceAs(HWND hWnd)
             Config_SetLastDeviceFile(szFile);
             UpdateTitle(hWnd);
         } else {
-            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_SAVE_DEV),
+                        LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         }
     }
 }
@@ -846,11 +949,14 @@ void Main_CmdSaveDeviceAs(HWND hWnd)
  */
 void Main_CmdDeviceProps(HWND hWnd)
 {
-    if (!PromptDisconnectIfNeeded(hWnd))
+    if (!PromptDisconnectIfNeeded(hWnd)) {
         return;
-    if (!PromptSaveIfNeeded(hWnd))
+    }
+    if (!PromptSaveIfNeeded(hWnd)) {
         return;
-    if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_DEVICE_PROPS), hWnd, DevicePropsDlgProc) == IDOK) {
+    }
+    if (DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_DEVICE_PROPS),
+                   hWnd, DevicePropsDlgProc) == IDOK) {
         UpdateMenuState(hWnd);
         UpdateStatusBar();
         UpdateTitle(hWnd);
@@ -867,9 +973,11 @@ void Main_CmdDeviceProps(HWND hWnd)
  */
 void Main_CmdKeyMgmt(HWND hWnd)
 {
-    if (!PromptDisconnectIfNeeded(hWnd))
+    if (!PromptDisconnectIfNeeded(hWnd)) {
         return;
-    DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_KEY_MGMT), hWnd, KeyMgmtDlgProc);
+    }
+    DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_KEY_MGMT), hWnd,
+               KeyMgmtDlgProc);
 }
 
 /*
@@ -900,7 +1008,8 @@ void Main_OnConnect(HWND hMainWnd)
 
     if (!Serial_Open(&g_serial, g_szPort, hMainWnd)) {
         TRACE_FW(TAG, "ERROR: Serial_Open failed");
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_PORT_ERROR), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_PORT_ERROR),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -942,12 +1051,14 @@ void Main_OnReconnect(HWND hMainWnd)
     }
 
     if (!g_szPort[0]) {
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_NO_LAST_PORT), LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_NO_LAST_PORT),
+                    LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
         return;
     }
 
     if (!IsPortAvailable(g_szPort)) {
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_PORT_NOT_AVAIL), LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_PORT_NOT_AVAIL),
+                    LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
         return;
     }
 
@@ -955,7 +1066,8 @@ void Main_OnReconnect(HWND hMainWnd)
 
     if (!Serial_Open(&g_serial, g_szPort, hMainWnd)) {
         TRACE_FW(TAG, "ERROR: Serial_Open failed");
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_PORT_ERROR), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_PORT_ERROR),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -986,8 +1098,9 @@ void Main_OnReconnect(HWND hMainWnd)
  */
 void Main_OnDisconnect(HWND hMainWnd)
 {
-    if (!Serial_IsOpen(&g_serial))
+    if (!Serial_IsOpen(&g_serial)) {
         return;
+    }
 
     Serial_Close(&g_serial);
 
@@ -1007,10 +1120,12 @@ void Main_OnDisconnect(HWND hMainWnd)
  */
 void Main_OnFlashImport(HWND hMainWnd)
 {
-    if (!PromptDisconnectIfNeeded(hMainWnd))
+    if (!PromptDisconnectIfNeeded(hMainWnd)) {
         return;
-    if (!PromptSaveIfNeeded(hMainWnd))
+    }
+    if (!PromptSaveIfNeeded(hMainWnd)) {
         return;
+    }
 
     OPENFILENAMEW ofn = {0};
     WCHAR szFile[MAX_PATH] = {0};
@@ -1021,13 +1136,16 @@ void Main_OnFlashImport(HWND hMainWnd)
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_FILEMUSTEXIST;
 
-    if (!GetOpenFileNameW(&ofn))
+    if (!GetOpenFileNameW(&ofn)) {
         return;
+    }
 
     /* Check file size */
-    HANDLE hFile = CreateFileW(szFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE hFile = CreateFileW(szFile, GENERIC_READ, 0, NULL, OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_OPEN_FILE), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_OPEN_FILE),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -1035,8 +1153,10 @@ void Main_OnFlashImport(HWND hMainWnd)
     if (fileSize != g_device.flash.size) {
         CloseHandle(hFile);
         WCHAR msg[128];
-        wsprintfW(msg, LoadStr(IDS_MSG_FLASH_MISMATCH), fileSize, g_device.flash.size);
-        MessageBoxW(hMainWnd, msg, LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        wsprintfW(msg, LoadStr(IDS_MSG_FLASH_MISMATCH), fileSize,
+                  g_device.flash.size);
+        MessageBoxW(hMainWnd, msg, LoadStr(IDS_MSG_ERROR),
+                    MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -1045,7 +1165,9 @@ void Main_OnFlashImport(HWND hMainWnd)
     EnableWindow(hMainWnd, FALSE);
 
     DWORD bytesRead;
-    BOOL ok = ReadFile(hFile, g_device.flash.data, fileSize, &bytesRead, NULL) && bytesRead == fileSize;
+    BOOL ok =
+        ReadFile(hFile, g_device.flash.data, fileSize, &bytesRead, NULL) &&
+        bytesRead == fileSize;
     CloseHandle(hFile);
 
     /* Restore window state */
@@ -1053,7 +1175,8 @@ void Main_OnFlashImport(HWND hMainWnd)
     SetCursor(hOldCursor);
 
     if (!ok) {
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_READ_FILE), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_READ_FILE),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -1080,8 +1203,9 @@ void Main_OnFlashExport(HWND hMainWnd)
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
     ofn.lpstrDefExt = L"bin";
 
-    if (!GetSaveFileNameW(&ofn))
+    if (!GetSaveFileNameW(&ofn)) {
         return;
+    }
 
     /* Create snapshot of flash data */
     DWORD flashSize = g_device.flash.size;
@@ -1089,7 +1213,8 @@ void Main_OnFlashExport(HWND hMainWnd)
     if (flashSize > 0 && g_device.flash.data) {
         flashSnapshot = (BYTE *)HeapAlloc(GetProcessHeap(), 0, flashSize);
         if (!flashSnapshot) {
-            MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC_SNAP), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC_SNAP),
+                        LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
             return;
         }
         memcpy(flashSnapshot, g_device.flash.data, flashSize);
@@ -1100,19 +1225,22 @@ void Main_OnFlashExport(HWND hMainWnd)
     EnableWindow(hMainWnd, FALSE);
 
     /* Write snapshot to file */
-    HANDLE hFile = CreateFileW(szFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE hFile = CreateFileW(szFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                               FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
         EnableWindow(hMainWnd, TRUE);
         SetCursor(hOldCursor);
         HeapFree(GetProcessHeap(), 0, flashSnapshot);
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_CREATE_FILE), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_CREATE_FILE),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
     DWORD bytesWritten;
     BOOL ok = TRUE;
     if (flashSnapshot && flashSize > 0) {
-        ok = WriteFile(hFile, flashSnapshot, flashSize, &bytesWritten, NULL) && bytesWritten == flashSize;
+        ok = WriteFile(hFile, flashSnapshot, flashSize, &bytesWritten, NULL) &&
+             bytesWritten == flashSize;
     }
     CloseHandle(hFile);
 
@@ -1123,7 +1251,8 @@ void Main_OnFlashExport(HWND hMainWnd)
     if (!ok) {
         DeleteFileW(szFile);
         HeapFree(GetProcessHeap(), 0, flashSnapshot);
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_WRITE_FILE), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_WRITE_FILE),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -1137,13 +1266,13 @@ void Main_OnFlashExport(HWND hMainWnd)
  * Thread frees this structure when done.
  */
 typedef struct {
-    DEVICE_CTX device;      /* Device header info */
-    BYTE *efuse;            /* eFuse data snapshot */
-    DWORD efuseSize;        /* eFuse size */
-    BYTE *flash;            /* Flash data snapshot */
-    DWORD flashSize;        /* Flash size */
+    DEVICE_CTX device;        /* Device header info */
+    BYTE *efuse;              /* eFuse data snapshot */
+    DWORD efuseSize;          /* eFuse size */
+    BYTE *flash;              /* Flash data snapshot */
+    DWORD flashSize;          /* Flash size */
     WCHAR filename[MAX_PATH]; /* Output filename */
-    HWND hWnd;              /* Owner window */
+    HWND hWnd;                /* Owner window */
 } DEVICE_SNAPSHOT;
 
 /*
@@ -1175,9 +1304,10 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
 
     /* Write header */
     fwprintf(f, L"=== FakeEsptool Device Dump ===\n");
-    fwprintf(f, L"File: %ls\n", snap->device.filename[0] ? snap->device.filename : L"Untitled");
-    fwprintf(f, L"Date: %04d-%02d-%02d %02d:%02d:%02d\n\n",
-             st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+    fwprintf(f, L"File: %ls\n",
+             snap->device.filename[0] ? snap->device.filename : L"Untitled");
+    fwprintf(f, L"Date: %04d-%02d-%02d %02d:%02d:%02d\n\n", st.wYear, st.wMonth,
+             st.wDay, st.wHour, st.wMinute, st.wSecond);
 
     /* Write header info */
     fwprintf(f, L"[Header]\n");
@@ -1190,31 +1320,35 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     fwprintf(f, L"Chip Type:  %ls\n", chipName);
 
     /* Get xtal freq */
-    const WCHAR *xtalStr = (snap->device.chip.xtal_freq == 0) ? L"40MHz" : L"26MHz";
+    const WCHAR *xtalStr =
+        (snap->device.chip.xtal_freq == 0) ? L"40MHz" : L"26MHz";
     fwprintf(f, L"XTAL Freq:  %ls\n\n", xtalStr);
 
     /* Write MAC address */
     fwprintf(f, L"[MAC Address]\n");
     const BYTE *mac = snap->device.chip.mac;
-    fwprintf(f, L"%02X:%02X:%02X:%02X:%02X:%02X\n\n",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    fwprintf(f, L"%02X:%02X:%02X:%02X:%02X:%02X\n\n", mac[0], mac[1], mac[2],
+             mac[3], mac[4], mac[5]);
 
     /* Write Flash config */
     fwprintf(f, L"[Flash Config]\n");
-    if (snap->flashSize >= 1024 * 1024)
-        fwprintf(f, L"Size:       %luMB (%lu bytes)\n\n", snap->flashSize / (1024 * 1024), snap->flashSize);
-    else
-        fwprintf(f, L"Size:       %luKB (%lu bytes)\n\n", snap->flashSize / 1024, snap->flashSize);
+    if (snap->flashSize >= 1024 * 1024) {
+        fwprintf(f, L"Size:       %luMB (%lu bytes)\n\n",
+                 snap->flashSize / (1024 * 1024), snap->flashSize);
+    } else {
+        fwprintf(f, L"Size:       %luKB (%lu bytes)\n\n",
+                 snap->flashSize / 1024, snap->flashSize);
+    }
 
     /* Write eFuse security fields (raw values) */
     fwprintf(f, L"[eFuse Security Fields]\n");
 
-    /* Helper to read bits from eFuse data */
-    #define READ_EFUSE_BITS(offset, mask) \
-        ((*(DWORD *)(snap->efuse + (offset)) & (mask)))
+/* Helper to read bits from eFuse data */
+#define READ_EFUSE_BITS(offset, mask)                                          \
+    ((*(DWORD *)(snap->efuse + (offset)) & (mask)))
 
-    /* Count set bits in a value */
-    #define COUNT_BITS(v) count_set_bits(v)
+/* Count set bits in a value */
+#define COUNT_BITS(v) count_set_bits(v)
 
     switch (snap->device.chip.type) {
     case CHIP_ESP32: {
@@ -1223,7 +1357,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         DWORD dl_decrypt = READ_EFUSE_BITS(0x18, 1UL << 8) >> 8;
         DWORD dl_cache = READ_EFUSE_BITS(0x18, 1UL << 9) >> 9;
         DWORD uart_dis = READ_EFUSE_BITS(0x00, 1UL << 27) >> 27;
-        fwprintf(f, L"FLASH_CRYPT_CNT:     0x%02X (%d bits set)\n", flash_crypt_cnt, COUNT_BITS(flash_crypt_cnt));
+        fwprintf(f, L"FLASH_CRYPT_CNT:     0x%02X (%d bits set)\n",
+                 flash_crypt_cnt, COUNT_BITS(flash_crypt_cnt));
         fwprintf(f, L"DISABLE_DL_ENCRYPT:  %lu\n", dl_encrypt);
         fwprintf(f, L"DISABLE_DL_DECRYPT:  %lu\n", dl_decrypt);
         fwprintf(f, L"DISABLE_DL_CACHE:    %lu\n", dl_cache);
@@ -1235,7 +1370,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 20) >> 20;
         DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 4) >> 4;
         DWORD sec_dl = READ_EFUSE_BITS(0x3C, 1UL << 5) >> 5;
-        fwprintf(f, L"SPI_BOOT_CRYPT_CNT:          0x%02X (%d bits set)\n", crypt_cnt, COUNT_BITS(crypt_cnt));
+        fwprintf(f, L"SPI_BOOT_CRYPT_CNT:          0x%02X (%d bits set)\n",
+                 crypt_cnt, COUNT_BITS(crypt_cnt));
         fwprintf(f, L"DIS_DOWNLOAD_MANUAL_ENCRYPT: %lu\n", dl_encrypt);
         fwprintf(f, L"DIS_DOWNLOAD_MODE:           %lu\n", dl_mode);
         fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:    %lu\n", sec_dl);
@@ -1246,7 +1382,9 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 20) >> 20;
         DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 4) >> 4;
         DWORD sec_dl = READ_EFUSE_BITS(0x3C, 1UL << 5) >> 5;
-        fwprintf(f, L"SPI_BOOT_CRYPT_CNT:                0x%02X (%d bits set)\n", crypt_cnt, COUNT_BITS(crypt_cnt));
+        fwprintf(f,
+                 L"SPI_BOOT_CRYPT_CNT:                0x%02X (%d bits set)\n",
+                 crypt_cnt, COUNT_BITS(crypt_cnt));
         fwprintf(f, L"DIS_DOWNLOAD_MANUAL_ENCRYPT:       %lu\n", dl_encrypt);
         fwprintf(f, L"DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE: %lu\n", dl_mode);
         fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:          %lu\n", sec_dl);
@@ -1257,7 +1395,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 6) >> 6;
         DWORD dl_mode = READ_EFUSE_BITS(0x30, 1UL << 14) >> 14;
         DWORD sec_dl = READ_EFUSE_BITS(0x30, 1UL << 16) >> 16;
-        fwprintf(f, L"SPI_BOOT_CRYPT_CNT:          0x%02X (%d bits set)\n", crypt_cnt, COUNT_BITS(crypt_cnt));
+        fwprintf(f, L"SPI_BOOT_CRYPT_CNT:          0x%02X (%d bits set)\n",
+                 crypt_cnt, COUNT_BITS(crypt_cnt));
         fwprintf(f, L"DIS_DOWNLOAD_MANUAL_ENCRYPT: %lu\n", dl_encrypt);
         fwprintf(f, L"DIS_DOWNLOAD_MODE:           %lu\n", dl_mode);
         fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:    %lu\n", sec_dl);
@@ -1269,7 +1408,9 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 20) >> 20;
         DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 4) >> 4;
         DWORD sec_dl = READ_EFUSE_BITS(0x3C, 1UL << 5) >> 5;
-        fwprintf(f, L"SPI_BOOT_CRYPT_CNT:                0x%02X (%d bits set)\n", crypt_cnt, COUNT_BITS(crypt_cnt));
+        fwprintf(f,
+                 L"SPI_BOOT_CRYPT_CNT:                0x%02X (%d bits set)\n",
+                 crypt_cnt, COUNT_BITS(crypt_cnt));
         fwprintf(f, L"DIS_DOWNLOAD_MANUAL_ENCRYPT:       %lu\n", dl_encrypt);
         fwprintf(f, L"DIS_DOWNLOAD_MODE:                 %lu\n", dl_mode);
         fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:          %lu\n", sec_dl);
@@ -1326,7 +1467,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         DWORD revoke1 = READ_EFUSE_BITS(0x34, 1UL << 22) >> 22;
         DWORD revoke2 = READ_EFUSE_BITS(0x34, 1UL << 23) >> 23;
         fwprintf(f, L"DIS_PAD_JTAG:               %lu\n", pad_jtag);
-        fwprintf(f, L"SOFT_DIS_JTAG:              %lu (%d bits set)\n", soft_jtag, COUNT_BITS(soft_jtag));
+        fwprintf(f, L"SOFT_DIS_JTAG:              %lu (%d bits set)\n",
+                 soft_jtag, COUNT_BITS(soft_jtag));
         fwprintf(f, L"DIS_USB_JTAG:               %lu\n", usb_jtag);
         fwprintf(f, L"DIS_FORCE_DOWNLOAD:         %lu\n", force_dl);
         fwprintf(f, L"DIS_USB_SERIAL_JTAG_PRINT:  %lu\n", usb_print);
@@ -1356,7 +1498,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         DWORD revoke1 = READ_EFUSE_BITS(0x34, 1UL << 22) >> 22;
         DWORD revoke2 = READ_EFUSE_BITS(0x34, 1UL << 23) >> 23;
         fwprintf(f, L"DIS_PAD_JTAG:               %lu\n", pad_jtag);
-        fwprintf(f, L"SOFT_DIS_JTAG:              %lu (%d bits set)\n", soft_jtag, COUNT_BITS(soft_jtag));
+        fwprintf(f, L"SOFT_DIS_JTAG:              %lu (%d bits set)\n",
+                 soft_jtag, COUNT_BITS(soft_jtag));
         fwprintf(f, L"DIS_USB_JTAG:               %lu\n", usb_jtag);
         fwprintf(f, L"DIS_FORCE_DOWNLOAD:         %lu\n", force_dl);
         fwprintf(f, L"DIS_USB_SERIAL_JTAG_PRINT:  %lu\n", usb_print);
@@ -1372,8 +1515,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         break;
     }
 
-    #undef READ_EFUSE_BITS
-    #undef COUNT_BITS
+#undef READ_EFUSE_BITS
+#undef COUNT_BITS
 
     fwprintf(f, L"\n");
 
@@ -1393,9 +1536,9 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     switch (snap->device.chip.type) {
     case CHIP_ESP32: {
         static const KEY_INFO esp32_keys[] = {
-            { "BLOCK1", 0x38, 32 },
-            { "BLOCK2", 0x58, 32 },
-            { "BLOCK3", 0x78, 32 },
+            {"BLOCK1", 0x38, 32},
+            {"BLOCK2", 0x58, 32},
+            {"BLOCK3", 0x78, 32},
         };
         keys = esp32_keys;
         key_count = 3;
@@ -1404,12 +1547,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     case CHIP_ESP32S2:
     case CHIP_ESP32S3: {
         static const KEY_INFO s2s3_keys[] = {
-            { "KEY0", 0x9C, 32 },
-            { "KEY1", 0xBC, 32 },
-            { "KEY2", 0xDC, 32 },
-            { "KEY3", 0xFC, 32 },
-            { "KEY4", 0x11C, 32 },
-            { "KEY5", 0x13C, 32 },
+            {"KEY0", 0x9C, 32}, {"KEY1", 0xBC, 32},  {"KEY2", 0xDC, 32},
+            {"KEY3", 0xFC, 32}, {"KEY4", 0x11C, 32}, {"KEY5", 0x13C, 32},
         };
         keys = s2s3_keys;
         key_count = 6;
@@ -1417,7 +1556,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     }
     case CHIP_ESP32C2: {
         static const KEY_INFO c2_keys[] = {
-            { "KEY0", 0x60, 32 },
+            {"KEY0", 0x60, 32},
         };
         keys = c2_keys;
         key_count = 1;
@@ -1426,12 +1565,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     case CHIP_ESP32C3:
     case CHIP_ESP32C6: {
         static const KEY_INFO c3c6_keys[] = {
-            { "KEY0", 0x9C, 32 },
-            { "KEY1", 0xBC, 32 },
-            { "KEY2", 0xDC, 32 },
-            { "KEY3", 0xFC, 32 },
-            { "KEY4", 0x11C, 32 },
-            { "KEY5", 0x13C, 32 },
+            {"KEY0", 0x9C, 32}, {"KEY1", 0xBC, 32},  {"KEY2", 0xDC, 32},
+            {"KEY3", 0xFC, 32}, {"KEY4", 0x11C, 32}, {"KEY5", 0x13C, 32},
         };
         keys = c3c6_keys;
         key_count = 6;
@@ -1441,7 +1576,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         break;
     }
 
-    fwprintf(f, L"%-10ls %-24ls %-10ls %-10ls\n", L"Block", L"Purpose", L"Status", L"Size");
+    fwprintf(f, L"%-10ls %-24ls %-10ls %-10ls\n", L"Block", L"Purpose",
+             L"Status", L"Size");
     fwprintf(f, L"---------- ------------------------ ---------- ----------\n");
 
     for (int i = 0; i < key_count; i++) {
@@ -1460,26 +1596,51 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         BYTE purpose = Chip_GetKeyPurpose(&snap->device.chip, i);
         const WCHAR *purposeStr;
         switch (purpose) {
-        case KEY_PURPOSE_USER:                purposeStr = L"USER (0)"; break;
-        case KEY_PURPOSE_RESERVED:            purposeStr = L"RESERVED (1)"; break;
-        case KEY_PURPOSE_XTS_AES_256_KEY_1:  purposeStr = L"XTS-AES-256-1 (2)"; break;
-        case KEY_PURPOSE_XTS_AES_256_KEY_2:  purposeStr = L"XTS-AES-256-2 (3)"; break;
-        case KEY_PURPOSE_XTS_AES_128_KEY:    purposeStr = L"XTS-AES-128 (4)"; break;
-        case KEY_PURPOSE_HMAC_DOWN_ALL:      purposeStr = L"HMAC-DOWN-ALL (5)"; break;
-        case KEY_PURPOSE_HMAC_DOWN_JTAG:     purposeStr = L"HMAC-DOWN-JTAG (6)"; break;
-        case KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE: purposeStr = L"HMAC-DOWN-SIG (7)"; break;
-        case KEY_PURPOSE_HMAC_UP:            purposeStr = L"HMAC-UP (8)"; break;
-        case KEY_PURPOSE_SECURE_BOOT_DIGEST0: purposeStr = L"SEC-BOOT-DIG0 (9)"; break;
-        case KEY_PURPOSE_SECURE_BOOT_DIGEST1: purposeStr = L"SEC-BOOT-DIG1 (10)"; break;
-        case KEY_PURPOSE_SECURE_BOOT_DIGEST2: purposeStr = L"SEC-BOOT-DIG2 (11)"; break;
-        default:                              purposeStr = L"UNKNOWN"; break;
+        case KEY_PURPOSE_USER:
+            purposeStr = L"USER (0)";
+            break;
+        case KEY_PURPOSE_RESERVED:
+            purposeStr = L"RESERVED (1)";
+            break;
+        case KEY_PURPOSE_XTS_AES_256_KEY_1:
+            purposeStr = L"XTS-AES-256-1 (2)";
+            break;
+        case KEY_PURPOSE_XTS_AES_256_KEY_2:
+            purposeStr = L"XTS-AES-256-2 (3)";
+            break;
+        case KEY_PURPOSE_XTS_AES_128_KEY:
+            purposeStr = L"XTS-AES-128 (4)";
+            break;
+        case KEY_PURPOSE_HMAC_DOWN_ALL:
+            purposeStr = L"HMAC-DOWN-ALL (5)";
+            break;
+        case KEY_PURPOSE_HMAC_DOWN_JTAG:
+            purposeStr = L"HMAC-DOWN-JTAG (6)";
+            break;
+        case KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE:
+            purposeStr = L"HMAC-DOWN-SIG (7)";
+            break;
+        case KEY_PURPOSE_HMAC_UP:
+            purposeStr = L"HMAC-UP (8)";
+            break;
+        case KEY_PURPOSE_SECURE_BOOT_DIGEST0:
+            purposeStr = L"SEC-BOOT-DIG0 (9)";
+            break;
+        case KEY_PURPOSE_SECURE_BOOT_DIGEST1:
+            purposeStr = L"SEC-BOOT-DIG1 (10)";
+            break;
+        case KEY_PURPOSE_SECURE_BOOT_DIGEST2:
+            purposeStr = L"SEC-BOOT-DIG2 (11)";
+            break;
+        default:
+            purposeStr = L"UNKNOWN";
+            break;
         }
 
         WCHAR wname[16];
         MultiByteToWideChar(CP_UTF8, 0, keys[i].name, -1, wname, 16);
 
-        fwprintf(f, L"%-10ls %-24ls %-10ls %-10ls\n",
-                 wname, purposeStr,
+        fwprintf(f, L"%-10ls %-24ls %-10ls %-10ls\n", wname, purposeStr,
                  programmed ? L"Programmed" : L"Empty",
                  keys[i].size == 32 ? L"256-bit" : L"128-bit");
     }
@@ -1488,18 +1649,24 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
 
     /* Write eFuse data */
     fwprintf(f, L"[eFuse] (%lu bytes)\n", snap->efuseSize);
-    fwprintf(f, L"Offset    00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F  ASCII\n");
-    fwprintf(f, L"--------  -----------------------  -----------------------  ----------------\n");
+    fwprintf(
+        f,
+        L"Offset    00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F  ASCII\n");
+    fwprintf(f, L"--------  -----------------------  -----------------------  "
+                L"----------------\n");
 
     for (DWORD i = 0; i < snap->efuseSize; i += 16) {
         fwprintf(f, L"%08X  ", i);
         /* Hex bytes */
         for (DWORD j = 0; j < 16; j++) {
-            if (i + j < snap->efuseSize)
+            if (i + j < snap->efuseSize) {
                 fwprintf(f, L"%02X ", snap->efuse[i + j]);
+            }
             else
                 fwprintf(f, L"   ");
-            if (j == 7) fwprintf(f, L" ");
+            if (j == 7) {
+                fwprintf(f, L" ");
+            }
         }
         fwprintf(f, L" ");
         /* ASCII */
@@ -1513,18 +1680,24 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
 
     /* Write Flash data */
     fwprintf(f, L"[Flash Data] (%lu bytes)\n", snap->flashSize);
-    fwprintf(f, L"Offset    00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F  ASCII\n");
-    fwprintf(f, L"--------  -----------------------  -----------------------  ----------------\n");
+    fwprintf(
+        f,
+        L"Offset    00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F  ASCII\n");
+    fwprintf(f, L"--------  -----------------------  -----------------------  "
+                L"----------------\n");
 
     for (DWORD i = 0; i < snap->flashSize; i += 16) {
         fwprintf(f, L"%08X  ", i);
         /* Hex bytes */
         for (DWORD j = 0; j < 16; j++) {
-            if (i + j < snap->flashSize)
+            if (i + j < snap->flashSize) {
                 fwprintf(f, L"%02X ", snap->flash[i + j]);
+            }
             else
                 fwprintf(f, L"   ");
-            if (j == 7) fwprintf(f, L" ");
+            if (j == 7) {
+                fwprintf(f, L" ");
+            }
         }
         fwprintf(f, L" ");
         /* ASCII */
@@ -1536,14 +1709,21 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     }
 
 cleanup:
-    if (f) fclose(f);
+    if (f) {
+        fclose(f);
+    }
 
     /* Notify main window */
-    PostMessage(snap->hWnd, WM_DUMP_COMPLETE, ok ? TRUE : FALSE, ok ? 0 : GetLastError());
+    PostMessage(snap->hWnd, WM_DUMP_COMPLETE, ok ? TRUE : FALSE,
+                ok ? 0 : GetLastError());
 
     /* Free snapshot data */
-    if (snap->efuse) HeapFree(GetProcessHeap(), 0, snap->efuse);
-    if (snap->flash) HeapFree(GetProcessHeap(), 0, snap->flash);
+    if (snap->efuse) {
+        HeapFree(GetProcessHeap(), 0, snap->efuse);
+    }
+    if (snap->flash) {
+        HeapFree(GetProcessHeap(), 0, snap->flash);
+    }
     HeapFree(GetProcessHeap(), 0, snap);
 
     return ok ? 0 : 1;
@@ -1571,7 +1751,9 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
         lstrcpyW(szFile, name);
         /* Remove .esp extension */
         WCHAR *ext = wcsrchr(szFile, L'.');
-        if (ext) *ext = L'\0';
+        if (ext) {
+            *ext = L'\0';
+        }
         lstrcatW(szFile, L"_dump.txt");
     } else {
         lstrcpyW(szFile, L"device_dump.txt");
@@ -1585,13 +1767,16 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
     ofn.lpstrDefExt = L"txt";
 
-    if (!GetSaveFileNameW(&ofn))
+    if (!GetSaveFileNameW(&ofn)) {
         return;
+    }
 
     /* Create snapshot */
-    DEVICE_SNAPSHOT *snap = (DEVICE_SNAPSHOT *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(DEVICE_SNAPSHOT));
+    DEVICE_SNAPSHOT *snap = (DEVICE_SNAPSHOT *)HeapAlloc(
+        GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(DEVICE_SNAPSHOT));
     if (!snap) {
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -1606,7 +1791,8 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
         snap->efuse = (BYTE *)HeapAlloc(GetProcessHeap(), 0, snap->efuseSize);
         if (!snap->efuse) {
             HeapFree(GetProcessHeap(), 0, snap);
-            MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC_EFUSE), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC_EFUSE),
+                        LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
             return;
         }
         memcpy(snap->efuse, g_device.chip.efuse, snap->efuseSize);
@@ -1617,9 +1803,12 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
     if (snap->flashSize > 0 && g_device.flash.data) {
         snap->flash = (BYTE *)HeapAlloc(GetProcessHeap(), 0, snap->flashSize);
         if (!snap->flash) {
-            if (snap->efuse) HeapFree(GetProcessHeap(), 0, snap->efuse);
+            if (snap->efuse) {
+                HeapFree(GetProcessHeap(), 0, snap->efuse);
+            }
             HeapFree(GetProcessHeap(), 0, snap);
-            MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC_FLASH), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC_FLASH),
+                        LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
             return;
         }
         memcpy(snap->flash, g_device.flash.data, snap->flashSize);
@@ -1634,10 +1823,15 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
     if (!hThread) {
         EnableWindow(hMainWnd, TRUE);
         SetCursor(LoadCursor(NULL, IDC_ARROW));
-        if (snap->efuse) HeapFree(GetProcessHeap(), 0, snap->efuse);
-        if (snap->flash) HeapFree(GetProcessHeap(), 0, snap->flash);
+        if (snap->efuse) {
+            HeapFree(GetProcessHeap(), 0, snap->efuse);
+        }
+        if (snap->flash) {
+            HeapFree(GetProcessHeap(), 0, snap->flash);
+        }
         HeapFree(GetProcessHeap(), 0, snap);
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_DUMP_THREAD), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_DUMP_THREAD),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
     CloseHandle(hThread); /* Thread will run independently */
@@ -1653,8 +1847,9 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
 void Main_OnLogClear(HWND hMainWnd)
 {
     (void)hMainWnd;
-    if (g_hEdit)
+    if (g_hEdit) {
         SetWindowTextW(g_hEdit, L"");
+    }
 }
 
 /*
@@ -1673,13 +1868,14 @@ void Main_OnLogFont(HWND hMainWnd)
     cf.lStructSize = sizeof(cf);
     cf.hwndOwner = hMainWnd;
     cf.lpLogFont = &lf;
-    cf.Flags = CF_SCREENFONTS | CF_FIXEDPITCHONLY | CF_INITTOLOGFONTSTRUCT | CF_NOVERTFONTS;
+    cf.Flags = CF_SCREENFONTS | CF_FIXEDPITCHONLY | CF_INITTOLOGFONTSTRUCT |
+               CF_NOVERTFONTS;
     cf.nFontType = SCREEN_FONTTYPE;
 
     if (ChooseFontW(&cf)) {
         g_logFont = lf;
         ApplyFontToEdit(g_hEdit, &g_logFont);
-        Config_SetFont(&g_logFont);  /* Save to config */
+        Config_SetFont(&g_logFont); /* Save to config */
     }
 }
 
@@ -1699,8 +1895,8 @@ void Main_OnLogSaveAs(HWND hMainWnd)
     /* Generate default filename with timestamp */
     SYSTEMTIME st;
     GetLocalTime(&st);
-    wsprintfW(szFile, L"FakeEsptool_%04d%02d%02d_%02d%02d%02d.log",
-              st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+    wsprintfW(szFile, L"FakeEsptool_%04d%02d%02d_%02d%02d%02d.log", st.wYear,
+              st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
 
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hMainWnd;
@@ -1710,28 +1906,33 @@ void Main_OnLogSaveAs(HWND hMainWnd)
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
     ofn.lpstrDefExt = L"log";
 
-    if (!GetSaveFileNameW(&ofn))
+    if (!GetSaveFileNameW(&ofn)) {
         return;
+    }
 
-    HANDLE hFile = CreateFileW(szFile, GENERIC_WRITE, 0, NULL,
-                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE hFile = CreateFileW(szFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                               FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
-        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_SAVE_ERROR), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_SAVE_ERROR),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         return;
     }
 
     int textLen = GetWindowTextLengthW(g_hEdit);
     if (textLen > 0) {
-        WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), 0, (textLen + 1) * sizeof(WCHAR));
+        WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), 0,
+                                        (textLen + 1) * sizeof(WCHAR));
         if (buf) {
             GetWindowTextW(g_hEdit, buf, textLen + 1);
 
             /* Convert to UTF-8 (no BOM) */
-            int utf8Len = WideCharToMultiByte(CP_UTF8, 0, buf, textLen + 1, NULL, 0, NULL, NULL);
+            int utf8Len = WideCharToMultiByte(CP_UTF8, 0, buf, textLen + 1,
+                                              NULL, 0, NULL, NULL);
             if (utf8Len > 0) {
                 char *utf8Buf = (char *)HeapAlloc(GetProcessHeap(), 0, utf8Len);
                 if (utf8Buf) {
-                    WideCharToMultiByte(CP_UTF8, 0, buf, textLen + 1, utf8Buf, utf8Len, NULL, NULL);
+                    WideCharToMultiByte(CP_UTF8, 0, buf, textLen + 1, utf8Buf,
+                                        utf8Len, NULL, NULL);
                     DWORD written;
                     /* Exclude null terminator from output */
                     WriteFile(hFile, utf8Buf, utf8Len - 1, &written, NULL);
@@ -1754,9 +1955,11 @@ void Main_OnLogSaveAs(HWND hMainWnd)
  */
 void Main_OnExit(HWND hWnd)
 {
-    if (!PromptDisconnectIfNeeded(hWnd))
+    if (!PromptDisconnectIfNeeded(hWnd)) {
         return;
-    if (!PromptSaveIfNeeded(hWnd))
+    }
+    if (!PromptSaveIfNeeded(hWnd)) {
         return;
+    }
     DestroyWindow(hWnd);
 }

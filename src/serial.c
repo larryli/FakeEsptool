@@ -11,8 +11,8 @@
 #include "main.h"
 #include "resource.h"
 #include "utils/trace.h"
-#include <setupapi.h>
 #include <devguid.h>
+#include <setupapi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <wchar.h>
@@ -40,14 +40,16 @@ static int NaturalCompare(const WCHAR *s1, const WCHAR *s2)
             /* Compare numeric parts as integers */
             long n1 = wcstol(s1, (WCHAR **)&s1, 10);
             long n2 = wcstol(s2, (WCHAR **)&s2, 10);
-            if (n1 != n2)
+            if (n1 != n2) {
                 return (n1 < n2) ? -1 : 1;
+            }
         } else {
             /* Compare character by character */
             WCHAR c1 = towlower(*s1);
             WCHAR c2 = towlower(*s2);
-            if (c1 != c2)
+            if (c1 != c2) {
                 return (c1 < c2) ? -1 : 1;
+            }
             s1++;
             s2++;
         }
@@ -93,33 +95,42 @@ BOOL Serial_EnumPorts(HWND hCombo)
     g_portCount = 0;
     SendMessageW(hCombo, CB_RESETCONTENT, 0, 0);
 
-    HDEVINFO devInfo = SetupDiGetClassDevs(&GUID_DEVCLASS_PORTS, NULL, NULL, DIGCF_PRESENT);
-    if (devInfo == INVALID_HANDLE_VALUE)
+    HDEVINFO devInfo =
+        SetupDiGetClassDevs(&GUID_DEVCLASS_PORTS, NULL, NULL, DIGCF_PRESENT);
+    if (devInfo == INVALID_HANDLE_VALUE) {
         return FALSE;
+    }
 
-    SP_DEVINFO_DATA devInfoData = { .cbSize = sizeof(SP_DEVINFO_DATA) };
+    SP_DEVINFO_DATA devInfoData = {.cbSize = sizeof(SP_DEVINFO_DATA)};
     BOOL found = FALSE;
 
-    for (DWORD i = 0; SetupDiEnumDeviceInfo(devInfo, i, &devInfoData) && g_portCount < MAX_PORTS; i++) {
+    for (DWORD i = 0; SetupDiEnumDeviceInfo(devInfo, i, &devInfoData) &&
+                      g_portCount < MAX_PORTS;
+         i++) {
         /* Get port name from registry */
-        HKEY hKey = SetupDiOpenDevRegKey(devInfo, &devInfoData, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
-        if (hKey == INVALID_HANDLE_VALUE)
+        HKEY hKey = SetupDiOpenDevRegKey(
+            devInfo, &devInfoData, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
+        if (hKey == INVALID_HANDLE_VALUE) {
             continue;
+        }
 
         WCHAR portName[32] = {0};
         DWORD size = sizeof(portName);
         DWORD type = 0;
-        LONG ret = RegQueryValueExW(hKey, L"PortName", NULL, &type, (LPBYTE)portName, &size);
+        LONG ret = RegQueryValueExW(hKey, L"PortName", NULL, &type,
+                                    (LPBYTE)portName, &size);
         RegCloseKey(hKey);
 
-        if (ret != ERROR_SUCCESS || type != REG_SZ)
+        if (ret != ERROR_SUCCESS || type != REG_SZ) {
             continue;
+        }
 
         /* Get friendly name */
         WCHAR friendlyName[128] = {0};
         DWORD friendlySize = sizeof(friendlyName);
-        if (!SetupDiGetDeviceRegistryPropertyW(devInfo, &devInfoData, SPDRP_FRIENDLYNAME,
-                                               NULL, (PBYTE)friendlyName, friendlySize, NULL)) {
+        if (!SetupDiGetDeviceRegistryPropertyW(
+                devInfo, &devInfoData, SPDRP_FRIENDLYNAME, NULL,
+                (PBYTE)friendlyName, friendlySize, NULL)) {
             /* Fallback to port name if no friendly name */
             lstrcpyW(friendlyName, portName);
         }
@@ -129,7 +140,8 @@ BOOL Serial_EnumPorts(HWND hCombo)
         lstrcpyW(g_portInfo[g_portCount].friendlyName, friendlyName);
 
         /* Add to combo box without sorting (CB_INSERTSTRING at end) */
-        int idx = (int)SendMessageW(hCombo, CB_INSERTSTRING, (WPARAM)-1, (LPARAM)friendlyName);
+        int idx = (int)SendMessageW(hCombo, CB_INSERTSTRING, (WPARAM)-1,
+                                    (LPARAM)friendlyName);
         if (idx >= 0) {
             SendMessageW(hCombo, CB_SETITEMDATA, idx, (LPARAM)g_portCount);
             found = TRUE;
@@ -144,11 +156,14 @@ BOOL Serial_EnumPorts(HWND hCombo)
         int count = (int)SendMessageW(hCombo, CB_GETCOUNT, 0, 0);
         if (count > 1) {
             /* Collect items into temporary array */
-            COMBO_ITEM *items = (COMBO_ITEM *)HeapAlloc(GetProcessHeap(), 0, count * sizeof(COMBO_ITEM));
+            COMBO_ITEM *items = (COMBO_ITEM *)HeapAlloc(
+                GetProcessHeap(), 0, count * sizeof(COMBO_ITEM));
             if (items) {
                 for (int i = 0; i < count; i++) {
-                    SendMessageW(hCombo, CB_GETLBTEXT, i, (LPARAM)items[i].text);
-                    items[i].portIdx = (int)SendMessageW(hCombo, CB_GETITEMDATA, i, 0);
+                    SendMessageW(hCombo, CB_GETLBTEXT, i,
+                                 (LPARAM)items[i].text);
+                    items[i].portIdx =
+                        (int)SendMessageW(hCombo, CB_GETITEMDATA, i, 0);
                 }
 
                 /* Sort using qsort with natural compare on port name */
@@ -157,9 +172,12 @@ BOOL Serial_EnumPorts(HWND hCombo)
                 /* Clear and repopulate combo box in sorted order */
                 SendMessageW(hCombo, CB_RESETCONTENT, 0, 0);
                 for (int i = 0; i < count; i++) {
-                    int idx = (int)SendMessageW(hCombo, CB_INSERTSTRING, (WPARAM)-1, (LPARAM)items[i].text);
+                    int idx =
+                        (int)SendMessageW(hCombo, CB_INSERTSTRING, (WPARAM)-1,
+                                          (LPARAM)items[i].text);
                     if (idx >= 0)
-                        SendMessageW(hCombo, CB_SETITEMDATA, idx, items[i].portIdx);
+                        SendMessageW(hCombo, CB_SETITEMDATA, idx,
+                                     items[i].portIdx);
                 }
 
                 HeapFree(GetProcessHeap(), 0, items);
@@ -178,12 +196,16 @@ BOOL Serial_EnumPorts(HWND hCombo)
  * and posts notifications to the UI thread via PostMessage.
  *
  * Thread safety:
- * - Read only: ctx->hPort, ctx->hNotify, ctx->bRunning, ctx->onReceive, ctx->onSignal
- * - Write only: ctx->dwRxBytes, ctx->dwTxBytes (volatile, no lock needed for stats)
+ * - Read only: ctx->hPort, ctx->hNotify, ctx->bRunning, ctx->onReceive,
+ * ctx->onSignal
+ * - Write only: ctx->dwRxBytes, ctx->dwTxBytes (volatile, no lock needed for
+ * stats)
  * - Synchronization: ctx->bRunning checked before each operation
- * - Callbacks (onReceive, onSignal) called from this thread, must be thread-safe
+ * - Callbacks (onReceive, onSignal) called from this thread, must be
+ * thread-safe
  *
- * Shutdown: Set ctx->bRunning = FALSE, then CancelIo to interrupt WaitCommEvent.
+ * Shutdown: Set ctx->bRunning = FALSE, then CancelIo to interrupt
+ * WaitCommEvent.
  */
 static DWORD WINAPI Listener_Proc(LPVOID param)
 {
@@ -213,7 +235,8 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
 
     while (ctx->bRunning) {
         /* Set comm mask to listen for receive and signal events */
-        if (!SetCommMask(ctx->hPort, EV_RXCHAR | EV_ERR | EV_DSR | EV_CTS | EV_RING | EV_RLSD)) {
+        if (!SetCommMask(ctx->hPort, EV_RXCHAR | EV_ERR | EV_DSR | EV_CTS |
+                                         EV_RING | EV_RLSD)) {
             errorExit = TRUE;
             break;
         }
@@ -228,7 +251,8 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
                     /* Timeout - check if there's data in the buffer anyway */
                     COMSTAT comStat;
                     DWORD dwErrors;
-                    if (ClearCommError(ctx->hPort, &dwErrors, &comStat) && comStat.cbInQue > 0) {
+                    if (ClearCommError(ctx->hPort, &dwErrors, &comStat) &&
+                        comStat.cbInQue > 0) {
                         dwEvtMask = EV_RXCHAR;
                     } else {
                         continue;
@@ -239,9 +263,11 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
                     break;
                 }
                 if (waitResult == WAIT_OBJECT_0) {
-                    if (!GetOverlappedResult(ctx->hPort, &ov, &(DWORD){0}, FALSE)) {
-                        if (GetLastError() == ERROR_OPERATION_ABORTED)
+                    if (!GetOverlappedResult(ctx->hPort, &ov, &(DWORD){0},
+                                             FALSE)) {
+                        if (GetLastError() == ERROR_OPERATION_ABORTED) {
                             continue;
+                        }
                         errorExit = TRUE;
                         break;
                     }
@@ -250,14 +276,16 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
                 /* Normal shutdown via CancelIo */
                 break;
             } else {
-                TRACE_FW(TAG, "ERROR: WaitCommEvent failed: %lu", GetLastError());
+                TRACE_FW(TAG, "ERROR: WaitCommEvent failed: %lu",
+                         GetLastError());
                 errorExit = TRUE;
                 break;
             }
         }
 
-        if (!ctx->bRunning)
+        if (!ctx->bRunning) {
             break;
+        }
 
         /* Handle received data */
         if (dwEvtMask & EV_RXCHAR) {
@@ -272,8 +300,9 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
 
             if (comStat.cbInQue > 0) {
                 DWORD toRead = comStat.cbInQue;
-                if (toRead > READ_BUFFER_SIZE)
+                if (toRead > READ_BUFFER_SIZE) {
                     toRead = READ_BUFFER_SIZE;
+                }
                 OVERLAPPED ovRead = {0};
                 ovRead.hEvent = hReadEvent;
                 ResetEvent(hReadEvent);
@@ -281,9 +310,11 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
                 if (ReadFile(ctx->hPort, buffer, toRead, &bytesRead, &ovRead)) {
                     /* Read completed synchronously */
                 } else if (GetLastError() == ERROR_IO_PENDING) {
-                    if (WaitForSingleObject(hReadEvent, 1000) != WAIT_OBJECT_0)
+                    if (WaitForSingleObject(hReadEvent, 1000) != WAIT_OBJECT_0) {
                         continue;
-                    if (!GetOverlappedResult(ctx->hPort, &ovRead, &bytesRead, FALSE)) {
+                    }
+                    if (!GetOverlappedResult(ctx->hPort, &ovRead, &bytesRead,
+                                             FALSE)) {
                         errorExit = TRUE;
                         continue;
                     }
@@ -295,11 +326,15 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
                     /* Post RX data to UI thread for logging */
                     if (ctx->hNotify && IsWindow(ctx->hNotify)) {
                         size_t allocSize = (size_t)bytesRead + 1;
-                        void *copy = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, allocSize);
+                        void *copy = HeapAlloc(GetProcessHeap(),
+                                               HEAP_ZERO_MEMORY, allocSize);
                         if (copy) {
                             CopyMemory(copy, buffer, bytesRead);
-                            if (!PostMessage(ctx->hNotify, WM_SERIAL_RX, (WPARAM)bytesRead, (LPARAM)copy)) {
-                                TRACE_FW(TAG, "ERROR: PostMessage RX failed: %lu", GetLastError());
+                            if (!PostMessage(ctx->hNotify, WM_SERIAL_RX,
+                                             (WPARAM)bytesRead, (LPARAM)copy)) {
+                                TRACE_FW(TAG,
+                                         "ERROR: PostMessage RX failed: %lu",
+                                         GetLastError());
                                 HeapFree(GetProcessHeap(), 0, copy);
                             }
                         }
@@ -315,12 +350,14 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
                      *
                      * Current: esptool protocol (main.c / esptool.c)
                      *
-                     * To customize: implement your own callback and register it.
+                     * To customize: implement your own callback and register
+                     * it.
                      *
                      * ============================================================
                      */
-                    if (ctx->onReceive)
+                    if (ctx->onReceive) {
                         ctx->onReceive(ctx, buffer, bytesRead, ctx->hNotify);
+                    }
 
                     ctx->dwRxBytes += bytesRead;
                 }
@@ -338,14 +375,17 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
         if (dwEvtMask & (EV_DSR | EV_CTS | EV_RING | EV_RLSD)) {
             DWORD modemStatus = 0;
             if (GetCommModemStatus(ctx->hPort, &modemStatus)) {
-                /* Notify UI to display signal change: wParam=0 for host signals */
+                /* Notify UI to display signal change: wParam=0 for host signals
+                 */
                 if (ctx->hNotify && IsWindow(ctx->hNotify)) {
-                    PostMessage(ctx->hNotify, WM_SERIAL_SIGNAL, 0, (LPARAM)modemStatus);
+                    PostMessage(ctx->hNotify, WM_SERIAL_SIGNAL, 0,
+                                (LPARAM)modemStatus);
                 }
 
                 /* Call signal callback */
-                if (ctx->onSignal)
+                if (ctx->onSignal) {
                     ctx->onSignal(ctx, modemStatus, ctx->hNotify);
+                }
             }
         }
     }
@@ -370,8 +410,9 @@ BOOL Serial_Open(SERIAL_CTX *ctx, const WCHAR *portName, HWND hNotify)
 {
     TRACE_FW(TAG, "Opening port: %s", portName);
 
-    if (ctx->hPort != INVALID_HANDLE_VALUE && ctx->hPort != NULL)
+    if (ctx->hPort != INVALID_HANDLE_VALUE && ctx->hPort != NULL) {
         return FALSE;
+    }
 
     /* Create events */
     ctx->hStartEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -392,7 +433,7 @@ BOOL Serial_Open(SERIAL_CTX *ctx, const WCHAR *portName, HWND hNotify)
     }
 
     /* Configure serial port: 115200 baud, 8 data bits, no parity, 1 stop bit */
-    DCB dcb = { .DCBlength = sizeof(DCB) };
+    DCB dcb = {.DCBlength = sizeof(DCB)};
     if (!GetCommState(ctx->hPort, &dcb)) {
         CloseHandle(ctx->hPort);
         ctx->hPort = INVALID_HANDLE_VALUE;
@@ -507,24 +548,23 @@ void Serial_Close(SERIAL_CTX *ctx)
  */
 BOOL Serial_IsOpen(const SERIAL_CTX *ctx)
 {
-    return (ctx->hPort != INVALID_HANDLE_VALUE && ctx->hPort != NULL && ctx->bRunning);
+    return (ctx->hPort != INVALID_HANDLE_VALUE && ctx->hPort != NULL &&
+            ctx->bRunning);
 }
 
 /*
  * Serial_GetRxBytes - Get total received byte count
  */
-DWORD Serial_GetRxBytes(const SERIAL_CTX *ctx)
-{
-    return ctx->dwRxBytes;
-}
+DWORD Serial_GetRxBytes(const SERIAL_CTX *ctx) { return ctx->dwRxBytes; }
 
 /*
  * Serial_GetPortName - Get port name by index
  */
 BOOL Serial_GetPortName(int index, WCHAR *portName, int maxLen)
 {
-    if (index < 0 || index >= g_portCount)
+    if (index < 0 || index >= g_portCount) {
         return FALSE;
+    }
     lstrcpynW(portName, g_portInfo[index].portName, maxLen);
     return TRUE;
 }
@@ -532,22 +572,22 @@ BOOL Serial_GetPortName(int index, WCHAR *portName, int maxLen)
 /*
  * Serial_GetTxBytes - Get total sent byte count
  */
-DWORD Serial_GetTxBytes(const SERIAL_CTX *ctx)
-{
-    return ctx->dwTxBytes;
-}
+DWORD Serial_GetTxBytes(const SERIAL_CTX *ctx) { return ctx->dwTxBytes; }
 
 /*
  * Serial_WriteData - Write data to serial port
  *
  * Returns: Number of bytes written.
  */
-DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify)
+DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len,
+                       HWND hNotify)
 {
-    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
+    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL) {
         return 0;
-    if (!data || len == 0)
+    }
+    if (!data || len == 0) {
         return 0;
+    }
 
     /* Post TX data to UI thread for logging first (before WriteFile,
        so log is recorded even if write fails or times out) */
@@ -555,7 +595,8 @@ DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotif
         void *copy = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, len + 1);
         if (copy) {
             CopyMemory(copy, data, len);
-            if (!PostMessage(hNotify, WM_SERIAL_TX, (WPARAM)len, (LPARAM)copy)) {
+            if (!PostMessage(hNotify, WM_SERIAL_TX, (WPARAM)len,
+                             (LPARAM)copy)) {
                 HeapFree(GetProcessHeap(), 0, copy);
             }
         }
@@ -563,8 +604,9 @@ DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotif
 
     OVERLAPPED ov = {0};
     HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-    if (!hEvent)
+    if (!hEvent) {
         return 0;
+    }
     ov.hEvent = hEvent;
 
     DWORD bytesWritten = 0;
@@ -578,7 +620,8 @@ DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotif
     if (result && bytesWritten > 0) {
         ctx->dwTxBytes += bytesWritten;
     } else {
-        Serial_PostLogF(hNotify, L"TX!", L"WriteFile failed: result=%d err=%lu written=%lu/%lu",
+        Serial_PostLogF(hNotify, L"TX!",
+                        L"WriteFile failed: result=%d err=%lu written=%lu/%lu",
                         result, GetLastError(), bytesWritten, len);
     }
 
@@ -590,8 +633,9 @@ DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotif
  */
 void Serial_SetReceiveCallback(SERIAL_CTX *ctx, SERIAL_RX_CB cb)
 {
-    if (ctx)
+    if (ctx) {
         ctx->onReceive = cb;
+    }
 }
 
 /*
@@ -602,16 +646,18 @@ void Serial_SetReceiveCallback(SERIAL_CTX *ctx, SERIAL_RX_CB cb)
  */
 void Serial_PostLog(HWND hNotify, const WCHAR *tag, const WCHAR *text)
 {
-    if (!hNotify || !IsWindow(hNotify) || !tag || !text)
+    if (!hNotify || !IsWindow(hNotify) || !tag || !text) {
         return;
+    }
 
     /* Allocate single buffer for both tag and text */
     size_t tagLen = lstrlenW(tag) + 1;
     size_t textLen = lstrlenW(text) + 1;
     size_t totalSize = (tagLen + textLen) * sizeof(WCHAR);
     WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), 0, totalSize);
-    if (!buf)
+    if (!buf) {
         return;
+    }
 
     /* Copy tag at beginning, text after tag */
     WCHAR *tagCopy = buf;
@@ -619,7 +665,8 @@ void Serial_PostLog(HWND hNotify, const WCHAR *tag, const WCHAR *text)
     CopyMemory(tagCopy, tag, tagLen * sizeof(WCHAR));
     CopyMemory(textCopy, text, textLen * sizeof(WCHAR));
 
-    if (!PostMessage(hNotify, WM_SERIAL_LOG, (WPARAM)tagCopy, (LPARAM)textCopy)) {
+    if (!PostMessage(hNotify, WM_SERIAL_LOG, (WPARAM)tagCopy,
+                     (LPARAM)textCopy)) {
         HeapFree(GetProcessHeap(), 0, buf);
     }
 }
@@ -631,8 +678,9 @@ void Serial_PostLog(HWND hNotify, const WCHAR *tag, const WCHAR *text)
 
 void Serial_PostLogF(HWND hNotify, const WCHAR *tag, const WCHAR *fmt, ...)
 {
-    if (!hNotify || !tag || !fmt)
+    if (!hNotify || !tag || !fmt) {
         return;
+    }
 
     WCHAR buf[LOGF_BUF_SIZE];
     va_list args;
@@ -648,8 +696,9 @@ void Serial_PostLogF(HWND hNotify, const WCHAR *tag, const WCHAR *fmt, ...)
  */
 void Serial_SetSignalCallback(SERIAL_CTX *ctx, SERIAL_SIGNAL_CB cb)
 {
-    if (ctx)
+    if (ctx) {
         ctx->onSignal = cb;
+    }
 }
 
 /*
@@ -657,8 +706,9 @@ void Serial_SetSignalCallback(SERIAL_CTX *ctx, SERIAL_SIGNAL_CB cb)
  */
 BOOL Serial_SetDtr(SERIAL_CTX *ctx, BOOL state)
 {
-    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
+    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL) {
         return FALSE;
+    }
 
     BOOL result = EscapeCommFunction(ctx->hPort, state ? SETDTR : CLRDTR);
     if (result && ctx->hNotify && IsWindow(ctx->hNotify)) {
@@ -673,8 +723,9 @@ BOOL Serial_SetDtr(SERIAL_CTX *ctx, BOOL state)
  */
 BOOL Serial_SetRts(SERIAL_CTX *ctx, BOOL state)
 {
-    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
+    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL) {
         return FALSE;
+    }
 
     BOOL result = EscapeCommFunction(ctx->hPort, state ? SETRTS : CLRRTS);
     if (result && ctx->hNotify && IsWindow(ctx->hNotify)) {
@@ -689,14 +740,16 @@ BOOL Serial_SetRts(SERIAL_CTX *ctx, BOOL state)
  */
 BOOL Serial_SetBaudRate(SERIAL_CTX *ctx, DWORD baudRate)
 {
-    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
+    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL) {
         return FALSE;
+    }
 
     FlushFileBuffers(ctx->hPort);
 
-    DCB dcb = { .DCBlength = sizeof(DCB) };
-    if (!GetCommState(ctx->hPort, &dcb))
+    DCB dcb = {.DCBlength = sizeof(DCB)};
+    if (!GetCommState(ctx->hPort, &dcb)) {
         return FALSE;
+    }
 
     /* FlushFileBuffers only guarantees data reaches the USB-to-serial chip's
        internal FIFO, not that the FIFO has been physically transmitted.
@@ -708,8 +761,9 @@ BOOL Serial_SetBaudRate(SERIAL_CTX *ctx, DWORD baudRate)
     }
 
     dcb.BaudRate = baudRate;
-    if (!SetCommState(ctx->hPort, &dcb))
+    if (!SetCommState(ctx->hPort, &dcb)) {
         return FALSE;
+    }
 
     /* Notify UI to update config display */
     if (ctx->hNotify && IsWindow(ctx->hNotify)) {
@@ -724,18 +778,22 @@ BOOL Serial_SetBaudRate(SERIAL_CTX *ctx, DWORD baudRate)
  */
 BOOL Serial_SetDataBits(SERIAL_CTX *ctx, BYTE dataBits)
 {
-    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
+    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL) {
         return FALSE;
-    if (dataBits < 5 || dataBits > 8)
+    }
+    if (dataBits < 5 || dataBits > 8) {
         return FALSE;
+    }
 
-    DCB dcb = { .DCBlength = sizeof(DCB) };
-    if (!GetCommState(ctx->hPort, &dcb))
+    DCB dcb = {.DCBlength = sizeof(DCB)};
+    if (!GetCommState(ctx->hPort, &dcb)) {
         return FALSE;
+    }
 
     dcb.ByteSize = dataBits;
-    if (!SetCommState(ctx->hPort, &dcb))
+    if (!SetCommState(ctx->hPort, &dcb)) {
         return FALSE;
+    }
 
     /* Notify UI to update config display */
     if (ctx->hNotify && IsWindow(ctx->hNotify)) {
@@ -750,17 +808,20 @@ BOOL Serial_SetDataBits(SERIAL_CTX *ctx, BYTE dataBits)
  */
 BOOL Serial_SetParity(SERIAL_CTX *ctx, BYTE parity)
 {
-    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
+    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL) {
         return FALSE;
+    }
 
-    DCB dcb = { .DCBlength = sizeof(DCB) };
-    if (!GetCommState(ctx->hPort, &dcb))
+    DCB dcb = {.DCBlength = sizeof(DCB)};
+    if (!GetCommState(ctx->hPort, &dcb)) {
         return FALSE;
+    }
 
     dcb.Parity = parity;
     dcb.fParity = (parity != NOPARITY);
-    if (!SetCommState(ctx->hPort, &dcb))
+    if (!SetCommState(ctx->hPort, &dcb)) {
         return FALSE;
+    }
 
     /* Notify UI to update config display */
     if (ctx->hNotify && IsWindow(ctx->hNotify)) {
@@ -775,16 +836,19 @@ BOOL Serial_SetParity(SERIAL_CTX *ctx, BYTE parity)
  */
 BOOL Serial_SetStopBits(SERIAL_CTX *ctx, BYTE stopBits)
 {
-    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
+    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL) {
         return FALSE;
+    }
 
-    DCB dcb = { .DCBlength = sizeof(DCB) };
-    if (!GetCommState(ctx->hPort, &dcb))
+    DCB dcb = {.DCBlength = sizeof(DCB)};
+    if (!GetCommState(ctx->hPort, &dcb)) {
         return FALSE;
+    }
 
     dcb.StopBits = stopBits;
-    if (!SetCommState(ctx->hPort, &dcb))
+    if (!SetCommState(ctx->hPort, &dcb)) {
         return FALSE;
+    }
 
     /* Notify UI to update config display */
     if (ctx->hNotify && IsWindow(ctx->hNotify)) {
@@ -797,19 +861,30 @@ BOOL Serial_SetStopBits(SERIAL_CTX *ctx, BYTE stopBits)
 /*
  * Serial_GetConfig - Get current serial port configuration
  */
-BOOL Serial_GetConfig(SERIAL_CTX *ctx, DWORD *baudRate, BYTE *dataBits, BYTE *parity, BYTE *stopBits)
+BOOL Serial_GetConfig(SERIAL_CTX *ctx, DWORD *baudRate, BYTE *dataBits,
+                      BYTE *parity, BYTE *stopBits)
 {
-    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL)
+    if (!ctx || ctx->hPort == INVALID_HANDLE_VALUE || ctx->hPort == NULL) {
         return FALSE;
+    }
 
-    DCB dcb = { .DCBlength = sizeof(DCB) };
-    if (!GetCommState(ctx->hPort, &dcb))
+    DCB dcb = {.DCBlength = sizeof(DCB)};
+    if (!GetCommState(ctx->hPort, &dcb)) {
         return FALSE;
+    }
 
-    if (baudRate) *baudRate = dcb.BaudRate;
-    if (dataBits) *dataBits = dcb.ByteSize;
-    if (parity) *parity = dcb.Parity;
-    if (stopBits) *stopBits = dcb.StopBits;
+    if (baudRate) {
+        *baudRate = dcb.BaudRate;
+    }
+    if (dataBits) {
+        *dataBits = dcb.ByteSize;
+    }
+    if (parity) {
+        *parity = dcb.Parity;
+    }
+    if (stopBits) {
+        *stopBits = dcb.StopBits;
+    }
 
     return TRUE;
 }

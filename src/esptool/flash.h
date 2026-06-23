@@ -17,8 +17,8 @@
 
 /* Flash storage context */
 typedef struct {
-    BYTE *data;             /* Flash data buffer */
-    DWORD size;             /* Flash size in bytes */
+    BYTE *data; /* Flash data buffer */
+    DWORD size; /* Flash size in bytes */
 } FLASH_CTX;
 
 /*

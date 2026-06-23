@@ -12,6 +12,7 @@
 /*
  * KeyMgmtDlgProc - Key Management dialog procedure
  */
-INT_PTR CALLBACK KeyMgmtDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK KeyMgmtDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
+                                LPARAM lParam);
 
 #endif /* DLG_KEY_MGMT_H */

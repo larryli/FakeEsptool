@@ -5,30 +5,30 @@
  * and RichEdit log display. Handles menu commands and serial port events.
  */
 
-#include <windows.h>
 #include "main.h"
-#include "serial.h"
-#include "esptool/esptool.h"
+#include "app_commands.h"
+#include "app_logview.h"
+#include "dlg/dlg.h"
 #include "esptool/device.h"
+#include "esptool/esptool.h"
 #include "resource.h"
+#include "serial.h"
 #include "utils/config.h"
 #include "utils/lang.h"
 #include "utils/trace.h"
-#include "dlg/dlg.h"
-#include "app_logview.h"
-#include "app_commands.h"
-#include <richedit.h>
+#include <commctrl.h>
 #include <commdlg.h>
 #include <dbt.h>
 #include <devguid.h>
-#include <commctrl.h>
+#include <richedit.h>
 #include <shellapi.h>
-#include <winver.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <wchar.h>
+#include <windows.h>
+#include <winver.h>
 
 #pragma comment(lib, "Shell32.lib")
 #pragma comment(lib, "Version.lib")
@@ -40,26 +40,21 @@ static const char *TAG = "GUI";
 #endif
 
 /* Populate flash size combo box based on chip selection */
-static const WCHAR *esp8266_flash_names[] = {
-    L"256KB", L"512KB", L"1MB", L"2MB", L"4MB", L"8MB", L"16MB"
-};
+static const WCHAR *esp8266_flash_names[] = {L"256KB", L"512KB", L"1MB", L"2MB",
+                                             L"4MB",   L"8MB",   L"16MB"};
 static const DWORD esp8266_flash_sizes[] = {
-    256*1024, 512*1024, 1024*1024, 2*1024*1024,
-    4*1024*1024, 8*1024*1024, 16*1024*1024
-};
+    256 * 1024,      512 * 1024,      1024 * 1024,     2 * 1024 * 1024,
+    4 * 1024 * 1024, 8 * 1024 * 1024, 16 * 1024 * 1024};
 #define ESP8266_FLASH_COUNT 7
-#define ESP8266_FLASH_DEFAULT 4  /* 4MB */
+#define ESP8266_FLASH_DEFAULT 4 /* 4MB */
 
-static const WCHAR *esp32_flash_names[] = {
-    L"1MB", L"2MB", L"4MB", L"8MB",
-    L"16MB", L"32MB", L"64MB", L"128MB"
-};
+static const WCHAR *esp32_flash_names[] = {L"1MB",  L"2MB",  L"4MB",  L"8MB",
+                                           L"16MB", L"32MB", L"64MB", L"128MB"};
 static const DWORD esp32_flash_sizes[] = {
-    1024*1024, 2*1024*1024, 4*1024*1024, 8*1024*1024,
-    16*1024*1024, 32*1024*1024, 64*1024*1024, 128*1024*1024
-};
+    1024 * 1024,      2 * 1024 * 1024,  4 * 1024 * 1024,  8 * 1024 * 1024,
+    16 * 1024 * 1024, 32 * 1024 * 1024, 64 * 1024 * 1024, 128 * 1024 * 1024};
 #define ESP32_FLASH_COUNT 8
-#define ESP32_FLASH_DEFAULT 2  /* 4MB */
+#define ESP32_FLASH_DEFAULT 2 /* 4MB */
 
 /*
  * PopulateFlashSizes - Populate flash size combo box
@@ -77,15 +72,16 @@ void PopulateFlashSizes(HWND hFlash, CHIP_TYPE chip, DWORD currentSize)
 
     BOOL isEsp8266 = (chip == CHIP_ESP8266);
     const WCHAR **names = isEsp8266 ? esp8266_flash_names : esp32_flash_names;
-    const DWORD  *sizes = isEsp8266 ? esp8266_flash_sizes : esp32_flash_sizes;
+    const DWORD *sizes = isEsp8266 ? esp8266_flash_sizes : esp32_flash_sizes;
     int count = isEsp8266 ? ESP8266_FLASH_COUNT : ESP32_FLASH_COUNT;
     int defaultIdx = isEsp8266 ? ESP8266_FLASH_DEFAULT : ESP32_FLASH_DEFAULT;
 
     int selectIdx = defaultIdx;
     for (int i = 0; i < count; i++) {
         SendMessageW(hFlash, CB_ADDSTRING, 0, (LPARAM)names[i]);
-        if (sizes[i] == currentSize)
+        if (sizes[i] == currentSize) {
             selectIdx = i;
+        }
     }
     SendMessageW(hFlash, CB_SETCURSEL, selectIdx, 0);
 }
@@ -103,27 +99,35 @@ void PopulateFlashSizes(HWND hFlash, CHIP_TYPE chip, DWORD currentSize)
 DWORD GetFlashSizeFromCombo(HWND hFlash, CHIP_TYPE chip)
 {
     int sel = (int)SendMessageW(hFlash, CB_GETCURSEL, 0, 0);
-    if (sel < 0) sel = 0;
+    if (sel < 0) {
+        sel = 0;
+    }
     BOOL isEsp8266 = (chip == CHIP_ESP8266);
     const DWORD *sizes = isEsp8266 ? esp8266_flash_sizes : esp32_flash_sizes;
     int count = isEsp8266 ? ESP8266_FLASH_COUNT : ESP32_FLASH_COUNT;
-    if (sel >= count) sel = count - 1;
+    if (sel >= count) {
+        sel = count - 1;
+    }
     return sizes[sel];
 }
 
 /* Global state */
-SERIAL_CTX g_serial = { .hPort = NULL, .hThread = NULL, .hStartEvent = NULL, .hNotify = NULL, .bRunning = FALSE };
+SERIAL_CTX g_serial = {.hPort = NULL,
+                       .hThread = NULL,
+                       .hStartEvent = NULL,
+                       .hNotify = NULL,
+                       .bRunning = FALSE};
 DEVICE_CTX g_device = {0};
 ESPTOOL_CTX g_esptool = {0};
-static HWND g_hWnd = NULL;           /* Main window handle */
+static HWND g_hWnd = NULL; /* Main window handle */
 HWND g_hToolbar = NULL;
 HWND g_hStatusbar = NULL;
 HWND g_hEdit = NULL;
-static HMODULE g_hRichEdit = NULL;   /* RichEdit DLL handle */
-static HDEVNOTIFY g_hDevNotify = NULL;  /* Device notification handle */
+static HMODULE g_hRichEdit = NULL;     /* RichEdit DLL handle */
+static HDEVNOTIFY g_hDevNotify = NULL; /* Device notification handle */
 WCHAR g_szPort[32] = {0};
 WCHAR g_szSelectedPort[32] = {0};
-LOGFONTW g_logFont = {0};  /* Current font */
+LOGFONTW g_logFont = {0}; /* Current font */
 
 /* Forward declarations */
 static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam);
@@ -162,8 +166,9 @@ void OnDeviceModified(void)
  */
 static DWORD OnSerialWrite(const BYTE *data, DWORD len)
 {
-    if (!Serial_IsOpen(&g_serial))
+    if (!Serial_IsOpen(&g_serial)) {
         return 0;
+    }
     return Serial_WriteData(&g_serial, data, len, g_hWnd);
 }
 
@@ -172,18 +177,21 @@ static DWORD OnSerialWrite(const BYTE *data, DWORD len)
  */
 static BOOL OnBaudRateChange(DWORD baudRate)
 {
-    if (!Serial_IsOpen(&g_serial))
+    if (!Serial_IsOpen(&g_serial)) {
         return FALSE;
+    }
     return Serial_SetBaudRate(&g_serial, baudRate);
 }
 
 /*
  * OnEsptoolProcessData - esptool protocol data receive callback
  */
-void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify)
+void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len,
+                          HWND hNotify)
 {
-    if (!ctx || !data || len == 0)
+    if (!ctx || !data || len == 0) {
         return;
+    }
     g_esptool.hNotify = hNotify;
     Esptool_Feed(&g_esptool, data, (int)len);
 }
@@ -192,10 +200,11 @@ void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNo
 static BOOL g_prev_dsr = FALSE;
 static BOOL g_prev_cts = FALSE;
 static BOOL g_reset_pending = FALSE;
-static BOOL g_saw_io0_low = FALSE;  /* DSR:ON CTS:OFF seen = IO0=LOW */
+static BOOL g_saw_io0_low = FALSE; /* DSR:ON CTS:OFF seen = IO0=LOW */
 
 /*
- * ResetSignalState - Reset signal state (call when serial connection is established)
+ * ResetSignalState - Reset signal state (call when serial connection is
+ * established)
  */
 void ResetSignalState(void)
 {
@@ -206,9 +215,11 @@ void ResetSignalState(void)
 }
 
 /*
- * OutputBootMessage - Output boot message to serial and log window (for download mode)
+ * OutputBootMessage - Output boot message to serial and log window (for
+ * download mode)
  */
-static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode, BYTE reset_cause, HWND hNotify)
+static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode,
+                              BYTE reset_cause, HWND hNotify)
 {
     Esptool_ResetState(&g_esptool);
 
@@ -217,32 +228,40 @@ static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode, BYTE reset_ca
     Serial_PostLogF(hNotify, L"CFG", L"Baud rate: %lu", bootBaud);
 
     char boot_msg_buf[512];
-    const char *msg = Chip_GetBootMessage(&g_device.chip,
-        download_mode, reset_cause, boot_msg_buf,
-        sizeof(boot_msg_buf));
+    const char *msg =
+        Chip_GetBootMessage(&g_device.chip, download_mode, reset_cause,
+                            boot_msg_buf, sizeof(boot_msg_buf));
     if (msg[0]) {
         Serial_WriteData(ctx, (const BYTE *)msg, (DWORD)strlen(msg), hNotify);
 
         const char *line = msg;
         while (*line) {
             const char *end = strchr(line, '\r');
-            if (!end) end = line + strlen(line);
-            int wlen = MultiByteToWideChar(CP_UTF8, 0, line, (int)(end - line), NULL, 0);
+            if (!end) {
+                end = line + strlen(line);
+            }
+            int wlen = MultiByteToWideChar(CP_UTF8, 0, line, (int)(end - line),
+                                           NULL, 0);
             if (wlen > 0) {
-                WCHAR *wline = (WCHAR *)HeapAlloc(GetProcessHeap(), 0, (wlen + 1) * sizeof(WCHAR));
+                WCHAR *wline = (WCHAR *)HeapAlloc(GetProcessHeap(), 0,
+                                                  (wlen + 1) * sizeof(WCHAR));
                 if (wline) {
-                    MultiByteToWideChar(CP_UTF8, 0, line, (int)(end - line), wline, wlen);
+                    MultiByteToWideChar(CP_UTF8, 0, line, (int)(end - line),
+                                        wline, wlen);
                     wline[wlen] = L'\0';
                     Serial_PostLog(hNotify, L"BOOT", wline);
                     HeapFree(GetProcessHeap(), 0, wline);
                 }
             }
             line = end;
-            while (*line == '\r' || *line == '\n') line++;
+            while (*line == '\r' || *line == '\n') {
+                line++;
+            }
         }
     }
 
-    /* Download mode: switch special chips (74880) to 115200 for esptool communication */
+    /* Download mode: switch special chips (74880) to 115200 for esptool
+     * communication */
     if (download_mode && bootBaud != 115200) {
         Serial_SetBaudRate(ctx, 115200);
         Serial_PostLogF(hNotify, L"CFG", L"Baud rate: 115200");
@@ -280,38 +299,36 @@ void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
     BOOL cts = (modemStatus & MS_CTS_ON) != 0;
 
     if (dsr != g_prev_dsr || cts != g_prev_cts) {
-        Serial_PostLogF(hNotify, L"SIG", L"DSR:%s CTS:%s",
-                        dsr ? L"ON" : L"OFF", cts ? L"ON" : L"OFF");
+        Serial_PostLogF(hNotify, L"SIG", L"DSR:%s CTS:%s", dsr ? L"ON" : L"OFF",
+                        cts ? L"ON" : L"OFF");
 
         /* DSR:OFF CTS:ON = Reset start (DTR=OFF, RTS=ON -> IO0=HIGH, EN=LOW) */
         if (!dsr && cts) {
             g_reset_pending = TRUE;
             g_saw_io0_low = FALSE;
-        }
         /* DSR:ON CTS:OFF = IO0=LOW (DTR=ON, RTS=OFF -> GPIO0=LOW) */
-        else if (g_reset_pending && dsr && !cts) {
+        } else if (g_reset_pending && dsr && !cts) {
             g_saw_io0_low = TRUE;
-        }
         /* DSR:ON CTS:ON = Intermediate state during ClassicReset (ignore) */
-        else if (g_reset_pending && dsr && cts) {
+        } else if (g_reset_pending && dsr && cts) {
             /* Keep g_reset_pending and g_saw_io0_low unchanged */
-        }
         /* DSR:OFF CTS:OFF = Reset end */
-        else if (g_reset_pending && !dsr && !cts) {
+        } else if (g_reset_pending && !dsr && !cts) {
             if (g_saw_io0_low) {
                 /* ClassicReset: IO0 was LOW -> enter download mode */
                 Serial_PostLog(hNotify, L"SIG", L"Download mode entered");
-                OutputBootMessage(ctx, TRUE, 0x01, hNotify);  /* download, POWERON */
+                OutputBootMessage(ctx, TRUE, 0x01,
+                                  hNotify); /* download, POWERON */
             } else {
                 /* HardReset: IO0 stayed HIGH -> normal boot */
                 Serial_PostLog(hNotify, L"SIG", L"Hard reset (normal boot)");
-                OutputBootMessage(ctx, FALSE, 0x02, hNotify);  /* normal boot, EXT */
+                OutputBootMessage(ctx, FALSE, 0x02,
+                                  hNotify); /* normal boot, EXT */
             }
             g_reset_pending = FALSE;
             g_saw_io0_low = FALSE;
-        }
         /* Any other state cancels pending reset */
-        else {
+        } else {
             g_reset_pending = FALSE;
             g_saw_io0_low = FALSE;
         }
@@ -327,32 +344,50 @@ void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
  * Handles all window messages for the application main window.
  * Dispatches messages to specific handler functions.
  */
-static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam,
+                                    LPARAM lParam)
 {
     switch (msg) {
-    case WM_CREATE:         return Main_OnCreate(hWnd, wParam, lParam);
-    case WM_SIZE:           return Main_OnSize(hWnd, wParam, lParam);
-    case WM_COMMAND:        return Main_OnCommand(hWnd, wParam, lParam);
-    case WM_NOTIFY:         return Main_OnNotify(hWnd, wParam, lParam);
+    case WM_CREATE:
+        return Main_OnCreate(hWnd, wParam, lParam);
+    case WM_SIZE:
+        return Main_OnSize(hWnd, wParam, lParam);
+    case WM_COMMAND:
+        return Main_OnCommand(hWnd, wParam, lParam);
+    case WM_NOTIFY:
+        return Main_OnNotify(hWnd, wParam, lParam);
     case WM_TIMER:
         if (wParam == LOG_FLUSH_TIMER_ID) {
             LogView_FlushTimer();
             return 0;
         }
         break;
-    case WM_SERIAL_RX:      return Main_OnSerialRx(hWnd, wParam, lParam);
-    case WM_SERIAL_TX:      return Main_OnSerialTx(hWnd, wParam, lParam);
-    case WM_SERIAL_ERROR:   return Main_OnSerialError(hWnd, wParam, lParam);
-    case WM_SERIAL_LOG:     return Main_OnSerialLog(hWnd, wParam, lParam);
-    case WM_SERIAL_SIGNAL:  return Main_OnSerialSignal(hWnd, wParam, lParam);
-    case WM_SERIAL_CONFIG:  return Main_OnSerialConfig(hWnd, wParam, lParam);
-    case WM_DUMP_COMPLETE:  return Main_OnDumpComplete(hWnd, wParam, lParam);
-    case WM_DEVICECHANGE:   return Main_OnDeviceChange(hWnd, wParam, lParam);
-    case WM_CLOSE:          return Main_OnClose(hWnd, wParam, lParam);
-    case WM_APP_INIT:       return Main_OnAppInit(hWnd, wParam, lParam);
-    case WM_DESTROY:        return Main_OnDestroy(hWnd, wParam, lParam);
-    case WM_COPYDATA:       return Main_OnCopyData(hWnd, wParam, lParam);
-    case WM_DROPFILES:      return Main_OnDropFiles(hWnd, wParam, lParam);
+    case WM_SERIAL_RX:
+        return Main_OnSerialRx(hWnd, wParam, lParam);
+    case WM_SERIAL_TX:
+        return Main_OnSerialTx(hWnd, wParam, lParam);
+    case WM_SERIAL_ERROR:
+        return Main_OnSerialError(hWnd, wParam, lParam);
+    case WM_SERIAL_LOG:
+        return Main_OnSerialLog(hWnd, wParam, lParam);
+    case WM_SERIAL_SIGNAL:
+        return Main_OnSerialSignal(hWnd, wParam, lParam);
+    case WM_SERIAL_CONFIG:
+        return Main_OnSerialConfig(hWnd, wParam, lParam);
+    case WM_DUMP_COMPLETE:
+        return Main_OnDumpComplete(hWnd, wParam, lParam);
+    case WM_DEVICECHANGE:
+        return Main_OnDeviceChange(hWnd, wParam, lParam);
+    case WM_CLOSE:
+        return Main_OnClose(hWnd, wParam, lParam);
+    case WM_APP_INIT:
+        return Main_OnAppInit(hWnd, wParam, lParam);
+    case WM_DESTROY:
+        return Main_OnDestroy(hWnd, wParam, lParam);
+    case WM_COPYDATA:
+        return Main_OnCopyData(hWnd, wParam, lParam);
+    case WM_DROPFILES:
+        return Main_OnDropFiles(hWnd, wParam, lParam);
     }
     return DefWindowProcW(hWnd, msg, wParam, lParam);
 }
@@ -369,9 +404,10 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     HINSTANCE hInst = ((CREATESTRUCT *)lParam)->hInstance;
 
     /* Create toolbar */
-    g_hToolbar = CreateWindowExW(0, TOOLBARCLASSNAMEW, NULL,
-        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | CCS_TOP | TBSTYLE_TOOLTIPS,
-        0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_TOOLBAR, hInst, NULL);
+    g_hToolbar = CreateWindowExW(
+        0, TOOLBARCLASSNAMEW, NULL,
+        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | CCS_TOP | TBSTYLE_TOOLTIPS, 0, 0,
+        0, 0, hWnd, (HMENU)IDC_MAIN_TOOLBAR, hInst, NULL);
 
     SendMessageW(g_hToolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
     SendMessageW(g_hToolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(16, 16));
@@ -389,19 +425,19 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     int btn = 0;
 
     /* File group */
-    buttons[btn].iBitmap = iBase + 0;  /* New */
+    buttons[btn].iBitmap = iBase + 0; /* New */
     buttons[btn].idCommand = IDM_NEW_DEVICE;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 1;  /* Open */
+    buttons[btn].iBitmap = iBase + 1; /* Open */
     buttons[btn].idCommand = IDM_OPEN_DEVICE;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 2;  /* Save */
+    buttons[btn].iBitmap = iBase + 2; /* Save */
     buttons[btn].idCommand = IDM_SAVE_DEVICE;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
@@ -411,7 +447,7 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     buttons[btn].fsStyle = BTNS_SEP;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 3;  /* Device Properties */
+    buttons[btn].iBitmap = iBase + 3; /* Device Properties */
     buttons[btn].idCommand = IDM_DEVICE_PROPS;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
@@ -422,21 +458,21 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     btn++;
 
     /* Serial group */
-    buttons[btn].iBitmap = iBase + 4;  /* Connect */
+    buttons[btn].iBitmap = iBase + 4; /* Connect */
     buttons[btn].idCommand = IDM_CONNECT;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 5;  /* Reconnect */
+    buttons[btn].iBitmap = iBase + 5; /* Reconnect */
     buttons[btn].idCommand = IDM_RECONNECT;
-    buttons[btn].fsState = 0;  /* Disabled initially */
+    buttons[btn].fsState = 0; /* Disabled initially */
     buttons[btn].fsStyle = BTNS_BUTTON;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 6;  /* Disconnect */
+    buttons[btn].iBitmap = iBase + 6; /* Disconnect */
     buttons[btn].idCommand = IDM_DISCONNECT;
-    buttons[btn].fsState = 0;  /* Disabled initially */
+    buttons[btn].fsState = 0; /* Disabled initially */
     buttons[btn].fsStyle = BTNS_BUTTON;
     btn++;
 
@@ -445,13 +481,13 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     btn++;
 
     /* Flash group */
-    buttons[btn].iBitmap = iBase + 7;  /* Import */
+    buttons[btn].iBitmap = iBase + 7; /* Import */
     buttons[btn].idCommand = IDM_FLASH_IMPORT;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 8;  /* Export */
+    buttons[btn].iBitmap = iBase + 8; /* Export */
     buttons[btn].idCommand = IDM_FLASH_EXPORT;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
@@ -461,7 +497,7 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     buttons[btn].fsStyle = BTNS_SEP;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 9;  /* Key Management */
+    buttons[btn].iBitmap = iBase + 9; /* Key Management */
     buttons[btn].idCommand = IDM_KEY_MGMT;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
@@ -472,13 +508,13 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     btn++;
 
     /* Log group */
-    buttons[btn].iBitmap = iBase + 10;  /* Clear */
+    buttons[btn].iBitmap = iBase + 10; /* Clear */
     buttons[btn].idCommand = IDM_LOG_CLEAR;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
     btn++;
 
-    buttons[btn].iBitmap = iBase + 11;  /* Save Log */
+    buttons[btn].iBitmap = iBase + 11; /* Save Log */
     buttons[btn].idCommand = IDM_LOG_SAVEAS;
     buttons[btn].fsState = TBSTATE_ENABLED;
     buttons[btn].fsStyle = BTNS_BUTTON;
@@ -487,16 +523,18 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     SendMessageW(g_hToolbar, TB_ADDBUTTONS, btn, (LPARAM)buttons);
 
     /* Create status bar */
-    g_hStatusbar = CreateWindowExW(0, STATUSCLASSNAMEW, NULL,
-        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
-        0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_STATUSBAR, hInst, NULL);
+    g_hStatusbar = CreateWindowExW(
+        0, STATUSCLASSNAMEW, NULL, WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP, 0, 0,
+        0, 0, hWnd, (HMENU)IDC_MAIN_STATUSBAR, hInst, NULL);
     CreateStatusTooltip(hWnd);
 
     /* Create RichEdit log display */
     g_hRichEdit = LoadLibraryW(L"riched20.dll");
-    g_hEdit = CreateWindowExW(0, RICHEDIT_CLASSW, NULL,
-        WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-        0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_EDIT, hInst, NULL);
+    g_hEdit =
+        CreateWindowExW(0, RICHEDIT_CLASSW, NULL,
+                        WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_LEFT |
+                            ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
+                        0, 0, 0, 0, hWnd, (HMENU)IDC_MAIN_EDIT, hInst, NULL);
 
     /* Configure RichEdit: unlimited text, light gray background */
     SendMessageW(g_hEdit, EM_SETLIMITTEXT, 0, 0);
@@ -514,7 +552,8 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     dbi.dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE);
     dbi.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
     dbi.dbcc_classguid = GUID_DEVCLASS_PORTS;
-    g_hDevNotify = RegisterDeviceNotificationW(hWnd, &dbi, DEVICE_NOTIFY_WINDOW_HANDLE);
+    g_hDevNotify =
+        RegisterDeviceNotificationW(hWnd, &dbi, DEVICE_NOTIFY_WINDOW_HANDLE);
 
     UpdateTitle(hWnd);
     UpdateMenuState(hWnd);
@@ -546,9 +585,8 @@ static LRESULT Main_OnSize(HWND hWnd, WPARAM wParam, LPARAM lParam)
     int toolbarH = rcToolbar.bottom - rcToolbar.top;
     int statusH = rcStatus.bottom - rcStatus.top;
 
-    SetWindowPos(g_hEdit, NULL, 0, toolbarH,
-                rcClient.right, rcClient.bottom - toolbarH - statusH,
-                SWP_NOZORDER);
+    SetWindowPos(g_hEdit, NULL, 0, toolbarH, rcClient.right,
+                 rcClient.bottom - toolbarH - statusH, SWP_NOZORDER);
 
     UpdateStatusBar();
     return 0;
@@ -562,31 +600,76 @@ static LRESULT Main_OnSize(HWND hWnd, WPARAM wParam, LPARAM lParam)
 static LRESULT Main_OnCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     switch (LOWORD(wParam)) {
-    case IDM_NEW_DEVICE:     Main_CmdNewDevice(hWnd); break;
-    case IDM_OPEN_DEVICE:    Main_CmdOpenDevice(hWnd); break;
-    case IDM_SAVE_DEVICE:    Main_CmdSaveDevice(hWnd); break;
-    case IDM_SAVE_DEVICE_AS: Main_CmdSaveDeviceAs(hWnd); break;
-    case IDM_DEVICE_PROPS:   Main_CmdDeviceProps(hWnd); break;
-    case IDM_CONNECT:        Main_OnConnect(hWnd); break;
-    case IDM_DISCONNECT:     Main_OnDisconnect(hWnd); break;
-    case IDM_RECONNECT:      Main_OnReconnect(hWnd); break;
-    case IDM_FLASH_IMPORT:   Main_OnFlashImport(hWnd); break;
-    case IDM_FLASH_EXPORT:   Main_OnFlashExport(hWnd); break;
-    case IDM_KEY_MGMT:       Main_CmdKeyMgmt(hWnd); break;
-    case IDM_DUMP_DEVICE_AS: Main_OnDumpDeviceAs(hWnd); break;
-    case IDM_LOG_CLEAR:      Main_OnLogClear(hWnd); break;
-    case IDM_LOG_SAVEAS:     Main_OnLogSaveAs(hWnd); break;
-    case IDM_LOG_FONT:       Main_OnLogFont(hWnd); break;
-    case IDM_EXIT:           Main_OnExit(hWnd); break;
-    case IDM_ABOUT:
-        DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_ABOUT), hWnd, AboutDlgProc);
+    case IDM_NEW_DEVICE:
+        Main_CmdNewDevice(hWnd);
         break;
-    case IDM_ENCRYPT_NONE:   Main_CmdEncryptState(hWnd, 0); break;
-    case IDM_ENCRYPT_DEV:    Main_CmdEncryptState(hWnd, 1); break;
-    case IDM_ENCRYPT_RELEASE:   Main_CmdEncryptState(hWnd, 2); break;
-    case IDM_DOWNLOAD_NORMAL:   Main_CmdDownloadMode(hWnd, 0); break;
-    case IDM_DOWNLOAD_SECURE:   Main_CmdDownloadMode(hWnd, 1); break;
-    case IDM_DOWNLOAD_DISABLED: Main_CmdDownloadMode(hWnd, 2); break;
+    case IDM_OPEN_DEVICE:
+        Main_CmdOpenDevice(hWnd);
+        break;
+    case IDM_SAVE_DEVICE:
+        Main_CmdSaveDevice(hWnd);
+        break;
+    case IDM_SAVE_DEVICE_AS:
+        Main_CmdSaveDeviceAs(hWnd);
+        break;
+    case IDM_DEVICE_PROPS:
+        Main_CmdDeviceProps(hWnd);
+        break;
+    case IDM_CONNECT:
+        Main_OnConnect(hWnd);
+        break;
+    case IDM_DISCONNECT:
+        Main_OnDisconnect(hWnd);
+        break;
+    case IDM_RECONNECT:
+        Main_OnReconnect(hWnd);
+        break;
+    case IDM_FLASH_IMPORT:
+        Main_OnFlashImport(hWnd);
+        break;
+    case IDM_FLASH_EXPORT:
+        Main_OnFlashExport(hWnd);
+        break;
+    case IDM_KEY_MGMT:
+        Main_CmdKeyMgmt(hWnd);
+        break;
+    case IDM_DUMP_DEVICE_AS:
+        Main_OnDumpDeviceAs(hWnd);
+        break;
+    case IDM_LOG_CLEAR:
+        Main_OnLogClear(hWnd);
+        break;
+    case IDM_LOG_SAVEAS:
+        Main_OnLogSaveAs(hWnd);
+        break;
+    case IDM_LOG_FONT:
+        Main_OnLogFont(hWnd);
+        break;
+    case IDM_EXIT:
+        Main_OnExit(hWnd);
+        break;
+    case IDM_ABOUT:
+        DialogBoxW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_ABOUT), hWnd,
+                   AboutDlgProc);
+        break;
+    case IDM_ENCRYPT_NONE:
+        Main_CmdEncryptState(hWnd, 0);
+        break;
+    case IDM_ENCRYPT_DEV:
+        Main_CmdEncryptState(hWnd, 1);
+        break;
+    case IDM_ENCRYPT_RELEASE:
+        Main_CmdEncryptState(hWnd, 2);
+        break;
+    case IDM_DOWNLOAD_NORMAL:
+        Main_CmdDownloadMode(hWnd, 0);
+        break;
+    case IDM_DOWNLOAD_SECURE:
+        Main_CmdDownloadMode(hWnd, 1);
+        break;
+    case IDM_DOWNLOAD_DISABLED:
+        Main_CmdDownloadMode(hWnd, 2);
+        break;
     }
     SetFocus(g_hEdit);
     return 0;
@@ -692,7 +775,8 @@ static LRESULT Main_OnSerialError(HWND hWnd, WPARAM wParam, LPARAM lParam)
     UpdateTitle(hWnd);
     UpdateMenuState(hWnd);
     UpdateStatusBar();
-    MessageBoxW(hWnd, LoadStr(IDS_MSG_CONN_LOST), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+    MessageBoxW(hWnd, LoadStr(IDS_MSG_CONN_LOST), LoadStr(IDS_MSG_ERROR),
+                MB_OK | MB_ICONERROR);
     return 0;
 }
 
@@ -708,7 +792,8 @@ static LRESULT Main_OnSerialLog(HWND hWnd, WPARAM wParam, LPARAM lParam)
     WCHAR *text = (WCHAR *)lParam;
     if (tag && text) {
         Main_AppendCustomLog(hWnd, tag, text);
-        HeapFree(GetProcessHeap(), 0, tag);  /* tag points to start of combined buffer */
+        HeapFree(GetProcessHeap(), 0,
+                 tag); /* tag points to start of combined buffer */
     }
     return 0;
 }
@@ -759,17 +844,33 @@ static LRESULT Main_OnSerialConfig(HWND hWnd, WPARAM wParam, LPARAM lParam)
     if (Serial_GetConfig(&g_serial, &baudRate, &dataBits, &parity, &stopBits)) {
         const WCHAR *parityStr = L"N";
         switch (parity) {
-        case NOPARITY: parityStr = L"N"; break;
-        case ODDPARITY: parityStr = L"O"; break;
-        case EVENPARITY: parityStr = L"E"; break;
-        case MARKPARITY: parityStr = L"M"; break;
-        case SPACEPARITY: parityStr = L"S"; break;
+        case NOPARITY:
+            parityStr = L"N";
+            break;
+        case ODDPARITY:
+            parityStr = L"O";
+            break;
+        case EVENPARITY:
+            parityStr = L"E";
+            break;
+        case MARKPARITY:
+            parityStr = L"M";
+            break;
+        case SPACEPARITY:
+            parityStr = L"S";
+            break;
         }
         const WCHAR *stopStr = L"1";
         switch (stopBits) {
-        case ONESTOPBIT: stopStr = L"1"; break;
-        case ONE5STOPBITS: stopStr = L"1.5"; break;
-        case TWOSTOPBITS: stopStr = L"2"; break;
+        case ONESTOPBIT:
+            stopStr = L"1";
+            break;
+        case ONE5STOPBITS:
+            stopStr = L"1.5";
+            break;
+        case TWOSTOPBITS:
+            stopStr = L"2";
+            break;
         }
         WCHAR buf[64];
         wsprintfW(buf, L"%lu,%d%s%s", baudRate, dataBits, parityStr, stopStr);
@@ -831,10 +932,12 @@ static LRESULT Main_OnDeviceChange(HWND hWnd, WPARAM wParam, LPARAM lParam)
  */
 static LRESULT Main_OnClose(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
-    if (!PromptDisconnectIfNeeded(hWnd))
+    if (!PromptDisconnectIfNeeded(hWnd)) {
         return 0;
-    if (!PromptSaveIfNeeded(hWnd))
+    }
+    if (!PromptSaveIfNeeded(hWnd)) {
         return 0;
+    }
     DestroyWindow(hWnd);
     return 0;
 }
@@ -861,7 +964,8 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
             return 0;
         } else {
             TRACE_FW(TAG, "Failed to load command line file");
-            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_LOAD_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_LOAD_DEV),
+                        LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         }
     }
 
@@ -870,11 +974,13 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
     if (Config_GetLastDeviceFile(lastFile, MAX_PATH)) {
         /* Check if file exists */
         DWORD attr = GetFileAttributesW(lastFile);
-        if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
+        if (attr != INVALID_FILE_ATTRIBUTES &&
+            !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
             /* Prompt user */
             WCHAR msg[MAX_PATH + 64];
             wsprintfW(msg, LoadStr(IDS_MSG_OPEN_LAST_FILE), lastFile);
-            int ret = MessageBoxW(hWnd, msg, LoadStr(IDS_OPEN_DEVICE_TITLE), MB_YESNO | MB_ICONQUESTION);
+            int ret = MessageBoxW(hWnd, msg, LoadStr(IDS_OPEN_DEVICE_TITLE),
+                                  MB_YESNO | MB_ICONQUESTION);
             if (ret == IDYES) {
                 if (Device_Load(&g_device, lastFile)) {
                     Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
@@ -897,7 +1003,8 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
             UpdateStatusBar();
             UpdateTitle(hWnd);
         } else {
-            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_CREATE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_CREATE_DEV),
+                        LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
             DestroyWindow(hWnd);
         }
     }
@@ -918,8 +1025,9 @@ static LRESULT Main_OnCopyData(HWND hWnd, WPARAM wParam, LPARAM lParam)
         size_t maxLen = pcds->cbData / sizeof(WCHAR);
         if (filePath[maxLen - 1] == L'\0' || filePath[maxLen - 2] == L'\0') {
             /* Activate window */
-            if (IsIconic(hWnd))
+            if (IsIconic(hWnd)) {
                 ShowWindow(hWnd, SW_RESTORE);
+            }
             SetForegroundWindow(hWnd);
             /* Open file */
             Main_OpenDeviceFile(hWnd, filePath);
@@ -952,8 +1060,8 @@ static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam)
     WCHAR *ext = wcsrchr(filePath, L'.');
     if (!ext || _wcsicmp(ext, L".esp") != 0) {
         DragFinish(hDrop);
-        MessageBoxW(hWnd, LoadStr(IDS_MSG_ONLY_ESP),
-                    LoadStr(IDS_MSG_WARNING), MB_OK | MB_ICONWARNING);
+        MessageBoxW(hWnd, LoadStr(IDS_MSG_ONLY_ESP), LoadStr(IDS_MSG_WARNING),
+                    MB_OK | MB_ICONWARNING);
         return 0;
     }
 
@@ -963,12 +1071,12 @@ static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam)
         WCHAR msg[MAX_PATH + 64];
         wsprintfW(msg, LoadStr(IDS_MSG_OPEN_FILE), filePath);
         openFile = (MessageBoxW(hWnd, msg, LoadStr(IDS_OPEN_DEVICE_TITLE),
-                               MB_YESNO | MB_ICONQUESTION) == IDYES);
+                                MB_YESNO | MB_ICONQUESTION) == IDYES);
     } else {
         WCHAR msg[MAX_PATH + 128];
         wsprintfW(msg, LoadStr(IDS_MSG_OPEN_MULTI_FILE), filePath);
         openFile = (MessageBoxW(hWnd, msg, LoadStr(IDS_OPEN_DEVICE_TITLE),
-                               MB_YESNO | MB_ICONQUESTION) == IDYES);
+                                MB_YESNO | MB_ICONQUESTION) == IDYES);
     }
 
     if (openFile) {
@@ -1017,7 +1125,8 @@ static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam)
  */
 static BOOL Main_Init(HINSTANCE hInstance)
 {
-    INITCOMMONCONTROLSEX icex = { .dwSize = sizeof(icex), .dwICC = ICC_BAR_CLASSES | ICC_TAB_CLASSES };
+    INITCOMMONCONTROLSEX icex = {.dwSize = sizeof(icex),
+                                 .dwICC = ICC_BAR_CLASSES | ICC_TAB_CLASSES};
     InitCommonControlsEx(&icex);
 
     /* Initialize esptool protocol with pointers to device data */
@@ -1053,16 +1162,17 @@ static HWND Main_CreateWindow(HINSTANCE hInstance)
     HMENU hMenu = LoadMenuW(hInstance, MAKEINTRESOURCEW(IDR_MAIN_MENU));
 
     HWND hWnd = CreateWindowExW(0, L"FakeEsptoolClass", LoadStr(IDS_APP_NAME),
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
-        NULL, hMenu, hInstance, NULL);
+                                WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
+                                CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+                                NULL, hMenu, hInstance, NULL);
 
     if (hWnd) {
         ShowWindow(hWnd, SW_SHOW);
         UpdateWindow(hWnd);
         /* Set focus to log control for auto-scroll */
-        if (g_hEdit)
+        if (g_hEdit) {
             SetFocus(g_hEdit);
+        }
     }
 
     return hWnd;
@@ -1081,7 +1191,8 @@ static HWND Main_CreateWindow(HINSTANCE hInstance)
  *
  * Returns exit code from message loop.
  */
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                    LPWSTR lpCmdLine, int nCmdShow)
 {
     (void)hPrevInstance;
     (void)nCmdShow;
@@ -1109,7 +1220,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         } else {
             /* Take first argument (until space or end) */
             size_t len = wcslen(src);
-            if (len >= MAX_PATH) len = MAX_PATH - 1;
+            if (len >= MAX_PATH) {
+                len = MAX_PATH - 1;
+            }
             wcsncpy(cmdFilePath, src, len);
             cmdFilePath[len] = L'\0';
         }
@@ -1136,18 +1249,21 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
                 /* Prompt user */
                 WCHAR msg[MAX_PATH + 128];
                 wsprintfW(msg, LoadStr(IDS_MSG_ALREADY_RUNNING), cmdFilePath);
-                if (MessageBoxW(NULL, msg, LoadStr(IDS_APP_NAME), MB_YESNO | MB_ICONQUESTION) == IDYES) {
+                if (MessageBoxW(NULL, msg, LoadStr(IDS_APP_NAME),
+                                MB_YESNO | MB_ICONQUESTION) == IDYES) {
                     /* Send file path to existing instance */
                     COPYDATASTRUCT cds = {0};
                     cds.dwData = 0;
-                    cds.cbData = (DWORD)((wcslen(cmdFilePath) + 1) * sizeof(WCHAR));
+                    cds.cbData =
+                        (DWORD)((wcslen(cmdFilePath) + 1) * sizeof(WCHAR));
                     cds.lpData = (void *)cmdFilePath;
                     SendMessageW(hExistingWnd, WM_COPYDATA, 0, (LPARAM)&cds);
                 }
             } else {
                 /* Just activate existing window */
-                if (IsIconic(hExistingWnd))
+                if (IsIconic(hExistingWnd)) {
                     ShowWindow(hExistingWnd, SW_RESTORE);
+                }
                 SetForegroundWindow(hExistingWnd);
             }
         }
@@ -1193,23 +1309,28 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     TRACE_FW(TAG, "Main window created: %p", hWnd);
 
     /* Load accelerator table */
-    HACCEL hAccel = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDR_MAIN_ACCEL));
+    HACCEL hAccel =
+        LoadAccelerators(hInstance, MAKEINTRESOURCE(IDR_MAIN_ACCEL));
 
     /* Store command line file path for WM_APP_INIT to process */
     static WCHAR s_cmdFilePath[MAX_PATH] = {0};
     if (cmdFilePath[0]) {
         /* Check if file exists */
         DWORD attr = GetFileAttributesW(cmdFilePath);
-        if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
+        if (attr != INVALID_FILE_ATTRIBUTES &&
+            !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
             wcscpy(s_cmdFilePath, cmdFilePath);
         } else {
             TRACE_FW(TAG, "Command line file not found: %ls", cmdFilePath);
-            MessageBoxW(NULL, LoadStr(IDS_MSG_FILE_NOT_FOUND), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(NULL, LoadStr(IDS_MSG_FILE_NOT_FOUND),
+                        LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
         }
     }
 
-    /* Trigger initialization - check for last device file or command line file */
-    PostMessage(hWnd, WM_APP_INIT, 0, s_cmdFilePath[0] ? (LPARAM)s_cmdFilePath : 0);
+    /* Trigger initialization - check for last device file or command line file
+     */
+    PostMessage(hWnd, WM_APP_INIT, 0,
+                s_cmdFilePath[0] ? (LPARAM)s_cmdFilePath : 0);
 
     /* Main message loop */
     MSG msg;

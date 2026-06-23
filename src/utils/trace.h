@@ -39,8 +39,8 @@ void Trace_Close(void);
  */
 void Trace_Write(const char *tag, const char *fmt, ...);
 
-#define TRACE_INIT()    Trace_Init()
-#define TRACE_CLOSE()   Trace_Close()
+#define TRACE_INIT() Trace_Init()
+#define TRACE_CLOSE() Trace_Close()
 
 #else
 
@@ -51,7 +51,7 @@ void Trace_Write(const char *tag, const char *fmt, ...);
 
 /* Framework trace */
 #ifdef ENABLE_TRACE_FW
-#define TRACE_FW(tag, ...)  Trace_Write(tag, __VA_ARGS__)
+#define TRACE_FW(tag, ...) Trace_Write(tag, __VA_ARGS__)
 #else
 #define TRACE_FW(tag, ...)
 #endif

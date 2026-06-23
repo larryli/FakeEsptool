@@ -17,36 +17,38 @@
 
 /* ============================================================================
  * Log entry buffer
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /* Log entry types */
 typedef enum {
-    LOG_TYPE_DATA,      /* RX/TX hex data */
-    LOG_TYPE_CUSTOM,    /* Custom text with tag */
-    LOG_TYPE_SIGNAL     /* Signal/config with colored tag */
+    LOG_TYPE_DATA,   /* RX/TX hex data */
+    LOG_TYPE_CUSTOM, /* Custom text with tag */
+    LOG_TYPE_SIGNAL  /* Signal/config with colored tag */
 } LOG_ENTRY_TYPE;
 
 /* Log entry structure */
 typedef struct LOG_ENTRY {
-    struct LOG_ENTRY *next;     /* Next in linked list */
-    LOG_ENTRY_TYPE type;        /* Entry type */
-    COLORREF color1;            /* Primary color (direction or tag) */
-    COLORREF color2;            /* Secondary color (data or text) */
-    WCHAR *text;                /* Formatted text (dynamically allocated) */
-    int textLen;                /* Text length in characters */
+    struct LOG_ENTRY *next; /* Next in linked list */
+    LOG_ENTRY_TYPE type;    /* Entry type */
+    COLORREF color1;        /* Primary color (direction or tag) */
+    COLORREF color2;        /* Secondary color (data or text) */
+    WCHAR *text;            /* Formatted text (dynamically allocated) */
+    int textLen;            /* Text length in characters */
 } LOG_ENTRY;
 
 /* Buffer state */
-static LOG_ENTRY *g_logHead = NULL;     /* Head of pending entries list */
-static LOG_ENTRY *g_logTail = NULL;     /* Tail of pending entries list */
-static int g_logCount = 0;              /* Number of pending entries */
-static CRITICAL_SECTION g_logLock;      /* Thread safety */
-static HWND g_hMainWnd = NULL;          /* Main window handle */
+static LOG_ENTRY *g_logHead = NULL; /* Head of pending entries list */
+static LOG_ENTRY *g_logTail = NULL; /* Tail of pending entries list */
+static int g_logCount = 0;          /* Number of pending entries */
+static CRITICAL_SECTION g_logLock;  /* Thread safety */
+static HWND g_hMainWnd = NULL;      /* Main window handle */
 static BOOL g_initialized = FALSE;
 
 /* ============================================================================
  * Buffer management
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /*
  * AddEntry - Add a log entry to the buffer
@@ -94,8 +96,9 @@ static void FreeEntryChain(LOG_ENTRY *head)
 {
     while (head) {
         LOG_ENTRY *next = head->next;
-        if (head->text)
+        if (head->text) {
             HeapFree(GetProcessHeap(), 0, head->text);
+        }
         HeapFree(GetProcessHeap(), 0, head);
         head = next;
     }
@@ -110,7 +113,8 @@ static CRITICAL_SECTION g_tsLock;         /* Lock for timestamp counter */
  * FormatTimestamp - Format current time as timestamp string with relative delta
  *
  * Format: "YYYY-MM-DD HH:MM:SS.mmm +X.XXX "
- *         Absolute time + relative delta since last log entry (millisecond precision)
+ *         Absolute time + relative delta since last log entry (millisecond
+ * precision)
  *
  * Thread-safe: uses separate lock for timestamp counter.
  */
@@ -133,14 +137,15 @@ static int FormatTimestamp(WCHAR *buf, int maxLen)
     LeaveCriticalSection(&g_tsLock);
 
     return wsprintfW(buf, L"%04d-%02d-%02d %02d:%02d:%02d.%03d +%lu.%03lu ",
-                     st.wYear, st.wMonth, st.wDay,
-                     st.wHour, st.wMinute, st.wSecond, st.wMilliseconds,
-                     deltaMs / 1000, deltaMs % 1000);
+                     st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute,
+                     st.wSecond, st.wMilliseconds, deltaMs / 1000,
+                     deltaMs % 1000);
 }
 
 /* ============================================================================
  * RichEdit update helpers
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /*
  * SetEditColor - Set text color for current selection
@@ -167,15 +172,17 @@ static void AppendColoredText(HWND hEdit, const WCHAR *text, COLORREF color)
 
 /* ============================================================================
  * Public API
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /*
  * LogView_Init - Initialize log view subsystem
  */
 void LogView_Init(HWND hWnd)
 {
-    if (g_initialized)
+    if (g_initialized) {
         return;
+    }
 
     InitializeCriticalSection(&g_logLock);
     InitializeCriticalSection(&g_tsLock);
@@ -199,12 +206,14 @@ void LogView_Init(HWND hWnd)
  */
 void LogView_Close(void)
 {
-    if (!g_initialized)
+    if (!g_initialized) {
         return;
+    }
 
     /* Stop timer */
-    if (g_hMainWnd)
+    if (g_hMainWnd) {
         KillTimer(g_hMainWnd, LOG_FLUSH_TIMER_ID);
+    }
 
     /* Flush remaining entries */
     LogView_Flush();
@@ -220,13 +229,15 @@ void LogView_Close(void)
  */
 void LogView_FlushTimer(void)
 {
-    if (!g_hEdit || g_logCount == 0)
+    if (!g_hEdit || g_logCount == 0) {
         return;
+    }
 
     /* Remove all pending entries */
     LOG_ENTRY *head = RemoveAllEntries();
-    if (!head)
+    if (!head) {
         return;
+    }
 
     /* Disable redraw for batch update */
     SendMessageW(g_hEdit, WM_SETREDRAW, FALSE, 0);
@@ -256,10 +267,7 @@ void LogView_FlushTimer(void)
 /*
  * LogView_Flush - Flush all buffered log entries immediately
  */
-void LogView_Flush(void)
-{
-    LogView_FlushTimer();
-}
+void LogView_Flush(void) { LogView_FlushTimer(); }
 
 /*
  * Main_AppendLog - Format and append RX/TX data to log buffer
@@ -270,14 +278,16 @@ void LogView_Flush(void)
 void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
 {
     (void)hMainWnd;
-    if (!g_initialized || len == 0)
+    if (!g_initialized || len == 0) {
         return;
+    }
 
     /* Calculate buffer size:
      * - Timestamp: ~33 chars "YYYY-MM-DD HH:MM:SS.mmm +S.DDD "
      * - Direction: 5 chars "[RX] " or "[TX] "
      * - Per line (hex): 16*3 (hex bytes) + 1 (extra space at byte 8) = 49 chars
-     * - Per line (ASCII): 2 (" |") + 16 (ASCII chars) + 1 ("|") = 19 chars (optional)
+     * - Per line (ASCII): 2 (" |") + 16 (ASCII chars) + 1 ("|") = 19 chars
+     * (optional)
      * - Per line (newline): 2 chars
      * - Continuation prefix: ~35 chars
      * - Safety margin: 64 chars
@@ -288,9 +298,11 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
 #else
     DWORD bufSize = 64 + numLines * (49 + 2 + 35) + 64;
 #endif
-    WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bufSize * sizeof(WCHAR));
-    if (!buf)
+    WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                    bufSize * sizeof(WCHAR));
+    if (!buf) {
         return;
+    }
 
     int pos = 0;
     int maxPos = (int)bufSize - 1; /* Leave room for null terminator */
@@ -302,7 +314,7 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
     pos += wsprintfW(buf + pos, L"[%s] ", (dir == DIR_RX) ? L"RX" : L"TX");
 
     int prefixLen = pos;
-    int lineStart = 0;      /* Index into data[] for current line start */
+    int lineStart = 0; /* Index into data[] for current line start */
 
     for (DWORD i = 0; i < len && pos < maxPos - 30; i++) {
         /* Line break every 16 bytes */
@@ -313,7 +325,9 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
                 buf[pos++] = L' ';
                 buf[pos++] = L'|';
                 for (int k = lineStart; k < (int)i && pos < maxPos - 2; k++) {
-                    buf[pos++] = (data[k] >= 0x20 && data[k] <= 0x7E) ? (WCHAR)data[k] : L'.';
+                    buf[pos++] = (data[k] >= 0x20 && data[k] <= 0x7E)
+                                     ? (WCHAR)data[k]
+                                     : L'.';
                 }
                 buf[pos++] = L'|';
             }
@@ -325,19 +339,22 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
                 buf[pos++] = L'\n';
 
                 /* Prefix alignment */
-                for (int j = 0; j < prefixLen; j++)
+                for (int j = 0; j < prefixLen; j++) {
                     buf[pos++] = L' ';
+                }
             }
 
             lineStart = i;
         } else if (i > 0 && i % 8 == 0) {
             /* Extra space at byte 8 */
-            if (pos < maxPos)
+            if (pos < maxPos) {
                 buf[pos++] = L' ';
+            }
         }
 
-        if (pos + 4 < maxPos)
+        if (pos + 4 < maxPos) {
             pos += wsprintfW(buf + pos, L"%02X ", data[i]);
+        }
     }
 
 #ifndef LOG_NOT_SHOW_ASCII
@@ -355,7 +372,8 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
         buf[pos++] = L' ';
         buf[pos++] = L'|';
         for (int k = lineStart; k < (int)len && pos < maxPos - 2; k++) {
-            buf[pos++] = (data[k] >= 0x20 && data[k] <= 0x7E) ? (WCHAR)data[k] : L'.';
+            buf[pos++] =
+                (data[k] >= 0x20 && data[k] <= 0x7E) ? (WCHAR)data[k] : L'.';
         }
         buf[pos++] = L'|';
     }
@@ -368,7 +386,8 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
     buf[pos] = L'\0';
 
     /* Create entry */
-    LOG_ENTRY *entry = (LOG_ENTRY *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(LOG_ENTRY));
+    LOG_ENTRY *entry = (LOG_ENTRY *)HeapAlloc(
+        GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(LOG_ENTRY));
     if (entry) {
         entry->type = LOG_TYPE_DATA;
         entry->color1 = (dir == DIR_RX) ? COLOR_RX : COLOR_TX;
@@ -386,15 +405,18 @@ void Main_AppendLog(HWND hMainWnd, const BYTE *data, DWORD len, int dir)
 void Main_AppendCustomLog(HWND hMainWnd, const WCHAR *tag, const WCHAR *text)
 {
     (void)hMainWnd;
-    if (!g_initialized || !tag || !text)
+    if (!g_initialized || !tag || !text) {
         return;
+    }
 
     /* Build formatted text: timestamp + tag + text + newline */
     int textLen = lstrlenW(text);
     int maxLen = 64 + 64 + textLen + 4;
-    WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, maxLen * sizeof(WCHAR));
-    if (!buf)
+    WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                    maxLen * sizeof(WCHAR));
+    if (!buf) {
         return;
+    }
 
     int pos = 0;
     pos += FormatTimestamp(buf + pos, maxLen - pos);
@@ -405,7 +427,8 @@ void Main_AppendCustomLog(HWND hMainWnd, const WCHAR *tag, const WCHAR *text)
     buf[pos++] = L'\n';
     buf[pos] = L'\0';
 
-    LOG_ENTRY *entry = (LOG_ENTRY *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(LOG_ENTRY));
+    LOG_ENTRY *entry = (LOG_ENTRY *)HeapAlloc(
+        GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(LOG_ENTRY));
     if (entry) {
         entry->type = LOG_TYPE_CUSTOM;
         entry->color1 = COLOR_CUSTOM;
@@ -420,17 +443,21 @@ void Main_AppendCustomLog(HWND hMainWnd, const WCHAR *tag, const WCHAR *text)
 /*
  * Main_AppendSignalLog - Format and append signal/config log to buffer
  */
-void Main_AppendSignalLog(const WCHAR *tag, const WCHAR *text, COLORREF tagColor)
+void Main_AppendSignalLog(const WCHAR *tag, const WCHAR *text,
+                          COLORREF tagColor)
 {
-    if (!g_initialized || !tag || !text)
+    if (!g_initialized || !tag || !text) {
         return;
+    }
 
     /* Build formatted text: timestamp + tag + text + newline */
     int textLen = lstrlenW(text);
     int maxLen = 64 + 64 + textLen + 4;
-    WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, maxLen * sizeof(WCHAR));
-    if (!buf)
+    WCHAR *buf = (WCHAR *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                    maxLen * sizeof(WCHAR));
+    if (!buf) {
         return;
+    }
 
     int pos = 0;
     pos += FormatTimestamp(buf + pos, maxLen - pos);
@@ -441,7 +468,8 @@ void Main_AppendSignalLog(const WCHAR *tag, const WCHAR *text, COLORREF tagColor
     buf[pos++] = L'\n';
     buf[pos] = L'\0';
 
-    LOG_ENTRY *entry = (LOG_ENTRY *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(LOG_ENTRY));
+    LOG_ENTRY *entry = (LOG_ENTRY *)HeapAlloc(
+        GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(LOG_ENTRY));
     if (entry) {
         entry->type = LOG_TYPE_SIGNAL;
         entry->color1 = tagColor;

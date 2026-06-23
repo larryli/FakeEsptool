@@ -5,14 +5,14 @@
 #ifndef APP_COMMANDS_H
 #define APP_COMMANDS_H
 
-#include <windows.h>
-#include "serial.h"
+#include "dlg/dlg.h"
 #include "esptool/device.h"
 #include "esptool/esptool.h"
+#include "serial.h"
 #include "utils/config.h"
 #include "utils/lang.h"
 #include "utils/trace.h"
-#include "dlg/dlg.h"
+#include <windows.h>
 
 /* Global state (defined in main.c) */
 extern HWND g_hEdit;
@@ -30,19 +30,20 @@ extern HWND g_hStatusbar;
 #define DEFAULT_FONT_SIZE 10
 
 /* Status bar part widths */
-#define STATUS_PART1_WIDTH  100  /* Chip + Flash size */
-#define STATUS_PART2_WIDTH  110  /* Encryption status */
-#define STATUS_PART3_WIDTH  110  /* Download mode */
-#define STATUS_PART4_WIDTH  110  /* Secure Boot status */
-#define STATUS_PART5_WIDTH  100  /* JTAG status */
+#define STATUS_PART1_WIDTH 100 /* Chip + Flash size */
+#define STATUS_PART2_WIDTH 110 /* Encryption status */
+#define STATUS_PART3_WIDTH 110 /* Download mode */
+#define STATUS_PART4_WIDTH 110 /* Secure Boot status */
+#define STATUS_PART5_WIDTH 100 /* JTAG status */
 
 /* Message size limit */
-#define MAX_MSG_SIZE        65536
+#define MAX_MSG_SIZE 65536
 
 /*
  * OnEsptoolProcessData - esptool protocol data receive callback
  */
-void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify);
+void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len,
+                          HWND hNotify);
 
 /*
  * OnEsptoolSignal - esptool protocol signal change callback

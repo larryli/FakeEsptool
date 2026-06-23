@@ -5,14 +5,14 @@
 #ifndef DLG_H
 #define DLG_H
 
-#include <windows.h>
-#include <commctrl.h>
-#include <commdlg.h>
-#include "../resource.h"
-#include "../utils/lang.h"
 #include "../esptool/chip.h"
 #include "../esptool/device.h"
 #include "../esptool/esptool.h"
+#include "../resource.h"
+#include "../utils/lang.h"
+#include <commctrl.h>
+#include <commdlg.h>
+#include <windows.h>
 
 /* Global state (defined in main.c) */
 extern DEVICE_CTX g_device;
@@ -37,22 +37,26 @@ void OnDeviceModified(void);
 /*
  * DevicePropsDlgProc - Device Properties dialog procedure
  */
-INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
+                                    LPARAM lParam);
 
 /*
  * PortSelectDlgProc - Port selection dialog procedure
  */
-INT_PTR CALLBACK PortSelectDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK PortSelectDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
+                                   LPARAM lParam);
 
 /*
  * AboutDlgProc - About dialog procedure
  */
-INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
+                              LPARAM lParam);
 
 /*
  * KeyMgmtDlgProc - Key Management dialog procedure
  */
-INT_PTR CALLBACK KeyMgmtDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK KeyMgmtDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
+                                LPARAM lParam);
 
 /*
  * ShowPortSelectDialog - Show port selection dialog

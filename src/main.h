@@ -11,18 +11,24 @@
 #include <windows.h>
 
 /* Custom window messages from serial/protocol layer to GUI */
-#define WM_SERIAL_RX      (WM_USER + 1)  /* RX data: wParam=len, lParam=HeapAlloc ptr */
-#define WM_SERIAL_TX      (WM_USER + 2)  /* TX data: wParam=len, lParam=HeapAlloc ptr */
-#define WM_SERIAL_ERROR   (WM_USER + 3)  /* Connection error: wParam=error code */
-#define WM_SERIAL_LOG     (WM_USER + 4)  /* Custom log: wParam=WCHAR* tag, lParam=WCHAR* text */
-#define WM_SERIAL_SIGNAL  (WM_USER + 5)  /* Signal change: wParam=modemStatus */
-#define WM_SERIAL_CONFIG  (WM_USER + 6)  /* Config change: wParam=baudRate, lParam=config flags */
+#define WM_SERIAL_RX                                                           \
+    (WM_USER + 1) /* RX data: wParam=len, lParam=HeapAlloc ptr */
+#define WM_SERIAL_TX                                                           \
+    (WM_USER + 2) /* TX data: wParam=len, lParam=HeapAlloc ptr */
+#define WM_SERIAL_ERROR (WM_USER + 3) /* Connection error: wParam=error code   \
+                                       */
+#define WM_SERIAL_LOG                                                          \
+    (WM_USER + 4) /* Custom log: wParam=WCHAR* tag, lParam=WCHAR* text */
+#define WM_SERIAL_SIGNAL (WM_USER + 5) /* Signal change: wParam=modemStatus */
+#define WM_SERIAL_CONFIG                                                       \
+    (WM_USER + 6) /* Config change: wParam=baudRate, lParam=config flags */
 
 /* Custom message for application initialization */
-#define WM_APP_INIT       (WM_USER + 100)
+#define WM_APP_INIT (WM_USER + 100)
 
 /* Custom message for dump completion notification */
-#define WM_DUMP_COMPLETE  (WM_USER + 101)  /* wParam=success(BOOL), lParam=error code */
+#define WM_DUMP_COMPLETE                                                       \
+    (WM_USER + 101) /* wParam=success(BOOL), lParam=error code */
 
 /* Single instance mutex name */
 #define SINGLE_INSTANCE_MUTEX L"FakeEsptool_SingleInstance_Mutex"

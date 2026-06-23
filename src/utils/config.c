@@ -6,21 +6,21 @@
  */
 
 #include "config.h"
-#include <wchar.h>
-#include <stdio.h>
 #include <shlwapi.h>
+#include <stdio.h>
+#include <wchar.h>
 
 static WCHAR g_iniPath[MAX_PATH] = {0};
 static WCHAR g_exeDir[MAX_PATH] = {0};
 
 /* Section and key names */
-#define SECTION_FONT    L"Font"
-#define KEY_FONT_NAME   L"Name"
-#define KEY_FONT_SIZE   L"Size"
+#define SECTION_FONT L"Font"
+#define KEY_FONT_NAME L"Name"
+#define KEY_FONT_SIZE L"Size"
 #define KEY_FONT_WEIGHT L"Weight"
 
-#define SECTION_PORT    L"Port"
-#define KEY_LAST_PORT   L"LastPort"
+#define SECTION_PORT L"Port"
+#define KEY_LAST_PORT L"LastPort"
 
 /*
  * Config_Init - Initialize config module
@@ -32,13 +32,15 @@ void Config_Init(void)
     /* Save exe directory before replacing extension */
     lstrcpyW(g_exeDir, g_iniPath);
     WCHAR *lastSlash = wcsrchr(g_exeDir, L'\\');
-    if (lastSlash)
+    if (lastSlash) {
         *(lastSlash + 1) = L'\0';
+    }
 
     /* Replace .exe with .ini */
     WCHAR *ext = wcsrchr(g_iniPath, L'.');
-    if (ext)
+    if (ext) {
         lstrcpyW(ext, L".ini");
+    }
 }
 
 /*
@@ -46,27 +48,31 @@ void Config_Init(void)
  */
 BOOL Config_GetFont(LOGFONTW *lf)
 {
-    if (!g_iniPath[0])
+    if (!g_iniPath[0]) {
         return FALSE;
+    }
 
     WCHAR name[LF_FACESIZE] = {0};
-    GetPrivateProfileStringW(SECTION_FONT, KEY_FONT_NAME, L"",
-                             name, LF_FACESIZE, g_iniPath);
+    GetPrivateProfileStringW(SECTION_FONT, KEY_FONT_NAME, L"", name,
+                             LF_FACESIZE, g_iniPath);
 
-    if (name[0] == L'\0')
+    if (name[0] == L'\0') {
         return FALSE;
+    }
 
     int size = GetPrivateProfileIntW(SECTION_FONT, KEY_FONT_SIZE, 0, g_iniPath);
-    int weight = GetPrivateProfileIntW(SECTION_FONT, KEY_FONT_WEIGHT, 0, g_iniPath);
+    int weight =
+        GetPrivateProfileIntW(SECTION_FONT, KEY_FONT_WEIGHT, 0, g_iniPath);
 
-    if (size <= 0)
+    if (size <= 0) {
         return FALSE;
+    }
 
     HDC hdc = GetDC(NULL);
     int dpi = GetDeviceCaps(hdc, LOGPIXELSY);
     ReleaseDC(NULL, hdc);
 
-    lf->lfHeight = -MulDiv(size, dpi, 72);  /* Convert point size to pixels */
+    lf->lfHeight = -MulDiv(size, dpi, 72); /* Convert point size to pixels */
     lf->lfWeight = weight;
     lf->lfCharSet = DEFAULT_CHARSET;
     lf->lfOutPrecision = OUT_TT_PRECIS;
@@ -83,8 +89,9 @@ BOOL Config_GetFont(LOGFONTW *lf)
  */
 void Config_SetFont(const LOGFONTW *lf)
 {
-    if (!g_iniPath[0])
+    if (!g_iniPath[0]) {
         return;
+    }
 
     /* Calculate point size from pixel height using actual DPI */
     HDC hdc = GetDC(NULL);
@@ -95,7 +102,8 @@ void Config_SetFont(const LOGFONTW *lf)
 
     WCHAR buf[32];
     wsprintfW(buf, L"%d", size);
-    WritePrivateProfileStringW(SECTION_FONT, KEY_FONT_NAME, lf->lfFaceName, g_iniPath);
+    WritePrivateProfileStringW(SECTION_FONT, KEY_FONT_NAME, lf->lfFaceName,
+                               g_iniPath);
     WritePrivateProfileStringW(SECTION_FONT, KEY_FONT_SIZE, buf, g_iniPath);
     wsprintfW(buf, L"%d", lf->lfWeight);
     WritePrivateProfileStringW(SECTION_FONT, KEY_FONT_WEIGHT, buf, g_iniPath);
@@ -106,11 +114,12 @@ void Config_SetFont(const LOGFONTW *lf)
  */
 BOOL Config_GetLastPort(WCHAR *portName, int maxLen)
 {
-    if (!g_iniPath[0])
+    if (!g_iniPath[0]) {
         return FALSE;
+    }
 
-    GetPrivateProfileStringW(SECTION_PORT, KEY_LAST_PORT, L"",
-                             portName, maxLen, g_iniPath);
+    GetPrivateProfileStringW(SECTION_PORT, KEY_LAST_PORT, L"", portName, maxLen,
+                             g_iniPath);
 
     return (portName[0] != L'\0');
 }
@@ -120,10 +129,12 @@ BOOL Config_GetLastPort(WCHAR *portName, int maxLen)
  */
 void Config_SetLastPort(const WCHAR *portName)
 {
-    if (!g_iniPath[0])
+    if (!g_iniPath[0]) {
         return;
+    }
 
-    WritePrivateProfileStringW(SECTION_PORT, KEY_LAST_PORT, portName, g_iniPath);
+    WritePrivateProfileStringW(SECTION_PORT, KEY_LAST_PORT, portName,
+                               g_iniPath);
 }
 
 /*
@@ -133,15 +144,17 @@ void Config_SetLastPort(const WCHAR *portName)
  */
 BOOL Config_GetLastDeviceFile(WCHAR *filePath, int maxLen)
 {
-    if (!g_iniPath[0])
+    if (!g_iniPath[0]) {
         return FALSE;
+    }
 
     WCHAR savedPath[MAX_PATH] = {0};
-    GetPrivateProfileStringW(L"Device", L"LastFile", L"",
-                             savedPath, MAX_PATH, g_iniPath);
+    GetPrivateProfileStringW(L"Device", L"LastFile", L"", savedPath, MAX_PATH,
+                             g_iniPath);
 
-    if (savedPath[0] == L'\0')
+    if (savedPath[0] == L'\0') {
         return FALSE;
+    }
 
     /* Check if relative path (no drive letter) */
     if (savedPath[1] != L':' && g_exeDir[0]) {
@@ -166,8 +179,9 @@ BOOL Config_GetLastDeviceFile(WCHAR *filePath, int maxLen)
  */
 void Config_SetLastDeviceFile(const WCHAR *filePath)
 {
-    if (!g_iniPath[0])
+    if (!g_iniPath[0]) {
         return;
+    }
 
     if (!filePath || !filePath[0]) {
         WritePrivateProfileStringW(L"Device", L"LastFile", L"", g_iniPath);
@@ -176,8 +190,7 @@ void Config_SetLastDeviceFile(const WCHAR *filePath)
 
     /* Check if same drive letter */
     if (g_exeDir[0] && filePath[0] &&
-        (g_exeDir[0] | 0x20) == (filePath[0] | 0x20) &&
-        filePath[1] == L':') {
+        (g_exeDir[0] | 0x20) == (filePath[0] | 0x20) && filePath[1] == L':') {
         /* Same drive - save relative path */
         WCHAR relPath[MAX_PATH] = {0};
         PathRelativePathToW(relPath, g_exeDir, FILE_ATTRIBUTE_DIRECTORY,
@@ -192,13 +205,15 @@ void Config_SetLastDeviceFile(const WCHAR *filePath)
 /*
  * Config_GetString - Get string value from config
  */
-BOOL Config_GetString(const WCHAR *section, const WCHAR *key, WCHAR *value, int maxLen, const WCHAR *defaultVal)
+BOOL Config_GetString(const WCHAR *section, const WCHAR *key, WCHAR *value,
+                      int maxLen, const WCHAR *defaultVal)
 {
-    if (!g_iniPath[0] || !section || !key || !value || maxLen <= 0)
+    if (!g_iniPath[0] || !section || !key || !value || maxLen <= 0) {
         return FALSE;
+    }
 
-    GetPrivateProfileStringW(section, key, defaultVal ? defaultVal : L"",
-                             value, maxLen, g_iniPath);
+    GetPrivateProfileStringW(section, key, defaultVal ? defaultVal : L"", value,
+                             maxLen, g_iniPath);
 
     return (value[0] != L'\0');
 }
@@ -206,10 +221,12 @@ BOOL Config_GetString(const WCHAR *section, const WCHAR *key, WCHAR *value, int 
 /*
  * Config_SetString - Save string value to config
  */
-void Config_SetString(const WCHAR *section, const WCHAR *key, const WCHAR *value)
+void Config_SetString(const WCHAR *section, const WCHAR *key,
+                      const WCHAR *value)
 {
-    if (!g_iniPath[0] || !section || !key)
+    if (!g_iniPath[0] || !section || !key) {
         return;
+    }
 
     WritePrivateProfileStringW(section, key, value ? value : L"", g_iniPath);
 }
@@ -219,8 +236,9 @@ void Config_SetString(const WCHAR *section, const WCHAR *key, const WCHAR *value
  */
 int Config_GetInt(const WCHAR *section, const WCHAR *key, int defaultVal)
 {
-    if (!g_iniPath[0] || !section || !key)
+    if (!g_iniPath[0] || !section || !key) {
         return defaultVal;
+    }
 
     return (int)GetPrivateProfileIntW(section, key, defaultVal, g_iniPath);
 }
@@ -230,8 +248,9 @@ int Config_GetInt(const WCHAR *section, const WCHAR *key, int defaultVal)
  */
 void Config_SetInt(const WCHAR *section, const WCHAR *key, int value)
 {
-    if (!g_iniPath[0] || !section || !key)
+    if (!g_iniPath[0] || !section || !key) {
         return;
+    }
 
     WCHAR buf[32];
     wsprintfW(buf, L"%d", value);

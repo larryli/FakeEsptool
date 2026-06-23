@@ -3,5 +3,16 @@
     IndentWidth: 4,
     TabWidth: 4,
     BreakBeforeBraces: Custom,
-    BraceWrapping: { AfterFunction: true }
+    BraceWrapping: {
+        AfterFunction: true,
+        AfterControlStatement: Never,
+        AfterEnum: false,
+        AfterStruct: false,
+        AfterUnion: false,
+        BeforeElse: false,
+    },
+    AllowShortIfStatementsOnASingleLine: Never,
+    AllowShortLoopsOnASingleLine: false,
+    AllowShortBlocksOnASingleLine: Never,
+    AllowShortCaseLabelsOnASingleLine: false,
 }

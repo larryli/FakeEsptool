@@ -47,8 +47,9 @@ BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b)
         return FALSE;
     }
 
-    if (!ctx->in_frame)
+    if (!ctx->in_frame) {
         return FALSE;
+    }
 
     if (ctx->escaped) {
         if (ctx->len >= SLIP_MAX_FRAME) {
@@ -101,20 +102,14 @@ BOOL Slip_IsComplete(const SLIP_CTX *ctx)
  *
  * Returns pointer to internal buffer containing decoded frame data.
  */
-const BYTE *Slip_GetPayload(const SLIP_CTX *ctx)
-{
-    return ctx->buf;
-}
+const BYTE *Slip_GetPayload(const SLIP_CTX *ctx) { return ctx->buf; }
 
 /*
  * Slip_GetLength - Get decoded frame length
  *
  * Returns length of decoded frame data in bytes.
  */
-int Slip_GetLength(const SLIP_CTX *ctx)
-{
-    return ctx->len;
-}
+int Slip_GetLength(const SLIP_CTX *ctx) { return ctx->len; }
 
 /*
  * Slip_Reset - Reset decoder state
@@ -144,8 +139,9 @@ int Slip_Encode(const BYTE *data, int len, BYTE *out, int out_max)
 {
     int pos = 0;
 
-    if (out_max < 3)
+    if (out_max < 3) {
         return 0;
+    }
     out[pos++] = SLIP_END;
 
     for (int i = 0; i < len && pos < out_max - 1; i++) {
@@ -164,8 +160,9 @@ int Slip_Encode(const BYTE *data, int len, BYTE *out, int out_max)
         }
     }
 
-    if (pos >= out_max)
+    if (pos >= out_max) {
         return 0;
+    }
     out[pos++] = SLIP_END;
 
     return pos;

@@ -7,15 +7,15 @@
 #ifndef ESP_DEVICE_H
 #define ESP_DEVICE_H
 
-#include <windows.h>
 #include "chip.h"
 #include "flash.h"
+#include <windows.h>
 
 /* Device file magic number ("ESP\0") */
-#define DEVICE_MAGIC    0x45535000
+#define DEVICE_MAGIC 0x45535000
 
 /* Device file format version */
-#define DEVICE_VERSION  1
+#define DEVICE_VERSION 1
 
 /*
  * Device file format v1 layout:
@@ -44,16 +44,17 @@
 
 /* Device context */
 typedef struct DEVICE_CTX_TAG {
-    CHIP_CTX  chip;             /* Chip characteristics */
-    FLASH_CTX flash;            /* Flash storage */
-    WCHAR     filename[MAX_PATH]; /* Current file path */
-    BOOL      modified;         /* TRUE if data has been modified */
+    CHIP_CTX chip;            /* Chip characteristics */
+    FLASH_CTX flash;          /* Flash storage */
+    WCHAR filename[MAX_PATH]; /* Current file path */
+    BOOL modified;            /* TRUE if data has been modified */
 } DEVICE_CTX;
 
 /*
  * Device_Init - Initialize new device with chip type, flash size, and MAC
  */
-BOOL Device_Init(DEVICE_CTX *ctx, CHIP_TYPE chipType, DWORD flashSize, const BYTE mac[6]);
+BOOL Device_Init(DEVICE_CTX *ctx, CHIP_TYPE chipType, DWORD flashSize,
+                 const BYTE mac[6]);
 
 /*
  * Device_Close - Release device resources

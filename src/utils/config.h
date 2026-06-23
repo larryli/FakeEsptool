@@ -65,7 +65,8 @@ void Config_SetLastDeviceFile(const WCHAR *filePath);
  * @defaultVal: Default value if key not found
  * Returns: TRUE if value was loaded
  */
-BOOL Config_GetString(const WCHAR *section, const WCHAR *key, WCHAR *value, int maxLen, const WCHAR *defaultVal);
+BOOL Config_GetString(const WCHAR *section, const WCHAR *key, WCHAR *value,
+                      int maxLen, const WCHAR *defaultVal);
 
 /*
  * Config_SetString - Save string value to config
@@ -73,7 +74,8 @@ BOOL Config_GetString(const WCHAR *section, const WCHAR *key, WCHAR *value, int 
  * @key: Key name
  * @value: Value to save
  */
-void Config_SetString(const WCHAR *section, const WCHAR *key, const WCHAR *value);
+void Config_SetString(const WCHAR *section, const WCHAR *key,
+                      const WCHAR *value);
 
 /*
  * Config_GetInt - Get integer value from config

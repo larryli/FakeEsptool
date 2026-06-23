@@ -9,42 +9,42 @@
 #include <string.h>
 
 /* Memory allocation helpers */
-static inline void *deflate_malloc(size_t size) {
+static inline void *deflate_malloc(size_t size)
+{
     return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
 }
 
 /*
  * deflate_free - Free allocated memory
  */
-static inline void deflate_free(void *ptr) {
-    if (ptr) HeapFree(GetProcessHeap(), 0, ptr);
+static inline void deflate_free(void *ptr)
+{
+    if (ptr) {
+        HeapFree(GetProcessHeap(), 0, ptr);
+    }
 }
 
 /* Static Huffman code tables for DEFLATE */
 static const WORD deflate_lit_lengths[29] = {
-    3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
-    35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258
-};
+    3,  4,  5,  6,  7,  8,  9,  10, 11,  13,  15,  17,  19,  23, 27,
+    31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258};
 
-static const BYTE deflate_lit_extra[29] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2,
-    3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0
-};
+static const BYTE deflate_lit_extra[29] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
+                                           1, 1, 2, 2, 2, 2, 3, 3, 3, 3,
+                                           4, 4, 4, 4, 5, 5, 5, 5, 0};
 
 static const WORD deflate_dist_codes[30] = {
-    1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193,
-    257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577
-};
+    1,    2,    3,    4,    5,    7,    9,    13,    17,    25,
+    33,   49,   65,   97,   129,  193,  257,  385,   513,   769,
+    1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577};
 
 static const BYTE deflate_dist_extra[30] = {
-    0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,
-    7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13
-};
+    0, 0, 0, 0, 1, 1, 2, 2,  3,  3,  4,  4,  5,  5,  6,
+    6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13};
 
 /* Code length order for dynamic block */
-static const BYTE deflate_cl_order[19] = {
-    16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15
-};
+static const BYTE deflate_cl_order[19] = {16, 17, 18, 0, 8,  7, 9,  6, 10, 5,
+                                          11, 4,  12, 3, 13, 2, 14, 1, 15};
 
 /*
  * deflate_read_bits - Read bits from bit buffer
@@ -64,15 +64,17 @@ static int deflate_read_bits(DEFLATE_CTX *ctx, int count)
 
     while (count > 0) {
         if (ctx->bit_count == 0) {
-            if (ctx->in_pos >= ctx->in_len)
+            if (ctx->in_pos >= ctx->in_len) {
                 return -1;
+            }
             ctx->bit_buf = ctx->in_buf[ctx->in_pos++];
             ctx->bit_count = 8;
         }
 
         int bits = count;
-        if (bits > ctx->bit_count)
+        if (bits > ctx->bit_count) {
             bits = ctx->bit_count;
+        }
 
         value |= (ctx->bit_buf & ((1 << bits) - 1)) << shift;
         ctx->bit_buf >>= bits;
@@ -96,7 +98,8 @@ static int deflate_read_bits(DEFLATE_CTX *ctx, int count)
  *
  * Returns DEFLATE_OK on success, DEFLATE_NO_MEMORY on allocation failure.
  */
-static int deflate_build_huffman(DEFLATE_HUFF *huff, const BYTE *lengths, int count)
+static int deflate_build_huffman(DEFLATE_HUFF *huff, const BYTE *lengths,
+                                 int count)
 {
     int i;
     int max_len = 0;
@@ -104,8 +107,9 @@ static int deflate_build_huffman(DEFLATE_HUFF *huff, const BYTE *lengths, int co
 
     /* Find maximum code length */
     for (i = 0; i < count; i++) {
-        if (lengths[i] > max_len)
+        if (lengths[i] > max_len) {
             max_len = lengths[i];
+        }
     }
 
     if (max_len == 0) {
@@ -117,18 +121,21 @@ static int deflate_build_huffman(DEFLATE_HUFF *huff, const BYTE *lengths, int co
 
     /* Allocate counts array */
     huff->counts = (WORD *)deflate_malloc((max_len + 1) * sizeof(WORD));
-    if (!huff->counts)
+    if (!huff->counts) {
         return DEFLATE_NO_MEMORY;
+    }
 
     /* Count codes of each length */
     for (i = 0; i < count; i++) {
-        if (lengths[i] > 0)
+        if (lengths[i] > 0) {
             huff->counts[lengths[i]]++;
+        }
     }
 
     /* Calculate total number of symbols */
-    for (i = 1; i <= max_len; i++)
+    for (i = 1; i <= max_len; i++) {
         total += huff->counts[i];
+    }
 
     /* Allocate symbols array */
     huff->symbols = (WORD *)deflate_malloc(total * sizeof(WORD));
@@ -151,13 +158,15 @@ static int deflate_build_huffman(DEFLATE_HUFF *huff, const BYTE *lengths, int co
 
         /* Calculate offsets for each code length */
         offsets[1] = 0;
-        for (i = 2; i <= max_len; i++)
+        for (i = 2; i <= max_len; i++) {
             offsets[i] = offsets[i - 1] + huff->counts[i - 1];
+        }
 
         /* Place symbols in sorted order */
         for (i = 0; i < count; i++) {
-            if (lengths[i] > 0)
+            if (lengths[i] > 0) {
                 huff->symbols[offsets[lengths[i]]++] = (WORD)i;
+            }
         }
 
         deflate_free(offsets);
@@ -205,14 +214,16 @@ static int deflate_decode_huffman(DEFLATE_CTX *ctx, const DEFLATE_HUFF *huff)
 
     for (len = 1; len <= huff->max_length; len++) {
         int bit = deflate_read_bits(ctx, 1);
-        if (bit < 0)
+        if (bit < 0) {
             return -1;
+        }
 
         code = (code << 1) | bit;
 
         int count = huff->counts[len];
-        if (code - first < count)
+        if (code - first < count) {
             return huff->symbols[index + (code - first)];
+        }
 
         index += count;
         first = (first + count) << 1;
@@ -236,7 +247,7 @@ static int deflate_decode_dynamic(DEFLATE_CTX *ctx)
     int hlit, hdist, hclen;
     int i, j;
     BYTE cl_lengths[19] = {0};
-    BYTE lengths[320];  /* Max literal/length + distance codes */
+    BYTE lengths[320]; /* Max literal/length + distance codes */
     DEFLATE_HUFF cl_huff = {0};
     int ret;
 
@@ -245,8 +256,9 @@ static int deflate_decode_dynamic(DEFLATE_CTX *ctx)
     hdist = deflate_read_bits(ctx, 5);
     hclen = deflate_read_bits(ctx, 4);
 
-    if (hlit < 0 || hdist < 0 || hclen < 0)
+    if (hlit < 0 || hdist < 0 || hclen < 0) {
         return DEFLATE_BAD_INPUT;
+    }
 
     hlit += 257;
     hdist += 1;
@@ -255,15 +267,17 @@ static int deflate_decode_dynamic(DEFLATE_CTX *ctx)
     /* Read code length code lengths */
     for (i = 0; i < hclen; i++) {
         int len = deflate_read_bits(ctx, 3);
-        if (len < 0)
+        if (len < 0) {
             return DEFLATE_BAD_INPUT;
+        }
         cl_lengths[deflate_cl_order[i]] = (BYTE)len;
     }
 
     /* Build code length Huffman code */
     ret = deflate_build_huffman(&cl_huff, cl_lengths, 19);
-    if (ret != DEFLATE_OK)
+    if (ret != DEFLATE_OK) {
         return ret;
+    }
 
     /* Decode literal/length and distance code lengths */
     i = 0;
@@ -288,8 +302,9 @@ static int deflate_decode_dynamic(DEFLATE_CTX *ctx)
             }
             {
                 BYTE prev = lengths[i - 1];
-                for (j = 0; j < repeat && i < hlit + hdist; j++)
+                for (j = 0; j < repeat && i < hlit + hdist; j++) {
                     lengths[i++] = prev;
+                }
             }
         } else if (sym == 17) {
             int repeat = deflate_read_bits(ctx, 3) + 3;
@@ -297,16 +312,18 @@ static int deflate_decode_dynamic(DEFLATE_CTX *ctx)
                 deflate_free_huffman(&cl_huff);
                 return DEFLATE_BAD_INPUT;
             }
-            for (j = 0; j < repeat && i < hlit + hdist; j++)
+            for (j = 0; j < repeat && i < hlit + hdist; j++) {
                 lengths[i++] = 0;
+            }
         } else if (sym == 18) {
             int repeat = deflate_read_bits(ctx, 7) + 11;
             if (repeat < 0) {
                 deflate_free_huffman(&cl_huff);
                 return DEFLATE_BAD_INPUT;
             }
-            for (j = 0; j < repeat && i < hlit + hdist; j++)
+            for (j = 0; j < repeat && i < hlit + hdist; j++) {
                 lengths[i++] = 0;
+            }
         } else {
             deflate_free_huffman(&cl_huff);
             return DEFLATE_BAD_INPUT;
@@ -317,8 +334,9 @@ static int deflate_decode_dynamic(DEFLATE_CTX *ctx)
 
     /* Build literal/length Huffman code */
     ret = deflate_build_huffman(&ctx->lit_huff, lengths, hlit);
-    if (ret != DEFLATE_OK)
+    if (ret != DEFLATE_OK) {
         return ret;
+    }
 
     /* Build distance Huffman code */
     ret = deflate_build_huffman(&ctx->dist_huff, lengths + hlit, hdist);
@@ -347,23 +365,29 @@ static int deflate_decode_static(DEFLATE_CTX *ctx)
     int i;
 
     /* Literal/length code lengths (RFC 1951, Section 3.2.6) */
-    for (i = 0; i < 144; i++)
+    for (i = 0; i < 144; i++) {
         lengths[i] = 8;
-    for (i = 144; i < 256; i++)
+    }
+    for (i = 144; i < 256; i++) {
         lengths[i] = 9;
-    for (i = 256; i < 280; i++)
+    }
+    for (i = 256; i < 280; i++) {
         lengths[i] = 7;
-    for (i = 280; i < 288; i++)
+    }
+    for (i = 280; i < 288; i++) {
         lengths[i] = 8;
+    }
 
     /* Build literal/length Huffman code */
     int ret = deflate_build_huffman(&ctx->lit_huff, lengths, 288);
-    if (ret != DEFLATE_OK)
+    if (ret != DEFLATE_OK) {
         return ret;
+    }
 
     /* Distance code lengths (all 5 bits) */
-    for (i = 0; i < 32; i++)
+    for (i = 0; i < 32; i++) {
         lengths[i] = 5;
+    }
 
     /* Build distance Huffman code */
     ret = deflate_build_huffman(&ctx->dist_huff, lengths, 32);
@@ -395,8 +419,9 @@ static int deflate_process_block(DEFLATE_CTX *ctx)
     bfinal = deflate_read_bits(ctx, 1);
     btype = deflate_read_bits(ctx, 2);
 
-    if (bfinal < 0 || btype < 0)
+    if (bfinal < 0 || btype < 0) {
         return DEFLATE_BAD_INPUT;
+    }
 
     /* Handle block based on type */
     if (btype == 0) {
@@ -408,22 +433,27 @@ static int deflate_process_block(DEFLATE_CTX *ctx)
         ctx->bit_count = 0;
 
         /* Read length */
-        if (ctx->in_pos + 4 > ctx->in_len)
+        if (ctx->in_pos + 4 > ctx->in_len) {
             return DEFLATE_BAD_INPUT;
+        }
 
         len = ctx->in_buf[ctx->in_pos] | (ctx->in_buf[ctx->in_pos + 1] << 8);
-        nlen = ctx->in_buf[ctx->in_pos + 2] | (ctx->in_buf[ctx->in_pos + 3] << 8);
+        nlen =
+            ctx->in_buf[ctx->in_pos + 2] | (ctx->in_buf[ctx->in_pos + 3] << 8);
         ctx->in_pos += 4;
 
         /* Verify length */
-        if (len != (~nlen & 0xFFFF))
+        if (len != (~nlen & 0xFFFF)) {
             return DEFLATE_BAD_INPUT;
+        }
 
         /* Check bounds */
-        if (ctx->in_pos + len > ctx->in_len)
+        if (ctx->in_pos + len > ctx->in_len) {
             return DEFLATE_BAD_INPUT;
-        if (ctx->out_pos + len > ctx->out_len)
+        }
+        if (ctx->out_pos + len > ctx->out_len) {
             return DEFLATE_ERROR;
+        }
 
         /* Copy data */
         memcpy(ctx->out_buf + ctx->out_pos, ctx->in_buf + ctx->in_pos, len);
@@ -437,8 +467,9 @@ static int deflate_process_block(DEFLATE_CTX *ctx)
             ret = deflate_decode_dynamic(ctx);
         }
 
-        if (ret != DEFLATE_OK)
+        if (ret != DEFLATE_OK) {
             return ret;
+        }
 
         /* Decode symbols */
         for (;;) {
@@ -532,7 +563,7 @@ static int deflate_process_block(DEFLATE_CTX *ctx)
         return DEFLATE_BAD_INPUT;
     }
 
-    return bfinal ? DEFLATE_OK : 1;  /* Return 1 if not final block */
+    return bfinal ? DEFLATE_OK : 1; /* Return 1 if not final block */
 }
 
 /*
@@ -555,8 +586,9 @@ int deflate_decompress(DEFLATE_CTX *ctx)
     /* Process blocks until final block */
     do {
         ret = deflate_process_block(ctx);
-        if (ret < 0)
+        if (ret < 0) {
             return ret;
+        }
     } while (ret == 1);
 
     return DEFLATE_OK;

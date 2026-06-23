@@ -15,7 +15,8 @@
 typedef enum { DIR_RX, DIR_TX } DATA_DIR;
 
 /* Receive callback type - called when data is received */
-typedef void (*SERIAL_RX_CB)(void *ctx, const BYTE *data, DWORD len, HWND hNotify);
+typedef void (*SERIAL_RX_CB)(void *ctx, const BYTE *data, DWORD len,
+                             HWND hNotify);
 
 /* Signal change callback type - called when DSR/CTS signals change
  * @modemStatus: Result of GetCommModemStatus() (MS_DSR_ON, MS_CTS_ON, etc.)
@@ -24,14 +25,14 @@ typedef void (*SERIAL_SIGNAL_CB)(void *ctx, DWORD modemStatus, HWND hNotify);
 
 /* Serial port context */
 typedef struct {
-    HANDLE hPort;           /* Serial port handle */
-    HANDLE hThread;         /* Listener thread handle */
-    HANDLE hStartEvent;     /* Thread start synchronization event */
-    HWND hNotify;           /* Window to receive WM_SERIAL_* messages */
-    volatile BOOL bRunning; /* Thread running flag */
-    volatile DWORD dwRxBytes; /* Total bytes received */
-    volatile DWORD dwTxBytes; /* Total bytes sent */
-    SERIAL_RX_CB onReceive; /* Receive data callback */
+    HANDLE hPort;              /* Serial port handle */
+    HANDLE hThread;            /* Listener thread handle */
+    HANDLE hStartEvent;        /* Thread start synchronization event */
+    HWND hNotify;              /* Window to receive WM_SERIAL_* messages */
+    volatile BOOL bRunning;    /* Thread running flag */
+    volatile DWORD dwRxBytes;  /* Total bytes received */
+    volatile DWORD dwTxBytes;  /* Total bytes sent */
+    SERIAL_RX_CB onReceive;    /* Receive data callback */
     SERIAL_SIGNAL_CB onSignal; /* Signal change callback */
 } SERIAL_CTX;
 
@@ -74,7 +75,8 @@ DWORD Serial_GetTxBytes(const SERIAL_CTX *ctx);
  * Serial_WriteData - Write data to serial port
  * Returns: Number of bytes written
  */
-DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len, HWND hNotify);
+DWORD Serial_WriteData(SERIAL_CTX *ctx, const BYTE *data, DWORD len,
+                       HWND hNotify);
 
 /*
  * Serial_SetReceiveCallback - Set the receive data callback
@@ -140,7 +142,8 @@ BOOL Serial_SetStopBits(SERIAL_CTX *ctx, BYTE stopBits);
  * @stopBits: Pointer to receive stop bits (can be NULL)
  * Returns: TRUE on success
  */
-BOOL Serial_GetConfig(SERIAL_CTX *ctx, DWORD *baudRate, BYTE *dataBits, BYTE *parity, BYTE *stopBits);
+BOOL Serial_GetConfig(SERIAL_CTX *ctx, DWORD *baudRate, BYTE *dataBits,
+                      BYTE *parity, BYTE *stopBits);
 
 /*
  * Serial_PostLog - Post a custom log message to the UI thread
