@@ -403,7 +403,9 @@ void Esptool_SetBaudRateCallback(ESPTOOL_CTX *ctx, ESP_BAUDRATE_CB cb)
  * @data:       Optional data payload (can be NULL)
  * @data_len:   Data payload length
  */
-void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD status, BYTE status_len, const BYTE *data, WORD data_len)
+void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val,
+                           DWORD status, BYTE status_len,
+                           const BYTE *data, WORD data_len)
 {
     BYTE resp[ESP_RESP_BUF_SIZE];
     int pos = 0;
@@ -611,22 +613,16 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     if (pkt->size >= 16)
         delayUs = ReadLE32(pkt->data + 12);
 
-    TRACE_PROTO(TAG, "WRITE_REG addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr, val, mask, delayUs);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr, val, mask, delayUs);
-    Serial_PostLogF(ctx->hNotify, L"DBG", L"  WRITE_REG raw size=%u [%02X %02X %02X %02X %02X %02X %02X %02X]",
-                    pkt->size,
-                    pkt->data[0], pkt->data[1], pkt->data[2], pkt->data[3],
-                    pkt->data[4], pkt->data[5], pkt->data[6], pkt->data[7]);
+    TRACE_PROTO(TAG, "WRITE_REG addr=0x%08lX val=0x%08lX "
+                "mask=0x%08lX delay=%lu", addr, val, mask, delayUs);
+    Serial_PostLogF(ctx->hNotify, L"ESP",
+                    L"  addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu",
+                    addr, val, mask, delayUs);
 
     /* Apply mask: only bits set in mask are written */
     DWORD currentVal = Chip_ReadReg(ctx->chip, addr);
     DWORD newVal = (currentVal & ~mask) | (val & mask);
     Chip_WriteReg(ctx->chip, addr, newVal);
-
-    /* Debug: verify eFuse write by reading back */
-    DWORD readback = Chip_ReadReg(ctx->chip, addr);
-    Serial_PostLogF(ctx->hNotify, L"DBG", L"  WRITE_REG: current=0x%08lX val=0x%08lX mask=0x%08lX new=0x%08lX readback=0x%08lX",
-                    currentVal, val, mask, newVal, readback);
 
     if (ctx->onModified) ctx->onModified();
     /* WRITE_REG always returns 2-byte status, Val field is 0x00000000 */
@@ -718,8 +714,12 @@ static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         BYTE expected = Esptool_CalcChecksum(payload, payload_len);
         BYTE received = (BYTE)(pkt->value & 0xFF);
         if (expected != received) {
-            TRACE_PROTO(TAG, "MEM_DATA checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
-            Serial_PostLogF(ctx->hNotify, L"ESP", L"  Checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
+            TRACE_PROTO(TAG, "MEM_DATA checksum mismatch: "
+                        "expected=0x%02X received=0x%02X",
+                        expected, received);
+            Serial_PostLogF(ctx->hNotify, L"ESP",
+                L"  Checksum mismatch: expected=0x%02X received=0x%02X",
+                expected, received);
             BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_MEM_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
             return;
@@ -789,8 +789,6 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* FLASH_DEFL_BEGIN format:
        [uncompressed_size:4][num_blocks:4][block_size:4][offset:4] */
     DWORD uncompressed_size = ReadLE32(pkt->data);
-    DWORD blocks = ReadLE32(pkt->data + 4);
-    DWORD bsize = ReadLE32(pkt->data + 8);
     DWORD offset = ReadLE32(pkt->data + 12);
 
     /* ROM mode sends extra 4 bytes for encrypted flag */
@@ -804,17 +802,15 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN rejected: release mode, plaintext not allowed");
         Serial_PostLog(ctx->hNotify, L"ERR", L"  Release mode: plaintext flash disabled");
         BYTE status_len = ESP_STATUS_LEN(ctx);
-        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN,
+            ctx->last_read_val, ESP_FAIL, status_len, NULL,
+            status_len);
         return;
     }
 
-    TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN uncompressed=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
-                uncompressed_size, blocks, bsize, offset, encrypted);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  uncompressed=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
-                    uncompressed_size, blocks, bsize, offset, encrypted);
-
-    /* Log encryption state */
-    TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN: flash_encrypted=%d chip_type=%d stub_mode=%d", encrypted, ctx->chip->type, ctx->stub_mode);
+    TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN: flash_encrypted=%d "
+                "chip_type=%d stub_mode=%d",
+                encrypted, ctx->chip->type, ctx->stub_mode);
     TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN: IsFlashEncryptionEnabled=%d IsDownloadEncryptDisabled=%d",
              Chip_IsFlashEncryptionEnabled(ctx->chip), Chip_IsDownloadEncryptDisabled(ctx->chip));
 
@@ -842,9 +838,12 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         DWORD ret = Defl_FlushBuffer(ctx);
         if (ret != ESP_OK) {
             TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN flush previous failed");
-            Serial_PostLog(ctx->hNotify, L"ERR", L"  Failed to flush previous compressed data");
+            Serial_PostLog(ctx->hNotify, L"ERR",
+                L"  Failed to flush previous compressed data");
             BYTE status_len = ESP_STATUS_LEN(ctx);
-            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN,
+                ctx->last_read_val, ESP_FAIL, status_len,
+                NULL, status_len);
             return;
         }
     }
@@ -872,10 +871,15 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     if (uncompressed_size > 0) {
         ctx->defl_buf = (BYTE *)HeapAlloc(GetProcessHeap(), 0, uncompressed_size);
         if (!ctx->defl_buf) {
-            TRACE_PROTO(TAG, "Failed to allocate deflate buffer: %lu bytes", uncompressed_size);
-            Serial_PostLogF(ctx->hNotify, L"ERR", L"  Failed to allocate deflate buffer: %lu bytes", uncompressed_size);
+            TRACE_PROTO(TAG, "Failed to allocate deflate buffer: "
+                        "%lu bytes", uncompressed_size);
+            Serial_PostLogF(ctx->hNotify, L"ERR",
+                L"  Failed to allocate deflate buffer: %lu bytes",
+                uncompressed_size);
             BYTE status_len = ESP_STATUS_LEN(ctx);
-            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN,
+                ctx->last_read_val, ESP_FAIL, status_len,
+                NULL, status_len);
             return;
         }
         ctx->defl_buf_cap = uncompressed_size;
@@ -916,7 +920,9 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         TRACE_PROTO(TAG, "FLASH_DEFL_DATA seq mismatch: expected=%lu received=%lu", ctx->flash_seq, seq);
         Serial_PostLogF(ctx->hNotify, L"ESP", L"  Seq mismatch: expected=%lu received=%lu", ctx->flash_seq, seq);
         BYTE status_len = ESP_STATUS_LEN(ctx);
-        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA,
+            ctx->last_read_val, ESP_FAIL, status_len,
+            NULL, status_len);
         return;
     }
 
@@ -928,9 +934,13 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         BYTE received = (BYTE)(pkt->value & 0xFF);
         if (expected != received) {
             TRACE_PROTO(TAG, "FLASH_DEFL_DATA checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
-            Serial_PostLogF(ctx->hNotify, L"ESP", L"  Checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
+            Serial_PostLogF(ctx->hNotify, L"ESP",
+                L"  Checksum mismatch: expected=0x%02X "
+                L"received=0x%02X", expected, received);
             BYTE status_len = ESP_STATUS_LEN(ctx);
-            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA,
+            ctx->last_read_val, ESP_FAIL, status_len,
+            NULL, status_len);
             return;
         }
 
@@ -943,7 +953,9 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
                 Serial_PostLogF(ctx->hNotify, L"ERR", L"  Deflate buffer overflow");
                 Defl_FreeBuffer(ctx);
                 BYTE status_len = ESP_STATUS_LEN(ctx);
-                Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
+                Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA,
+            ctx->last_read_val, ESP_FAIL, status_len,
+            NULL, status_len);
                 return;
             }
 
@@ -951,7 +963,9 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             ctx->defl_buf_size += data_len;
 
             TRACE_PROTO(TAG, "FLASH_DEFL_DATA accumulated %lu/%lu bytes", ctx->defl_buf_size, ctx->defl_buf_cap);
-            Serial_PostLogF(ctx->hNotify, L"ESP", L"  Accumulated %lu/%lu bytes", ctx->defl_buf_size, ctx->defl_buf_cap);
+            Serial_PostLogF(ctx->hNotify, L"ESP",
+                L"  Accumulated %lu/%lu bytes",
+                ctx->defl_buf_size, ctx->defl_buf_cap);
         }
 
         ctx->flash_seq = seq + 1;
@@ -1275,7 +1289,9 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         BYTE received = (BYTE)(pkt->value & 0xFF);
         if (expected != received) {
             TRACE_PROTO(TAG, "FLASH_DATA checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
-            Serial_PostLogF(ctx->hNotify, L"ESP", L"  Checksum mismatch: expected=0x%02X received=0x%02X", expected, received);
+            Serial_PostLogF(ctx->hNotify, L"ESP",
+                L"  Checksum mismatch: expected=0x%02X "
+                L"received=0x%02X", expected, received);
             BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val, ESP_FAIL, status_len, NULL, status_len);
             return;

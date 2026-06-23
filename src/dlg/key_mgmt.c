@@ -361,8 +361,12 @@ static void RefreshListView(HWND hList, int selectIndex)
         ListView_SetItemText(hList, idx, 1, (LPWSTR)GetPurposeName(purpose));
 
         /* Column 2: Status (set/empty) */
-        BOOL empty = IsKeyEmpty(&g_device.chip, blocks[i].efuse_offset, blocks[i].key_size);
-        ListView_SetItemText(hList, idx, 2, (LPWSTR)LoadStr(empty ? IDS_KEY_MGMT_STATUS_EMPTY : IDS_KEY_MGMT_STATUS_SET));
+        BOOL empty = IsKeyEmpty(&g_device.chip,
+                                blocks[i].efuse_offset,
+                                blocks[i].key_size);
+        ListView_SetItemText(hList, idx, 2,
+            (LPWSTR)LoadStr(empty ? IDS_KEY_MGMT_STATUS_EMPTY
+                                  : IDS_KEY_MGMT_STATUS_SET));
 
         /* Column 3: Size */
         WCHAR wSize[16];
@@ -644,7 +648,9 @@ static void HandlePurpose(HWND hDlg, HWND hList)
 
     /* Build purpose list */
     BYTE currentPurpose = Chip_GetKeyPurpose(&g_device.chip, sel);
-    BOOL isS3Key5 = ((g_device.chip.type == CHIP_ESP32S3 || g_device.chip.type == CHIP_ESP32C3 || g_device.chip.type == CHIP_ESP32C6) && sel == 5);
+    BOOL isS3Key5 = ((g_device.chip.type == CHIP_ESP32S3 ||
+                      g_device.chip.type == CHIP_ESP32C3 ||
+                      g_device.chip.type == CHIP_ESP32C6) && sel == 5);
 
     /* Simple dialog using MessageBox with choices isn't ideal;
        use a combo box in a dialog. For simplicity, use a track popup menu. */

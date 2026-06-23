@@ -40,13 +40,24 @@ static const char *TAG = "GUI";
 #endif
 
 /* Populate flash size combo box based on chip selection */
-static const WCHAR *esp8266_flash_names[] = { L"256KB", L"512KB", L"1MB", L"2MB", L"4MB", L"8MB", L"16MB" };
-static const DWORD  esp8266_flash_sizes[] = { 256*1024, 512*1024, 1024*1024, 2*1024*1024, 4*1024*1024, 8*1024*1024, 16*1024*1024 };
+static const WCHAR *esp8266_flash_names[] = {
+    L"256KB", L"512KB", L"1MB", L"2MB", L"4MB", L"8MB", L"16MB"
+};
+static const DWORD esp8266_flash_sizes[] = {
+    256*1024, 512*1024, 1024*1024, 2*1024*1024,
+    4*1024*1024, 8*1024*1024, 16*1024*1024
+};
 #define ESP8266_FLASH_COUNT 7
 #define ESP8266_FLASH_DEFAULT 4  /* 4MB */
 
-static const WCHAR *esp32_flash_names[] = { L"1MB", L"2MB", L"4MB", L"8MB", L"16MB", L"32MB", L"64MB", L"128MB" };
-static const DWORD  esp32_flash_sizes[] = { 1024*1024, 2*1024*1024, 4*1024*1024, 8*1024*1024, 16*1024*1024, 32*1024*1024, 64*1024*1024, 128*1024*1024 };
+static const WCHAR *esp32_flash_names[] = {
+    L"1MB", L"2MB", L"4MB", L"8MB",
+    L"16MB", L"32MB", L"64MB", L"128MB"
+};
+static const DWORD esp32_flash_sizes[] = {
+    1024*1024, 2*1024*1024, 4*1024*1024, 8*1024*1024,
+    16*1024*1024, 32*1024*1024, 64*1024*1024, 128*1024*1024
+};
 #define ESP32_FLASH_COUNT 8
 #define ESP32_FLASH_DEFAULT 2  /* 4MB */
 
@@ -206,7 +217,9 @@ static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode, BYTE reset_ca
     Serial_PostLogF(hNotify, L"CFG", L"Baud rate: %lu", bootBaud);
 
     char boot_msg_buf[512];
-    const char *msg = Chip_GetBootMessage(&g_device.chip, download_mode, reset_cause, boot_msg_buf, sizeof(boot_msg_buf));
+    const char *msg = Chip_GetBootMessage(&g_device.chip,
+        download_mode, reset_cause, boot_msg_buf,
+        sizeof(boot_msg_buf));
     if (msg[0]) {
         Serial_WriteData(ctx, (const BYTE *)msg, (DWORD)strlen(msg), hNotify);
 
@@ -369,7 +382,9 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     tbab.nID = IDB_TOOLBAR;
     int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 12, (LPARAM)&tbab);
 
-    /* Toolbar buttons: New, Open, Save | DeviceProps | Connect, Reconnect, Disconnect | Import, Export, KeyMgmt | Clear, SaveLog */
+    /* Toolbar buttons: New, Open, Save | DeviceProps |
+       Connect, Reconnect, Disconnect | Import, Export,
+       KeyMgmt | Clear, SaveLog */
     TBBUTTON buttons[18] = {0};
     int btn = 0;
 

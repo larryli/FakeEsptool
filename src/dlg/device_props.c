@@ -143,7 +143,10 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM l
                     } else {
                         if (oldFlashData)
                             HeapFree(GetProcessHeap(), 0, oldFlashData);
-                        MessageBoxW(hDlg, LoadStr(IDS_MSG_FAIL_UPDATE_DEV), LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+                        MessageBoxW(hDlg,
+                                    LoadStr(IDS_MSG_FAIL_UPDATE_DEV),
+                                    LoadStr(IDS_MSG_ERROR),
+                                    MB_OK | MB_ICONERROR);
                     }
                 } else {
                     EndDialog(hDlg, IDOK);

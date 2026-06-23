@@ -164,6 +164,7 @@ output\esptool.obj: \
 	src\esptool\slip.h \
 	src\serial.h \
 	src\utils\deflate.h \
+	src\utils\encrypt.h \
 	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 

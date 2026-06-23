@@ -213,7 +213,9 @@ void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD statu
  * @data:       Optional data payload (can be NULL if data_len=0)
  * @data_len:   Data payload length in bytes
  */
-void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val, DWORD status, BYTE status_len, const BYTE *data, WORD data_len);
+void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val,
+                           DWORD status, BYTE status_len,
+                           const BYTE *data, WORD data_len);
 
 /*
  * Esptool_CalcChecksum - Calculate XOR checksum

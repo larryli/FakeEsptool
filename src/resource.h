@@ -183,7 +183,7 @@
 #define IDS_KEY_MGMT_FAIL_WRITE      10212  /* "Failed to write key file." */
 #define IDS_KEY_MGMT_SIZE_MISMATCH   10213  /* "Key file size (%lu bytes) does not match key block size (%d bytes)." */
 #define IDS_KEY_MGMT_KEY_EMPTY       10214  /* "Selected key block is empty." */
-#define IDS_KEY_MGMT_CONFIRM_OVERWRITE 10215  /* "Selected key block already contains a key.\nOverwrite with a new random key?" */
+#define IDS_KEY_MGMT_CONFIRM_OVERWRITE 10215  /* "Selected key block already contains\na key. Overwrite?" */
 #define IDS_KEY_MGMT_CONFIRM_CLEAR   10216  /* "Clear the selected key block? This cannot be undone." */
 #define IDS_KEY_MGMT_ALREADY_EMPTY   10217  /* "Selected key block is already empty." */
 #define IDS_KEY_MGMT_CAPTION         10219  /* "Key Management" */
