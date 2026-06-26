@@ -8,8 +8,10 @@
 #include "main.h"
 #include "app_commands.h"
 #include "app_logview.h"
+#include "device_file.h"
 #include "dlg/dlg.h"
-#include "esptool/device.h"
+#include "esptool/chip.h"
+#include "esptool/flash.h"
 #include "esptool/esptool.h"
 #include "resource.h"
 #include "serial.h"
@@ -117,7 +119,10 @@ SERIAL_CTX g_serial = {.hPort = NULL,
                        .hStartEvent = NULL,
                        .hNotify = NULL,
                        .bRunning = FALSE};
-DEVICE_CTX g_device = {0};
+CHIP_CTX g_chip = {0};
+FLASH_CTX g_flash = {0};
+WCHAR g_deviceFile[MAX_PATH] = {0};
+BOOL g_deviceModified = FALSE;
 ESPTOOL_CTX g_esptool = {0};
 static HWND g_hWnd = NULL; /* Main window handle */
 HWND g_hToolbar = NULL;
@@ -153,7 +158,7 @@ static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam);
  */
 void OnDeviceModified(void)
 {
-    Device_SetModified(&g_device, TRUE);
+    g_deviceModified = TRUE;
     if (g_hWnd) {
         UpdateTitle(g_hWnd);
         UpdateStatusBar();
@@ -223,13 +228,13 @@ static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode,
 {
     Esptool_ResetState(&g_esptool);
 
-    DWORD bootBaud = Chip_GetBootBaudRate(&g_device.chip);
+    DWORD bootBaud = Chip_GetBootBaudRate(&g_chip);
     Serial_SetBaudRate(ctx, bootBaud);
     Serial_PostLogF(hNotify, L"CFG", L"Baud rate: %lu", bootBaud);
 
     char boot_msg_buf[512];
     const char *msg =
-        Chip_GetBootMessage(&g_device.chip, download_mode, reset_cause,
+        Chip_GetBootMessage(&g_chip, download_mode, reset_cause,
                             boot_msg_buf, sizeof(boot_msg_buf));
     if (msg[0]) {
         Serial_WriteData(ctx, (const BYTE *)msg, (DWORD)strlen(msg), hNotify);
@@ -955,9 +960,11 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
     const WCHAR *cmdFilePath = (const WCHAR *)lParam;
     if (cmdFilePath && cmdFilePath[0]) {
         TRACE_FW(TAG, "Opening command line file: %ls", cmdFilePath);
-        if (Device_Load(&g_device, cmdFilePath)) {
+        if (DeviceFile_Load(&g_chip, &g_flash, cmdFilePath)) {
             Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
             Config_SetLastDeviceFile(cmdFilePath);
+            g_deviceModified = FALSE;
+            wcscpy(g_deviceFile, cmdFilePath);
             UpdateStatusBar();
             UpdateTitle(hWnd);
             SetWindowTextW(g_hEdit, L"");
@@ -982,8 +989,10 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
             int ret = MessageBoxW(hWnd, msg, LoadStr(IDS_OPEN_DEVICE_TITLE),
                                   MB_YESNO | MB_ICONQUESTION);
             if (ret == IDYES) {
-                if (Device_Load(&g_device, lastFile)) {
+                if (DeviceFile_Load(&g_chip, &g_flash, lastFile)) {
                     Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+                    g_deviceModified = FALSE;
+                    wcscpy(g_deviceFile, lastFile);
                     UpdateMenuState(hWnd);
                     UpdateStatusBar();
                     UpdateTitle(hWnd);
@@ -996,8 +1005,13 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
     /* No last file or user declined - create default device */
     {
         static const BYTE defaultMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0x01};
-        if (Device_Init(&g_device, CHIP_ESP32, 4 * 1024 * 1024, defaultMac)) {
-            g_device.chip.xtal_freq = XTAL_FREQ_40M;
+        if (Chip_Init(&g_chip, CHIP_ESP32) &&
+            Flash_Init(&g_flash, 4 * 1024 * 1024)) {
+            Chip_SetFlashSize(&g_chip, 4 * 1024 * 1024);
+            Chip_SetMac(&g_chip, defaultMac);
+            g_chip.xtal_freq = XTAL_FREQ_40M;
+            g_deviceModified = FALSE;
+            g_deviceFile[0] = 0;
             Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
             UpdateMenuState(hWnd);
             UpdateStatusBar();
@@ -1104,7 +1118,8 @@ static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam)
     }
     Serial_Close(&g_serial);
     Esptool_Close(&g_esptool);
-    Device_Close(&g_device);
+    Flash_Close(&g_flash);
+    Chip_Close(&g_chip);
     if (g_hRichEdit) {
         FreeLibrary(g_hRichEdit);
         g_hRichEdit = NULL;
@@ -1130,7 +1145,7 @@ static BOOL Main_Init(HINSTANCE hInstance)
     InitCommonControlsEx(&icex);
 
     /* Initialize esptool protocol with pointers to device data */
-    Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
+    Esptool_Init(&g_esptool, &g_chip, &g_flash);
     Esptool_SetWriteCallback(&g_esptool, OnSerialWrite);
     Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
 

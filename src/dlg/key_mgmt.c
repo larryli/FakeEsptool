@@ -127,7 +127,7 @@ static const KEY_BLOCK_INFO key_blocks_esp32c6[] = {
  */
 static const KEY_BLOCK_INFO *GetKeyBlocks(int *count)
 {
-    switch (g_device.chip.type) {
+    switch (g_chip.type) {
     case CHIP_ESP8266:
         *count = 0;
         return NULL;
@@ -378,11 +378,11 @@ static void RefreshListView(HWND hList, int selectIndex)
         int idx = ListView_InsertItem(hList, &item);
 
         /* Column 1: Purpose (from eFuse KEY_PURPOSE field) */
-        BYTE purpose = Chip_GetKeyPurpose(&g_device.chip, i);
+        BYTE purpose = Chip_GetKeyPurpose(&g_chip, i);
         ListView_SetItemText(hList, idx, 1, (LPWSTR)GetPurposeName(purpose));
 
         /* Column 2: Status (set/empty) */
-        BOOL empty = IsKeyEmpty(&g_device.chip, blocks[i].efuse_offset,
+        BOOL empty = IsKeyEmpty(&g_chip, blocks[i].efuse_offset,
                                 blocks[i].key_size);
         ListView_SetItemText(hList, idx, 2,
                              (LPWSTR)LoadStr(empty ? IDS_KEY_MGMT_STATUS_EMPTY
@@ -426,9 +426,9 @@ static void RefreshListView(HWND hList, int selectIndex)
     /* Purpose button: enabled only for S2/S3/C3/C6 (not ESP32/C2/ESP8266) */
     if (hPurpose) {
         BOOL canChange = !connected && count > 0 &&
-                         g_device.chip.type != CHIP_ESP8266 &&
-                         g_device.chip.type != CHIP_ESP32 &&
-                         g_device.chip.type != CHIP_ESP32C2;
+                         g_chip.type != CHIP_ESP8266 &&
+                         g_chip.type != CHIP_ESP32 &&
+                         g_chip.type != CHIP_ESP32C2;
         EnableWindow(hPurpose, canChange);
     }
 }
@@ -499,16 +499,16 @@ static void HandleImport(HWND hDlg, HWND hList)
     }
 
     /* Write key to eFuse */
-    WriteKey(&g_device.chip, blocks[sel].efuse_offset, blocks[sel].key_size,
+    WriteKey(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size,
              key);
-    Device_SetModified(&g_device, TRUE);
+    g_deviceModified = TRUE;
 
     /* Refresh list and keep selection */
     RefreshListView(hList, sel);
 
     /* Update hex display */
     WCHAR hexStr[HEX_STRING_MAX] = {0};
-    FormatKeyHex(&g_device.chip, blocks[sel].efuse_offset, blocks[sel].key_size,
+    FormatKeyHex(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size,
                  hexStr, HEX_STRING_MAX);
     SetDlgItemTextW(hDlg, IDC_KEY_HEX, hexStr);
 }
@@ -531,7 +531,7 @@ static void HandleExport(HWND hDlg, HWND hList)
         return;
     }
 
-    if (IsKeyEmpty(&g_device.chip, blocks[sel].efuse_offset,
+    if (IsKeyEmpty(&g_chip, blocks[sel].efuse_offset,
                    blocks[sel].key_size)) {
         MessageBoxW(hDlg, LoadStr(IDS_KEY_MGMT_KEY_EMPTY),
                     LoadStr(IDS_KEY_MGMT_CAPTION), MB_OK | MB_ICONWARNING);
@@ -556,7 +556,7 @@ static void HandleExport(HWND hDlg, HWND hList)
 
     /* Read key from eFuse */
     BYTE key[KEY_SIZE_MAX] = {0};
-    ReadKey(&g_device.chip, blocks[sel].efuse_offset, blocks[sel].key_size,
+    ReadKey(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size,
             key);
 
     /* Write file */
@@ -600,7 +600,7 @@ static void HandleGenerate(HWND hDlg, HWND hList)
     }
 
     /* Confirm overwrite if key is not empty */
-    if (!IsKeyEmpty(&g_device.chip, blocks[sel].efuse_offset,
+    if (!IsKeyEmpty(&g_chip, blocks[sel].efuse_offset,
                     blocks[sel].key_size)) {
         int ret = MessageBoxW(hDlg, LoadStr(IDS_KEY_MGMT_CONFIRM_OVERWRITE),
                               LoadStr(IDS_KEY_MGMT_CAPTION),
@@ -615,16 +615,16 @@ static void HandleGenerate(HWND hDlg, HWND hList)
     GenerateRandomKey(key, blocks[sel].key_size);
 
     /* Write key to eFuse */
-    WriteKey(&g_device.chip, blocks[sel].efuse_offset, blocks[sel].key_size,
+    WriteKey(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size,
              key);
-    Device_SetModified(&g_device, TRUE);
+    g_deviceModified = TRUE;
 
     /* Refresh list and keep selection */
     RefreshListView(hList, sel);
 
     /* Update hex display */
     WCHAR hexStr[HEX_STRING_MAX] = {0};
-    FormatKeyHex(&g_device.chip, blocks[sel].efuse_offset, blocks[sel].key_size,
+    FormatKeyHex(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size,
                  hexStr, HEX_STRING_MAX);
     SetDlgItemTextW(hDlg, IDC_KEY_HEX, hexStr);
 }
@@ -647,7 +647,7 @@ static void HandleClear(HWND hDlg, HWND hList)
         return;
     }
 
-    if (IsKeyEmpty(&g_device.chip, blocks[sel].efuse_offset,
+    if (IsKeyEmpty(&g_chip, blocks[sel].efuse_offset,
                    blocks[sel].key_size)) {
         MessageBoxW(hDlg, LoadStr(IDS_KEY_MGMT_ALREADY_EMPTY),
                     LoadStr(IDS_KEY_MGMT_CAPTION), MB_OK | MB_ICONINFORMATION);
@@ -664,9 +664,9 @@ static void HandleClear(HWND hDlg, HWND hList)
 
     /* Clear key (write zeros) */
     BYTE key[KEY_SIZE_MAX] = {0};
-    WriteKey(&g_device.chip, blocks[sel].efuse_offset, blocks[sel].key_size,
+    WriteKey(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size,
              key);
-    Device_SetModified(&g_device, TRUE);
+    g_deviceModified = TRUE;
 
     /* Refresh list and keep selection */
     RefreshListView(hList, sel);
@@ -692,10 +692,10 @@ static void HandlePurpose(HWND hDlg, HWND hList)
     }
 
     /* Build purpose list */
-    BYTE currentPurpose = Chip_GetKeyPurpose(&g_device.chip, sel);
-    BOOL isS3Key5 = ((g_device.chip.type == CHIP_ESP32S3 ||
-                      g_device.chip.type == CHIP_ESP32C3 ||
-                      g_device.chip.type == CHIP_ESP32C6) &&
+    BYTE currentPurpose = Chip_GetKeyPurpose(&g_chip, sel);
+    BOOL isS3Key5 = ((g_chip.type == CHIP_ESP32S3 ||
+                      g_chip.type == CHIP_ESP32C3 ||
+                      g_chip.type == CHIP_ESP32C6) &&
                      sel == 5);
 
     /* Simple dialog using MessageBox with choices isn't ideal;
@@ -746,8 +746,8 @@ static void HandlePurpose(HWND hDlg, HWND hList)
     }
 
     /* Set new purpose */
-    Chip_SetKeyPurpose(&g_device.chip, sel, newPurpose);
-    Device_SetModified(&g_device, TRUE);
+    Chip_SetKeyPurpose(&g_chip, sel, newPurpose);
+    g_deviceModified = TRUE;
 
     /* Refresh list and keep selection */
     RefreshListView(hList, sel);
@@ -778,7 +778,7 @@ static void HandleInitDialog(HWND hDlg)
     /* Set dialog title with chip name */
     WCHAR title[TITLE_MAX];
     WCHAR chipName[32];
-    MultiByteToWideChar(CP_UTF8, 0, g_device.chip.name, -1, chipName, 32);
+    MultiByteToWideChar(CP_UTF8, 0, g_chip.name, -1, chipName, 32);
     wsprintfW(title, LoadStr(IDS_KEY_MGMT_TITLE), chipName);
     SetWindowTextW(hDlg, title);
 
@@ -831,7 +831,7 @@ static void HandleItemChanged(HWND hDlg, const NMLISTVIEW *nmlv)
     /* Update key hex display */
     WCHAR hexStr[HEX_STRING_MAX] = {0};
     if (blocks && sel >= 0 && sel < count) {
-        FormatKeyHex(&g_device.chip, blocks[sel].efuse_offset,
+        FormatKeyHex(&g_chip, blocks[sel].efuse_offset,
                      blocks[sel].key_size, hexStr, HEX_STRING_MAX);
     }
     SetDlgItemTextW(hDlg, IDC_KEY_HEX, hexStr);

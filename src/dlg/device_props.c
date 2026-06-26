@@ -24,9 +24,9 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
     switch (msg) {
     case WM_INITDIALOG: {
         /* Save current values */
-        selectedChip = g_device.chip.type;
-        selectedFlash = g_device.flash.size;
-        memcpy(mac, g_device.chip.mac, 6);
+        selectedChip = g_chip.type;
+        selectedFlash = g_flash.size;
+        memcpy(mac, g_chip.mac, 6);
 
         HWND hChip = GetDlgItem(hDlg, IDC_CHIP_COMBO);
         SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP8266");
@@ -44,7 +44,7 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
         HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
         SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"40MHz");
         SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"26MHz");
-        SendMessageW(hXtal, CB_SETCURSEL, g_device.chip.xtal_freq, 0);
+        SendMessageW(hXtal, CB_SETCURSEL, g_chip.xtal_freq, 0);
         /* Disable XTAL freq for fixed-xtal chips */
         if (selectedChip == CHIP_ESP32C3 || selectedChip == CHIP_ESP32C6 ||
             selectedChip == CHIP_ESP32S2 || selectedChip == CHIP_ESP32S3) {
@@ -66,7 +66,7 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
                 int chipSel = (int)SendMessageW(hChip, CB_GETCURSEL, 0, 0);
                 HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
                 PopulateFlashSizes(hFlash, (CHIP_TYPE)chipSel,
-                                   g_device.flash.size);
+                                   g_flash.size);
                 /* Enable/disable XTAL freq combo based on chip type */
                 HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
                 BOOL xtalEditable =
@@ -115,31 +115,35 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
             BYTE xtalFreq = (BYTE)SendMessageW(hXtal, CB_GETCURSEL, 0, 0);
 
             /* Check if anything changed */
-            BOOL changed = (selectedChip != g_device.chip.type) ||
-                           (selectedFlash != g_device.flash.size) ||
-                           (memcmp(mac, g_device.chip.mac, 6) != 0) ||
-                           (xtalFreq != g_device.chip.xtal_freq);
+            BOOL changed = (selectedChip != g_chip.type) ||
+                           (selectedFlash != g_flash.size) ||
+                           (memcmp(mac, g_chip.mac, 6) != 0) ||
+                           (xtalFreq != g_chip.xtal_freq);
 
             if (changed) {
                 /* Reinitialize device with new settings */
-                DWORD oldFlashSize = g_device.flash.size;
-                BYTE *oldFlashData = g_device.flash.data;
-                g_device.flash.data = NULL; /* Prevent double-free */
+                DWORD oldFlashSize = g_flash.size;
+                BYTE *oldFlashData = g_flash.data;
+                g_flash.data = NULL; /* Prevent double-free */
 
-                Device_Close(&g_device);
-                if (Device_Init(&g_device, selectedChip, selectedFlash, mac)) {
-                    g_device.chip.xtal_freq = xtalFreq;
+                Flash_Close(&g_flash);
+                Chip_Close(&g_chip);
+                if (Chip_Init(&g_chip, selectedChip) &&
+                    Flash_Init(&g_flash, selectedFlash)) {
+                    Chip_SetFlashSize(&g_chip, selectedFlash);
+                    Chip_SetMac(&g_chip, mac);
+                    g_chip.xtal_freq = xtalFreq;
 
                     /* Copy old flash data if same size or larger */
                     if (oldFlashData && oldFlashSize <= selectedFlash) {
-                        memcpy(g_device.flash.data, oldFlashData, oldFlashSize);
+                        memcpy(g_flash.data, oldFlashData, oldFlashSize);
                     }
                     if (oldFlashData) {
                         HeapFree(GetProcessHeap(), 0, oldFlashData);
                     }
 
                     Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
-                    Device_SetModified(&g_device, TRUE);
+                    g_deviceModified = TRUE;
                     EndDialog(hDlg, IDOK);
                 } else {
                     if (oldFlashData) {

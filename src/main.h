@@ -9,6 +9,14 @@
 #define MAIN_H
 
 #include <windows.h>
+#include "esptool/chip.h"
+#include "esptool/flash.h"
+
+/* Global device state (defined in main.c) */
+extern CHIP_CTX g_chip;
+extern FLASH_CTX g_flash;
+extern WCHAR g_deviceFile[MAX_PATH];
+extern BOOL g_deviceModified;
 
 /* Custom window messages from serial/protocol layer to GUI */
 #define WM_SERIAL_RX                                                           \

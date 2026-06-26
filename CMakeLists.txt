@@ -16,11 +16,11 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 add_executable(FakeEsptool WIN32
     src/main.c
     src/serial.c
+    src/device_file.c
     src/esptool/slip.c
     src/esptool/chip.c
     src/esptool/flash.c
     src/esptool/esptool.c
-    src/esptool/device.c
     src/utils/config.c
     src/utils/lang.c
     src/utils/trace.c

@@ -6,7 +6,7 @@
 #define DLG_H
 
 #include "../esptool/chip.h"
-#include "../esptool/device.h"
+#include "../esptool/flash.h"
 #include "../esptool/esptool.h"
 #include "../resource.h"
 #include "../utils/lang.h"
@@ -15,7 +15,10 @@
 #include <windows.h>
 
 /* Global state (defined in main.c) */
-extern DEVICE_CTX g_device;
+extern CHIP_CTX g_chip;
+extern FLASH_CTX g_flash;
+extern WCHAR g_deviceFile[MAX_PATH];
+extern BOOL g_deviceModified;
 extern ESPTOOL_CTX g_esptool;
 extern WCHAR g_szSelectedPort[32];
 
