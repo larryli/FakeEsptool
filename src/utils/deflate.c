@@ -6,12 +6,13 @@
  */
 
 #include "deflate.h"
+#include "mem.h"
 #include <string.h>
 
 /* Memory allocation helpers */
 static inline void *deflate_malloc(size_t size)
 {
-    return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+    return Mem_ZeroAlloc((DWORD)size);
 }
 
 /*
@@ -19,9 +20,7 @@ static inline void *deflate_malloc(size_t size)
  */
 static inline void deflate_free(void *ptr)
 {
-    if (ptr) {
-        HeapFree(GetProcessHeap(), 0, ptr);
-    }
+    Mem_Free(ptr);
 }
 
 /* Static Huffman code tables for DEFLATE */

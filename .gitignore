@@ -1,5 +1,6 @@
 # Build directories
 build/
+build_debug_mem/
 build_tests/
 build_trace/
 

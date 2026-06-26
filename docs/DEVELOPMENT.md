@@ -63,6 +63,7 @@ Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
 | `utils/config.c/h` | 配置持久化 |
 | `utils/lang.c/h` | 国际化辅助 |
 | `utils/trace.c/h` | 调试日志 |
+| `utils/mem.c/h` | 内存管理（封装 Heap API，可选泄漏追踪） |
 | `utils/deflate.c/h` | DEFLATE 解压（用于压缩模式烧录） |
 | `utils/encrypt.c/h` | AES-XTS 加密/解密（用于加密烧录） |
 
@@ -87,6 +88,10 @@ cmake --build build --config Release -j
 # 禁用 RX/TX hex dump 中的 ASCII 解码（减少日志 tokens，适合 Agents 分析）
 cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DLOG_NOT_SHOW_ASCII=ON -B build
 cmake --build build --config Release -j
+
+# 启用内存泄漏追踪
+cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DENABLE_MEM_DEBUG=ON -B build
+cmake --build build --config Release -j
 ```
 
 **构建选项：**
@@ -96,6 +101,7 @@ cmake --build build --config Release -j
 | `ENABLE_TRACE_FW` | OFF | 启用框架调试日志（TRACE_FW） |
 | `ENABLE_TRACE_PROTO` | OFF | 启用协议调试日志（TRACE_PROTO） |
 | `LOG_NOT_SHOW_ASCII` | OFF | 禁用 RX/TX hex dump 中的 ASCII 解码 |
+| `ENABLE_MEM_DEBUG` | OFF | 启用内存分配泄漏追踪 |
 
 输出：`build/Release/FakeEsptool.exe`（Release）或 `build/Debug/FakeEsptool.exe`（Debug）
 
@@ -407,31 +413,35 @@ HeapFree(GetProcessHeap(), 0, snapshot);
 
 ### 内存管理
 
-本项目使用 Windows Heap API 进行动态内存管理，**禁止**使用 C 标准库的 `malloc`/`calloc`/`realloc`/`free`。
+协议层和设备层使用 `utils/mem.h` 提供的内存管理函数，**禁止**直接调用 `HeapAlloc`/`HeapFree`。
 
-**原因：**
-- 统一使用 Windows 堆管理，便于调试和内存泄漏检测
-- `HeapAlloc`/`HeapFree` 支持 `HEAP_ZERO_MEMORY` 标志替代 `calloc`
-- 与项目中已有的 `HeapAlloc`/`HeapFree` 用法保持一致
+**函数：**
+
+```c
+void *Mem_Alloc(DWORD size);              // 未初始化分配
+void *Mem_ZeroAlloc(DWORD size);          // 零初始化分配
+void *Mem_Realloc(void *ptr, DWORD size); // 重新分配
+void  Mem_Free(void *ptr);                // 释放（NULL 安全）
+```
 
 **规范：**
 
 ```c
-// ✗ 错误 - 使用 C 标准库
-void *ptr = malloc(size);
-void *ptr = calloc(count, size);
-free(ptr);
-
-// ✓ 正确 - 使用 Windows Heap API
-void *ptr = HeapAlloc(GetProcessHeap(), 0, size);           // 未初始化
-void *ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);  // 零初始化（替代 calloc）
+// ✗ 错误 - 直接调用 Heap API
+void *ptr = HeapAlloc(GetProcessHeap(), 0, size);
+void *ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
 HeapFree(GetProcessHeap(), 0, ptr);
+
+// ✓ 正确 - 使用 mem.h
+void *ptr = Mem_Alloc(size);
+void *ptr = Mem_ZeroAlloc(size);
+Mem_Free(ptr);
 ```
 
 **示例：**
 
 ```c
-BYTE *efuse = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, efuse_size);
+BYTE *efuse = (BYTE *)Mem_ZeroAlloc(efuse_size);
 if (!efuse) {
     TRACE_FW(TAG, "Failed to allocate eFuse");
     return FALSE;
@@ -439,14 +449,22 @@ if (!efuse) {
 
 // 使用 efuse...
 
-HeapFree(GetProcessHeap(), 0, efuse);
+Mem_Free(efuse);
+efuse = NULL;
 ```
 
+**调试模式：**
+
+启用 CMake 选项 `-DENABLE_MEM_DEBUG=ON` 启用内存泄漏追踪：
+- 维护全局分配链表，记录每个分配的文件、行号、大小
+- 程序退出时调用 `Mem_ReportLeaks()` 输出未释放的分配
+- 提供 `Mem_GetAllocCount()` 和 `Mem_GetTotalAllocSize()` 查询当前分配状态
+- Release 模式下零开销（宏展开为空）
+
 **注意事项：**
-- 始终检查 `HeapAlloc` 返回值，失败时返回 `NULL`
-- 使用 `HEAP_ZERO_MEMORY` 替代 `calloc` 的零初始化行为
-- 使用 `GetProcessHeap()` 获取进程默认堆句柄
+- 始终检查 `Mem_Alloc`/`Mem_ZeroAlloc` 返回值，失败时返回 `NULL`
 - 释放后将指针置为 `NULL`，防止悬挂指针
+- GUI 层（`app_commands.c`、`app_logview.c`、`serial.c`、`dlg/*.c`）可继续使用 `HeapAlloc`/`HeapFree`
 
 ## 调试
 

@@ -5,6 +5,7 @@
  */
 
 #include "chip.h"
+#include "../utils/mem.h"
 #include "../utils/trace.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -137,7 +138,7 @@ static BOOL InitChipCommon(CHIP_CTX *ctx, CHIP_TYPE type)
     ctx->has_usb = cfg->has_usb;
 
     ctx->efuse =
-        (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ctx->efuse_size);
+        (BYTE *)Mem_ZeroAlloc(ctx->efuse_size);
     if (!ctx->efuse) {
         TRACE_PROTO(TAG, "Failed to allocate eFuse for %s", cfg->name);
         return FALSE;
@@ -577,7 +578,7 @@ fail:
 void Chip_Close(CHIP_CTX *ctx)
 {
     if (ctx->efuse) {
-        HeapFree(GetProcessHeap(), 0, ctx->efuse);
+        Mem_Free(ctx->efuse);
         ctx->efuse = NULL;
     }
 }

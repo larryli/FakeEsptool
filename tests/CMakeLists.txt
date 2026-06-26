@@ -15,6 +15,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 add_executable(test_deflate
     test_deflate.c
     ../src/utils/deflate.c
+    ../src/utils/mem.c
 )
 
 # Include directories

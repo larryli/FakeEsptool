@@ -5,6 +5,7 @@
  */
 
 #include "flash.h"
+#include "../utils/mem.h"
 #include "../utils/trace.h"
 #include <string.h>
 #include <wincrypt.h>
@@ -31,7 +32,7 @@ BOOL Flash_Init(FLASH_CTX *ctx, DWORD size)
         return FALSE;
     }
 
-    ctx->data = (BYTE *)HeapAlloc(GetProcessHeap(), 0, size);
+    ctx->data = (BYTE *)Mem_Alloc(size);
     if (!ctx->data) {
         TRACE_PROTO(TAG, "Failed to allocate %lu bytes", size);
         return FALSE;
@@ -52,7 +53,7 @@ BOOL Flash_Init(FLASH_CTX *ctx, DWORD size)
 void Flash_Close(FLASH_CTX *ctx)
 {
     if (ctx->data) {
-        HeapFree(GetProcessHeap(), 0, ctx->data);
+        Mem_Free(ctx->data);
         ctx->data = NULL;
     }
 }

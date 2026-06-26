@@ -24,6 +24,7 @@ add_executable(FakeEsptool WIN32
     src/utils/config.c
     src/utils/lang.c
     src/utils/trace.c
+    src/utils/mem.c
     src/utils/deflate.c
     src/utils/encrypt.c
     src/app_logview.c
@@ -84,4 +85,12 @@ option(LOG_NOT_SHOW_ASCII "Hide ASCII decode in RX/TX hex dump" OFF)
 if(LOG_NOT_SHOW_ASCII)
     target_compile_definitions(FakeEsptool PRIVATE LOG_NOT_SHOW_ASCII=1)
     message(STATUS "ASCII decode in hex dump disabled")
+endif()
+
+# Memory debug options
+option(ENABLE_MEM_DEBUG "Enable memory allocation leak tracking" OFF)
+
+if(ENABLE_MEM_DEBUG)
+    target_compile_definitions(FakeEsptool PRIVATE ENABLE_MEM_DEBUG=1)
+    message(STATUS "Memory leak tracking enabled")
 endif()

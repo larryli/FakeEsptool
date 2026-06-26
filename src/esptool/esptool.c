@@ -8,6 +8,7 @@
 #include "../serial.h"
 #include "../utils/deflate.h"
 #include "../utils/encrypt.h"
+#include "../utils/mem.h"
 #include "../utils/trace.h"
 #include <stdio.h>
 #include <string.h>
@@ -105,7 +106,7 @@ BYTE Esptool_CalcChecksum(const BYTE *data, int len)
 static void Defl_FreeBuffer(ESPTOOL_CTX *ctx)
 {
     if (ctx->defl_buf) {
-        HeapFree(GetProcessHeap(), 0, ctx->defl_buf);
+        Mem_Free(ctx->defl_buf);
         ctx->defl_buf = NULL;
     }
     ctx->defl_buf_size = 0;
@@ -248,13 +249,12 @@ static DWORD Defl_FlushBuffer(ESPTOOL_CTX *ctx)
 
     /* Reuse or allocate decompression buffer */
     if (ctx->decomp_buf && ctx->decomp_buf_cap < ctx->defl_unc_size) {
-        HeapFree(GetProcessHeap(), 0, ctx->decomp_buf);
+        Mem_Free(ctx->decomp_buf);
         ctx->decomp_buf = NULL;
         ctx->decomp_buf_cap = 0;
     }
     if (!ctx->decomp_buf) {
-        ctx->decomp_buf = (BYTE *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
-                                            ctx->defl_unc_size);
+        ctx->decomp_buf = (BYTE *)Mem_ZeroAlloc(ctx->defl_unc_size);
         if (!ctx->decomp_buf) {
             TRACE_PROTO(TAG, "Failed to allocate decompression buffer");
             Serial_PostLog(ctx->hNotify, L"ERR",
@@ -340,7 +340,7 @@ void Esptool_Close(ESPTOOL_CTX *ctx)
 {
     Defl_FreeBuffer(ctx);
     if (ctx->decomp_buf) {
-        HeapFree(GetProcessHeap(), 0, ctx->decomp_buf);
+        Mem_Free(ctx->decomp_buf);
         ctx->decomp_buf = NULL;
         ctx->decomp_buf_cap = 0;
     }
@@ -487,7 +487,7 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val,
     if (encoded_max <= sizeof(encoded_stack)) {
         encoded = encoded_stack;
     } else {
-        encoded = (BYTE *)HeapAlloc(GetProcessHeap(), 0, encoded_max);
+        encoded = (BYTE *)Mem_Alloc(encoded_max);
         if (!encoded) {
             TRACE_PROTO(TAG, "Failed to allocate encoded buffer (%lu bytes)",
                         encoded_max);
@@ -504,7 +504,7 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val,
     }
 
     if (used_heap) {
-        HeapFree(GetProcessHeap(), 0, encoded);
+        Mem_Free(encoded);
     }
 
     const char *cmdName = GetCmdName(cmd);
@@ -956,7 +956,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* Allocate accumulation buffer */
     if (uncompressed_size > 0) {
         ctx->defl_buf =
-            (BYTE *)HeapAlloc(GetProcessHeap(), 0, uncompressed_size);
+            (BYTE *)Mem_Alloc(uncompressed_size);
         if (!ctx->defl_buf) {
             TRACE_PROTO(TAG,
                         "Failed to allocate deflate buffer: "
@@ -1148,7 +1148,7 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
                            2, NULL, 2);
 
     /* Allocate buffers once before the loop */
-    BYTE *buf = (BYTE *)HeapAlloc(GetProcessHeap(), 0, bsize);
+    BYTE *buf = (BYTE *)Mem_Alloc(bsize);
     if (!buf) {
         Serial_PostLog(ctx->hNotify, L"ERR",
                        L"  Failed to allocate read buffer");
@@ -1156,9 +1156,9 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 
     DWORD encoded_max = bsize * 2 + 2;
-    BYTE *encoded = (BYTE *)HeapAlloc(GetProcessHeap(), 0, encoded_max);
+    BYTE *encoded = (BYTE *)Mem_Alloc(encoded_max);
     if (!encoded) {
-        HeapFree(GetProcessHeap(), 0, buf);
+        Mem_Free(buf);
         Serial_PostLog(ctx->hNotify, L"ERR",
                        L"  Failed to allocate encode buffer");
         return;
@@ -1193,8 +1193,8 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 
     /* Free buffers after the loop */
-    HeapFree(GetProcessHeap(), 0, encoded);
-    HeapFree(GetProcessHeap(), 0, buf);
+    Mem_Free(encoded);
+    Mem_Free(buf);
 
     /* Step 3: Calculate and send 16-byte MD5 digest as final SLIP frame */
     BYTE md5[16];
