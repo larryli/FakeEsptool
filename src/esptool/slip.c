@@ -4,8 +4,8 @@
  * Handles SLIP framing for esptool serial communication.
  */
 
+#include "../esptool_hal.h"
 #include "slip.h"
-#include "../utils/trace.h"
 
 #if ENABLE_TRACE
 static const char *TAG = "SLIP";
@@ -53,7 +53,7 @@ BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b)
 
     if (ctx->escaped) {
         if (ctx->len >= SLIP_MAX_FRAME) {
-            TRACE_PROTO(TAG, "Frame overflow");
+            EsptoolHal_LogD(TAG, "Frame overflow");
             ctx->in_frame = FALSE;
             ctx->len = 0;
             return FALSE;
@@ -66,7 +66,7 @@ BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b)
             ctx->buf[ctx->len++] = SLIP_ESC;
             break;
         default:
-            TRACE_PROTO(TAG, "Invalid escape: 0x%02X", b);
+            EsptoolHal_LogD(TAG, "Invalid escape: 0x%02X", b);
             ctx->in_frame = FALSE;
             ctx->len = 0;
             return FALSE;
@@ -76,7 +76,7 @@ BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b)
         ctx->escaped = TRUE;
     } else {
         if (ctx->len >= SLIP_MAX_FRAME) {
-            TRACE_PROTO(TAG, "Frame overflow");
+            EsptoolHal_LogD(TAG, "Frame overflow");
             ctx->in_frame = FALSE;
             ctx->len = 0;
             return FALSE;

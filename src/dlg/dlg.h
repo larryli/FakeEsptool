@@ -8,6 +8,7 @@
 #include "../esptool/chip.h"
 #include "../esptool/flash.h"
 #include "../esptool/esptool.h"
+#include "../esptool_hal.h"
 #include "../resource.h"
 #include "../utils/lang.h"
 #include <commctrl.h>

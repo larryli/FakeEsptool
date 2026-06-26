@@ -807,7 +807,7 @@ void Main_CmdNewDevice(HWND hWnd)
         g_chip.xtal_freq = XTAL_FREQ_40M;
         g_deviceModified = FALSE;
         g_deviceFile[0] = 0;
-        Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+        EsptoolHal_SetModifiedCallback(OnDeviceModified);
         UpdateMenuState(hWnd);
         UpdateStatusBar();
         UpdateTitle(hWnd);
@@ -846,7 +846,7 @@ void Main_CmdOpenDevice(HWND hWnd)
         Flash_Close(&g_flash);
         Chip_Close(&g_chip);
         if (DeviceFile_Load(&g_chip, &g_flash, szFile)) {
-            Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+            EsptoolHal_SetModifiedCallback(OnDeviceModified);
             Config_SetLastDeviceFile(szFile);
             UpdateMenuState(hWnd);
             UpdateStatusBar();
@@ -882,7 +882,7 @@ BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath)
     Flash_Close(&g_flash);
     Chip_Close(&g_chip);
     if (DeviceFile_Load(&g_chip, &g_flash, filePath)) {
-        Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+        EsptoolHal_SetModifiedCallback(OnDeviceModified);
         Config_SetLastDeviceFile(filePath);
         UpdateMenuState(hWnd);
         UpdateStatusBar();

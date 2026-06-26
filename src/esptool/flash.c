@@ -4,10 +4,8 @@
  * Provides read/write/erase operations on simulated flash memory.
  */
 
+#include "../esptool_hal.h"
 #include "flash.h"
-#include "../utils/md5.h"
-#include "../utils/mem.h"
-#include "../utils/trace.h"
 #include <string.h>
 
 #if ENABLE_TRACE
@@ -30,16 +28,16 @@ BOOL Flash_Init(FLASH_CTX *ctx, DWORD size)
         return FALSE;
     }
 
-    ctx->data = (BYTE *)Mem_Alloc(size);
+    ctx->data = (BYTE *)EsptoolHal_MemAlloc(size);
     if (!ctx->data) {
-        TRACE_PROTO(TAG, "Failed to allocate %lu bytes", size);
+        EsptoolHal_LogD(TAG, "Failed to allocate %lu bytes", size);
         return FALSE;
     }
 
     memset(ctx->data, FLASH_ERASE_PATTERN, size);
     ctx->size = size;
 
-    TRACE_PROTO(TAG, "Initialized %lu KB flash", size / 1024);
+    EsptoolHal_LogD(TAG, "Initialized %lu KB flash", size / 1024);
     return TRUE;
 }
 
@@ -51,7 +49,7 @@ BOOL Flash_Init(FLASH_CTX *ctx, DWORD size)
 void Flash_Close(FLASH_CTX *ctx)
 {
     if (ctx->data) {
-        Mem_Free(ctx->data);
+        EsptoolHal_MemFree(ctx->data);
         ctx->data = NULL;
     }
 }
@@ -135,7 +133,7 @@ BOOL Flash_Erase(FLASH_CTX *ctx, DWORD addr, DWORD len)
 
     DWORD aligned_len = end_sector - start_sector;
 
-    TRACE_PROTO(TAG, "Erase: addr=0x%08lX len=%lu -> aligned: 0x%08lX len=%lu",
+    EsptoolHal_LogD(TAG, "Erase: addr=0x%08lX len=%lu -> aligned: 0x%08lX len=%lu",
                 addr, len, start_sector, aligned_len);
 
     memset(ctx->data + start_sector, FLASH_ERASE_PATTERN, aligned_len);
@@ -173,5 +171,5 @@ void Flash_CalcMd5(const FLASH_CTX *ctx, DWORD addr, DWORD len, BYTE md5[16])
         return;
     }
 
-    MD5_Calc(ctx->data + addr, len, md5);
+    EsptoolHal_MD5Calc(ctx->data + addr, len, md5);
 }

@@ -2,11 +2,15 @@
  * efuse.c - eFuse controller simulation and field queries for ESP chips.
  */
 
+#include "../esptool_hal.h"
 #include "efuse.h"
 #include "chip.h"
-#include "../utils/trace.h"
 #include <stdio.h>
 #include <string.h>
+
+#if ENABLE_TRACE
+static const char *TAG = "EFUSE";
+#endif
 
 #if ENABLE_TRACE
 static const char *TAG = "EFUSE";
@@ -93,7 +97,7 @@ static void EfuseWrite32(CHIP_CTX *ctx, int offset, DWORD val)
         ctx->efuse[offset + 1] |= (BYTE)((val >> 8) & 0xFF);
         ctx->efuse[offset + 2] |= (BYTE)((val >> 16) & 0xFF);
         ctx->efuse[offset + 3] |= (BYTE)((val >> 24) & 0xFF);
-        TRACE_PROTO(TAG,
+        EsptoolHal_LogD(TAG,
                     "eFuse write: offset=0x%X val=0x%08lX "
                     "before=%02X%02X%02X%02X after=%02X%02X%02X%02X",
                     offset, val, b3, b2, b1, b0, ctx->efuse[offset + 3],
@@ -117,7 +121,7 @@ BOOL Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, DWORD val)
             int word_idx = (offset - wr_ofs) / 4;
             if (word_idx < 8) {
                 ctx->pgm_data[blk * 8 + word_idx] = val;
-                TRACE_PROTO(TAG, "ESP32 BLOCK%d PGM_DATA%d = 0x%08lX", blk,
+                EsptoolHal_LogD(TAG, "ESP32 BLOCK%d PGM_DATA%d = 0x%08lX", blk,
                             word_idx, val);
             }
             return TRUE;
@@ -126,13 +130,13 @@ BOOL Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, DWORD val)
 
     /* CONF_REG */
     if (offset == (int)ctx->efuse_conf_ofs) {
-        TRACE_PROTO(TAG, "EFUSE_CONF = 0x%08lX", val);
+        EsptoolHal_LogD(TAG, "EFUSE_CONF = 0x%08lX", val);
         return TRUE;
     }
 
     /* CMD_REG */
     if (offset == (int)ctx->efuse_cmd_ofs) {
-        TRACE_PROTO(TAG, "EFUSE_CMD = 0x%08lX", val);
+        EsptoolHal_LogD(TAG, "EFUSE_CMD = 0x%08lX", val);
         if (val == 0x1) {
             /* EFUSE_CMD_READ: Copy write registers to read registers */
             for (int blk = 0; blk < num_blocks; blk++) {
@@ -152,7 +156,7 @@ BOOL Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, DWORD val)
                 for (int i = 0; i < block_len; i++) {
                     EfuseWrite32(ctx, block_offset + i * 4, blk_pgm[i]);
                 }
-                TRACE_PROTO(
+                EsptoolHal_LogD(
                     TAG, "ESP32 eFuse BURN block%d at offset 0x%X (%d words)",
                     blk, block_offset, block_len);
             }
@@ -176,20 +180,20 @@ BOOL Chip_WriteRegModern(CHIP_CTX *ctx, int offset, DWORD val)
         int idx = offset / 4;
         if (idx < 8) {
             ctx->pgm_data[idx] = val;
-            TRACE_PROTO(TAG, "PGM_DATA%d = 0x%08lX", idx, val);
+            EsptoolHal_LogD(TAG, "PGM_DATA%d = 0x%08lX", idx, val);
         }
         return TRUE;
     }
 
     /* CONF_REG */
     if (offset == (int)ctx->efuse_conf_ofs) {
-        TRACE_PROTO(TAG, "EFUSE_CONF = 0x%08lX", val);
+        EsptoolHal_LogD(TAG, "EFUSE_CONF = 0x%08lX", val);
         return TRUE;
     }
 
     /* CMD_REG */
     if (offset == (int)ctx->efuse_cmd_ofs) {
-        TRACE_PROTO(TAG, "EFUSE_CMD = 0x%08lX", val);
+        EsptoolHal_LogD(TAG, "EFUSE_CMD = 0x%08lX", val);
         if (val & 0x02) {
             int block = (int)((val >> 2) & 0xF);
             const DWORD *block_offsets = NULL;
@@ -222,7 +226,7 @@ BOOL Chip_WriteRegModern(CHIP_CTX *ctx, int offset, DWORD val)
                 for (int i = 0; i < 8; i++) {
                     EfuseWrite32(ctx, block_offset + i * 4, ctx->pgm_data[i]);
                 }
-                TRACE_PROTO(TAG, "eFuse BURN block%d at offset 0x%X", block,
+                EsptoolHal_LogD(TAG, "eFuse BURN block%d at offset 0x%X", block,
                             block_offset);
             }
         }
@@ -329,7 +333,7 @@ void Efuse_ApplyBlock0Defaults(CHIP_CTX *ctx)
         return;
     }
 
-    TRACE_PROTO(TAG,
+    EsptoolHal_LogD(TAG,
                 "ApplyBlock0Defaults: word0=%02X%02X%02X%02X, crypt_cfg=%02X",
                 ctx->efuse[0x03], ctx->efuse[0x02], ctx->efuse[0x01],
                 ctx->efuse[0x00], ctx->efuse[0x14]);
@@ -341,12 +345,12 @@ void Efuse_ApplyBlock0Defaults(CHIP_CTX *ctx)
             ctx->efuse[0x02] == 0 && ctx->efuse[0x03] == 0) {
             ctx->efuse[0x01] = 0x10;
             ctx->efuse[0x03] = 0x80;
-            TRACE_PROTO(TAG, "ApplyBlock0Defaults: word0 defaults applied");
+            EsptoolHal_LogD(TAG, "ApplyBlock0Defaults: word0 defaults applied");
         }
         /* word5: FLASH_CRYPT_CONFIG at bits[31:28] */
         if (ctx->efuse[0x17] == 0) {
             ctx->efuse[0x17] = 0xF0;
-            TRACE_FW(TAG, "ApplyBlock0Defaults: FLASH_CRYPT_CONFIG set to 0xF");
+            EsptoolHal_LogD(TAG, "ApplyBlock0Defaults: FLASH_CRYPT_CONFIG set to 0xF");
         }
         break;
     default:

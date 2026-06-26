@@ -4,12 +4,10 @@
  * Parses SLIP frames, routes commands, and sends responses.
  */
 
-#include "esptool.h"
-#include "../serial.h"
+#include "../esptool_hal.h"
 #include "../utils/deflate.h"
 #include "../utils/encrypt.h"
-#include "../utils/mem.h"
-#include "../utils/trace.h"
+#include "esptool.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -62,7 +60,7 @@ static const ESP_CMD_INFO commandTable[256] = {
 /* Minimum packet size check macro */
 #define CHECK_PKT_SIZE(pkt, min_size)                                          \
     if ((pkt)->size < (min_size)) {                                            \
-        TRACE_PROTO(TAG, "Packet too small: cmd=0x%02X size=%u min=%u",        \
+        EsptoolHal_LogD(TAG, "Packet too small: cmd=0x%02X size=%u min=%u",        \
                     (pkt)->command, (pkt)->size, (min_size));                  \
         return;                                                                \
     }
@@ -106,7 +104,7 @@ BYTE Esptool_CalcChecksum(const BYTE *data, int len)
 static void Defl_FreeBuffer(ESPTOOL_CTX *ctx)
 {
     if (ctx->defl_buf) {
-        Mem_Free(ctx->defl_buf);
+        EsptoolHal_MemFree(ctx->defl_buf);
         ctx->defl_buf = NULL;
     }
     ctx->defl_buf_size = 0;
@@ -133,7 +131,7 @@ static DWORD Esptool_EncryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len,
     int key_len = 0;
     int key_offset = Efuse_GetEncryptionKeyOffset(ctx->chip, &key_len);
 
-    TRACE_PROTO(TAG,
+    EsptoolHal_LogD(TAG,
                 "EncryptInPlace: flash_encrypted=%d key_offset=0x%02X "
                 "key_len=%d efuse=%p efuse_size=%d",
                 ctx->flash_encrypted, key_offset, key_len, ctx->chip->efuse,
@@ -141,46 +139,45 @@ static DWORD Esptool_EncryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len,
 
     if (key_offset < 0 || !ctx->chip->efuse ||
         key_offset + key_len > ctx->chip->efuse_size) {
-        TRACE_PROTO(TAG, "EncryptInPlace: No encryption key available");
-        Serial_PostLog(ctx->hNotify, L"ERR", L"  No encryption key in eFuse");
+        EsptoolHal_LogD(TAG, "EncryptInPlace: No encryption key available");
+        EsptoolHal_LogE("ERR", "  No encryption key in eFuse");
         return ESP_FAIL;
     }
 
     const BYTE *key = &ctx->chip->efuse[key_offset];
-    TRACE_PROTO(TAG,
+    EsptoolHal_LogD(TAG,
                 "EncryptInPlace: Key first 8 bytes: %02X %02X %02X %02X %02X "
                 "%02X %02X %02X",
                 key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7]);
 
     ENCRYPT_CTX enc_ctx;
-    int ret = Encrypt_Init(&enc_ctx, key, key_len, flash_addr);
-    TRACE_PROTO(TAG,
+    int ret = EsptoolHal_EncryptInit(&enc_ctx, key, key_len, flash_addr);
+    EsptoolHal_LogD(TAG,
                 "EncryptInPlace: Encrypt_Init ret=%d flash_addr=0x%08lX "
                 "len=%lu key_len=%d",
                 ret, flash_addr, len, key_len);
 
     if (ret == ENCRYPT_OK) {
-        ret = Encrypt_Data(&enc_ctx, data, data, len);
+        ret = EsptoolHal_EncryptData(&enc_ctx, data, data, len);
     }
 
     if (ret == ENCRYPT_OK) {
-        TRACE_PROTO(
+        EsptoolHal_LogD(
             TAG,
             "EncryptInPlace: Success, encrypted %lu bytes at offset 0x%08lX",
             len, flash_addr);
-        TRACE_PROTO(TAG,
+        EsptoolHal_LogD(TAG,
                     "EncryptInPlace: Output first 8 bytes: %02X %02X %02X %02X "
                     "%02X %02X %02X %02X",
                     data[0], data[1], data[2], data[3], data[4], data[5],
                     data[6], data[7]);
-        Serial_PostLogF(ctx->hNotify, L"ESP",
-                        L"  Encrypted %lu bytes at offset 0x%08lX", len,
+        EsptoolHal_LogI("ESP", "  Encrypted %lu bytes at offset 0x%08lX", len,
                         flash_addr);
         return ESP_OK;
     }
 
-    TRACE_PROTO(TAG, "EncryptInPlace: Encryption failed ret=%d", ret);
-    Serial_PostLogF(ctx->hNotify, L"ERR", L"  Encryption failed: %d", ret);
+    EsptoolHal_LogD(TAG, "EncryptInPlace: Encryption failed ret=%d", ret);
+    EsptoolHal_LogE("ERR", "  Encryption failed: %d", ret);
     return ESP_FAIL;
 }
 
@@ -203,7 +200,7 @@ static DWORD Esptool_DecryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len,
 
     /* ESP32: DISABLE_DL_DECRYPT disables decryption in download mode */
     if (Efuse_IsDownloadDecryptDisabled(ctx->chip)) {
-        TRACE_PROTO(
+        EsptoolHal_LogD(
             TAG,
             "DecryptInPlace: DISABLE_DL_DECRYPT set, returning ciphertext");
         return ESP_OK;
@@ -214,27 +211,27 @@ static DWORD Esptool_DecryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len,
 
     if (key_offset < 0 || !ctx->chip->efuse ||
         key_offset + key_len > ctx->chip->efuse_size) {
-        TRACE_PROTO(TAG, "DecryptInPlace: No encryption key available");
+        EsptoolHal_LogD(TAG, "DecryptInPlace: No encryption key available");
         return ESP_FAIL;
     }
 
     const BYTE *key = &ctx->chip->efuse[key_offset];
     ENCRYPT_CTX enc_ctx;
-    int ret = Encrypt_Init(&enc_ctx, key, key_len, flash_addr);
+    int ret = EsptoolHal_EncryptInit(&enc_ctx, key, key_len, flash_addr);
 
     if (ret == ENCRYPT_OK) {
-        ret = Decrypt_Data(&enc_ctx, data, data, len);
+        ret = EsptoolHal_DecryptData(&enc_ctx, data, data, len);
     }
 
     if (ret == ENCRYPT_OK) {
-        TRACE_PROTO(
+        EsptoolHal_LogD(
             TAG,
             "DecryptInPlace: Success, decrypted %lu bytes at offset 0x%08lX",
             len, flash_addr);
         return ESP_OK;
     }
 
-    TRACE_PROTO(TAG, "DecryptInPlace: Decryption failed ret=%d", ret);
+    EsptoolHal_LogD(TAG, "DecryptInPlace: Decryption failed ret=%d", ret);
     return ESP_FAIL;
 }
 
@@ -249,16 +246,15 @@ static DWORD Defl_FlushBuffer(ESPTOOL_CTX *ctx)
 
     /* Reuse or allocate decompression buffer */
     if (ctx->decomp_buf && ctx->decomp_buf_cap < ctx->defl_unc_size) {
-        Mem_Free(ctx->decomp_buf);
+        EsptoolHal_MemFree(ctx->decomp_buf);
         ctx->decomp_buf = NULL;
         ctx->decomp_buf_cap = 0;
     }
     if (!ctx->decomp_buf) {
-        ctx->decomp_buf = (BYTE *)Mem_ZeroAlloc(ctx->defl_unc_size);
+        ctx->decomp_buf = (BYTE *)EsptoolHal_MemZeroAlloc(ctx->defl_unc_size);
         if (!ctx->decomp_buf) {
-            TRACE_PROTO(TAG, "Failed to allocate decompression buffer");
-            Serial_PostLog(ctx->hNotify, L"ERR",
-                           L"  Failed to allocate decompression buffer");
+            EsptoolHal_LogD(TAG, "Failed to allocate decompression buffer");
+            EsptoolHal_LogE("ERR", "Failed to allocate decompression buffer");
             Defl_FreeBuffer(ctx);
             return ESP_FAIL;
         }
@@ -267,24 +263,23 @@ static DWORD Defl_FlushBuffer(ESPTOOL_CTX *ctx)
 
     /* Initialize decompressor */
     DEFLATE_CTX deflate_ctx;
-    deflate_init(&deflate_ctx, ctx->defl_buf, ctx->defl_buf_size,
+    EsptoolHal_DeflateInit(&deflate_ctx, ctx->defl_buf, ctx->defl_buf_size,
                  ctx->decomp_buf, ctx->decomp_buf_cap);
 
     /* Decompress */
-    int ret = deflate_decompress(&deflate_ctx);
+    int ret = EsptoolHal_DeflateDecompress(&deflate_ctx);
     if (ret != DEFLATE_OK) {
-        TRACE_PROTO(TAG, "Decompression failed: %d", ret);
-        Serial_PostLogF(ctx->hNotify, L"ERR", L"  Decompression failed: %d",
+        EsptoolHal_LogD(TAG, "Decompression failed: %d", ret);
+        EsptoolHal_LogE("ERR", "  Decompression failed: %d",
                         ret);
         Defl_FreeBuffer(ctx);
         return ESP_FAIL;
     }
 
     DWORD decomp_size = (DWORD)deflate_ctx.out_pos;
-    TRACE_PROTO(TAG, "Defl flush: %lu -> %lu bytes at offset 0x%08lX",
+    EsptoolHal_LogD(TAG, "Defl flush: %lu -> %lu bytes at offset 0x%08lX",
                 ctx->defl_buf_size, decomp_size, ctx->defl_offset);
-    Serial_PostLogF(ctx->hNotify, L"ESP",
-                    L"  Decompressed %lu -> %lu bytes at offset 0x%08lX",
+    EsptoolHal_LogI("ESP", "Decompressed %lu -> %lu bytes at offset 0x%08lX",
                     ctx->defl_buf_size, decomp_size, ctx->defl_offset);
 
     /* Encrypt if encrypted flag was set */
@@ -340,7 +335,7 @@ void Esptool_Close(ESPTOOL_CTX *ctx)
 {
     Defl_FreeBuffer(ctx);
     if (ctx->decomp_buf) {
-        Mem_Free(ctx->decomp_buf);
+        EsptoolHal_MemFree(ctx->decomp_buf);
         ctx->decomp_buf = NULL;
         ctx->decomp_buf_cap = 0;
     }
@@ -370,8 +365,8 @@ void Esptool_ResetState(ESPTOOL_CTX *ctx)
     ctx->defl_unc_size = 0;
     ctx->flash_encrypted = FALSE;
     Slip_Reset(&ctx->slip);
-    TRACE_PROTO(TAG, "Protocol state reset to IDLE");
-    Serial_PostLog(ctx->hNotify, L"ESP", L"  Protocol state reset");
+    EsptoolHal_LogD(TAG, "Protocol state reset to IDLE");
+    EsptoolHal_LogI("ESP", "  Protocol state reset");
 }
 
 /*
@@ -446,17 +441,16 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val,
     /* Calculate total size: header(8) + data_len */
     WORD total_data_len = data_len;
 
-    TRACE_PROTO(TAG,
+    EsptoolHal_LogD(TAG,
                 "SendResponse cmd=0x%02X req_val=0x%08lX status=0x%08lX "
                 "status_len=%u data_len=%u",
                 cmd, req_val, status, status_len, data_len);
 
     /* Check if data fits in response buffer */
     if (data_len > sizeof(resp) - 8) {
-        TRACE_PROTO(TAG, "Response too large: cmd=0x%02X data_len=%u max=%zu",
+        EsptoolHal_LogD(TAG, "Response too large: cmd=0x%02X data_len=%u max=%zu",
                     cmd, data_len, sizeof(resp) - 8);
-        Serial_PostLogF(ctx->hNotify, L"ERR",
-                        L"Response too large: cmd=0x%02X size=%u", cmd,
+        EsptoolHal_LogE("ERR", "Response too large: cmd=0x%02X size=%u", cmd,
                         data_len);
         return;
     }
@@ -487,9 +481,9 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val,
     if (encoded_max <= sizeof(encoded_stack)) {
         encoded = encoded_stack;
     } else {
-        encoded = (BYTE *)Mem_Alloc(encoded_max);
+        encoded = (BYTE *)EsptoolHal_MemAlloc(encoded_max);
         if (!encoded) {
-            TRACE_PROTO(TAG, "Failed to allocate encoded buffer (%lu bytes)",
+            EsptoolHal_LogD(TAG, "Failed to allocate encoded buffer (%lu bytes)",
                         encoded_max);
             return;
         }
@@ -504,14 +498,14 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val,
     }
 
     if (used_heap) {
-        Mem_Free(encoded);
+        EsptoolHal_MemFree(encoded);
     }
 
     const char *cmdName = GetCmdName(cmd);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"[RES] %hs size=%u status=0x%08lX",
+    EsptoolHal_LogI("ESP", "[RES] %hs size=%u status=0x%08lX",
                     cmdName, total_data_len, status);
 
-    TRACE_PROTO(TAG, "TX cmd=0x%02X status=%lu len=%u", cmd, status,
+    EsptoolHal_LogD(TAG, "TX cmd=0x%02X status=%lu len=%u", cmd, status,
                 total_data_len);
 }
 
@@ -579,8 +573,8 @@ static BOOL ParsePacket(const BYTE *frame, int frame_len, ESP_PACKET *pkt)
  */
 static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
-    TRACE_PROTO(TAG, "SYNC received");
-    Serial_PostLog(ctx->hNotify, L"ESP", L"  Sync handshake");
+    EsptoolHal_LogD(TAG, "SYNC received");
+    EsptoolHal_LogI("ESP", "  Sync handshake");
     ctx->state = ESP_STATE_SYNCED;
     ctx->synced = TRUE;
     ctx->stub_mode = FALSE;
@@ -613,8 +607,8 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD addr = ReadLE32(pkt->data);
     DWORD val = Chip_ReadReg(ctx->chip, addr);
 
-    TRACE_PROTO(TAG, "READ_REG addr=0x%08lX val=0x%08lX", addr, val);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX -> 0x%08lX", addr,
+    EsptoolHal_LogD(TAG, "READ_REG addr=0x%08lX val=0x%08lX", addr, val);
+    EsptoolHal_LogI("ESP", "  addr=0x%08lX -> 0x%08lX", addr,
                     val);
 
     /* Cache the register value for use in subsequent responses */
@@ -623,8 +617,7 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* Transition to READY state when chip detection register is read */
     if (addr == CHIP_DETECT_REG && ctx->state == ESP_STATE_SYNCED) {
         ctx->state = ESP_STATE_READY;
-        Serial_PostLog(ctx->hNotify, L"ESP",
-                       L"  Chip detected, ready for commands");
+        EsptoolHal_LogI("ESP", "Chip detected, ready for commands");
     }
 
     /* Real device returns register value in Value field (bytes 4-7),
@@ -661,12 +654,11 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         delayUs = ReadLE32(pkt->data + 12);
     }
 
-    TRACE_PROTO(TAG,
+    EsptoolHal_LogD(TAG,
                 "WRITE_REG addr=0x%08lX val=0x%08lX "
                 "mask=0x%08lX delay=%lu",
                 addr, val, mask, delayUs);
-    Serial_PostLogF(ctx->hNotify, L"ESP",
-                    L"  addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr,
+    EsptoolHal_LogI("ESP", "addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr,
                     val, mask, delayUs);
 
     /* Apply mask: only bits set in mask are written */
@@ -701,8 +693,8 @@ static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         old_baud = ReadLE32(pkt->data + 4);
     }
 
-    TRACE_PROTO(TAG, "CHANGE_BAUDRATE old=%lu new=%lu", old_baud, new_baud);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  old=%lu new=%lu", old_baud,
+    EsptoolHal_LogD(TAG, "CHANGE_BAUDRATE old=%lu new=%lu", old_baud, new_baud);
+    EsptoolHal_LogI("ESP", "  old=%lu new=%lu", old_baud,
                     new_baud);
 
     /* Send response at old baud rate first */
@@ -713,7 +705,7 @@ static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* Then switch to new baud rate */
     if (ctx->onBaudRate) {
         ctx->onBaudRate(new_baud);
-        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Baud rate switched to %lu",
+        EsptoolHal_LogI("ESP", "  Baud rate switched to %lu",
                         new_baud);
     }
 }
@@ -736,10 +728,9 @@ static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD bsize = ReadLE32(pkt->data + 8);
     DWORD offset = ReadLE32(pkt->data + 12);
 
-    TRACE_PROTO(TAG, "MEM_BEGIN total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
+    EsptoolHal_LogD(TAG, "MEM_BEGIN total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
                 total, blocks, bsize, offset);
-    Serial_PostLogF(ctx->hNotify, L"ESP",
-                    L"  total=%lu blocks=%lu bsize=%lu offset=0x%08lX", total,
+    EsptoolHal_LogI("ESP", "total=%lu blocks=%lu bsize=%lu offset=0x%08lX", total,
                     blocks, bsize, offset);
 
     ctx->state = ESP_STATE_MEM_WRITING;
@@ -764,8 +755,8 @@ static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     CHECK_PKT_SIZE(pkt, 16);
     DWORD seq = ReadLE32(pkt->data);
 
-    TRACE_PROTO(TAG, "MEM_DATA seq=%lu len=%u", seq, pkt->size);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%u", seq, pkt->size);
+    EsptoolHal_LogD(TAG, "MEM_DATA seq=%lu len=%u", seq, pkt->size);
+    EsptoolHal_LogI("ESP", "  seq=%lu len=%u", seq, pkt->size);
 
     /* Verify checksum: payload starts at offset 16 */
     if (pkt->size > 16) {
@@ -774,13 +765,11 @@ static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         BYTE expected = Esptool_CalcChecksum(payload, payload_len);
         BYTE received = (BYTE)(pkt->value & 0xFF);
         if (expected != received) {
-            TRACE_PROTO(TAG,
+            EsptoolHal_LogD(TAG,
                         "MEM_DATA checksum mismatch: "
                         "expected=0x%02X received=0x%02X",
                         expected, received);
-            Serial_PostLogF(
-                ctx->hNotify, L"ESP",
-                L"  Checksum mismatch: expected=0x%02X received=0x%02X",
+            EsptoolHal_LogI("ESP", "  Checksum mismatch: expected=0x%02X received=0x%02X",
                 expected, received);
             BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_MEM_DATA, ctx->last_read_val,
@@ -809,9 +798,9 @@ static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     CHECK_PKT_SIZE(pkt, 4);
     DWORD execute = ReadLE32(pkt->data);
 
-    TRACE_PROTO(TAG, "MEM_END execute=%lu", execute);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  execute=%lu", execute);
-    TRACE_PROTO(TAG, "MEM_END: stub_mode before=%d", ctx->stub_mode);
+    EsptoolHal_LogD(TAG, "MEM_END execute=%lu", execute);
+    EsptoolHal_LogI("ESP", "  execute=%lu", execute);
+    EsptoolHal_LogD(TAG, "MEM_END: stub_mode before=%d", ctx->stub_mode);
 
     ctx->state = ESP_STATE_READY;
 
@@ -828,10 +817,10 @@ static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             ctx->onWrite(ohai, sizeof(ohai));
         }
         ctx->stub_mode = TRUE;
-        Serial_PostLog(ctx->hNotify, L"ESP", L"  Stub mode: OHAI sent");
-        TRACE_PROTO(TAG, "MEM_END: OHAI sent, stub_mode=TRUE");
+        EsptoolHal_LogI("ESP", "  Stub mode: OHAI sent");
+        EsptoolHal_LogD(TAG, "MEM_END: OHAI sent, stub_mode=TRUE");
     } else {
-        TRACE_PROTO(TAG, "MEM_END: stub_mode already TRUE, skipping OHAI");
+        EsptoolHal_LogD(TAG, "MEM_END: stub_mode already TRUE, skipping OHAI");
     }
 }
 
@@ -865,11 +854,10 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* Release mode: reject plaintext writes when encryption is active */
     if (!encrypted && Efuse_IsFlashEncryptionEnabled(ctx->chip) &&
         Efuse_IsDownloadEncryptDisabled(ctx->chip)) {
-        TRACE_PROTO(
+        EsptoolHal_LogD(
             TAG,
             "FLASH_DEFL_BEGIN rejected: release mode, plaintext not allowed");
-        Serial_PostLog(ctx->hNotify, L"ERR",
-                       L"  Release mode: plaintext flash disabled");
+        EsptoolHal_LogE("ERR", "Release mode: plaintext flash disabled");
         BYTE status_len = ESP_STATUS_LEN(ctx);
         Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN,
                                ctx->last_read_val, ESP_FAIL, status_len, NULL,
@@ -877,11 +865,11 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         return;
     }
 
-    TRACE_PROTO(TAG,
+    EsptoolHal_LogD(TAG,
                 "FLASH_DEFL_BEGIN: flash_encrypted=%d "
                 "chip_type=%d stub_mode=%d",
                 encrypted, ctx->chip->type, ctx->stub_mode);
-    TRACE_PROTO(TAG,
+    EsptoolHal_LogD(TAG,
                 "FLASH_DEFL_BEGIN: IsFlashEncryptionEnabled=%d "
                 "IsDownloadEncryptDisabled=%d",
                 Efuse_IsFlashEncryptionEnabled(ctx->chip),
@@ -892,7 +880,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     {
         int key_len = 0;
         int key_offset = Efuse_GetEncryptionKeyOffset(ctx->chip, &key_len);
-        TRACE_PROTO(TAG,
+        EsptoolHal_LogD(TAG,
                     "FLASH_DEFL_BEGIN: key_offset=0x%02X key_len=%d efuse=%p "
                     "efuse_size=%d",
                     key_offset, key_len, ctx->chip->efuse,
@@ -900,27 +888,25 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         if (key_offset >= 0 && ctx->chip->efuse &&
             key_offset + key_len <= ctx->chip->efuse_size) {
             const BYTE *key = &ctx->chip->efuse[key_offset];
-            TRACE_PROTO(TAG,
+            EsptoolHal_LogD(TAG,
                         "FLASH_DEFL_BEGIN: Key first 8 bytes: %02X %02X %02X "
                         "%02X %02X %02X %02X %02X",
                         key[0], key[1], key[2], key[3], key[4], key[5], key[6],
                         key[7]);
         } else {
-            TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN: No encryption key available");
+            EsptoolHal_LogD(TAG, "FLASH_DEFL_BEGIN: No encryption key available");
         }
     }
 #endif
 
     /* Flush any pending accumulated data from previous session */
     if (ctx->defl_buf && ctx->defl_buf_size > 0) {
-        TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN: flushing previous accumulation");
-        Serial_PostLog(ctx->hNotify, L"ESP",
-                       L"  Flushing previous compressed data");
+        EsptoolHal_LogD(TAG, "FLASH_DEFL_BEGIN: flushing previous accumulation");
+        EsptoolHal_LogI("ESP", "Flushing previous compressed data");
         DWORD ret = Defl_FlushBuffer(ctx);
         if (ret != ESP_OK) {
-            TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN flush previous failed");
-            Serial_PostLog(ctx->hNotify, L"ERR",
-                           L"  Failed to flush previous compressed data");
+            EsptoolHal_LogD(TAG, "FLASH_DEFL_BEGIN flush previous failed");
+            EsptoolHal_LogE("ERR", "Failed to flush previous compressed data");
             BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN,
                                    ctx->last_read_val, ESP_FAIL, status_len,
@@ -948,22 +934,20 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         if (ctx->onModified) {
             ctx->onModified();
         }
-        Serial_PostLogF(ctx->hNotify, L"ESP",
-                        L"  Flash erased: offset=0x%08lX size=%lu", offset,
+        EsptoolHal_LogI("ESP", "Flash erased: offset=0x%08lX size=%lu", offset,
                         uncompressed_size);
     }
 
     /* Allocate accumulation buffer */
     if (uncompressed_size > 0) {
         ctx->defl_buf =
-            (BYTE *)Mem_Alloc(uncompressed_size);
+            (BYTE *)EsptoolHal_MemAlloc(uncompressed_size);
         if (!ctx->defl_buf) {
-            TRACE_PROTO(TAG,
+            EsptoolHal_LogD(TAG,
                         "Failed to allocate deflate buffer: "
                         "%lu bytes",
                         uncompressed_size);
-            Serial_PostLogF(ctx->hNotify, L"ERR",
-                            L"  Failed to allocate deflate buffer: %lu bytes",
+            EsptoolHal_LogE("ERR", "Failed to allocate deflate buffer: %lu bytes",
                             uncompressed_size);
             BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN,
@@ -973,7 +957,7 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         }
         ctx->defl_buf_cap = uncompressed_size;
         ctx->defl_buf_size = 0;
-        TRACE_PROTO(TAG, "FLASH_DEFL_BEGIN: allocated %lu bytes buffer",
+        EsptoolHal_LogD(TAG, "FLASH_DEFL_BEGIN: allocated %lu bytes buffer",
                     uncompressed_size);
     }
 
@@ -1003,19 +987,18 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD data_len = ReadLE32(pkt->data);
     DWORD seq = ReadLE32(pkt->data + 4);
 
-    TRACE_PROTO(
+    EsptoolHal_LogD(
         TAG, "HandleFlashDeflData: seq=%lu data_len=%lu pkt->size=%u state=%d",
         seq, data_len, pkt->size, ctx->state);
-    TRACE_PROTO(TAG, "FLASH_DEFL_DATA seq=%lu len=%lu", seq, data_len);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%lu", seq, data_len);
+    EsptoolHal_LogD(TAG, "FLASH_DEFL_DATA seq=%lu len=%lu", seq, data_len);
+    EsptoolHal_LogI("ESP", "  seq=%lu len=%lu", seq, data_len);
 
     /* Verify sequence number */
     if (seq != ctx->flash_seq) {
-        TRACE_PROTO(TAG,
+        EsptoolHal_LogD(TAG,
                     "FLASH_DEFL_DATA seq mismatch: expected=%lu received=%lu",
                     ctx->flash_seq, seq);
-        Serial_PostLogF(ctx->hNotify, L"ESP",
-                        L"  Seq mismatch: expected=%lu received=%lu",
+        EsptoolHal_LogI("ESP", "Seq mismatch: expected=%lu received=%lu",
                         ctx->flash_seq, seq);
         BYTE status_len = ESP_STATUS_LEN(ctx);
         Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val,
@@ -1030,13 +1013,12 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         BYTE expected = Esptool_CalcChecksum(payload, (int)data_len);
         BYTE received = (BYTE)(pkt->value & 0xFF);
         if (expected != received) {
-            TRACE_PROTO(TAG,
+            EsptoolHal_LogD(TAG,
                         "FLASH_DEFL_DATA checksum mismatch: expected=0x%02X "
                         "received=0x%02X",
                         expected, received);
-            Serial_PostLogF(ctx->hNotify, L"ESP",
-                            L"  Checksum mismatch: expected=0x%02X "
-                            L"received=0x%02X",
+            EsptoolHal_LogI("ESP", "Checksum mismatch: expected=0x%02X "
+                            "received=0x%02X",
                             expected, received);
             BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA,
@@ -1049,11 +1031,10 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         if (ctx->defl_buf_cap > 0 && data_len > 0) {
             /* Check buffer overflow */
             if (ctx->defl_buf_size + data_len > ctx->defl_buf_cap) {
-                TRACE_PROTO(TAG,
+                EsptoolHal_LogD(TAG,
                             "Deflate buffer overflow: size=%lu cap=%lu add=%lu",
                             ctx->defl_buf_size, ctx->defl_buf_cap, data_len);
-                Serial_PostLogF(ctx->hNotify, L"ERR",
-                                L"  Deflate buffer overflow");
+                EsptoolHal_LogE("ERR", "Deflate buffer overflow");
                 Defl_FreeBuffer(ctx);
                 BYTE status_len = ESP_STATUS_LEN(ctx);
                 Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA,
@@ -1065,10 +1046,9 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             memcpy(ctx->defl_buf + ctx->defl_buf_size, payload, data_len);
             ctx->defl_buf_size += data_len;
 
-            TRACE_PROTO(TAG, "FLASH_DEFL_DATA accumulated %lu/%lu bytes",
+            EsptoolHal_LogD(TAG, "FLASH_DEFL_DATA accumulated %lu/%lu bytes",
                         ctx->defl_buf_size, ctx->defl_buf_cap);
-            Serial_PostLogF(ctx->hNotify, L"ESP",
-                            L"  Accumulated %lu/%lu bytes", ctx->defl_buf_size,
+            EsptoolHal_LogI("ESP", "Accumulated %lu/%lu bytes", ctx->defl_buf_size,
                             ctx->defl_buf_cap);
         }
 
@@ -1092,14 +1072,14 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
-    TRACE_PROTO(TAG, "FLASH_DEFL_END");
-    Serial_PostLog(ctx->hNotify, L"ESP", L"  End compressed flash download");
+    EsptoolHal_LogD(TAG, "FLASH_DEFL_END");
+    EsptoolHal_LogI("ESP", "  End compressed flash download");
 
     /* Decompress accumulated data and write to flash */
     DWORD ret = Defl_FlushBuffer(ctx);
     if (ret != ESP_OK) {
-        TRACE_PROTO(TAG, "FLASH_DEFL_END flush failed");
-        Serial_PostLog(ctx->hNotify, L"ERR", L"  Decompression flush failed");
+        EsptoolHal_LogD(TAG, "FLASH_DEFL_END flush failed");
+        EsptoolHal_LogE("ERR", "  Decompression flush failed");
         ctx->state = ESP_STATE_READY;
         BYTE status_len = ESP_STATUS_LEN(ctx);
         Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_END, ctx->last_read_val,
@@ -1138,9 +1118,9 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     (void)psize;
 
-    TRACE_PROTO(TAG, "READ_FLASH addr=0x%08lX len=%lu bsize=%lu psize=%lu",
+    EsptoolHal_LogD(TAG, "READ_FLASH addr=0x%08lX len=%lu bsize=%lu psize=%lu",
                 addr, len, bsize, psize);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX len=%lu bsize=%lu",
+    EsptoolHal_LogI("ESP", "  addr=0x%08lX len=%lu bsize=%lu",
                     addr, len, bsize);
 
     /* Step 1: Send command ACK (2-byte status in command response) */
@@ -1148,19 +1128,17 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
                            2, NULL, 2);
 
     /* Allocate buffers once before the loop */
-    BYTE *buf = (BYTE *)Mem_Alloc(bsize);
+    BYTE *buf = (BYTE *)EsptoolHal_MemAlloc(bsize);
     if (!buf) {
-        Serial_PostLog(ctx->hNotify, L"ERR",
-                       L"  Failed to allocate read buffer");
+        EsptoolHal_LogE("ERR", "Failed to allocate read buffer");
         return;
     }
 
     DWORD encoded_max = bsize * 2 + 2;
-    BYTE *encoded = (BYTE *)Mem_Alloc(encoded_max);
+    BYTE *encoded = (BYTE *)EsptoolHal_MemAlloc(encoded_max);
     if (!encoded) {
-        Mem_Free(buf);
-        Serial_PostLog(ctx->hNotify, L"ERR",
-                       L"  Failed to allocate encode buffer");
+        EsptoolHal_MemFree(buf);
+        EsptoolHal_LogE("ERR", "Failed to allocate encode buffer");
         return;
     }
 
@@ -1173,8 +1151,7 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         }
 
         if (!Flash_Read(ctx->flash, addr + offset, buf, chunk_size)) {
-            Serial_PostLogF(ctx->hNotify, L"ERR",
-                            L"  Flash read failed at offset 0x%08lX",
+            EsptoolHal_LogE("ERR", "Flash read failed at offset 0x%08lX",
                             addr + offset);
             break;
         }
@@ -1193,8 +1170,8 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 
     /* Free buffers after the loop */
-    Mem_Free(encoded);
-    Mem_Free(buf);
+    EsptoolHal_MemFree(encoded);
+    EsptoolHal_MemFree(buf);
 
     /* Step 3: Calculate and send 16-byte MD5 digest as final SLIP frame */
     BYTE md5[16];
@@ -1206,8 +1183,8 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         ctx->onWrite(md5_encoded, (DWORD)md5_enc_len);
     }
 
-    TRACE_PROTO(TAG, "READ_FLASH complete: %lu bytes sent", len);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  Read complete: %lu bytes", len);
+    EsptoolHal_LogD(TAG, "READ_FLASH complete: %lu bytes sent", len);
+    EsptoolHal_LogI("ESP", "  Read complete: %lu bytes", len);
 }
 
 /*
@@ -1218,8 +1195,8 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleEraseFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
-    TRACE_PROTO(TAG, "ERASE_FLASH");
-    Serial_PostLog(ctx->hNotify, L"ESP", L"  Erase entire flash");
+    EsptoolHal_LogD(TAG, "ERASE_FLASH");
+    EsptoolHal_LogI("ESP", "  Erase entire flash");
 
     /* Free any pending deflate buffer */
     Defl_FreeBuffer(ctx);
@@ -1247,8 +1224,8 @@ static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD offset = ReadLE32(pkt->data);
     DWORD len = ReadLE32(pkt->data + 4);
 
-    TRACE_PROTO(TAG, "ERASE_BLOCK offset=0x%08lX len=%lu", offset, len);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  offset=0x%08lX len=%lu", offset,
+    EsptoolHal_LogD(TAG, "ERASE_BLOCK offset=0x%08lX len=%lu", offset, len);
+    EsptoolHal_LogI("ESP", "  offset=0x%08lX len=%lu", offset,
                     len);
 
     /* Free any pending deflate buffer */
@@ -1284,8 +1261,8 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD addr = ReadLE32(pkt->data);
     DWORD len = ReadLE32(pkt->data + 4);
 
-    TRACE_PROTO(TAG, "FLASH_MD5 addr=0x%08lX len=%lu", addr, len);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  addr=0x%08lX len=%lu", addr, len);
+    EsptoolHal_LogD(TAG, "FLASH_MD5 addr=0x%08lX len=%lu", addr, len);
+    EsptoolHal_LogI("ESP", "  addr=0x%08lX len=%lu", addr, len);
 
     BYTE md5[16];
     Flash_CalcMd5(ctx->flash, addr, len, md5);
@@ -1299,8 +1276,8 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         memcpy(&resp[0], md5, 16);
         resp[16] = 0x00; /* status byte 1 (success) */
         resp[17] = 0x00; /* status byte 2 (success) */
-        TRACE_PROTO(TAG, "  MD5 (stub, binary)");
-        Serial_PostLog(ctx->hNotify, L"ESP", L"  MD5 (stub, binary)");
+        EsptoolHal_LogD(TAG, "  MD5 (stub, binary)");
+        EsptoolHal_LogI("ESP", "  MD5 (stub, binary)");
         Esptool_SendResponseEx(ctx, ESP_CMD_SPI_FLASH_MD5, ctx->last_read_val,
                                ESP_OK, 2, resp, 18);
     } else {
@@ -1311,8 +1288,8 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         }
         resp[32] = 0x00; /* status byte 1 (success) */
         resp[33] = 0x00; /* status byte 2 (success) */
-        TRACE_PROTO(TAG, "  MD5=%.*s", 32, resp);
-        Serial_PostLogF(ctx->hNotify, L"ESP", L"  MD5=%.*hs", 32, resp);
+        EsptoolHal_LogD(TAG, "  MD5=%.*s", 32, resp);
+        EsptoolHal_LogI("ESP", "  MD5=%.*hs", 32, resp);
         Esptool_SendResponseEx(ctx, ESP_CMD_SPI_FLASH_MD5, ctx->last_read_val,
                                ESP_OK, 2, resp, 34);
     }
@@ -1348,10 +1325,9 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* Release mode: reject plaintext writes when encryption is active */
     if (!encrypted && Efuse_IsFlashEncryptionEnabled(ctx->chip) &&
         Efuse_IsDownloadEncryptDisabled(ctx->chip)) {
-        TRACE_PROTO(
+        EsptoolHal_LogD(
             TAG, "FLASH_BEGIN rejected: release mode, plaintext not allowed");
-        Serial_PostLog(ctx->hNotify, L"ERR",
-                       L"  Release mode: plaintext flash disabled");
+        EsptoolHal_LogE("ERR", "Release mode: plaintext flash disabled");
         BYTE status_len = ESP_STATUS_LEN(ctx);
         Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_BEGIN, ctx->last_read_val,
                                ESP_FAIL, status_len, NULL, status_len);
@@ -1367,13 +1343,11 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     ctx->flash_encrypted = (encrypted != 0);
     ctx->state = ESP_STATE_FLASH_WRITING;
 
-    TRACE_PROTO(TAG,
+    EsptoolHal_LogD(TAG,
                 "FLASH_BEGIN erase=%lu blocks=%lu bsize=%lu offset=0x%08lX "
                 "encrypted=%lu",
                 erase_size, num_blocks, block_size, offset, encrypted);
-    Serial_PostLogF(
-        ctx->hNotify, L"ESP",
-        L"  erase=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
+EsptoolHal_LogI("ESP", "  erase=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
         erase_size, num_blocks, block_size, offset, encrypted);
 
     /* Erase the flash region as requested by the host */
@@ -1382,8 +1356,7 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         if (ctx->onModified) {
             ctx->onModified();
         }
-        Serial_PostLogF(ctx->hNotify, L"ESP",
-                        L"  Flash erased: offset=0x%08lX size=%lu", offset,
+        EsptoolHal_LogI("ESP", "Flash erased: offset=0x%08lX size=%lu", offset,
                         erase_size);
     }
 
@@ -1410,15 +1383,14 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD data_len = ReadLE32(pkt->data);
     DWORD seq = ReadLE32(pkt->data + 4);
 
-    TRACE_PROTO(TAG, "FLASH_DATA seq=%lu len=%lu", seq, data_len);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  seq=%lu len=%lu", seq, data_len);
+    EsptoolHal_LogD(TAG, "FLASH_DATA seq=%lu len=%lu", seq, data_len);
+    EsptoolHal_LogI("ESP", "  seq=%lu len=%lu", seq, data_len);
 
     /* Verify sequence number */
     if (seq != ctx->flash_seq) {
-        TRACE_PROTO(TAG, "FLASH_DATA seq mismatch: expected=%lu received=%lu",
+        EsptoolHal_LogD(TAG, "FLASH_DATA seq mismatch: expected=%lu received=%lu",
                     ctx->flash_seq, seq);
-        Serial_PostLogF(ctx->hNotify, L"ESP",
-                        L"  Seq mismatch: expected=%lu received=%lu",
+        EsptoolHal_LogI("ESP", "Seq mismatch: expected=%lu received=%lu",
                         ctx->flash_seq, seq);
         BYTE status_len = ESP_STATUS_LEN(ctx);
         Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val,
@@ -1433,13 +1405,12 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         BYTE expected = Esptool_CalcChecksum(payload, (int)data_len);
         BYTE received = (BYTE)(pkt->value & 0xFF);
         if (expected != received) {
-            TRACE_PROTO(
+            EsptoolHal_LogD(
                 TAG,
                 "FLASH_DATA checksum mismatch: expected=0x%02X received=0x%02X",
                 expected, received);
-            Serial_PostLogF(ctx->hNotify, L"ESP",
-                            L"  Checksum mismatch: expected=0x%02X "
-                            L"received=0x%02X",
+            EsptoolHal_LogI("ESP", "Checksum mismatch: expected=0x%02X "
+                            "received=0x%02X",
                             expected, received);
             BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val,
@@ -1450,8 +1421,7 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         /* Encrypt if encrypted flag was set */
         if (Esptool_EncryptInPlace(ctx, payload, data_len, ctx->flash_offset) !=
             ESP_OK) {
-            Serial_PostLogF(ctx->hNotify, L"ERR",
-                            L"  Encryption failed at offset 0x%08lX",
+            EsptoolHal_LogE("ERR", "Encryption failed at offset 0x%08lX",
                             ctx->flash_offset);
             BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val,
@@ -1492,20 +1462,18 @@ static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     CHECK_PKT_SIZE(pkt, 4);
     DWORD reboot = ReadLE32(pkt->data);
 
-    TRACE_PROTO(TAG, "FLASH_END reboot=%lu", reboot);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  reboot=%lu", reboot);
+    EsptoolHal_LogD(TAG, "FLASH_END reboot=%lu", reboot);
+    EsptoolHal_LogI("ESP", "  reboot=%lu", reboot);
 
     /* Flush any pending deflate buffer (ROM mode scenario) */
     if (ctx->defl_buf && ctx->defl_buf_size > 0) {
-        TRACE_PROTO(TAG,
+        EsptoolHal_LogD(TAG,
                     "FLASH_END: flushing pending deflate buffer (%lu bytes)",
                     ctx->defl_buf_size);
-        Serial_PostLog(ctx->hNotify, L"ESP",
-                       L"  Flushing pending compressed data");
+        EsptoolHal_LogI("ESP", "Flushing pending compressed data");
         if (Defl_FlushBuffer(ctx) != ESP_OK) {
-            TRACE_PROTO(TAG, "FLASH_END: flush failed");
-            Serial_PostLog(ctx->hNotify, L"ERR",
-                           L"  Failed to flush compressed data");
+            EsptoolHal_LogD(TAG, "FLASH_END: flush failed");
+            EsptoolHal_LogE("ERR", "Failed to flush compressed data");
         }
     }
 
@@ -1535,17 +1503,17 @@ static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
-    TRACE_PROTO(TAG, "GET_SECURITY_INFO");
-    Serial_PostLog(ctx->hNotify, L"ESP", L"  Get security info");
+    EsptoolHal_LogD(TAG, "GET_SECURITY_INFO");
+    EsptoolHal_LogI("ESP", "  Get security info");
 
     /* ESP8266/ESP32 ROM and stub do not support GET_SECURITY_INFO.
        Return normal response with failure status (FF 00), matching real device
        behavior. esptool sees status != 0 and falls back to magic value
        detection. */
     if (ctx->chip->type == CHIP_ESP8266 || ctx->chip->type == CHIP_ESP32) {
-        TRACE_PROTO(TAG, "  Not supported on %s, returning failure",
+        EsptoolHal_LogD(TAG, "  Not supported on %s, returning failure",
                     ctx->chip->name);
-        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Not supported on %hs",
+        EsptoolHal_LogI("ESP", "  Not supported on %hs",
                         ctx->chip->name);
         BYTE err[2] = {0xFF, 0x00};
         Esptool_SendResponseEx(ctx, ESP_CMD_GET_SECURITY_INFO,
@@ -1558,12 +1526,10 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
        (succeeds). chip_id will be None, causing get_chip_id() to raise
        FatalError, which triggers fallback to magic value detection. */
     if (ctx->chip->type == CHIP_ESP32S2) {
-        TRACE_PROTO(TAG, "  ESP32-S2: returning 14-byte response (no chip_id)");
-        Serial_PostLog(ctx->hNotify, L"ESP",
-                       L"  ESP32-S2: no chip_id in response");
+        EsptoolHal_LogD(TAG, "  ESP32-S2: returning 14-byte response (no chip_id)");
+        EsptoolHal_LogI("ESP", "ESP32-S2: no chip_id in response");
         DWORD flash_crypt_cnt = Efuse_GetFlashCryptCnt(ctx->chip);
-        Serial_PostLogF(ctx->hNotify, L"ESP",
-                        L"  flags=0x%08lX flash_crypt_cnt=%u", 0UL,
+        EsptoolHal_LogI("ESP", "flags=0x%08lX flash_crypt_cnt=%u", 0UL,
                         (unsigned)flash_crypt_cnt);
         BYTE sec_data[14] = {0};
         /* bytes 0-3:   flags (all zeros) */
@@ -1606,21 +1572,18 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* bytes 16-19: api_version (0) */
     /* bytes 20-21: status = success (0x00, 0x00) */
 
-    TRACE_PROTO(TAG, "  chip_id (IMAGE_CHIP_ID)=%lu (0x%08lX)", chip_id,
+    EsptoolHal_LogD(TAG, "  chip_id (IMAGE_CHIP_ID)=%lu (0x%08lX)", chip_id,
                 chip_id);
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"  flags=0x%08lX flash_crypt_cnt=%u",
+    EsptoolHal_LogI("ESP", "  flags=0x%08lX flash_crypt_cnt=%u",
                     0UL, (unsigned)flash_crypt_cnt);
-    Serial_PostLogF(ctx->hNotify, L"ESP",
-                    L"  chip_id=%lu (0x%08lX) api_version=%lu", chip_id,
+    EsptoolHal_LogI("ESP", "chip_id=%lu (0x%08lX) api_version=%lu", chip_id,
                     chip_id, 0UL);
 
     /* Transition to READY state when chip detection succeeds via
      * GET_SECURITY_INFO */
     if (ctx->state == ESP_STATE_SYNCED) {
         ctx->state = ESP_STATE_READY;
-        Serial_PostLog(
-            ctx->hNotify, L"ESP",
-            L"  Chip detected via security info, ready for commands");
+        EsptoolHal_LogI("ESP", "  Chip detected via security info, ready for commands");
     }
 
     Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val,
@@ -1635,8 +1598,8 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleSpiAttach(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
-    TRACE_PROTO(TAG, "SPI_ATTACH");
-    Serial_PostLog(ctx->hNotify, L"ESP", L"  Attach SPI flash");
+    EsptoolHal_LogD(TAG, "SPI_ATTACH");
+    EsptoolHal_LogI("ESP", "  Attach SPI flash");
 
     /* SPI_ATTACH: ROM mode 4-byte status, stub mode 2-byte status */
     BYTE status_len = ESP_STATUS_LEN(ctx);
@@ -1672,21 +1635,19 @@ static void HandleSpiSetParams(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         status_mask = ReadLE32(pkt->data + 20);
     }
 
-    TRACE_PROTO(TAG,
+    EsptoolHal_LogD(TAG,
                 "SPI_SET_PARAMS fl_id=0x%08lX total=%lu block=%lu sector=%lu "
                 "page=%lu mask=0x%08lX",
                 fl_id, total_size, block_size, sector_size, page_size,
                 status_mask);
-    Serial_PostLogF(
-        ctx->hNotify, L"ESP",
-        L"  fl_id=0x%08lX total=%lu block=%lu sector=%lu page=%lu mask=0x%08lX",
+EsptoolHal_LogI("ESP", "  fl_id=0x%08lX total=%lu block=%lu sector=%lu page=%lu mask=0x%08lX",
         fl_id, total_size, block_size, sector_size, page_size, status_mask);
 
     /* ESP8266 ROM does not support SPI_SET_PARAMS.
        Return ROM_INVALID_RECV_MSG error so esptool falls back gracefully. */
     if (ctx->chip->type == CHIP_ESP8266 && !ctx->stub_mode) {
-        TRACE_PROTO(TAG, "  Not supported on ESP8266 ROM, returning error");
-        Serial_PostLog(ctx->hNotify, L"ESP", L"  Not supported on ESP8266 ROM");
+        EsptoolHal_LogD(TAG, "  Not supported on ESP8266 ROM, returning error");
+        EsptoolHal_LogI("ESP", "  Not supported on ESP8266 ROM");
         BYTE err_data[4] = {0x01, 0x05, 0x00, 0x00};
         Esptool_SendResponse(ctx, ESP_CMD_SPI_SET_PARAMS, ctx->last_read_val,
                              ESP_OK, err_data, 4);
@@ -1709,8 +1670,8 @@ static void HandleSpiSetParams(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  */
 static void HandleRunUserCode(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 {
-    TRACE_PROTO(TAG, "RUN_USER_CODE");
-    Serial_PostLog(ctx->hNotify, L"ESP", L"  Run user code (soft reset)");
+    EsptoolHal_LogD(TAG, "RUN_USER_CODE");
+    EsptoolHal_LogI("ESP", "  Run user code (soft reset)");
 
     /* RUN_USER_CODE: stub-only, fire-and-forget (client does not wait for
      * response) */
@@ -1737,10 +1698,10 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
 {
     ESP_PACKET *pkt = &ctx->pkt;
 
-    TRACE_PROTO(TAG, "RX frame len=%d", frame_len);
+    EsptoolHal_LogD(TAG, "RX frame len=%d", frame_len);
 
     if (!ParsePacket(frame, frame_len, pkt)) {
-        TRACE_PROTO(TAG, "Invalid packet");
+        EsptoolHal_LogD(TAG, "Invalid packet");
         return FALSE;
     }
 
@@ -1748,24 +1709,23 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
     const char *cmdName = GetCmdName(pkt->command);
 
     /* Get direction string */
-    const WCHAR *dirStr = (pkt->direction == ESP_DIR_REQUEST) ? L"REQ" : L"RES";
+    const WCHAR *dirStr = (pkt->direction == ESP_DIR_REQUEST) ? "REQ" : "RES";
 
     /* Log packet summary */
-    Serial_PostLogF(ctx->hNotify, L"ESP", L"[%s] %hs size=%u val=0x%08lX",
+    EsptoolHal_LogI("ESP", "[%s] %hs size=%u val=0x%08lX",
                     dirStr, cmdName, pkt->size, pkt->value);
 
     if (pkt->direction != ESP_DIR_REQUEST) {
-        TRACE_PROTO(TAG, "Not a request: 0x%02X", pkt->direction);
+        EsptoolHal_LogD(TAG, "Not a request: 0x%02X", pkt->direction);
         return FALSE;
     }
 
     /* Download mode disabled: ignore all commands (simulate ROM not entering
      * download mode) */
     if (Efuse_IsDownloadModeDisabled(ctx->chip)) {
-        TRACE_PROTO(TAG, "Download mode disabled, ignoring command 0x%02X",
+        EsptoolHal_LogD(TAG, "Download mode disabled, ignoring command 0x%02X",
                     pkt->command);
-        Serial_PostLog(ctx->hNotify, L"ESP",
-                       L"  Download mode disabled, command ignored");
+        EsptoolHal_LogI("ESP", "Download mode disabled, command ignored");
         return FALSE;
     }
 
@@ -1794,10 +1754,9 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
             break;
         }
         if (!allowed) {
-            TRACE_PROTO(TAG, "Secure download: command 0x%02X not allowed",
+            EsptoolHal_LogD(TAG, "Secure download: command 0x%02X not allowed",
                         pkt->command);
-            Serial_PostLogF(ctx->hNotify, L"ESP",
-                            L"  Secure download: command 0x%02X rejected",
+            EsptoolHal_LogI("ESP", "Secure download: command 0x%02X rejected",
                             pkt->command);
             BYTE status_len = ESP_STATUS_LEN(ctx);
             Esptool_SendResponseEx(ctx, pkt->command, pkt->value, ESP_FAIL,
@@ -1880,10 +1839,9 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
     }
 
     if (!valid) {
-        TRACE_PROTO(TAG, "Command 0x%02X not allowed in state %d", pkt->command,
+        EsptoolHal_LogD(TAG, "Command 0x%02X not allowed in state %d", pkt->command,
                     ctx->state);
-        Serial_PostLogF(ctx->hNotify, L"ESP",
-                        L"  Command 0x%02X rejected (state=%d)", pkt->command,
+        EsptoolHal_LogI("ESP", "Command 0x%02X rejected (state=%d)", pkt->command,
                         ctx->state);
         BYTE status_len = ESP_STATUS_LEN(ctx);
         Esptool_SendResponseEx(ctx, pkt->command, pkt->value, ESP_FAIL,
@@ -1957,8 +1915,8 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
         break;
     default:
         /* ROM returns ROM_INVALID_RECV_MSG (0x05) for unsupported commands */
-        TRACE_PROTO(TAG, "Unknown cmd: 0x%02X", pkt->command);
-        Serial_PostLogF(ctx->hNotify, L"ESP", L"  Unknown command: 0x%02X",
+        EsptoolHal_LogD(TAG, "Unknown cmd: 0x%02X", pkt->command);
+        EsptoolHal_LogI("ESP", "  Unknown command: 0x%02X",
                         pkt->command);
         {
             /* Response format: [status_byte_1 != 0][ROM_INVALID_RECV_MSG] +

@@ -4,10 +4,9 @@
  * Simulates chip properties, eFuse, and register access.
  */
 
+#include "../esptool_hal.h"
 #include "chip.h"
 #include "efuse.h"
-#include "../utils/mem.h"
-#include "../utils/trace.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -143,9 +142,9 @@ static BOOL InitChipCommon(CHIP_CTX *ctx, CHIP_TYPE type)
     ctx->has_usb = cfg->has_usb;
 
     ctx->efuse =
-        (BYTE *)Mem_ZeroAlloc(ctx->efuse_size);
+        (BYTE *)EsptoolHal_MemZeroAlloc(ctx->efuse_size);
     if (!ctx->efuse) {
-        TRACE_PROTO(TAG, "Failed to allocate eFuse for %s", cfg->name);
+        EsptoolHal_LogD(TAG, "Failed to allocate eFuse for %s", cfg->name);
         return FALSE;
     }
 
@@ -278,14 +277,14 @@ static BOOL InitEsp32(CHIP_CTX *ctx)
     ctx->efuse[0x02] = 0x00;
     ctx->efuse[0x03] = 0x80; /* word0 = 0x80001000 */
     ctx->efuse[0x17] = 0xF0; /* FLASH_CRYPT_CONFIG = 0xF at word5 bits[31:28] */
-    TRACE_PROTO(TAG,
+    EsptoolHal_LogD(TAG,
                 "InitEsp32: BLOCK0 defaults set, word0=%02X%02X%02X%02X, "
                 "crypt_cfg=%02X, efuse=%p",
                 ctx->efuse[0x03], ctx->efuse[0x02], ctx->efuse[0x01],
                 ctx->efuse[0x00], ctx->efuse[0x14], ctx->efuse);
 
     WriteMacEsp32(ctx);
-    TRACE_PROTO(TAG, "InitEsp32: After MAC write, word0=%02X%02X%02X%02X",
+    EsptoolHal_LogD(TAG, "InitEsp32: After MAC write, word0=%02X%02X%02X%02X",
                 ctx->efuse[0x03], ctx->efuse[0x02], ctx->efuse[0x01],
                 ctx->efuse[0x00]);
     /* ESP32 chip detection uses magic value at 0x40001000 (CHIP_DETECT_REG),
@@ -514,7 +513,7 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
         }
         break;
     default:
-        TRACE_PROTO(TAG, "Unknown chip type: %d", type);
+        EsptoolHal_LogD(TAG, "Unknown chip type: %d", type);
         return FALSE;
     }
 
@@ -524,7 +523,7 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
     /* Initialize SPI register defaults */
     ctx->spi_regs[SPI_CMD_OFFS / 4] = 0;
 
-    TRACE_PROTO(TAG,
+    EsptoolHal_LogD(TAG,
                 "Chip: %s, eFuse: %d bytes, Flash: %lu KB, SPI_BASE: 0x%08lX, "
                 "SPI_W0: 0x%02X",
                 ctx->name, ctx->efuse_size, ctx->flash_size / 1024,
@@ -545,7 +544,7 @@ fail:
 void Chip_Close(CHIP_CTX *ctx)
 {
     if (ctx->efuse) {
-        Mem_Free(ctx->efuse);
+        EsptoolHal_MemFree(ctx->efuse);
         ctx->efuse = NULL;
     }
 }
@@ -773,7 +772,7 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
 
                 if (cmd == SPIFLASH_RDID) {
                     ctx->spi_regs[ctx->spi_offs->w0 / 4] = ctx->flash_id;
-                    TRACE_PROTO(TAG, "SPI RDID: flash_id=0x%08lX",
+                    EsptoolHal_LogD(TAG, "SPI RDID: flash_id=0x%08lX",
                                 ctx->flash_id);
                 }
 

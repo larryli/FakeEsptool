@@ -142,7 +142,7 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
                         HeapFree(GetProcessHeap(), 0, oldFlashData);
                     }
 
-                    Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+                    EsptoolHal_SetModifiedCallback(OnDeviceModified);
                     g_deviceModified = TRUE;
                     EndDialog(hDlg, IDOK);
                 } else {

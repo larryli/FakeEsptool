@@ -13,6 +13,7 @@
 #include "esptool/chip.h"
 #include "esptool/flash.h"
 #include "esptool/esptool.h"
+#include "esptool_hal.h"
 #include "resource.h"
 #include "serial.h"
 #include "utils/config.h"
@@ -186,6 +187,21 @@ static BOOL OnBaudRateChange(DWORD baudRate)
         return FALSE;
     }
     return Serial_SetBaudRate(&g_serial, baudRate);
+}
+
+/*
+ * OnHalLog - HAL log callback, bridges to Serial_PostLog
+ */
+static void OnHalLog(const char *tag, const char *line, bool is_error,
+                     void *ctx)
+{
+    HWND hWnd = (HWND)ctx;
+    if (!hWnd)
+        return;
+    WCHAR wtag[32], wline[1024];
+    MultiByteToWideChar(CP_UTF8, 0, tag, -1, wtag, 32);
+    MultiByteToWideChar(CP_UTF8, 0, line, -1, wline, 1024);
+    Serial_PostLog(hWnd, wtag, wline);
 }
 
 /*
@@ -405,7 +421,6 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam,
 static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     g_hWnd = hWnd;
-    Esptool_SetNotify(&g_esptool, g_hWnd);
     HINSTANCE hInst = ((CREATESTRUCT *)lParam)->hInstance;
 
     /* Create toolbar */
@@ -961,7 +976,7 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
     if (cmdFilePath && cmdFilePath[0]) {
         TRACE_FW(TAG, "Opening command line file: %ls", cmdFilePath);
         if (DeviceFile_Load(&g_chip, &g_flash, cmdFilePath)) {
-            Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+            EsptoolHal_SetModifiedCallback(OnDeviceModified);
             Config_SetLastDeviceFile(cmdFilePath);
             g_deviceModified = FALSE;
             wcscpy(g_deviceFile, cmdFilePath);
@@ -990,7 +1005,7 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
                                   MB_YESNO | MB_ICONQUESTION);
             if (ret == IDYES) {
                 if (DeviceFile_Load(&g_chip, &g_flash, lastFile)) {
-                    Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+                    EsptoolHal_SetModifiedCallback(OnDeviceModified);
                     g_deviceModified = FALSE;
                     wcscpy(g_deviceFile, lastFile);
                     UpdateMenuState(hWnd);
@@ -1012,7 +1027,7 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
             g_chip.xtal_freq = XTAL_FREQ_40M;
             g_deviceModified = FALSE;
             g_deviceFile[0] = 0;
-            Esptool_SetModifiedCallback(&g_esptool, OnDeviceModified);
+            EsptoolHal_SetModifiedCallback(OnDeviceModified);
             UpdateMenuState(hWnd);
             UpdateStatusBar();
             UpdateTitle(hWnd);
@@ -1146,8 +1161,12 @@ static BOOL Main_Init(HINSTANCE hInstance)
 
     /* Initialize esptool protocol with pointers to device data */
     Esptool_Init(&g_esptool, &g_chip, &g_flash);
-    Esptool_SetWriteCallback(&g_esptool, OnSerialWrite);
-    Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
+
+    /* Register HAL callbacks */
+    EsptoolHal_SetWriteCallback(OnSerialWrite);
+    EsptoolHal_SetBaudRateCallback(OnBaudRateChange);
+    EsptoolHal_SetModifiedCallback(OnDeviceModified);
+    EsptoolHal_SetLogCallback(OnHalLog, NULL);
 
     WNDCLASSEXW wc = {
         .cbSize = sizeof(WNDCLASSEXW),
