@@ -65,6 +65,7 @@ FakeEsptool.exe: \
 	output\lang.obj \
 	output\main.obj \
 	output\main.res \
+	output\md5.obj \
 	output\mem.obj \
 	output\port_select.obj \
 	output\serial.obj \
@@ -302,6 +303,14 @@ output\encrypt.obj: \
 output\mem.obj: \
 	src\utils\mem.c \
 	src\utils\mem.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build md5.obj.
+# 
+output\md5.obj: \
+	src\utils\md5.c \
+	src\utils\md5.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 .SILENT:

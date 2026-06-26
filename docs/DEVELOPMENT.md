@@ -64,6 +64,7 @@ Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
 | `utils/lang.c/h` | 国际化辅助 |
 | `utils/trace.c/h` | 调试日志 |
 | `utils/mem.c/h` | 内存管理（封装 Heap API，可选泄漏追踪） |
+| `utils/md5.c/h` | MD5 哈希（封装平台相关实现，移植时替换 md5.c） |
 | `utils/deflate.c/h` | DEFLATE 解压（用于压缩模式烧录） |
 | `utils/encrypt.c/h` | AES-XTS 加密/解密（用于加密烧录） |
 

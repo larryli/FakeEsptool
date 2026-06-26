@@ -5,12 +5,10 @@
  */
 
 #include "flash.h"
+#include "../utils/md5.h"
 #include "../utils/mem.h"
 #include "../utils/trace.h"
 #include <string.h>
-#include <wincrypt.h>
-
-#pragma comment(lib, "advapi32.lib")
 
 #if ENABLE_TRACE
 static const char *TAG = "FLASH";
@@ -162,8 +160,6 @@ BOOL Flash_EraseAll(FLASH_CTX *ctx)
 /*
  * Flash_CalcMd5 - Calculate MD5 hash of flash region
  *
- * Uses Windows CryptoAPI to calculate MD5 hash.
- *
  * @ctx:  Pointer to flash context (const, read-only)
  * @addr: Start address in flash
  * @len:  Number of bytes to hash
@@ -171,29 +167,11 @@ BOOL Flash_EraseAll(FLASH_CTX *ctx)
  */
 void Flash_CalcMd5(const FLASH_CTX *ctx, DWORD addr, DWORD len, BYTE md5[16])
 {
-    HCRYPTPROV hProv = 0;
-    HCRYPTHASH hHash = 0;
-
     memset(md5, 0, 16);
 
     if (!ctx->data || addr >= ctx->size || len > ctx->size - addr) {
         return;
     }
 
-    if (!CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_FULL,
-                             CRYPT_VERIFYCONTEXT))
-        return;
-
-    if (!CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash)) {
-        CryptReleaseContext(hProv, 0);
-        return;
-    }
-
-    CryptHashData(hHash, ctx->data + addr, len, 0);
-
-    DWORD hashLen = 16;
-    CryptGetHashParam(hHash, HP_HASHVAL, md5, &hashLen, 0);
-
-    CryptDestroyHash(hHash);
-    CryptReleaseContext(hProv, 0);
+    MD5_Calc(ctx->data + addr, len, md5);
 }
