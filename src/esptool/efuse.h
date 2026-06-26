@@ -1,23 +1,15 @@
 /*
- * chip.h - ESP chip characteristics
- *
- * Simulates chip properties, eFuse, and register access.
+ * efuse.h - eFuse field definitions and constants for ESP chips.
  */
 
-#ifndef ESP_CHIP_H
-#define ESP_CHIP_H
+#ifndef ESP_EFUSE_H
+#define ESP_EFUSE_H
 
 #include <windows.h>
-#include "efuse.h"
 
-/* Maximum chip name length */
-#define CHIP_NAME_MAX 32
-
-/* ============================================================================
- * Chip detection register (used by esptool for autodetect)
- * ============================================================================
- */
-#define CHIP_DETECT_REG 0x40001000
+/* Forward declaration to avoid circular dependency with chip.h */
+struct CHIP_CTX_TAG;
+typedef struct CHIP_CTX_TAG CHIP_CTX;
 
 /* ============================================================================
  * eFuse base addresses per chip type
@@ -45,53 +37,6 @@
 
 /* ESP32-C6 eFuse */
 #define EFUSE_BASE_ESP32C6 0x600B0800
-
-/* ============================================================================
- * SPI register base addresses per chip type
- * ============================================================================
- */
-#define SPI_REG_BASE_ESP8266 0x60000200
-#define SPI_REG_BASE_ESP32 0x3FF42000
-#define SPI_REG_BASE_ESP32S2 0x3F402000
-#define SPI_REG_BASE_ESP32S3 0x60002000 /* Also used by ESP32-C2/C3 */
-#define SPI_REG_BASE_ESP32C6 0x60003000
-
-/* ============================================================================
- * UART register addresses per chip type
- * ============================================================================
- */
-#define UART_CLKDIV_REG_ESP32 0x3FF40014
-#define UART_CLKDIV_REG_ESP32S2 0x3F400014
-#define UART_CLKDIV_REG_ESP8266 0x60000014
-#define UART_CLKDIV_MASK 0xFFFFF
-
-/* ESP32 flash size register */
-#define FLASH_SIZE_REG_ESP32 0x3F400010
-
-/* ============================================================================
- * Chip ID values (used for READ_REG chip detection via magic value)
- * ============================================================================
- */
-#define CHIP_ID_ESP8266 0xFFF0C101
-#define CHIP_ID_ESP32 0x00F01D83
-#define CHIP_ID_ESP32S2 0x000007C6
-#define CHIP_ID_ESP32S3 0x00000009
-#define CHIP_ID_ESP32C2 0x7C41A06F
-#define CHIP_ID_ESP32C3 0x6921506F
-#define CHIP_ID_ESP32C6 0x2CE0806F
-
-/* ============================================================================
- * IMAGE_CHIP_ID values (used for GET_SECURITY_INFO chip detection)
- * These are small integers returned in the security info response.
- * ============================================================================
- */
-#define IMAGE_CHIP_ID_ESP8266 0
-#define IMAGE_CHIP_ID_ESP32 0
-#define IMAGE_CHIP_ID_ESP32S2 2
-#define IMAGE_CHIP_ID_ESP32S3 9
-#define IMAGE_CHIP_ID_ESP32C2 12
-#define IMAGE_CHIP_ID_ESP32C3 5
-#define IMAGE_CHIP_ID_ESP32C6 13
 
 /* ============================================================================
  * MAC eFuse offsets per chip type
@@ -389,200 +334,32 @@
 #define EFUSE_PGM_CMD 0x2
 #define EFUSE_READ_CMD 0x1
 
-/* Flash mode constants */
-#define FLASH_MODE_QIO 0
-#define FLASH_MODE_DIO 2
-#define FLASH_MODE_QOUT 1
-#define FLASH_MODE_DOUT 3
-
-/* Flash frequency constants */
-#define FLASH_FREQ_40M 0
-#define FLASH_FREQ_26M 1
-#define FLASH_FREQ_20M 2
-#define FLASH_FREQ_80M 3
-
-/* Crystal frequency constants */
-#define XTAL_FREQ_40M 0
-#define XTAL_FREQ_26M 1
-
-/* SPI register count (enough for SPI_CMD through SPI_W15) */
-#define SPI_REG_COUNT 64
-
-/* SPI register offsets (common to all chips) */
-#define SPI_CMD_OFFS 0x00
-#define SPI_ADDR_OFFS 0x04
-
-/* SPI register offsets per chip family.
-   Different chip families use different register layouts:
-   | Register   | ESP32-S2/S3/C2/C3/C6 | ESP32 | ESP8266 |
-   |------------|----------------------|-------|---------|
-   | SPI_USR    | 0x18                 | 0x1C  | 0x1C    |
-   | SPI_USR1   | 0x1C                 | 0x20  | 0x20    |
-   | SPI_USR2   | 0x20                 | 0x24  | 0x24    |
-   | SPI_W0     | 0x58                 | 0x80  | 0x40    |
-   | SPI_MOSI_DLEN | 0x24              | 0x28  | N/A     |
-   | SPI_MISO_DLEN | 0x28              | 0x2C  | N/A     | */
-typedef struct {
-    BYTE usr;       /* SPI_USR offset */
-    BYTE usr1;      /* SPI_USR1 offset */
-    BYTE usr2;      /* SPI_USR2 offset */
-    BYTE w0;        /* SPI_W0 offset */
-    BYTE mosi_dlen; /* SPI_MOSI_DLEN offset (0 if not supported) */
-    BYTE miso_dlen; /* SPI_MISO_DLEN offset (0 if not supported) */
-} SPI_OFFSETS;
-
-/* SPI register bit definitions */
-#define SPI_CMD_USR (1 << 18)
-#define SPI_USR_COMMAND (1 << 31)
-#define SPI_USR_ADDR (1 << 30)
-#define SPI_USR_DUMMY (1 << 29)
-#define SPI_USR_MISO (1 << 28)
-#define SPI_USR_MOSI (1 << 27)
-
-/* SPI flash commands */
-#define SPIFLASH_RDID 0x9F /* Read JEDEC ID */
-
-/* Supported chip types */
-typedef enum {
-    CHIP_ESP8266, /* ESP8266 WiFi chip */
-    CHIP_ESP32,   /* ESP32 dual-core WiFi+BT */
-    CHIP_ESP32S2, /* ESP32-S2 single-core WiFi */
-    CHIP_ESP32S3, /* ESP32-S3 dual-core WiFi+BT5 */
-    CHIP_ESP32C2, /* ESP32-C2 low-cost WiFi */
-    CHIP_ESP32C3, /* ESP32-C3 RISC-V WiFi+BT */
-    CHIP_ESP32C6, /* ESP32-C6 WiFi 6+BLE 5 */
-    CHIP_COUNT
-} CHIP_TYPE;
-
-/* Chip characteristics context */
-typedef struct CHIP_CTX_TAG {
-    CHIP_TYPE type;           /* Chip type */
-    char name[CHIP_NAME_MAX]; /* Chip name string */
-
-    BYTE mac[6]; /* MAC address */
-
-    BYTE *efuse;    /* eFuse data (dynamically allocated) */
-    int efuse_size; /* eFuse size in bytes */
-
-    DWORD flash_size; /* Flash size in bytes */
-    DWORD flash_id;   /* Flash JEDEC ID */
-    BYTE xtal_freq;   /* Crystal frequency */
-
-    DWORD sector_size; /* Flash sector size */
-    DWORD block_size;  /* Flash block size */
-    DWORD page_size;   /* Flash page size */
-
-    DWORD chip_id; /* Chip ID register value (magic value for READ_REG) */
-    DWORD security_chip_id; /* IMAGE_CHIP_ID for GET_SECURITY_INFO */
-    DWORD pkg_version;      /* Package version */
-    BOOL has_usb;           /* USB support flag */
-
-    DWORD spi_reg_base;          /* SPI register base address */
-    const SPI_OFFSETS *spi_offs; /* SPI register offsets for this chip family */
-    DWORD spi_regs[SPI_REG_COUNT]; /* SPI register file */
-
-    /* eFuse controller simulation */
-    DWORD efuse_base;   /* eFuse base address for this chip */
-    DWORD pgm_data[32]; /* PGM_DATA staging area for burn (ESP32: 4 blocks × 8
-                           words) */
-    DWORD efuse_conf_ofs; /* CONF_REG offset from efuse_base (0 = no controller)
-                           */
-    DWORD efuse_cmd_ofs;  /* CMD_REG offset from efuse_base */
-} CHIP_CTX;
-
-/*
- * Chip_Init - Initialize chip context with type-specific defaults
+/* ============================================================================
+ * eFuse query and manipulation functions
+ * ============================================================================
  */
-BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type);
 
-/*
- * Chip_Close - Release chip resources (free eFuse memory)
- */
-void Chip_Close(CHIP_CTX *ctx);
-
-/*
- * Chip_GetName - Get chip name string
- */
-const char *Chip_GetName(const CHIP_CTX *ctx);
-
-/*
- * Chip_SetMac - Set MAC address
- */
-BOOL Chip_SetMac(CHIP_CTX *ctx, const BYTE mac[6]);
-
-/*
- * Chip_GetMac - Get MAC address
- */
-const BYTE *Chip_GetMac(const CHIP_CTX *ctx);
-
-/*
- * Chip_ReadReg - Read register value (supports eFuse address range)
- */
-DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr);
-
-/*
- * Chip_WriteReg - Write register value (eFuse OR operation)
- */
-BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val);
-
-/*
- * Chip_SetFlashSize - Set flash size
- */
-void Chip_SetFlashSize(CHIP_CTX *ctx, DWORD size);
-
-/*
- * Chip_GetFlashSize - Get flash size
- */
-DWORD Chip_GetFlashSize(const CHIP_CTX *ctx);
-
-/*
- * Chip_GetChipId - Get chip ID
- */
-DWORD Chip_GetChipId(const CHIP_CTX *ctx);
-
-/*
- * Chip_GetEfuse - Get pointer to eFuse data
- *
- * Returns pointer to eFuse byte array, or NULL if not allocated.
- */
-const BYTE *Chip_GetEfuse(const CHIP_CTX *ctx);
-
-/*
- * Chip_GetEfuseMut - Get mutable pointer to eFuse data
- *
- * Returns pointer to eFuse byte array for writing, or NULL if not allocated.
- * Use with caution - eFuse is one-time-programmable in real hardware.
- */
-BYTE *Chip_GetEfuseMut(CHIP_CTX *ctx);
-
-/*
- * Chip_GetEfuseSize - Get eFuse size in bytes
- */
-int Chip_GetEfuseSize(const CHIP_CTX *ctx);
-
-/*
- * Chip_GetBootBaudRate - Get boot message baud rate
- *
- * Depends on chip type and crystal frequency.
- */
-DWORD Chip_GetBootBaudRate(const CHIP_CTX *ctx);
-
-/*
- * Chip_GetBootMessage - Get boot message text for reset
- *
- * Writes chip-specific boot message to caller-provided buffer.
- * download_mode: TRUE for download mode entry, FALSE for normal flash boot
- * reset_cause: 0x01=POWERON, 0x02=EXT, 0x03=WDT
- *
- * @ctx:           Pointer to chip context
- * @download_mode: TRUE for download, FALSE for normal boot
- * @reset_cause:   Reset cause code
- * @buf:           Output buffer
- * @buf_size:      Size of output buffer
- *
- * Returns pointer to buf, or empty string if buffer is too small.
- */
-const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode,
-                                BYTE reset_cause, char *buf, size_t buf_size);
+DWORD Efuse_GetFlashCryptCnt(const CHIP_CTX *ctx);
+BOOL Efuse_IsFlashEncryptionEnabled(const CHIP_CTX *ctx);
+BOOL Efuse_IsDownloadEncryptDisabled(const CHIP_CTX *ctx);
+BOOL Efuse_IsDownloadDecryptDisabled(const CHIP_CTX *ctx);
+BOOL Efuse_IsDownloadModeDisabled(const CHIP_CTX *ctx);
+BOOL Efuse_IsSecureDownloadEnabled(const CHIP_CTX *ctx);
+DWORD Efuse_GetDlEncryptDisabled(const CHIP_CTX *ctx);
+DWORD Efuse_GetDlModeDisabled(const CHIP_CTX *ctx);
+DWORD Efuse_GetSecureBootFlag(const CHIP_CTX *ctx);
+DWORD Efuse_GetJtagFlag(const CHIP_CTX *ctx);
+BOOL Efuse_IsSecureBootEnabled(const CHIP_CTX *ctx);
+BOOL Efuse_IsJtagDisabled(const CHIP_CTX *ctx);
+int Efuse_GetJtagDisabledCount(const CHIP_CTX *ctx);
+int Efuse_GetJtagTotalCount(const CHIP_CTX *ctx);
+DWORD Efuse_GetSoftJtagFlag(const CHIP_CTX *ctx);
+DWORD Efuse_GetUsbJtagFlag(const CHIP_CTX *ctx);
+BYTE Efuse_GetKeyPurpose(const CHIP_CTX *ctx, int block);
+void Efuse_SetKeyPurpose(CHIP_CTX *ctx, int block, BYTE purpose);
+int Efuse_GetEncryptionKeyOffset(const CHIP_CTX *ctx, int *key_len);
+void Efuse_SetFlashEncryption(CHIP_CTX *ctx, int mode);
+void Efuse_SetDownloadMode(CHIP_CTX *ctx, int mode);
+void Efuse_ApplyBlock0Defaults(CHIP_CTX *ctx);
 
 #endif

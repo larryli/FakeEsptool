@@ -378,7 +378,7 @@ static void RefreshListView(HWND hList, int selectIndex)
         int idx = ListView_InsertItem(hList, &item);
 
         /* Column 1: Purpose (from eFuse KEY_PURPOSE field) */
-        BYTE purpose = Chip_GetKeyPurpose(&g_chip, i);
+        BYTE purpose = Efuse_GetKeyPurpose(&g_chip, i);
         ListView_SetItemText(hList, idx, 1, (LPWSTR)GetPurposeName(purpose));
 
         /* Column 2: Status (set/empty) */
@@ -692,7 +692,7 @@ static void HandlePurpose(HWND hDlg, HWND hList)
     }
 
     /* Build purpose list */
-    BYTE currentPurpose = Chip_GetKeyPurpose(&g_chip, sel);
+    BYTE currentPurpose = Efuse_GetKeyPurpose(&g_chip, sel);
     BOOL isS3Key5 = ((g_chip.type == CHIP_ESP32S3 ||
                       g_chip.type == CHIP_ESP32C3 ||
                       g_chip.type == CHIP_ESP32C6) &&
@@ -746,7 +746,7 @@ static void HandlePurpose(HWND hDlg, HWND hList)
     }
 
     /* Set new purpose */
-    Chip_SetKeyPurpose(&g_chip, sel, newPurpose);
+    Efuse_SetKeyPurpose(&g_chip, sel, newPurpose);
     g_deviceModified = TRUE;
 
     /* Refresh list and keep selection */

@@ -131,7 +131,7 @@ static DWORD Esptool_EncryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len,
     }
 
     int key_len = 0;
-    int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, &key_len);
+    int key_offset = Efuse_GetEncryptionKeyOffset(ctx->chip, &key_len);
 
     TRACE_PROTO(TAG,
                 "EncryptInPlace: flash_encrypted=%d key_offset=0x%02X "
@@ -197,12 +197,12 @@ static DWORD Esptool_EncryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len,
 static DWORD Esptool_DecryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len,
                                     DWORD flash_addr)
 {
-    if (!Chip_IsFlashEncryptionEnabled(ctx->chip)) {
+    if (!Efuse_IsFlashEncryptionEnabled(ctx->chip)) {
         return ESP_OK;
     }
 
     /* ESP32: DISABLE_DL_DECRYPT disables decryption in download mode */
-    if (Chip_IsDownloadDecryptDisabled(ctx->chip)) {
+    if (Efuse_IsDownloadDecryptDisabled(ctx->chip)) {
         TRACE_PROTO(
             TAG,
             "DecryptInPlace: DISABLE_DL_DECRYPT set, returning ciphertext");
@@ -210,7 +210,7 @@ static DWORD Esptool_DecryptInPlace(ESPTOOL_CTX *ctx, BYTE *data, DWORD len,
     }
 
     int key_len = 0;
-    int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, &key_len);
+    int key_offset = Efuse_GetEncryptionKeyOffset(ctx->chip, &key_len);
 
     if (key_offset < 0 || !ctx->chip->efuse ||
         key_offset + key_len > ctx->chip->efuse_size) {
@@ -863,8 +863,8 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 
     /* Release mode: reject plaintext writes when encryption is active */
-    if (!encrypted && Chip_IsFlashEncryptionEnabled(ctx->chip) &&
-        Chip_IsDownloadEncryptDisabled(ctx->chip)) {
+    if (!encrypted && Efuse_IsFlashEncryptionEnabled(ctx->chip) &&
+        Efuse_IsDownloadEncryptDisabled(ctx->chip)) {
         TRACE_PROTO(
             TAG,
             "FLASH_DEFL_BEGIN rejected: release mode, plaintext not allowed");
@@ -884,14 +884,14 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     TRACE_PROTO(TAG,
                 "FLASH_DEFL_BEGIN: IsFlashEncryptionEnabled=%d "
                 "IsDownloadEncryptDisabled=%d",
-                Chip_IsFlashEncryptionEnabled(ctx->chip),
-                Chip_IsDownloadEncryptDisabled(ctx->chip));
+                Efuse_IsFlashEncryptionEnabled(ctx->chip),
+                Efuse_IsDownloadEncryptDisabled(ctx->chip));
 
     /* Log key availability */
 #ifdef ENABLE_TRACE_PROTO
     {
         int key_len = 0;
-        int key_offset = Chip_GetEncryptionKeyOffset(ctx->chip, &key_len);
+        int key_offset = Efuse_GetEncryptionKeyOffset(ctx->chip, &key_len);
         TRACE_PROTO(TAG,
                     "FLASH_DEFL_BEGIN: key_offset=0x%02X key_len=%d efuse=%p "
                     "efuse_size=%d",
@@ -1346,8 +1346,8 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 
     /* Release mode: reject plaintext writes when encryption is active */
-    if (!encrypted && Chip_IsFlashEncryptionEnabled(ctx->chip) &&
-        Chip_IsDownloadEncryptDisabled(ctx->chip)) {
+    if (!encrypted && Efuse_IsFlashEncryptionEnabled(ctx->chip) &&
+        Efuse_IsDownloadEncryptDisabled(ctx->chip)) {
         TRACE_PROTO(
             TAG, "FLASH_BEGIN rejected: release mode, plaintext not allowed");
         Serial_PostLog(ctx->hNotify, L"ERR",
@@ -1561,7 +1561,7 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         TRACE_PROTO(TAG, "  ESP32-S2: returning 14-byte response (no chip_id)");
         Serial_PostLog(ctx->hNotify, L"ESP",
                        L"  ESP32-S2: no chip_id in response");
-        DWORD flash_crypt_cnt = Chip_GetFlashCryptCnt(ctx->chip);
+        DWORD flash_crypt_cnt = Efuse_GetFlashCryptCnt(ctx->chip);
         Serial_PostLogF(ctx->hNotify, L"ESP",
                         L"  flags=0x%08lX flash_crypt_cnt=%u", 0UL,
                         (unsigned)flash_crypt_cnt);
@@ -1572,7 +1572,7 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         /* bytes 5-11:  key_purposes (7 bytes, one per key block KEY0-KEY5 +
          * reserved) */
         for (int i = 0; i < 7; i++) {
-            sec_data[5 + i] = Chip_GetKeyPurpose(ctx->chip, i);
+            sec_data[5 + i] = Efuse_GetKeyPurpose(ctx->chip, i);
         }
         /* bytes 12-13: status = success (0x00, 0x00) */
         Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val,
@@ -1587,7 +1587,7 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     DWORD chip_id = (ctx->chip->type == CHIP_ESP32)
                         ? ctx->chip->chip_id
                         : ctx->chip->security_chip_id;
-    DWORD flash_crypt_cnt = Chip_GetFlashCryptCnt(ctx->chip);
+    DWORD flash_crypt_cnt = Efuse_GetFlashCryptCnt(ctx->chip);
 
     BYTE sec_data[22] = {0};
     /* bytes 0-3:   flags (all zeros) */
@@ -1596,7 +1596,7 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* bytes 5-11:  key_purposes (7 bytes, one per key block KEY0-KEY5 +
      * reserved) */
     for (int i = 0; i < 7; i++) {
-        sec_data[5 + i] = Chip_GetKeyPurpose(ctx->chip, i);
+        sec_data[5 + i] = Efuse_GetKeyPurpose(ctx->chip, i);
     }
     /* bytes 12-15: chip_id (IMAGE_CHIP_ID, little-endian) */
     sec_data[12] = (BYTE)(chip_id & 0xFF);
@@ -1761,7 +1761,7 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
 
     /* Download mode disabled: ignore all commands (simulate ROM not entering
      * download mode) */
-    if (Chip_IsDownloadModeDisabled(ctx->chip)) {
+    if (Efuse_IsDownloadModeDisabled(ctx->chip)) {
         TRACE_PROTO(TAG, "Download mode disabled, ignoring command 0x%02X",
                     pkt->command);
         Serial_PostLog(ctx->hNotify, L"ESP",
@@ -1770,7 +1770,7 @@ BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len)
     }
 
     /* Secure download mode: only allow flash-related commands */
-    if (Chip_IsSecureDownloadEnabled(ctx->chip)) {
+    if (Efuse_IsSecureDownloadEnabled(ctx->chip)) {
         BOOL allowed = FALSE;
         switch (pkt->command) {
         case ESP_CMD_SYNC:

@@ -173,7 +173,7 @@ BOOL DeviceFile_Load(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename)
         }
     }
 
-    Chip_ApplyBlock0Defaults(chip);
+    Efuse_ApplyBlock0Defaults(chip);
 
     /* Flash init and data */
     if (!Flash_Init(flash, flashSize)) {

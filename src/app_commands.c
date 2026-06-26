@@ -246,8 +246,8 @@ static void UpdateEncryptionMenu(HMENU hMenu)
 {
     ENCRYPT_STATE state = g_encryptState;
     if (g_chip.name[0]) {
-        BOOL encrypted = Chip_IsFlashEncryptionEnabled(&g_chip);
-        BOOL release = Chip_IsDownloadEncryptDisabled(&g_chip);
+        BOOL encrypted = Efuse_IsFlashEncryptionEnabled(&g_chip);
+        BOOL release = Efuse_IsDownloadEncryptDisabled(&g_chip);
         if (encrypted && release) {
             state = ENCRYPT_STATE_RELEASE;
         } else if (encrypted) {
@@ -278,8 +278,8 @@ static void UpdateDownloadMenu(HMENU hMenu)
 {
     DOWNLOAD_MODE mode = g_downloadMode;
     if (g_chip.name[0]) {
-        BOOL dl_disabled = Chip_IsDownloadModeDisabled(&g_chip);
-        BOOL secure = Chip_IsSecureDownloadEnabled(&g_chip);
+        BOOL dl_disabled = Efuse_IsDownloadModeDisabled(&g_chip);
+        BOOL secure = Efuse_IsSecureDownloadEnabled(&g_chip);
         if (dl_disabled) {
             mode = DOWNLOAD_MODE_DISABLED;
         } else if (secure) {
@@ -309,7 +309,7 @@ void Main_CmdEncryptState(HWND hWnd, int state)
 {
     g_encryptState = (ENCRYPT_STATE)state;
     if (g_chip.name[0]) {
-        Chip_SetFlashEncryption(&g_chip, state);
+        Efuse_SetFlashEncryption(&g_chip, state);
         g_deviceModified = TRUE;
     }
     UpdateEncryptionMenu(GetMenu(hWnd));
@@ -326,7 +326,7 @@ void Main_CmdDownloadMode(HWND hWnd, int mode)
 {
     g_downloadMode = (DOWNLOAD_MODE)mode;
     if (g_chip.name[0]) {
-        Chip_SetDownloadMode(&g_chip, mode);
+        Efuse_SetDownloadMode(&g_chip, mode);
         g_deviceModified = TRUE;
     }
     UpdateDownloadMenu(GetMenu(hWnd));
@@ -341,8 +341,8 @@ void Main_CmdDownloadMode(HWND hWnd, int mode)
 static UINT GetEncryptStateStrId(void)
 {
     if (g_chip.name[0]) {
-        BOOL encrypted = Chip_IsFlashEncryptionEnabled(&g_chip);
-        BOOL release = Chip_IsDownloadEncryptDisabled(&g_chip);
+        BOOL encrypted = Efuse_IsFlashEncryptionEnabled(&g_chip);
+        BOOL release = Efuse_IsDownloadEncryptDisabled(&g_chip);
         if (encrypted && release) {
             return IDS_ENCRYPT_RELEASE;
         }
@@ -369,8 +369,8 @@ static UINT GetEncryptStateStrId(void)
 static UINT GetDownloadModeStrId(void)
 {
     if (g_chip.name[0]) {
-        BOOL dl_disabled = Chip_IsDownloadModeDisabled(&g_chip);
-        BOOL secure = Chip_IsSecureDownloadEnabled(&g_chip);
+        BOOL dl_disabled = Efuse_IsDownloadModeDisabled(&g_chip);
+        BOOL secure = Efuse_IsSecureDownloadEnabled(&g_chip);
         if (dl_disabled) {
             return IDS_DOWNLOAD_DISABLED;
         }
@@ -556,8 +556,8 @@ void UpdateStatusBar(void)
         if (g_chip.type == CHIP_ESP8266) {
             SetPartTooltip(1, L"");
         } else {
-            DWORD crypt = Chip_GetFlashCryptCnt(&g_chip);
-            DWORD dlEnc = Chip_GetDlEncryptDisabled(&g_chip);
+            DWORD crypt = Efuse_GetFlashCryptCnt(&g_chip);
+            DWORD dlEnc = Efuse_GetDlEncryptDisabled(&g_chip);
             const char *f1 = "SPI_BOOT_CRYPT_CNT";
             const char *f2 = (g_chip.type == CHIP_ESP32)
                                  ? "DISABLE_DL_ENCRYPT"
@@ -583,7 +583,7 @@ void UpdateStatusBar(void)
         if (g_chip.type == CHIP_ESP8266) {
             SetPartTooltip(2, L"");
         } else {
-            DWORD dlMode = Chip_GetDlModeDisabled(&g_chip);
+            DWORD dlMode = Efuse_GetDlModeDisabled(&g_chip);
             const char *field;
             switch (g_chip.type) {
             case CHIP_ESP32:
@@ -607,13 +607,13 @@ void UpdateStatusBar(void)
 
     /* Part 4: Secure Boot status */
     if (g_chip.name[0]) {
-        BOOL sb = Chip_IsSecureBootEnabled(&g_chip);
+        BOOL sb = Efuse_IsSecureBootEnabled(&g_chip);
         SendMessageW(g_hStatusbar, SB_SETTEXT, 3,
                      (LPARAM)LoadStr(sb ? IDS_SB_SECURE_BOOT_ENABLED
                                         : IDS_SB_SECURE_BOOT_DISABLED));
 
         /* Tooltip: eFuse field value */
-        DWORD sbFlag = Chip_GetSecureBootFlag(&g_chip);
+        DWORD sbFlag = Efuse_GetSecureBootFlag(&g_chip);
         if (g_chip.type == CHIP_ESP8266 ||
             g_chip.type == CHIP_ESP32C2) {
             SetPartTooltip(3, L"");
@@ -639,8 +639,8 @@ void UpdateStatusBar(void)
 
     /* Part 5: JTAG status */
     if (g_chip.name[0]) {
-        int jtagDis = Chip_GetJtagDisabledCount(&g_chip);
-        int jtagTotal = Chip_GetJtagTotalCount(&g_chip);
+        int jtagDis = Efuse_GetJtagDisabledCount(&g_chip);
+        int jtagTotal = Efuse_GetJtagTotalCount(&g_chip);
         UINT strId;
         if (jtagTotal == 0) {
             strId = IDS_SB_JTAG_ENABLED;
@@ -662,18 +662,18 @@ void UpdateStatusBar(void)
             if (g_chip.type == CHIP_ESP32) {
                 wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
                           "JTAG_DISABLE",
-                          (int)Chip_GetJtagFlag(&g_chip));
+                          (int)Efuse_GetJtagFlag(&g_chip));
             } else {
                 wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
                           "DIS_PAD_JTAG",
-                          (int)Chip_GetJtagFlag(&g_chip));
+                          (int)Efuse_GetJtagFlag(&g_chip));
                 wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
                           "SOFT_DIS_JTAG",
-                          (int)Chip_GetSoftJtagFlag(&g_chip));
+                          (int)Efuse_GetSoftJtagFlag(&g_chip));
                 if (jtagTotal >= 3) {
                     wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
                               "DIS_USB_JTAG",
-                              (int)Chip_GetUsbJtagFlag(&g_chip));
+                              (int)Efuse_GetUsbJtagFlag(&g_chip));
                 }
             }
             WCHAR tipBuf[192];
@@ -1323,8 +1323,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
 
     /* Write header info */
     fwprintf(f, L"[Header]\n");
-    fwprintf(f, L"Magic:      0x%08X (\"ESP\\0\")\n", DEVICE_MAGIC);
-    fwprintf(f, L"Version:    %d\n", DEVICE_VERSION);
+    fwprintf(f, L"Magic:      0x%08X (\"ESP\\0\")\n", DEVICE_FILE_MAGIC);
+    fwprintf(f, L"Version:    %d\n", DEVICE_FILE_VERSION);
 
     /* Get chip name */
     WCHAR chipName[32] = {0};
@@ -1605,7 +1605,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         }
 
         /* Get actual KEY_PURPOSE from eFuse */
-        BYTE purpose = Chip_GetKeyPurpose(&snap->chip, i);
+        BYTE purpose = Efuse_GetKeyPurpose(&snap->chip, i);
         const WCHAR *purposeStr;
         switch (purpose) {
         case KEY_PURPOSE_USER:

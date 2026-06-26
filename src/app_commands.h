@@ -6,7 +6,6 @@
 #define APP_COMMANDS_H
 
 #include "dlg/dlg.h"
-#include "esptool/device.h"
 #include "esptool/esptool.h"
 #include "serial.h"
 #include "utils/config.h"
