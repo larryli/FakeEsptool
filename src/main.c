@@ -192,12 +192,15 @@ static BOOL OnBaudRateChange(DWORD baudRate)
 /*
  * OnHalLog - HAL log callback, bridges to Serial_PostLog
  */
-static void OnHalLog(const char *tag, const char *line, bool is_error,
-                     void *ctx)
+static void OnHalLog(const char *tag, bool is_error, const char *fmt,
+                     va_list ap, void *ctx)
 {
     HWND hWnd = (HWND)ctx;
-    if (!hWnd)
+    if (!hWnd) {
         return;
+    }
+    char line[1024];
+    vsnprintf(line, sizeof(line), fmt, ap);
     WCHAR wtag[32], wline[1024];
     MultiByteToWideChar(CP_UTF8, 0, tag, -1, wtag, 32);
     MultiByteToWideChar(CP_UTF8, 0, line, -1, wline, 1024);

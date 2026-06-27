@@ -63,25 +63,19 @@ void fesp_hal_modified(void)
  * Engine-side forwarding (snake_case)
  * ======================================================================== */
 
-static void LogDispatch(const char *tag, bool is_error, const char *fmt,
-                        va_list ap)
-{
-    if (!s_logCb)
-        return;
-    char buf[1024];
-    vsnprintf(buf, sizeof(buf), fmt, ap);
-    buf[sizeof(buf) - 1] = '\0';
-    s_logCb(tag, buf, is_error, s_logCtx);
-}
-
 void fesp_hal_log_i(const char *tag, const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
 #ifdef ENABLE_TRACE
-    Trace_WriteVa(tag, fmt, ap);
+    va_list ap2;
+    va_copy(ap2, ap);
+    Trace_WriteVa(tag, fmt, ap2);
+    va_end(ap2);
 #endif
-    LogDispatch(tag, false, fmt, ap);
+    if (s_logCb) {
+        s_logCb(tag, false, fmt, ap, s_logCtx);
+    }
     va_end(ap);
 }
 
@@ -90,9 +84,14 @@ void fesp_hal_log_e(const char *tag, const char *fmt, ...)
     va_list ap;
     va_start(ap, fmt);
 #ifdef ENABLE_TRACE
-    Trace_WriteVa(tag, fmt, ap);
+    va_list ap2;
+    va_copy(ap2, ap);
+    Trace_WriteVa(tag, fmt, ap2);
+    va_end(ap2);
 #endif
-    LogDispatch(tag, true, fmt, ap);
+    if (s_logCb) {
+        s_logCb(tag, true, fmt, ap, s_logCtx);
+    }
     va_end(ap);
 }
 

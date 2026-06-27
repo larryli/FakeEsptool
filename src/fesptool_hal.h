@@ -64,8 +64,8 @@ int fesp_hal_decrypt_data(void *ctx, const BYTE *in_buf, BYTE *out_buf,
  * ======================================================================== */
 
 /* Log callback registration */
-typedef void (*ESP_HAL_LOGLINE_CB)(const char *tag, const char *line,
-                                   bool is_error, void *ctx);
+typedef void (*ESP_HAL_LOGLINE_CB)(const char *tag, bool is_error,
+                                   const char *fmt, va_list ap, void *ctx);
 void FEsptoolSetLogCallback(ESP_HAL_LOGLINE_CB cb, void *ctx);
 
 /* Info/Error log: forward to fesp_hal_log_i/e (implemented in .c) */
