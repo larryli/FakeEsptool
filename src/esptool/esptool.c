@@ -1678,7 +1678,7 @@ bool Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const uint8_t *frame, int frame_len)
     const char *cmdName = GetCmdName(pkt->command);
 
     /* Get direction string */
-    const WCHAR *dirStr = (pkt->direction == ESP_DIR_REQUEST) ? L"REQ" : L"RES";
+    const char *dirStr = (pkt->direction == ESP_DIR_REQUEST) ? "REQ" : "RES";
 
     /* Log packet summary */
     EsptoolHal_LogI("ESP", "[%s] %hs size=%u val=0x%08lX",
