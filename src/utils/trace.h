@@ -39,6 +39,13 @@ void Trace_Close(void);
  */
 void Trace_Write(const char *tag, const char *fmt, ...);
 
+/*
+ * Trace_WriteVa - Write trace message using va_list
+ *
+ * Core implementation. Trace_Write forwards to this.
+ */
+void Trace_WriteVa(const char *tag, const char *fmt, va_list ap);
+
 #define TRACE_INIT() Trace_Init()
 #define TRACE_CLOSE() Trace_Close()
 

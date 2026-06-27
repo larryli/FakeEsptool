@@ -7,7 +7,7 @@
 #include "slip.h"
 #include "../fesptool_hal.h"
 
-#if ENABLE_TRACE
+#if FESP_HAL_LOG_HAS_DEBUG
 static const char *TAG = "SLIP";
 #endif
 

@@ -7,11 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#if ENABLE_TRACE
-static const char *TAG = "EFUSE";
-#endif
-
-#if ENABLE_TRACE
+#if FESP_HAL_LOG_HAS_DEBUG
 static const char *TAG = "EFUSE";
 #endif
 
@@ -86,7 +82,7 @@ static const uint32_t efuse_block_wr_offsets_esp32[] = {
 static void efuse_write32(fesp_chip_ctx_t *ctx, int offset, uint32_t val)
 {
     if (offset + 3 < ctx->efuse_size) {
-#ifdef ENABLE_TRACE_PROTO
+#if FESP_HAL_LOG_HAS_DEBUG
         uint8_t b0 = ctx->efuse[offset];
         uint8_t b1 = ctx->efuse[offset + 1];
         uint8_t b2 = ctx->efuse[offset + 2];
@@ -96,12 +92,11 @@ static void efuse_write32(fesp_chip_ctx_t *ctx, int offset, uint32_t val)
         ctx->efuse[offset + 1] |= (uint8_t)((val >> 8) & 0xFF);
         ctx->efuse[offset + 2] |= (uint8_t)((val >> 16) & 0xFF);
         ctx->efuse[offset + 3] |= (uint8_t)((val >> 24) & 0xFF);
-        FESP_HAL_LOGD(TAG,
-                      "eFuse write: offset=0x%X val=0x%08lX "
-                      "before=%02X%02X%02X%02X after=%02X%02X%02X%02X",
-                      offset, val, b3, b2, b1, b0, ctx->efuse[offset + 3],
-                      ctx->efuse[offset + 2], ctx->efuse[offset + 1],
-                      ctx->efuse[offset]);
+        FESP_HAL_LOGD(TAG, "eFuse write: offset=0x%X val=0x%08lX "
+                           "before=%02X%02X%02X%02X after=%02X%02X%02X%02X",
+                       offset, val, b3, b2, b1, b0, ctx->efuse[offset + 3],
+                       ctx->efuse[offset + 2], ctx->efuse[offset + 1],
+                       ctx->efuse[offset]);
     }
 }
 

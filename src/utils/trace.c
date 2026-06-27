@@ -68,16 +68,12 @@ void Trace_Close(void)
 }
 
 /*
- * Trace_Write - Write trace message to log file
+ * Trace_WriteVa - Write trace message using va_list
  *
- * Thread-safe function that writes timestamped message with tag.
- * Format: "HH:MM:SS.mmm +X.XXX [thread_id] [tag] message\r\n"
- *
- * @tag: Category tag (e.g. "GUI", "ESP", "SER")
- * @fmt: printf-style format string
- * @...: Format arguments
+ * Core implementation with timestamp, thread ID, and tag formatting.
+ * Writes to log file in format: "HH:MM:SS.mmm +X.XXX [thread_id] [tag] message\r\n"
  */
-void Trace_Write(const char *tag, const char *fmt, ...)
+void Trace_WriteVa(const char *tag, const char *fmt, va_list ap)
 {
     if (g_hTraceFile == INVALID_HANDLE_VALUE) {
         return;
@@ -88,7 +84,6 @@ void Trace_Write(const char *tag, const char *fmt, ...)
     SYSTEMTIME st;
     GetLocalTime(&st);
 
-    /* Calculate relative time delta using high-precision counter */
     LARGE_INTEGER now;
     QueryPerformanceCounter(&now);
     DWORD deltaMs = 0;
@@ -104,13 +99,7 @@ void Trace_Write(const char *tag, const char *fmt, ...)
                        st.wMinute, st.wSecond, st.wMilliseconds, deltaMs / 1000,
                        deltaMs % 1000, GetCurrentThreadId(), tag ? tag : "?");
 
-    va_list args;
-    va_start(args, fmt);
-    int msgLen = vsnprintf(buf + len, sizeof(buf) - len, fmt, args);
-    va_end(args);
-
-    /* vsnprintf returns number of chars that would be written (excluding null).
-       Clamp len to actual buffer size to prevent out-of-bounds access. */
+    int msgLen = vsnprintf(buf + len, sizeof(buf) - len, fmt, ap);
     if (msgLen >= 0) {
         len += msgLen;
         if (len >= (int)sizeof(buf)) {
@@ -128,6 +117,19 @@ void Trace_Write(const char *tag, const char *fmt, ...)
     FlushFileBuffers(g_hTraceFile);
 
     LeaveCriticalSection(&g_csTrace);
+}
+
+/*
+ * Trace_Write - Write trace message to log file
+ *
+ * Convenience wrapper around Trace_WriteVa.
+ */
+void Trace_Write(const char *tag, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Trace_WriteVa(tag, fmt, args);
+    va_end(args);
 }
 
 #endif /* ENABLE_TRACE_FW || ENABLE_TRACE_PROTO */

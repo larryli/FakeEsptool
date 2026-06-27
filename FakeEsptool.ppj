@@ -29,7 +29,7 @@ POC_PROJECT_ZIPEXTRA = #
 CCFLAGS = -Tx64-coff -std:C11 -Zi -MT -Ot -Ob1 -fp:precise -W1 -Gz -Ze -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -D_CRT_SECURE_NO_WARNINGS -DENABLE_TRACE_FW=1 -DENABLE_TRACE_PROTO=1#
 ASFLAGS = -AAMD64 -Zi -Gz#
 RCFLAGS = #
-LINKFLAGS = -machine:x64 -debug -debugtype:both -subsystem:windows kernel32.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib setupapi.lib uuid.lib Shell32.lib Version.lib#
+LINKFLAGS = -machine:x64 -debug -debugtype:both -subsystem:windows kernel32.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib setupapi.lib shlwapi.lib uuid.lib Shell32.lib Version.lib#
 SIGNFLAGS = -location:CU -store:MY -timeurl:http://timestamp.verisign.com/scripts/timstamp.dll -errkill#
 CC = pocc.exe#
 AS = poasm.exe#

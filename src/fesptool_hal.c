@@ -6,6 +6,7 @@
  */
 
 #include "fesptool_hal.h"
+#include "utils/trace.h"
 #include <stdio.h>
 
 /* ========================================================================
@@ -37,26 +38,29 @@ void FEsptoolSetLogCallback(ESP_HAL_LOGLINE_CB cb, void *ctx)
 
 DWORD fesp_hal_write(const BYTE *data, DWORD len)
 {
-    if (s_writeCb)
+    if (s_writeCb) {
         return s_writeCb(data, len);
+    }
     return 0;
 }
 
 BOOL fesp_hal_set_baud_rate(DWORD baudRate)
 {
-    if (s_baudRateCb)
+    if (s_baudRateCb) {
         return s_baudRateCb(baudRate);
+    }
     return FALSE;
 }
 
 void fesp_hal_modified(void)
 {
-    if (s_modifiedCb)
+    if (s_modifiedCb) {
         s_modifiedCb();
+    }
 }
 
 /* ========================================================================
- * Log dispatch
+ * Engine-side forwarding (snake_case)
  * ======================================================================== */
 
 static void LogDispatch(const char *tag, bool is_error, const char *fmt,
@@ -74,6 +78,9 @@ void fesp_hal_log_i(const char *tag, const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
+#ifdef ENABLE_TRACE
+    Trace_WriteVa(tag, fmt, ap);
+#endif
     LogDispatch(tag, false, fmt, ap);
     va_end(ap);
 }
@@ -82,6 +89,9 @@ void fesp_hal_log_e(const char *tag, const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
+#ifdef ENABLE_TRACE
+    Trace_WriteVa(tag, fmt, ap);
+#endif
     LogDispatch(tag, true, fmt, ap);
     va_end(ap);
 }

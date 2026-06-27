@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if ENABLE_TRACE
+#if FESP_HAL_LOG_HAS_DEBUG
 static const char *TAG = "CHIP";
 #endif
 

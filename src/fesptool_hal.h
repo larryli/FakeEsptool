@@ -79,8 +79,10 @@ void fesp_hal_log_e(const char *tag, const char *fmt, ...);
 #ifdef ENABLE_TRACE
 void Trace_Write(const char *tag, const char *fmt, ...);
 #define FESP_HAL_LOGD(TAG, ...) Trace_Write(TAG, __VA_ARGS__)
+#define FESP_HAL_LOG_HAS_DEBUG 1
 #else
 #define FESP_HAL_LOGD(TAG, ...) ((void)0)
+#define FESP_HAL_LOG_HAS_DEBUG 0
 #endif
 
 /* ========================================================================
