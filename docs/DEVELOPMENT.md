@@ -7,43 +7,46 @@ FakeEsptool 是一个 ESP 芯片设备端模拟器，用于模拟 ESP8266/ESP32 
 ## 架构概览
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   main.c    │────▶│  serial.c   │────▶│  esptool.c  │
-│  (UI层)     │     │ (通信层)    │     │ (协议层)    │
-└──────┬──────┘     └─────────────┘     └──────┬──────┘
-       │                                       │
-       │                           ┌───────────┼───────────┐
-       │                           ▼           ▼           ▼
-       │                    ┌────────────┐┌──────────┐┌───────────┐
-       │                    │ slip.c     ││ chip.c   ││ flash.c   │
-       │                    │(SLIP编解码)││(芯片特性)││(Flash存储)│
-       │                    └────────────┘└──────────┘└───────────┘
-       │
-       ▼
-┌──────────────┐
-│  device.c    │
-│(设备文件管理)│
-└──────────────┘
+┌──────────────────────────────────────────────┐
+│  GUI 层                                       │
+│  main.c  app_commands.c  dlg/*.c  serial.c   │
+│  device_file.c（.esp 文件格式）               │
+└──────────┬───────────────────────────────────┘
+           │ 注册 HAL 回调
+           ▼
+┌──────────────────────────────────────────────┐
+│  esptool_hal.h/c  — 平台合同（HAL）           │
+│  输出回调：Write / SetBaudRate / Modified     │
+│  日志：LogI / LogE（GUI） / LogD（trace 文件） │
+│  工具：Mem_* / MD5 / Deflate / Encrypt       │
+└──────────┬───────────────────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────┐
+│  模拟引擎（src/esptool/）— 平台无关           │
+│  esptool.c/h  协议命令解析与响应              │
+│  slip.c/h     SLIP 编解码                    │
+│  chip.c/h     芯片模拟骨架                    │
+│  efuse.c/h    eFuse 模拟                     │
+│  flash.c/h    Flash 存储模拟                  │
+└──────────────────────────────────────────────┘
 ```
 
 ### 数据共享机制
 
-协议层（`ESPTOOL_CTX`）通过指针直接引用设备层（`DEVICE_CTX`）的数据，无需数据复制或同步：
+模拟引擎通过指针直接引用芯片和 Flash 数据，无需复制：
 
 ```
-g_device.chip  ◄─── g_esptool.chip   (同一块内存)
-g_device.flash ◄─── g_esptool.flash  (同一块内存)
+g_chip  ◄─── g_esptool.chip   (同一块内存)
+g_flash ◄─── g_esptool.flash  (同一块内存)
 ```
 
 **初始化**：
 ```c
-Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
+Chip_Init(&g_chip, CHIP_ESP32);
+Flash_Init(&g_flash, 4 * 1024 * 1024);
+Esptool_Init(&g_esptool, &g_chip, &g_flash);
 ```
-
-**数据流**：
-- esptool 协议层读写 `g_esptool.chip` / `g_esptool.flash` 时，直接修改 `g_device` 的数据
-- 设备保存、导出等操作直接读取 `g_device` 的数据
-- 无需额外的同步函数
 
 | 模块 | 职责 |
 |------|------|
@@ -51,10 +54,12 @@ Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
 | `app_commands.c/h` | 菜单和工具栏命令处理 |
 | `app_logview.c/h` | 日志视图和字体管理 |
 | `serial.c/h` | 串口通信，数据收发，信号控制 |
+| `device_file.c/h` | .esp 设备文件格式读写 |
+| `esptool_hal.h/c` | 平台合同：回调 + 工具函数转发 |
 | `esptool/slip.c/h` | SLIP 协议编解码 |
-| `esptool/chip.c/h` | 芯片特性模拟（efuse、MAC等） |
+| `esptool/chip.c/h` | 芯片模拟骨架（init、寄存器、MAC、启动日志） |
+| `esptool/efuse.c/h` | eFuse 模拟（控制器、读写、字段查询） |
 | `esptool/flash.c/h` | Flash 存储模拟 |
-| `esptool/device.c/h` | 设备文件管理 |
 | `esptool/esptool.c/h` | esptool 命令解析与响应 |
 | `dlg/device_props.c` | 设备属性对话框 |
 | `dlg/key_mgmt.c` | 密钥管理对话框 |
@@ -67,6 +72,35 @@ Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
 | `utils/md5.c/h` | MD5 哈希（封装平台相关实现，移植时替换 md5.c） |
 | `utils/deflate.c/h` | DEFLATE 解压（用于压缩模式烧录） |
 | `utils/encrypt.c/h` | AES-XTS 加密/解密（用于加密烧录） |
+
+### esptool_hal 接口
+
+模拟引擎的所有外部依赖汇聚到 `esptool_hal.h` 一个文件。移植时只需替换此头文件和对应的 `.c` 实现。
+
+**输出回调（引擎 → 外部）：**
+
+| 回调 | 说明 |
+|---|---|
+| `EsptoolHal_Write(data, len)` | 写数据到串口 |
+| `EsptoolHal_SetBaudRate(baud)` | 波特率切换 |
+| `EsptoolHal_Modified()` | 设备修改通知 |
+| `EsptoolHal_LogI(tag, fmt, ...)` | Info 日志（GUI 窗口） |
+| `EsptoolHal_LogE(tag, fmt, ...)` | Error 日志（GUI 窗口） |
+
+**工具函数（引擎 ← 平台实现）：**
+
+| 函数 | 说明 |
+|---|---|
+| `EsptoolHal_MemAlloc/ZeroAlloc/Free` | 内存管理 |
+| `EsptoolHal_MD5Calc` | MD5 哈希 |
+| `EsptoolHal_DeflateInit/Decompress` | DEFLATE 解压 |
+| `EsptoolHal_EncryptInit/Data`, `DecryptData` | AES-XTS 加解密 |
+
+**Debug 日志宏：**
+
+```c
+EsptoolHal_LogD(TAG, "debug message");  // 编译期可控（ENABLE_TRACE）
+```
 
 ## 编译
 
@@ -266,14 +300,21 @@ ctest --test-dir build_tests --build-config Release
 ## 使用示例
 
 ```c
+#include "esptool_hal.h"
+#include "esptool/chip.h"
+#include "esptool/flash.h"
 #include "esptool/esptool.h"
 
-// 初始化（协议层直接引用设备数据）
-Esptool_Init(&g_esptool, &g_device.chip, &g_device.flash);
+// 初始化
+Chip_Init(&g_chip, CHIP_ESP32);
+Flash_Init(&g_flash, 4 * 1024 * 1024);
+Esptool_Init(&g_esptool, &g_chip, &g_flash);
 
-// 注册回调
-Esptool_SetWriteCallback(&g_esptool, OnSerialWrite);
-Esptool_SetBaudRateCallback(&g_esptool, OnBaudRateChange);
+// 注册 HAL 回调
+EsptoolHal_SetWriteCallback(OnSerialWrite);
+EsptoolHal_SetBaudRateCallback(OnBaudRateChange);
+EsptoolHal_SetModifiedCallback(OnDeviceModified);
+EsptoolHal_SetLogCallback(OnHalLog, NULL);
 ```
 
 ## API 参考
@@ -476,23 +517,30 @@ cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DENABLE_TRACE_PROTO=ON -DENABL
 cmake --build build --config Release -j
 ```
 
-### 日志宏
+### 日志
+
+模拟引擎使用三级日志，通过 `esptool_hal.h` 统一接口：
 
 ```c
-#include "utils/trace.h"
+#include "esptool_hal.h"
 
 static const char *TAG = "ESP";
 
-TRACE_FW(TAG, "Framework message");
-TRACE_PROTO(TAG, "Protocol message: 0x%02X", cmd);
+// Debug 级别 — trace 文件输出（编译期可控）
+EsptoolHal_LogD(TAG, "key_offset=0x%02X", offset);
+
+// Info 级别 — GUI 窗口输出（始终启用）
+EsptoolHal_LogI(TAG, "Sync handshake");
+
+// Error 级别 — GUI 窗口输出（始终启用，可标红）
+EsptoolHal_LogE("ERR", "Encryption failed: %d", ret);
 ```
 
-### 窗口日志
-
-```c
-Serial_PostLog(hNotify, L"ESP", L"Command received");
-Serial_PostLogF(hNotify, L"ESP", L"Flash addr=0x%08lX", addr);
-```
+| 级别 | 宏/函数 | 去向 | 编译控制 |
+|---|---|---|---|
+| Debug | `EsptoolHal_LogD(TAG, ...)` | trace .log 文件 | `ENABLE_TRACE` |
+| Info | `EsptoolHal_LogI(tag, fmt, ...)` | GUI 窗口 | 始终启用 |
+| Error | `EsptoolHal_LogE(tag, fmt, ...)` | GUI 窗口（可标红） | 始终启用 |
 
 ### Trace 日志格式
 
