@@ -4,6 +4,30 @@
 
 ---
 
+## 高优先级 - fesptool 模拟引擎单元测试
+
+为 `src/fesptool/` 模拟引擎添加完整单元测试。需要提供 mock `fesptool_hal` 实现（捕获 Write、记录 Log、模拟 MD5/Deflate/Encrypt 使用当前平台实现）。
+
+**测试优先级与模块：**
+
+| 优先级 | 模块 | 测试要点 |
+|--------|------|----------|
+| 1 | `flash.c` | read/write（AND 语义）、erase（0xFF 恢复）、calc_md5、边界条件 |
+| 2 | `slip.c` | 编码/解码往返、转义序列、帧边界、缓冲区溢出保护 |
+| 3 | `efuse.c` | 字段偏移正确性、ReadEfuseBits/WriteEfuseBits/ClearEfuseBits、key purpose、加密状态查询 |
+| 4 | `chip.c` | 各芯片 Init、ReadReg/WriteReg 映射、SPI 寄存器、eFuse 控制器烧录、启动消息 |
+| 5 | `esptool.c` | SYNC 握手、READ_REG 检测、FLASH_BEGIN/DATA/END 完整流程、压缩烧录、加密烧录、GET_SECURITY_INFO、命令状态机 |
+
+**Mock HAL 要求：**
+- `fesp_hal_write`: 捕获写入数据到缓冲区，供断言验证 SLIP 响应
+- `fesp_hal_log_i/log_e`: 记录日志消息，供断言验证
+- `fesp_hal_set_baud_rate` / `fesp_hal_modified`: 记录调用次数
+- MD5/Deflate/Encrypt: 使用当前平台实现（Windows CryptoAPI、zlib、AES-XTS）
+
+**测试框架：** 复用现有 `tests/` 目录结构，CMake + ctest。
+
+---
+
 ## 低优先级 - 成熟芯片支持
 
 支持 esptool 官方已完善支持的 ESP 芯片。
