@@ -103,7 +103,7 @@ esptool --baud 921600 write-flash 0x0 bootloader.bin 0x10000 app.bin 0x8000 part
 
 **要点解读：**
 
-1. **74880 波特率**：ESP32-C2（26MHz XTAL）的 ROM Bootloader 使用 74880 波特率输出启动日志。其他芯片（如 ESP32、ESP32-S3）使用 115200。FakeEsptool 在 `Chip_GetBootBaudRate` 中根据芯片类型和 XTAL 频率决定。
+1. **74880 波特率**：ESP32-C2（26MHz XTAL）的 ROM Bootloader 使用 74880 波特率输出启动日志。其他芯片（如 ESP32、ESP32-S3）使用 115200。FakeEsptool 在 `fesp_chip_get_boot_baud_rate` 中根据芯片类型和 XTAL 频率决定。
 
 2. **启动日志格式**：每款芯片的 ROM 启动日志格式不同，包含 ROM 版本标识、复位原因、启动模式。详见 [REQUIREMENTS.md](REQUIREMENTS.md) 的"启动日志"章节。
 

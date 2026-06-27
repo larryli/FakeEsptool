@@ -10,10 +10,10 @@
 
 | 结构体 | 说明 |
 |--------|------|
-| `ESP_PACKET` | 协议数据包（约 32KB） |
-| `ESPTOOL_CTX` | 协议上下文（包含 ESP_PACKET 预分配缓冲区） |
+| `fesp_packet_t` | 协议数据包（约 32KB） |
+| `fesp_ctx_t` | 协议上下文（包含 fesp_packet_t 预分配缓冲区） |
 
-**ESP_PACKET 字段：**
+**fesp_packet_t 字段：**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -21,16 +21,16 @@
 | `command` | BYTE | 命令码 |
 | `size` | WORD | 数据载荷大小 |
 | `value` | DWORD | 命令相关值 |
-| `data[ESP_PACKET_DATA_MAX]` | BYTE | 数据载荷 |
+| `data[fesp_packet_t_DATA_MAX]` | BYTE | 数据载荷 |
 
-**ESPTOOL_CTX 字段：**
+**fesp_ctx_t 字段：**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `slip` | SLIP_CTX | SLIP 解码器上下文 |
-| `chip` | CHIP_CTX* | 指向设备芯片数据（不拥有） |
-| `flash` | FLASH_CTX* | 指向设备 Flash 数据（不拥有） |
-| `pkt` | ESP_PACKET | 预分配数据包缓冲区（避免栈溢出） |
+| `slip` | fesp_slip_ctx_t | SLIP 解码器上下文 |
+| `chip` | fesp_chip_ctx_t* | 指向设备芯片数据（不拥有） |
+| `flash` | fesp_flash_ctx_t* | 指向设备 Flash 数据（不拥有） |
+| `pkt` | fesp_packet_t | 预分配数据包缓冲区（避免栈溢出） |
 | `state` | ESP_STATE | 协议状态机 |
 | `synced` | BOOL | SYNC 握手完成标志 |
 | `stub_mode` | BOOL | Stub 运行标志 |
@@ -74,17 +74,17 @@
 
 | 函数 | 说明 |
 |------|------|
-| `Esptool_Init(ctx, chip, flash)` | 初始化上下文，绑定设备数据指针 |
-| `Esptool_ResetState(ctx)` | 重置协议状态（进入下载模式时调用） |
-| `Esptool_SetNotify(ctx, hNotify)` | 设置通知窗口 |
-| `Esptool_SetModifiedCallback(ctx, cb)` | 设置修改回调 |
-| `Esptool_SetWriteCallback(ctx, cb)` | 设置串口写回调 |
-| `Esptool_SetBaudRateCallback(ctx, cb)` | 设置波特率修改回调 |
-| `Esptool_Feed(ctx, data, len)` | 喂入串口数据 |
-| `Esptool_ProcessFrame(ctx, frame, frame_len)` | 处理一帧数据 |
-| `Esptool_SendResponse(ctx, cmd, req_val, status, data, len)` | 发送响应（4字节状态） |
-| `Esptool_SendResponseEx(ctx, cmd, req_val, status, status_len, data, len)` | 发送响应（可配置状态长度） |
-| `Esptool_CalcChecksum(data, len)` | 计算校验和 |
+| `fesp_init(ctx, chip, flash)` | 初始化上下文，绑定设备数据指针 |
+| `fesp_reset_state(ctx)` | 重置协议状态（进入下载模式时调用） |
+| `FEsptoolSetNotify (deprecated) (deprecated)(ctx, hNotify)` | 设置通知窗口 |
+| `FEsptoolSetModifiedCallback(ctx, cb)` | 设置修改回调 |
+| `FEsptoolSetWriteCallback(ctx, cb)` | 设置串口写回调 |
+| `FEsptoolSetBaudRateCallback(ctx, cb)` | 设置波特率修改回调 |
+| `fesp_feed(ctx, data, len)` | 喂入串口数据 |
+| `fesp_process_frame(ctx, frame, frame_len)` | 处理一帧数据 |
+| `fesp_send_response(ctx, cmd, req_val, status, data, len)` | 发送响应（4字节状态） |
+| `fesp_send_response_ex(ctx, cmd, req_val, status, status_len, data, len)` | 发送响应（可配置状态长度） |
+| `fesp_calc_checksum(data, len)` | 计算校验和 |
 
 **注意：** `SendResponseEx` 的 `status` 参数仅用于日志记录（TRACE_PROTO 和 Serial_PostLogF），不包含在响应包中。`status_len` 参数决定响应 Data 字段的总长度（`data_len` + 状态码），当 `data=NULL` 且 `data_len>0` 时，函数自动填充零字节（表示成功）。`SendResponse` 是 `SendResponseEx` 的便捷封装，固定使用 4 字节状态长度。
 
@@ -96,10 +96,10 @@
 
 | 结构体 | 说明 |
 |--------|------|
-| `SPI_OFFSETS` | SPI 寄存器偏移（按芯片族区分） |
-| `CHIP_CTX` | 芯片上下文（包含 SPI_OFFSETS 指针） |
+| `fesp_spi_offsets_t` | SPI 寄存器偏移（按芯片族区分） |
+| `fesp_chip_ctx_t` | 芯片上下文（包含 fesp_spi_offsets_t 指针） |
 
-**SPI_OFFSETS 字段：**
+**fesp_spi_offsets_t 字段：**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -114,9 +114,9 @@
 
 | 常量 | 值 | 说明 |
 |------|-----|------|
-| `CHIP_DETECT_REG` | `0x40001000` | 芯片检测魔数寄存器地址（用于 esptool 自动识别） |
+| `FESP_CHIP_DETECT_REG` | `0x40001000` | 芯片检测魔数寄存器地址（用于 esptool 自动识别） |
 
-**CHIP_CTX eFuse 控制器字段（用于 C2/C3/C6 烧录模拟）：**
+**fesp_chip_ctx_t eFuse 控制器字段（用于 C2/C3/C6 烧录模拟）：**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -128,41 +128,41 @@
 
 | 函数 | 说明 |
 |------|------|
-| `Chip_Init(ctx, type)` | 初始化芯片 |
-| `Chip_Close(ctx)` | 释放芯片 |
-| `Chip_GetName(ctx)` | 获取芯片名称 |
-| `Chip_SetMac(ctx, mac)` | 设置MAC地址 |
-| `Chip_GetMac(ctx)` | 获取MAC地址 |
-| `Chip_ReadReg(ctx, addr)` | 读取寄存器（含 eFuse 值存储读取） |
-| `Chip_WriteReg(ctx, addr, val)` | 写入寄存器（含 eFuse 控制器烧录模拟） |
-| `Chip_SetFlashSize(ctx, size)` | 设置Flash大小 |
-| `Chip_GetFlashSize(ctx)` | 获取Flash大小 |
-| `Chip_GetChipId(ctx)` | 获取芯片ID |
-| `Chip_GetEfuse(ctx)` | 获取efuse数据 |
-| `Chip_GetEfuseSize(ctx)` | 获取efuse大小 |
-| `Chip_GetBootBaudRate(ctx)` | 获取启动日志波特率 |
-| `Chip_GetBootMessage(ctx, download_mode, reset_cause)` | 获取启动日志文本 |
-| `Chip_IsFlashEncryptionEnabled(ctx)` | 检查 Flash 加密是否启用 |
-| `Chip_IsDownloadEncryptDisabled(ctx)` | 检查下载模式加密是否禁用（量产模式） |
-| `Chip_IsDownloadModeDisabled(ctx)` | 检查下载模式是否禁用 |
-| `Chip_IsSecureDownloadEnabled(ctx)` | 检查安全下载模式是否启用 |
-| `Chip_IsSecureBootEnabled(ctx)` | 检查安全启动是否启用 |
-| `Chip_IsJtagDisabled(ctx)` | 检查 JTAG 是否禁用（DIS_PAD_JTAG） |
-| `Chip_GetJtagDisabledCount(ctx)` | 获取已禁用的 JTAG 接口数 |
-| `Chip_GetJtagTotalCount(ctx)` | 获取 JTAG 接口总数 |
-| `Chip_GetFlashCryptCnt(ctx)` | 获取 SPI_BOOT_CRYPT_CNT 原始值 |
-| `Chip_GetDlEncryptDisabled(ctx)` | 获取 DIS_DOWNLOAD_MANUAL_ENCRYPT 原始值 |
-| `Chip_GetDlModeDisabled(ctx)` | 获取 DIS_DOWNLOAD_MODE 原始值 |
-| `Chip_GetSecureBootFlag(ctx)` | 获取安全启动 eFuse 原始值 |
-| `Chip_GetJtagFlag(ctx)` | 获取 DIS_PAD_JTAG 原始值 |
-| `Chip_GetSoftJtagFlag(ctx)` | 获取 SOFT_DIS_JTAG 原始值 |
-| `Chip_GetUsbJtagFlag(ctx)` | 获取 DIS_USB_JTAG 原始值 |
-| `Chip_GetKeyPurpose(ctx, block)` | 获取密钥块用途 |
-| `Chip_GetEncryptionKeyOffset(ctx, key_len)` | 获取加密密钥 eFuse 偏移和长度 |
-| `Chip_SetFlashEncryption(ctx, mode)` | **GUI 层**：设置加密状态（0=无, 1=开发, 2=量产） |
-| `Chip_SetDownloadMode(ctx, mode)` | **GUI 层**：设置下载模式（0=正常, 1=安全, 2=禁用） |
+| `fesp_chip_init(ctx, type)` | 初始化芯片 |
+| `fesp_chip_close(ctx)` | 释放芯片 |
+| `fesp_chip_get_name(ctx)` | 获取芯片名称 |
+| `fesp_chip_set_mac(ctx, mac)` | 设置MAC地址 |
+| `fesp_chip_get_mac(ctx)` | 获取MAC地址 |
+| `fesp_chip_read_reg(ctx, addr)` | 读取寄存器（含 eFuse 值存储读取） |
+| `fesp_chip_write_reg(ctx, addr, val)` | 写入寄存器（含 eFuse 控制器烧录模拟） |
+| `fesp_chip_set_flash_size(ctx, size)` | 设置Flash大小 |
+| `fesp_chip_get_flash_size(ctx)` | 获取Flash大小 |
+| `fesp_chip_get_chip_id(ctx)` | 获取芯片ID |
+| `fesp_chip_get_efuse(ctx)` | 获取efuse数据 |
+| `fesp_chip_get_efuse_size(ctx)` | 获取efuse大小 |
+| `fesp_chip_get_boot_baud_rate(ctx)` | 获取启动日志波特率 |
+| `fesp_chip_get_boot_message(ctx, download_mode, reset_cause)` | 获取启动日志文本 |
+| `fesp_efuse_is_flash_encryption_enabled(ctx)` | 检查 Flash 加密是否启用 |
+| `fesp_efuse_is_download_encrypt_disabled(ctx)` | 检查下载模式加密是否禁用（量产模式） |
+| `fesp_efuse_is_download_mode_disabled(ctx)` | 检查下载模式是否禁用 |
+| `fesp_efuse_is_secure_download_enabled(ctx)` | 检查安全下载模式是否启用 |
+| `fesp_efuse_is_secure_boot_enabled(ctx)` | 检查安全启动是否启用 |
+| `fesp_efuse_is_jtag_disabled(ctx)` | 检查 JTAG 是否禁用（DIS_PAD_JTAG） |
+| `fesp_efuse_get_jtag_disabled_count(ctx)` | 获取已禁用的 JTAG 接口数 |
+| `fesp_efuse_get_jtag_total_count(ctx)` | 获取 JTAG 接口总数 |
+| `fesp_efuse_get_flash_crypt_cnt(ctx)` | 获取 SPI_BOOT_CRYPT_CNT 原始值 |
+| `fesp_efuse_get_dl_encrypt_disabled(ctx)` | 获取 DIS_DOWNLOAD_MANUAL_ENCRYPT 原始值 |
+| `fesp_efuse_get_dl_mode_disabled(ctx)` | 获取 DIS_DOWNLOAD_MODE 原始值 |
+| `fesp_efuse_get_secure_boot_flag(ctx)` | 获取安全启动 eFuse 原始值 |
+| `fesp_efuse_get_jtag_flag(ctx)` | 获取 DIS_PAD_JTAG 原始值 |
+| `fesp_efuse_get_soft_jtag_flag(ctx)` | 获取 SOFT_DIS_JTAG 原始值 |
+| `fesp_efuse_get_usb_jtag_flag(ctx)` | 获取 DIS_USB_JTAG 原始值 |
+| `fesp_efuse_get_key_purpose(ctx, block)` | 获取密钥块用途 |
+| `fesp_efuse_get_encryption_key_offset(ctx, key_len)` | 获取加密密钥 eFuse 偏移和长度 |
+| `fesp_efuse_set_flash_encryption(ctx, mode)` | **GUI 层**：设置加密状态（0=无, 1=开发, 2=量产） |
+| `fesp_efuse_set_download_mode(ctx, mode)` | **GUI 层**：设置下载模式（0=正常, 1=安全, 2=禁用） |
 
-**Chip_WriteReg eFuse 控制器行为：**
+**fesp_chip_write_reg eFuse 控制器行为：**
 - 对于有控制器的芯片（C2/C3/C6，`efuse_conf_ofs != 0`）：
   - 写入 PGM_DATA 范围（`EFUSE_BASE+0x00..+0x1F`）→ 暂存到 `pgm_data[]`
   - 写入 CONF_REG → 记录解锁码
@@ -178,9 +178,9 @@
 
 | 结构体 | 说明 |
 |--------|------|
-| `FLASH_CTX` | Flash 存储上下文 |
+| `fesp_flash_ctx_t` | Flash 存储上下文 |
 
-**FLASH_CTX 字段：**
+**fesp_flash_ctx_t 字段：**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -191,15 +191,15 @@
 
 | 函数 | 说明 |
 |------|------|
-| `Flash_Init(ctx, size)` | 初始化 Flash |
-| `Flash_Close(ctx)` | 释放 Flash |
-| `Flash_Read(ctx, addr, buf, len)` | 读取数据 |
-| `Flash_Write(ctx, addr, data, len)` | 写入数据（AND 操作，模拟真实 Flash 行为） |
-| `Flash_Erase(ctx, addr, len)` | 擦除区域（自动 4KB 扇区对齐，设为 0xFF） |
-| `Flash_EraseAll(ctx)` | 擦除全部 |
-| `Flash_CalcMd5(ctx, addr, len, md5)` | 计算 MD5 |
+| `fesp_flash_init(ctx, size)` | 初始化 Flash |
+| `fesp_flash_close(ctx)` | 释放 Flash |
+| `fesp_flash_read(ctx, addr, buf, len)` | 读取数据 |
+| `fesp_flash_write(ctx, addr, data, len)` | 写入数据（AND 操作，模拟真实 Flash 行为） |
+| `fesp_flash_erase(ctx, addr, len)` | 擦除区域（自动 4KB 扇区对齐，设为 0xFF） |
+| `fesp_flash_erase_all(ctx)` | 擦除全部 |
+| `fesp_flash_calc_md5(ctx, addr, len, md5)` | 计算 MD5 |
 
-**Flash_Write 行为说明：**
+**fesp_flash_write 行为说明：**
 - 真实 Flash 存储器只能将位从 1 改为 0，不能从 0 改为 1
 - 要将 0 改为 1，必须先擦除扇区（设为 0xFF）
 - 此函数执行：`flash[i] &= data[i]`
@@ -331,13 +331,13 @@ Decrypt_Data(&ctx, ciphertext, plaintext, sizeof(ciphertext));
 
 | 函数 | 说明 |
 |------|------|
-| `Slip_Init(ctx)` | 初始化解码器 |
-| `Slip_PutByte(ctx, b)` | 喂入字节 |
-| `Slip_IsComplete(ctx)` | 检查帧完成 |
-| `Slip_GetPayload(ctx)` | 获取载荷 |
-| `Slip_GetLength(ctx)` | 获取长度 |
-| `Slip_Reset(ctx)` | 重置状态 |
-| `Slip_Encode(data, len, out, max)` | 编码一帧 |
+| `fesp_slip_init(ctx)` | 初始化解码器 |
+| `fesp_slip_put_byte(ctx, b)` | 喂入字节 |
+| `fesp_slip_is_complete(ctx)` | 检查帧完成 |
+| `fesp_slip_get_payload(ctx)` | 获取载荷 |
+| `fesp_slip_get_length(ctx)` | 获取长度 |
+| `fesp_slip_reset(ctx)` | 重置状态 |
+| `fesp_slip_encode(data, len, out, max)` | 编码一帧 |
 
 ---
 
@@ -353,8 +353,8 @@ Decrypt_Data(&ctx, ciphertext, plaintext, sizeof(ciphertext));
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `chip` | CHIP_CTX | 芯片特性（类型、MAC、eFuse、晶振频率） |
-| `flash` | FLASH_CTX | Flash 存储（数据缓冲区、大小） |
+| `chip` | fesp_chip_ctx_t | 芯片特性（类型、MAC、eFuse、晶振频率） |
+| `flash` | fesp_flash_ctx_t | Flash 存储（数据缓冲区、大小） |
 | `filename` | WCHAR[MAX_PATH] | 当前文件路径 |
 | `modified` | BOOL | 数据修改标记 |
 
