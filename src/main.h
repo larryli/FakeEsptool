@@ -8,9 +8,9 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include <windows.h>
 #include "fesptool/chip.h"
 #include "fesptool/flash.h"
+#include <windows.h>
 
 /* Global device state (defined in main.c) */
 extern fesp_chip_ctx_t g_chip;
@@ -23,8 +23,9 @@ extern BOOL g_deviceModified;
     (WM_USER + 1) /* RX data: wParam=len, lParam=HeapAlloc ptr */
 #define WM_SERIAL_TX                                                           \
     (WM_USER + 2) /* TX data: wParam=len, lParam=HeapAlloc ptr */
-#define WM_SERIAL_ERROR (WM_USER + 3) /* Connection error: wParam=error code   \
-                                       */
+#define WM_SERIAL_ERROR                                                        \
+    (WM_USER + 3) /* Connection error: wParam=error code                       \
+                   */
 #define WM_SERIAL_LOG                                                          \
     (WM_USER + 4) /* Custom log: wParam=WCHAR* tag, lParam=WCHAR* text */
 #define WM_SERIAL_SIGNAL (WM_USER + 5) /* Signal change: wParam=modemStatus */

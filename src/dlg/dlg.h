@@ -6,8 +6,8 @@
 #define DLG_H
 
 #include "../fesptool/chip.h"
-#include "../fesptool/flash.h"
 #include "../fesptool/esptool.h"
+#include "../fesptool/flash.h"
 #include "../fesptool_hal.h"
 #include "../resource.h"
 #include "../utils/lang.h"

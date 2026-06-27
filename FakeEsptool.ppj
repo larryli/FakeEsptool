@@ -177,7 +177,6 @@ output\flash.obj: \
 output\esptool.obj: \
 	src\fesptool\esptool.c \
 	src\fesptool\esptool.h \
-	src\fesptool\esptool_priv.h \
 	src\fesptool_hal.h \
 	src\utils\deflate.h \
 	src\utils\encrypt.h

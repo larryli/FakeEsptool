@@ -12,12 +12,12 @@ FakeEsptool 是一个 ESP 芯片设备端模拟器，用于模拟 ESP8266/ESP32 
 │  main.c  app_commands.c  dlg/*.c  serial.c   │
 │  device_file.c（.esp 文件格式）               │
 └──────────┬───────────────────────────────────┘
-           │ 注册 HAL 回调
+           │ 直接调用
            ▼
 ┌──────────────────────────────────────────────┐
-│  esptool_hal.h/c  — 平台合同（HAL）           │
-│  输出回调：Write / SetBaudRate / Modified     │
-│  日志：LogI / LogE（GUI） / LogD（trace 文件） │
+│  fesptool_hal.h/c  — 平台合同（HAL）          │
+│  直调串口 API：Write / SetBaudRate            │
+│  直调 GUI：Modified / LogI / LogE             │
 │  工具：Mem_* / MD5 / Deflate / Encrypt       │
 └──────────┬───────────────────────────────────┘
            │
@@ -84,7 +84,7 @@ fesp_init(&g_esptool, &g_chip, &g_flash);
 | `app_logview.c/h` | 日志视图和字体管理 |
 | `serial.c/h` | 串口通信，数据收发，信号控制 |
 | `device_file.c/h` | .esp 设备文件格式读写 |
-| `esptool_hal.h/c` | 平台合同：回调 + 工具函数转发 |
+| `fesptool_hal.h/c` | 平台合同：直调串口/GUI + 工具函数转发 |
 | `fesptool/slip.c/h` | SLIP 编解码 |
 | `fesptool/chip.c/h` | 芯片模拟（init、寄存器、MAC、启动日志） |
 | `fesptool/chip_priv.h` | 芯片内部常量和函数声明 |
@@ -92,22 +92,27 @@ fesp_init(&g_esptool, &g_chip, &g_flash);
 | `fesptool/efuse_priv.h` | eFuse 内部常量和函数声明 |
 | `fesptool/flash.c/h` | Flash 存储模拟 |
 | `fesptool/esptool.c/h` | esptool 命令解析与响应 |
-| `fesptool/esptool_priv.h` | 协议内部声明 |
 | `fesptool/fesp.h` | 公开头文件聚合器 |
 
-### esptool_hal 接口
+### fesptool_hal 接口
 
-模拟引擎的所有外部依赖汇聚到 `esptool_hal.h` 一个文件。移植时只需替换此头文件和对应的 `.c` 实现。
+模拟引擎的所有外部依赖汇聚到 `fesptool_hal.h` 一个文件。移植时只需替换此头文件和对应的 `.c` 实现。
 
-**输出回调（引擎 → 外部）：**
+**初始化：**
 
-| 回调 | 说明 |
+| 函数 | 说明 |
 |---|---|
-| `fesp_hal_write(data, len)` | 写数据到串口 |
-| `fesp_hal_set_baud_rate(baud)` | 波特率切换 |
-| `fesp_hal_modified()` | 设备修改通知 |
-| `FESP_HAL_LOGI(tag, fmt, ...)` | Info 日志（GUI 窗口） |
-| `FESP_HAL_LOGE(tag, fmt, ...)` | Error 日志（GUI 窗口） |
+| `FEsptoolInit(hWnd, serial)` | 传入窗口句柄和串口上下文 |
+
+**引擎侧函数（引擎 → 平台实现）：**
+
+| 函数 | 说明 |
+|---|---|
+| `fesp_hal_write(data, len)` | 直调 `Serial_WriteData` 写串口 |
+| `fesp_hal_set_baud_rate(baud)` | 直调 `Serial_SetBaudRate` 切换波特率 |
+| `fesp_hal_modified()` | 直调 `OnDeviceModified` 通知 GUI |
+| `FESP_HAL_LOGI(tag, fmt, ...)` | Info 日志（直调 `Serial_PostLog`） |
+| `FESP_HAL_LOGE(tag, fmt, ...)` | Error 日志（直调 `Serial_PostLog`） |
 
 **工具函数（引擎 ← 平台实现）：**
 
@@ -124,14 +129,9 @@ fesp_init(&g_esptool, &g_chip, &g_flash);
 FESP_HAL_LOGD(TAG, "debug message");  // 编译期可控（ENABLE_TRACE）
 ```
 
-**GUI 注册函数（PascalCase）：**
+**设计原则：**
 
-| 函数 | 说明 |
-|---|---|
-| `FEsptoolSetWriteCallback(cb)` | 注册串口写回调 |
-| `FEsptoolSetBaudRateCallback(cb)` | 注册波特率回调 |
-| `FEsptoolSetModifiedCallback(cb)` | 注册设备修改回调 |
-| `FEsptoolSetLogCallback(cb, ctx)` | 注册日志回调 |
+胶水层不引入额外抽象。`fesptool_hal.c` 直接 include `serial.h` 和 `app_commands.h`，调用平台 API，不做回调转发。GUI 只需提供一个 `FEsptoolInit` 调用和一个 `OnDeviceModified` 函数。
 
 ## 编译
 
@@ -339,11 +339,8 @@ fesp_chip_init(&g_chip, FESP_CHIP_ESP32);
 fesp_flash_init(&g_flash, 4 * 1024 * 1024);
 fesp_init(&g_esptool, &g_chip, &g_flash);
 
-// 注册 HAL 回调
-FEsptoolSetWriteCallback(OnSerialWrite);
-FEsptoolSetBaudRateCallback(OnBaudRateChange);
-FEsptoolSetModifiedCallback(OnDeviceModified);
-FEsptoolSetLogCallback(OnHalLog, NULL);
+// 初始化 HAL（窗口创建后调用）
+FEsptoolInit(g_hWnd, &g_serial);
 ```
 
 ## API 参考
@@ -560,17 +557,17 @@ static const char *TAG = "ESP";
 FESP_HAL_LOGD(TAG, "key_offset=0x%02X", offset);
 
 // Info 级别 — GUI 窗口输出（始终启用）
-EsptoolWrap_Log(TAG, "Sync handshake");
+FESP_HAL_LOGI(TAG, "Sync handshake");
 
 // Error 级别 — GUI 窗口输出（始终启用，可标红）
-EsptoolWrap_Log("ERR", "Encryption failed: %d", ret);
+FESP_HAL_LOGE(TAG, "Encryption failed: %d", ret);
 ```
 
-| 级别 | 宏/函数 | 去向 | 编译控制 |
+| 级别 | 宏 | 去向 | 编译控制 |
 |---|---|---|---|
 | Debug | `FESP_HAL_LOGD(TAG, ...)` | trace .log 文件 | `ENABLE_TRACE` |
-| Info | `EsptoolWrap_Log(tag, fmt, ...)` | GUI 窗口 | 始终启用 |
-| Error | `EsptoolWrap_Log(tag, fmt, ...)` | GUI 窗口（可标红） | 始终启用 |
+| Info | `FESP_HAL_LOGI(TAG, ...)` | GUI 窗口 | 始终启用 |
+| Error | `FESP_HAL_LOGE(TAG, ...)` | GUI 窗口（可标红） | 始终启用 |
 
 ### Trace 日志格式
 

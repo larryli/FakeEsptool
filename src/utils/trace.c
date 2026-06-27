@@ -71,7 +71,8 @@ void Trace_Close(void)
  * Trace_WriteVa - Write trace message using va_list
  *
  * Core implementation with timestamp, thread ID, and tag formatting.
- * Writes to log file in format: "HH:MM:SS.mmm +X.XXX [thread_id] [tag] message\r\n"
+ * Writes to log file in format: "HH:MM:SS.mmm +X.XXX [thread_id] [tag]
+ * message\r\n"
  */
 void Trace_WriteVa(const char *tag, const char *fmt, va_list ap)
 {

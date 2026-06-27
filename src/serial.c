@@ -310,7 +310,8 @@ static DWORD WINAPI Listener_Proc(LPVOID param)
                 if (ReadFile(ctx->hPort, buffer, toRead, &bytesRead, &ovRead)) {
                     /* Read completed synchronously */
                 } else if (GetLastError() == ERROR_IO_PENDING) {
-                    if (WaitForSingleObject(hReadEvent, 1000) != WAIT_OBJECT_0) {
+                    if (WaitForSingleObject(hReadEvent, 1000) !=
+                        WAIT_OBJECT_0) {
                         continue;
                     }
                     if (!GetOverlappedResult(ctx->hPort, &ovRead, &bytesRead,

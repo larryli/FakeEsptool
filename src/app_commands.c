@@ -6,7 +6,6 @@
 
 #include "app_commands.h"
 #include "app_logview.h"
-#include "fesptool/chip.h"
 #include "device_file.h"
 #include "fesptool/chip.h"
 #include "fesptool/flash.h"
@@ -415,23 +414,20 @@ void UpdateMenuState(HWND hWnd)
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_KEY_MGMT, canKeyMgmt);
 
     /* Disable encryption and download mode menus for unsupported chips */
-    {
-        BOOL canEncrypt = g_chip.type != FESP_CHIP_ESP8266;
-        BOOL canDlMode = g_chip.type != FESP_CHIP_ESP8266;
-        BOOL canDlSecure = canDlMode && g_chip.type != FESP_CHIP_ESP32;
-        EnableMenuItem(hMenu, IDM_ENCRYPT_NONE,
-                       canEncrypt ? MF_ENABLED : MF_GRAYED);
-        EnableMenuItem(hMenu, IDM_ENCRYPT_DEV,
-                       canEncrypt ? MF_ENABLED : MF_GRAYED);
-        EnableMenuItem(hMenu, IDM_ENCRYPT_RELEASE,
-                       canEncrypt ? MF_ENABLED : MF_GRAYED);
-        EnableMenuItem(hMenu, IDM_DOWNLOAD_NORMAL,
-                       canDlMode ? MF_ENABLED : MF_GRAYED);
-        EnableMenuItem(hMenu, IDM_DOWNLOAD_SECURE,
-                       canDlSecure ? MF_ENABLED : MF_GRAYED);
-        EnableMenuItem(hMenu, IDM_DOWNLOAD_DISABLED,
-                       canDlMode ? MF_ENABLED : MF_GRAYED);
-    }
+    BOOL canEncrypt = g_chip.type != FESP_CHIP_ESP8266;
+    BOOL canDlMode = g_chip.type != FESP_CHIP_ESP8266;
+    BOOL canDlSecure = canDlMode && g_chip.type != FESP_CHIP_ESP32;
+    EnableMenuItem(hMenu, IDM_ENCRYPT_NONE,
+                   canEncrypt ? MF_ENABLED : MF_GRAYED);
+    EnableMenuItem(hMenu, IDM_ENCRYPT_DEV, canEncrypt ? MF_ENABLED : MF_GRAYED);
+    EnableMenuItem(hMenu, IDM_ENCRYPT_RELEASE,
+                   canEncrypt ? MF_ENABLED : MF_GRAYED);
+    EnableMenuItem(hMenu, IDM_DOWNLOAD_NORMAL,
+                   canDlMode ? MF_ENABLED : MF_GRAYED);
+    EnableMenuItem(hMenu, IDM_DOWNLOAD_SECURE,
+                   canDlSecure ? MF_ENABLED : MF_GRAYED);
+    EnableMenuItem(hMenu, IDM_DOWNLOAD_DISABLED,
+                   canDlMode ? MF_ENABLED : MF_GRAYED);
 
     /* Update encryption state and download mode menu check marks */
     UpdateEncryptionMenu(hMenu);
@@ -525,8 +521,7 @@ void UpdateStatusBar(void)
                 wsprintfW(buf, L"%s %luMB", chipName,
                           g_flash.size / (1024 * 1024));
             } else {
-                wsprintfW(buf, L"%s %luKB", chipName,
-                          g_flash.size / 1024);
+                wsprintfW(buf, L"%s %luKB", chipName, g_flash.size / 1024);
             }
             SendMessageW(g_hStatusbar, SB_SETTEXT, 0, (LPARAM)buf);
         } else {
@@ -807,7 +802,6 @@ void Main_CmdNewDevice(HWND hWnd)
         g_chip.xtal_freq = FESP_XTAL_FREQ_40M;
         g_deviceModified = FALSE;
         g_deviceFile[0] = 0;
-        FEsptoolSetModifiedCallback(OnDeviceModified);
         UpdateMenuState(hWnd);
         UpdateStatusBar();
         UpdateTitle(hWnd);
@@ -846,7 +840,6 @@ void Main_CmdOpenDevice(HWND hWnd)
         fesp_flash_close(&g_flash);
         fesp_chip_close(&g_chip);
         if (DeviceFile_Load(&g_chip, &g_flash, szFile)) {
-            FEsptoolSetModifiedCallback(OnDeviceModified);
             Config_SetLastDeviceFile(szFile);
             UpdateMenuState(hWnd);
             UpdateStatusBar();
@@ -882,7 +875,6 @@ BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath)
     fesp_flash_close(&g_flash);
     fesp_chip_close(&g_chip);
     if (DeviceFile_Load(&g_chip, &g_flash, filePath)) {
-        FEsptoolSetModifiedCallback(OnDeviceModified);
         Config_SetLastDeviceFile(filePath);
         UpdateMenuState(hWnd);
         UpdateStatusBar();
@@ -1163,8 +1155,7 @@ void Main_OnFlashImport(HWND hMainWnd)
     if (fileSize != g_flash.size) {
         CloseHandle(hFile);
         WCHAR msg[128];
-        wsprintfW(msg, LoadStr(IDS_MSG_FLASH_MISMATCH), fileSize,
-                  g_flash.size);
+        wsprintfW(msg, LoadStr(IDS_MSG_FLASH_MISMATCH), fileSize, g_flash.size);
         MessageBoxW(hMainWnd, msg, LoadStr(IDS_MSG_ERROR),
                     MB_OK | MB_ICONERROR);
         return;
@@ -1175,9 +1166,8 @@ void Main_OnFlashImport(HWND hMainWnd)
     EnableWindow(hMainWnd, FALSE);
 
     DWORD bytesRead;
-    BOOL ok =
-        ReadFile(hFile, g_flash.data, fileSize, &bytesRead, NULL) &&
-        bytesRead == fileSize;
+    BOOL ok = ReadFile(hFile, g_flash.data, fileSize, &bytesRead, NULL) &&
+              bytesRead == fileSize;
     CloseHandle(hFile);
 
     /* Restore window state */
@@ -1276,15 +1266,15 @@ void Main_OnFlashExport(HWND hMainWnd)
  * Thread frees this structure when done.
  */
 typedef struct {
-    fesp_chip_ctx_t chip;             /* Chip context snapshot */
-    fesp_flash_ctx_t flash;           /* Flash context snapshot */
+    fesp_chip_ctx_t chip;       /* Chip context snapshot */
+    fesp_flash_ctx_t flash;     /* Flash context snapshot */
     WCHAR deviceFile[MAX_PATH]; /* Device file path */
-    BYTE *efuse;              /* eFuse data snapshot */
-    DWORD efuseSize;          /* eFuse size */
-    BYTE *flashData;          /* Flash data snapshot */
-    DWORD flashSize;          /* Flash size */
-    WCHAR filename[MAX_PATH]; /* Output filename */
-    HWND hWnd;                /* Owner window */
+    BYTE *efuse;                /* eFuse data snapshot */
+    DWORD efuseSize;            /* eFuse size */
+    BYTE *flashData;            /* Flash data snapshot */
+    DWORD flashSize;            /* Flash size */
+    WCHAR filename[MAX_PATH];   /* Output filename */
+    HWND hWnd;                  /* Owner window */
 } DEVICE_SNAPSHOT;
 
 /*
@@ -1332,8 +1322,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     fwprintf(f, L"Chip Type:  %ls\n", chipName);
 
     /* Get xtal freq */
-    const WCHAR *xtalStr =
-        (snap->chip.xtal_freq == 0) ? L"40MHz" : L"26MHz";
+    const WCHAR *xtalStr = (snap->chip.xtal_freq == 0) ? L"40MHz" : L"26MHz";
     fwprintf(f, L"XTAL Freq:  %ls\n\n", xtalStr);
 
     /* Write MAC address */
@@ -1673,8 +1662,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         for (DWORD j = 0; j < 16; j++) {
             if (i + j < snap->efuseSize) {
                 fwprintf(f, L"%02X ", snap->efuse[i + j]);
-            }
-            else
+            } else
                 fwprintf(f, L"   ");
             if (j == 7) {
                 fwprintf(f, L" ");
@@ -1704,8 +1692,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         for (DWORD j = 0; j < 16; j++) {
             if (i + j < snap->flashSize) {
                 fwprintf(f, L"%02X ", snap->flashData[i + j]);
-            }
-            else
+            } else
                 fwprintf(f, L"   ");
             if (j == 7) {
                 fwprintf(f, L" ");
@@ -1815,7 +1802,8 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
     /* Snapshot Flash data */
     snap->flashSize = g_flash.size;
     if (snap->flashSize > 0 && g_flash.data) {
-        snap->flashData = (BYTE *)HeapAlloc(GetProcessHeap(), 0, snap->flashSize);
+        snap->flashData =
+            (BYTE *)HeapAlloc(GetProcessHeap(), 0, snap->flashSize);
         if (!snap->flashData) {
             if (snap->efuse) {
                 HeapFree(GetProcessHeap(), 0, snap->efuse);

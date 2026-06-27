@@ -6,30 +6,25 @@
  */
 
 #include "fesptool_hal.h"
+#include "app_commands.h"
 #include "utils/trace.h"
 #include <stdio.h>
 
 /* ========================================================================
- * Callback storage
+ * State
  * ======================================================================== */
 
-static ESP_HAL_WRITE_CB s_writeCb = NULL;
-static ESP_HAL_BAUDRATE_CB s_baudRateCb = NULL;
-static ESP_HAL_MODIFIED_CB s_modifiedCb = NULL;
-static ESP_HAL_LOGLINE_CB s_logCb = NULL;
-static void *s_logCtx = NULL;
+static HWND s_hWnd;
+static SERIAL_CTX *s_serial;
 
 /* ========================================================================
- * GUI-side registration (PascalCase)
+ * Initialization (PascalCase)
  * ======================================================================== */
 
-void FEsptoolSetWriteCallback(ESP_HAL_WRITE_CB cb) { s_writeCb = cb; }
-void FEsptoolSetBaudRateCallback(ESP_HAL_BAUDRATE_CB cb) { s_baudRateCb = cb; }
-void FEsptoolSetModifiedCallback(ESP_HAL_MODIFIED_CB cb) { s_modifiedCb = cb; }
-void FEsptoolSetLogCallback(ESP_HAL_LOGLINE_CB cb, void *ctx)
+void FEsptoolInit(HWND hWnd, SERIAL_CTX *serial)
 {
-    s_logCb = cb;
-    s_logCtx = ctx;
+    s_hWnd = hWnd;
+    s_serial = serial;
 }
 
 /* ========================================================================
@@ -38,30 +33,36 @@ void FEsptoolSetLogCallback(ESP_HAL_LOGLINE_CB cb, void *ctx)
 
 DWORD fesp_hal_write(const BYTE *data, DWORD len)
 {
-    if (s_writeCb) {
-        return s_writeCb(data, len);
+    if (!Serial_IsOpen(s_serial)) {
+        return 0;
     }
-    return 0;
+    return Serial_WriteData(s_serial, data, len, s_hWnd);
 }
 
 BOOL fesp_hal_set_baud_rate(DWORD baudRate)
 {
-    if (s_baudRateCb) {
-        return s_baudRateCb(baudRate);
+    if (!Serial_IsOpen(s_serial)) {
+        return FALSE;
     }
-    return FALSE;
+    return Serial_SetBaudRate(s_serial, baudRate);
 }
 
-void fesp_hal_modified(void)
-{
-    if (s_modifiedCb) {
-        s_modifiedCb();
-    }
-}
+void fesp_hal_modified(void) { OnDeviceModified(); }
 
 /* ========================================================================
- * Engine-side forwarding (snake_case)
+ * Engine-side logging (snake_case)
  * ======================================================================== */
+
+static void LogDispatch(const char *tag, bool is_error, const char *fmt,
+                        va_list ap)
+{
+    char line[1024];
+    vsnprintf(line, sizeof(line), fmt, ap);
+    WCHAR wtag[32], wline[1024];
+    MultiByteToWideChar(CP_UTF8, 0, tag, -1, wtag, 32);
+    MultiByteToWideChar(CP_UTF8, 0, line, -1, wline, 1024);
+    Serial_PostLog(s_hWnd, wtag, wline);
+}
 
 void fesp_hal_log_i(const char *tag, const char *fmt, ...)
 {
@@ -73,9 +74,7 @@ void fesp_hal_log_i(const char *tag, const char *fmt, ...)
     Trace_WriteVa(tag, fmt, ap2);
     va_end(ap2);
 #endif
-    if (s_logCb) {
-        s_logCb(tag, false, fmt, ap, s_logCtx);
-    }
+    LogDispatch(tag, false, fmt, ap);
     va_end(ap);
 }
 
@@ -89,9 +88,7 @@ void fesp_hal_log_e(const char *tag, const char *fmt, ...)
     Trace_WriteVa(tag, fmt, ap2);
     va_end(ap2);
 #endif
-    if (s_logCb) {
-        s_logCb(tag, true, fmt, ap, s_logCtx);
-    }
+    LogDispatch(tag, true, fmt, ap);
     va_end(ap);
 }
 

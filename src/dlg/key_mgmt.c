@@ -220,8 +220,8 @@ static BOOL IsKeyEmpty(const fesp_chip_ctx_t *chip, int offset, int size)
  *
  * Formats key as "01 02 03 ..." hex string.
  */
-static void FormatKeyHex(const fesp_chip_ctx_t *chip, int offset, int size, WCHAR *buf,
-                         int bufChars)
+static void FormatKeyHex(const fesp_chip_ctx_t *chip, int offset, int size,
+                         WCHAR *buf, int bufChars)
 {
     if (!IsValidKeyRange(chip, offset, size) || !buf || bufChars < 4) {
         if (buf && bufChars > 0) {
@@ -254,7 +254,8 @@ static void FormatKeyHex(const fesp_chip_ctx_t *chip, int offset, int size, WCHA
  *
  * Returns TRUE on success, FALSE on invalid range.
  */
-static BOOL ReadKey(const fesp_chip_ctx_t *chip, int offset, int size, BYTE *key)
+static BOOL ReadKey(const fesp_chip_ctx_t *chip, int offset, int size,
+                    BYTE *key)
 {
     if (!key) {
         return FALSE;
@@ -278,7 +279,8 @@ static BOOL ReadKey(const fesp_chip_ctx_t *chip, int offset, int size, BYTE *key
  *
  * Returns TRUE on success, FALSE on invalid range.
  */
-static BOOL WriteKey(fesp_chip_ctx_t *chip, int offset, int size, const BYTE *key)
+static BOOL WriteKey(fesp_chip_ctx_t *chip, int offset, int size,
+                     const BYTE *key)
 {
     if (!key) {
         return FALSE;
@@ -382,8 +384,8 @@ static void RefreshListView(HWND hList, int selectIndex)
         ListView_SetItemText(hList, idx, 1, (LPWSTR)GetPurposeName(purpose));
 
         /* Column 2: Status (set/empty) */
-        BOOL empty = IsKeyEmpty(&g_chip, blocks[i].efuse_offset,
-                                blocks[i].key_size);
+        BOOL empty =
+            IsKeyEmpty(&g_chip, blocks[i].efuse_offset, blocks[i].key_size);
         ListView_SetItemText(hList, idx, 2,
                              (LPWSTR)LoadStr(empty ? IDS_KEY_MGMT_STATUS_EMPTY
                                                    : IDS_KEY_MGMT_STATUS_SET));
@@ -425,10 +427,9 @@ static void RefreshListView(HWND hList, int selectIndex)
 
     /* Purpose button: enabled only for S2/S3/C3/C6 (not ESP32/C2/ESP8266) */
     if (hPurpose) {
-        BOOL canChange = !connected && count > 0 &&
-                         g_chip.type != FESP_CHIP_ESP8266 &&
-                         g_chip.type != FESP_CHIP_ESP32 &&
-                         g_chip.type != FESP_CHIP_ESP32C2;
+        BOOL canChange =
+            !connected && count > 0 && g_chip.type != FESP_CHIP_ESP8266 &&
+            g_chip.type != FESP_CHIP_ESP32 && g_chip.type != FESP_CHIP_ESP32C2;
         EnableWindow(hPurpose, canChange);
     }
 }
@@ -499,8 +500,7 @@ static void HandleImport(HWND hDlg, HWND hList)
     }
 
     /* Write key to eFuse */
-    WriteKey(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size,
-             key);
+    WriteKey(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size, key);
     g_deviceModified = TRUE;
 
     /* Refresh list and keep selection */
@@ -531,8 +531,7 @@ static void HandleExport(HWND hDlg, HWND hList)
         return;
     }
 
-    if (IsKeyEmpty(&g_chip, blocks[sel].efuse_offset,
-                   blocks[sel].key_size)) {
+    if (IsKeyEmpty(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size)) {
         MessageBoxW(hDlg, LoadStr(IDS_KEY_MGMT_KEY_EMPTY),
                     LoadStr(IDS_KEY_MGMT_CAPTION), MB_OK | MB_ICONWARNING);
         return;
@@ -556,8 +555,7 @@ static void HandleExport(HWND hDlg, HWND hList)
 
     /* Read key from eFuse */
     BYTE key[KEY_SIZE_MAX] = {0};
-    ReadKey(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size,
-            key);
+    ReadKey(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size, key);
 
     /* Write file */
     HANDLE hFile = CreateFileW(szFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
@@ -600,8 +598,7 @@ static void HandleGenerate(HWND hDlg, HWND hList)
     }
 
     /* Confirm overwrite if key is not empty */
-    if (!IsKeyEmpty(&g_chip, blocks[sel].efuse_offset,
-                    blocks[sel].key_size)) {
+    if (!IsKeyEmpty(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size)) {
         int ret = MessageBoxW(hDlg, LoadStr(IDS_KEY_MGMT_CONFIRM_OVERWRITE),
                               LoadStr(IDS_KEY_MGMT_CAPTION),
                               MB_YESNO | MB_ICONQUESTION);
@@ -615,8 +612,7 @@ static void HandleGenerate(HWND hDlg, HWND hList)
     GenerateRandomKey(key, blocks[sel].key_size);
 
     /* Write key to eFuse */
-    WriteKey(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size,
-             key);
+    WriteKey(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size, key);
     g_deviceModified = TRUE;
 
     /* Refresh list and keep selection */
@@ -647,8 +643,7 @@ static void HandleClear(HWND hDlg, HWND hList)
         return;
     }
 
-    if (IsKeyEmpty(&g_chip, blocks[sel].efuse_offset,
-                   blocks[sel].key_size)) {
+    if (IsKeyEmpty(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size)) {
         MessageBoxW(hDlg, LoadStr(IDS_KEY_MGMT_ALREADY_EMPTY),
                     LoadStr(IDS_KEY_MGMT_CAPTION), MB_OK | MB_ICONINFORMATION);
         return;
@@ -664,8 +659,7 @@ static void HandleClear(HWND hDlg, HWND hList)
 
     /* Clear key (write zeros) */
     BYTE key[KEY_SIZE_MAX] = {0};
-    WriteKey(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size,
-             key);
+    WriteKey(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size, key);
     g_deviceModified = TRUE;
 
     /* Refresh list and keep selection */
@@ -831,8 +825,8 @@ static void HandleItemChanged(HWND hDlg, const NMLISTVIEW *nmlv)
     /* Update key hex display */
     WCHAR hexStr[HEX_STRING_MAX] = {0};
     if (blocks && sel >= 0 && sel < count) {
-        FormatKeyHex(&g_chip, blocks[sel].efuse_offset,
-                     blocks[sel].key_size, hexStr, HEX_STRING_MAX);
+        FormatKeyHex(&g_chip, blocks[sel].efuse_offset, blocks[sel].key_size,
+                     hexStr, HEX_STRING_MAX);
     }
     SetDlgItemTextW(hDlg, IDC_KEY_HEX, hexStr);
 }

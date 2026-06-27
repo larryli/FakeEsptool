@@ -5,26 +5,26 @@
  * All ESP chips use standard AES-XTS with 16-byte blocks.
  */
 
+#include "../src/utils/encrypt.h"
+#include "encrypt_test_data.h"
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
-#include "../src/utils/encrypt.h"
-#include "encrypt_test_data.h"
 
 /* Test result tracking */
 static int tests_passed = 0;
 static int tests_failed = 0;
 
 /* Test helper macro */
-#define TEST_ASSERT(condition, message) \
-    do { \
-        if (condition) { \
-            printf("  PASS: %s\n", message); \
-            tests_passed++; \
-        } else { \
-            printf("  FAIL: %s\n", message); \
-            tests_failed++; \
-        } \
+#define TEST_ASSERT(condition, message)                                        \
+    do {                                                                       \
+        if (condition) {                                                       \
+            printf("  PASS: %s\n", message);                                   \
+            tests_passed++;                                                    \
+        } else {                                                               \
+            printf("  FAIL: %s\n", message);                                   \
+            tests_failed++;                                                    \
+        }                                                                      \
     } while (0)
 
 /* Test 0: AES-ECB with NIST test vector */
@@ -110,7 +110,8 @@ static void test_basic_encrypt_decrypt(void)
         printf("%02X ", plaintext_16[i]);
     printf("\n");
 
-    TEST_ASSERT(memcmp(decrypted, plaintext_16, 16) == 0, "Decrypted matches original plaintext");
+    TEST_ASSERT(memcmp(decrypted, plaintext_16, 16) == 0,
+                "Decrypted matches original plaintext");
 }
 
 /* Test 2: Encrypt/decrypt with 512-bit key */
@@ -129,12 +130,14 @@ static void test_512bit_key(void)
     /* Test encryption */
     ret = Encrypt_Data(&ctx, plaintext_16, ciphertext, 16);
     TEST_ASSERT(ret == ENCRYPT_OK, "Encrypt returns OK");
-    TEST_ASSERT(memcmp(ciphertext, plaintext_16, 16) != 0, "Ciphertext differs from plaintext");
+    TEST_ASSERT(memcmp(ciphertext, plaintext_16, 16) != 0,
+                "Ciphertext differs from plaintext");
 
     /* Test decryption */
     ret = Decrypt_Data(&ctx, ciphertext, decrypted, 16);
     TEST_ASSERT(ret == ENCRYPT_OK, "Decrypt returns OK");
-    TEST_ASSERT(memcmp(decrypted, plaintext_16, 16) == 0, "Decrypted matches original plaintext");
+    TEST_ASSERT(memcmp(decrypted, plaintext_16, 16) == 0,
+                "Decrypted matches original plaintext");
 }
 
 /* Test 3: Multiple blocks (48 bytes) */
@@ -153,18 +156,21 @@ static void test_multiple_blocks(void)
     /* Test encryption */
     ret = Encrypt_Data(&ctx, plaintext_48, ciphertext, 48);
     TEST_ASSERT(ret == ENCRYPT_OK, "Encrypt returns OK");
-    TEST_ASSERT(memcmp(ciphertext, plaintext_48, 48) != 0, "Ciphertext differs from plaintext");
+    TEST_ASSERT(memcmp(ciphertext, plaintext_48, 48) != 0,
+                "Ciphertext differs from plaintext");
 
     /* Test decryption */
     ret = Decrypt_Data(&ctx, ciphertext, decrypted, 48);
     TEST_ASSERT(ret == ENCRYPT_OK, "Decrypt returns OK");
-    TEST_ASSERT(memcmp(decrypted, plaintext_48, 48) == 0, "Decrypted matches original plaintext");
+    TEST_ASSERT(memcmp(decrypted, plaintext_48, 48) == 0,
+                "Decrypted matches original plaintext");
 }
 
 /* Test 4: Different flash addresses produce different ciphertext */
 static void test_different_addresses(void)
 {
-    printf("\nTest 4: Different flash addresses produce different ciphertext\n");
+    printf(
+        "\nTest 4: Different flash addresses produce different ciphertext\n");
 
     BYTE ciphertext1[16] = {0};
     BYTE ciphertext2[16] = {0};
@@ -202,11 +208,13 @@ static void test_invalid_params(void)
 
     /* Test invalid key length */
     ret = Encrypt_Init(&ctx, key, 24, 0x10000);
-    TEST_ASSERT(ret == ENCRYPT_BAD_INPUT, "Invalid key length returns BAD_INPUT");
+    TEST_ASSERT(ret == ENCRYPT_BAD_INPUT,
+                "Invalid key length returns BAD_INPUT");
 
     /* Test unaligned flash address */
     ret = Encrypt_Init(&ctx, key, 32, 0x10001);
-    TEST_ASSERT(ret == ENCRYPT_BAD_INPUT, "Unaligned flash address returns BAD_INPUT");
+    TEST_ASSERT(ret == ENCRYPT_BAD_INPUT,
+                "Unaligned flash address returns BAD_INPUT");
 
     /* Test NULL buffers */
     ret = Encrypt_Init(&ctx, key, 32, 0x10000);
@@ -230,7 +238,8 @@ static void test_invalid_params(void)
 /* Test 6: AES-XTS compatibility with espsecure (256-bit key, 16 bytes) */
 static void test_xts_256_compat_16(void)
 {
-    printf("\nTest 6: AES-XTS compatibility with espsecure (256-bit key, 16 bytes)\n");
+    printf("\nTest 6: AES-XTS compatibility with espsecure (256-bit key, 16 "
+           "bytes)\n");
 
     BYTE decrypted[16] = {0};
     ENCRYPT_CTX ctx;
@@ -251,7 +260,8 @@ static void test_xts_256_compat_16(void)
 /* Test 7: AES-XTS compatibility with espsecure (256-bit key, 48 bytes) */
 static void test_xts_256_compat_48(void)
 {
-    printf("\nTest 7: AES-XTS compatibility with espsecure (256-bit key, 48 bytes)\n");
+    printf("\nTest 7: AES-XTS compatibility with espsecure (256-bit key, 48 "
+           "bytes)\n");
 
     BYTE decrypted[48] = {0};
     ENCRYPT_CTX ctx;
@@ -272,7 +282,8 @@ static void test_xts_256_compat_48(void)
 /* Test 8: AES-XTS compatibility with espsecure (512-bit key, 16 bytes) */
 static void test_xts_512_compat_16(void)
 {
-    printf("\nTest 8: AES-XTS compatibility with espsecure (512-bit key, 16 bytes)\n");
+    printf("\nTest 8: AES-XTS compatibility with espsecure (512-bit key, 16 "
+           "bytes)\n");
 
     BYTE decrypted[16] = {0};
     ENCRYPT_CTX ctx;

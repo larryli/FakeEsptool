@@ -18,10 +18,7 @@ static inline void *deflate_malloc(size_t size)
 /*
  * deflate_free - Free allocated memory
  */
-static inline void deflate_free(void *ptr)
-{
-    Mem_Free(ptr);
-}
+static inline void deflate_free(void *ptr) { Mem_Free(ptr); }
 
 /* Static Huffman code tables for DEFLATE */
 static const WORD deflate_lit_lengths[29] = {
@@ -145,31 +142,29 @@ static int deflate_build_huffman(DEFLATE_HUFF *huff, const BYTE *lengths,
     }
 
     /* Sort symbols by code length */
-    {
-        WORD *offsets = (WORD *)deflate_malloc((max_len + 1) * sizeof(WORD));
-        if (!offsets) {
-            deflate_free(huff->counts);
-            deflate_free(huff->symbols);
-            huff->counts = NULL;
-            huff->symbols = NULL;
-            return DEFLATE_NO_MEMORY;
-        }
-
-        /* Calculate offsets for each code length */
-        offsets[1] = 0;
-        for (i = 2; i <= max_len; i++) {
-            offsets[i] = offsets[i - 1] + huff->counts[i - 1];
-        }
-
-        /* Place symbols in sorted order */
-        for (i = 0; i < count; i++) {
-            if (lengths[i] > 0) {
-                huff->symbols[offsets[lengths[i]]++] = (WORD)i;
-            }
-        }
-
-        deflate_free(offsets);
+    WORD *offsets = (WORD *)deflate_malloc((max_len + 1) * sizeof(WORD));
+    if (!offsets) {
+        deflate_free(huff->counts);
+        deflate_free(huff->symbols);
+        huff->counts = NULL;
+        huff->symbols = NULL;
+        return DEFLATE_NO_MEMORY;
     }
+
+    /* Calculate offsets for each code length */
+    offsets[1] = 0;
+    for (i = 2; i <= max_len; i++) {
+        offsets[i] = offsets[i - 1] + huff->counts[i - 1];
+    }
+
+    /* Place symbols in sorted order */
+    for (i = 0; i < count; i++) {
+        if (lengths[i] > 0) {
+            huff->symbols[offsets[lengths[i]]++] = (WORD)i;
+        }
+    }
+
+    deflate_free(offsets);
 
     huff->max_length = max_len;
     return DEFLATE_OK;
@@ -299,11 +294,9 @@ static int deflate_decode_dynamic(DEFLATE_CTX *ctx)
                 deflate_free_huffman(&cl_huff);
                 return DEFLATE_BAD_INPUT;
             }
-            {
-                BYTE prev = lengths[i - 1];
-                for (j = 0; j < repeat && i < hlit + hdist; j++) {
-                    lengths[i++] = prev;
-                }
+            BYTE prev = lengths[i - 1];
+            for (j = 0; j < repeat && i < hlit + hdist; j++) {
+                lengths[i++] = prev;
             }
         } else if (sym == 17) {
             int repeat = deflate_read_bits(ctx, 3) + 3;

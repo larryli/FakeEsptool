@@ -11,8 +11,8 @@
 #include "device_file.h"
 #include "dlg/dlg.h"
 #include "fesptool/chip.h"
-#include "fesptool/flash.h"
 #include "fesptool/esptool.h"
+#include "fesptool/flash.h"
 #include "fesptool_hal.h"
 #include "resource.h"
 #include "serial.h"
@@ -168,46 +168,6 @@ void OnDeviceModified(void)
 }
 
 /*
- * OnSerialWrite - Callback to write data to serial port
- */
-static DWORD OnSerialWrite(const BYTE *data, DWORD len)
-{
-    if (!Serial_IsOpen(&g_serial)) {
-        return 0;
-    }
-    return Serial_WriteData(&g_serial, data, len, g_hWnd);
-}
-
-/*
- * OnBaudRateChange - Callback to change serial port baud rate
- */
-static BOOL OnBaudRateChange(DWORD baudRate)
-{
-    if (!Serial_IsOpen(&g_serial)) {
-        return FALSE;
-    }
-    return Serial_SetBaudRate(&g_serial, baudRate);
-}
-
-/*
- * OnHalLog - HAL log callback, bridges to Serial_PostLog
- */
-static void OnHalLog(const char *tag, bool is_error, const char *fmt,
-                     va_list ap, void *ctx)
-{
-    HWND hWnd = (HWND)ctx;
-    if (!hWnd) {
-        return;
-    }
-    char line[1024];
-    vsnprintf(line, sizeof(line), fmt, ap);
-    WCHAR wtag[32], wline[1024];
-    MultiByteToWideChar(CP_UTF8, 0, tag, -1, wtag, 32);
-    MultiByteToWideChar(CP_UTF8, 0, line, -1, wline, 1024);
-    Serial_PostLog(hWnd, wtag, wline);
-}
-
-/*
  * OnEsptoolProcessData - esptool protocol data receive callback
  */
 void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len,
@@ -253,7 +213,7 @@ static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode,
     char boot_msg_buf[512];
     const char *msg =
         fesp_chip_get_boot_message(&g_chip, (bool)download_mode, reset_cause,
-                            boot_msg_buf, sizeof(boot_msg_buf));
+                                   boot_msg_buf, sizeof(boot_msg_buf));
     if (msg[0]) {
         Serial_WriteData(ctx, (const BYTE *)msg, (DWORD)strlen(msg), hNotify);
 
@@ -329,13 +289,14 @@ void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
         if (!dsr && cts) {
             g_reset_pending = TRUE;
             g_saw_io0_low = FALSE;
-        /* DSR:ON CTS:OFF = IO0=LOW (DTR=ON, RTS=OFF -> GPIO0=LOW) */
+            /* DSR:ON CTS:OFF = IO0=LOW (DTR=ON, RTS=OFF -> GPIO0=LOW) */
         } else if (g_reset_pending && dsr && !cts) {
             g_saw_io0_low = TRUE;
-        /* DSR:ON CTS:ON = Intermediate state during ClassicReset (ignore) */
+            /* DSR:ON CTS:ON = Intermediate state during ClassicReset (ignore)
+             */
         } else if (g_reset_pending && dsr && cts) {
             /* Keep g_reset_pending and g_saw_io0_low unchanged */
-        /* DSR:OFF CTS:OFF = Reset end */
+            /* DSR:OFF CTS:OFF = Reset end */
         } else if (g_reset_pending && !dsr && !cts) {
             if (g_saw_io0_low) {
                 /* ClassicReset: IO0 was LOW -> enter download mode */
@@ -350,7 +311,7 @@ void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
             }
             g_reset_pending = FALSE;
             g_saw_io0_low = FALSE;
-        /* Any other state cancels pending reset */
+            /* Any other state cancels pending reset */
         } else {
             g_reset_pending = FALSE;
             g_saw_io0_low = FALSE;
@@ -423,6 +384,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam,
 static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
     g_hWnd = hWnd;
+    FEsptoolInit(g_hWnd, &g_serial);
     HINSTANCE hInst = ((CREATESTRUCT *)lParam)->hInstance;
 
     /* Create toolbar */
@@ -978,7 +940,6 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
     if (cmdFilePath && cmdFilePath[0]) {
         TRACE_FW(TAG, "Opening command line file: %ls", cmdFilePath);
         if (DeviceFile_Load(&g_chip, &g_flash, cmdFilePath)) {
-            FEsptoolSetModifiedCallback(OnDeviceModified);
             Config_SetLastDeviceFile(cmdFilePath);
             g_deviceModified = FALSE;
             wcscpy(g_deviceFile, cmdFilePath);
@@ -1007,7 +968,6 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
                                   MB_YESNO | MB_ICONQUESTION);
             if (ret == IDYES) {
                 if (DeviceFile_Load(&g_chip, &g_flash, lastFile)) {
-                    FEsptoolSetModifiedCallback(OnDeviceModified);
                     g_deviceModified = FALSE;
                     wcscpy(g_deviceFile, lastFile);
                     UpdateMenuState(hWnd);
@@ -1020,24 +980,21 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
         }
     }
     /* No last file or user declined - create default device */
-    {
-        static const BYTE defaultMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0x01};
-        if (fesp_chip_init(&g_chip, FESP_CHIP_ESP32) &&
-            fesp_flash_init(&g_flash, 4 * 1024 * 1024)) {
-            fesp_chip_set_flash_size(&g_chip, 4 * 1024 * 1024);
-            fesp_chip_set_mac(&g_chip, defaultMac);
-            g_chip.xtal_freq = FESP_XTAL_FREQ_40M;
-            g_deviceModified = FALSE;
-            g_deviceFile[0] = 0;
-            FEsptoolSetModifiedCallback(OnDeviceModified);
-            UpdateMenuState(hWnd);
-            UpdateStatusBar();
-            UpdateTitle(hWnd);
-        } else {
-            MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_CREATE_DEV),
-                        LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
-            DestroyWindow(hWnd);
-        }
+    static const BYTE defaultMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0x01};
+    if (fesp_chip_init(&g_chip, FESP_CHIP_ESP32) &&
+        fesp_flash_init(&g_flash, 4 * 1024 * 1024)) {
+        fesp_chip_set_flash_size(&g_chip, 4 * 1024 * 1024);
+        fesp_chip_set_mac(&g_chip, defaultMac);
+        g_chip.xtal_freq = FESP_XTAL_FREQ_40M;
+        g_deviceModified = FALSE;
+        g_deviceFile[0] = 0;
+        UpdateMenuState(hWnd);
+        UpdateStatusBar();
+        UpdateTitle(hWnd);
+    } else {
+        MessageBoxW(hWnd, LoadStr(IDS_MSG_FAIL_CREATE_DEV),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        DestroyWindow(hWnd);
     }
     return 0;
 }
@@ -1163,12 +1120,6 @@ static BOOL Main_Init(HINSTANCE hInstance)
 
     /* Initialize esptool protocol with pointers to device data */
     fesp_init(&g_esptool, &g_chip, &g_flash);
-
-    /* Register HAL callbacks */
-    FEsptoolSetWriteCallback(OnSerialWrite);
-    FEsptoolSetBaudRateCallback(OnBaudRateChange);
-    FEsptoolSetModifiedCallback(OnDeviceModified);
-    FEsptoolSetLogCallback(OnHalLog, NULL);
 
     WNDCLASSEXW wc = {
         .cbSize = sizeof(WNDCLASSEXW),

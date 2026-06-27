@@ -92,11 +92,12 @@ static void efuse_write32(fesp_chip_ctx_t *ctx, int offset, uint32_t val)
         ctx->efuse[offset + 1] |= (uint8_t)((val >> 8) & 0xFF);
         ctx->efuse[offset + 2] |= (uint8_t)((val >> 16) & 0xFF);
         ctx->efuse[offset + 3] |= (uint8_t)((val >> 24) & 0xFF);
-        FESP_HAL_LOGD(TAG, "eFuse write: offset=0x%X val=0x%08lX "
-                           "before=%02X%02X%02X%02X after=%02X%02X%02X%02X",
-                       offset, val, b3, b2, b1, b0, ctx->efuse[offset + 3],
-                       ctx->efuse[offset + 2], ctx->efuse[offset + 1],
-                       ctx->efuse[offset]);
+        FESP_HAL_LOGD(TAG,
+                      "eFuse write: offset=0x%X val=0x%08lX "
+                      "before=%02X%02X%02X%02X after=%02X%02X%02X%02X",
+                      offset, val, b3, b2, b1, b0, ctx->efuse[offset + 3],
+                      ctx->efuse[offset + 2], ctx->efuse[offset + 1],
+                      ctx->efuse[offset]);
     }
 }
 

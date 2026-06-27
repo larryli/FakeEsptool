@@ -46,8 +46,10 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
         SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"26MHz");
         SendMessageW(hXtal, CB_SETCURSEL, g_chip.xtal_freq, 0);
         /* Disable XTAL freq for fixed-xtal chips */
-        if (selectedChip == FESP_CHIP_ESP32C3 || selectedChip == FESP_CHIP_ESP32C6 ||
-            selectedChip == FESP_CHIP_ESP32S2 || selectedChip == FESP_CHIP_ESP32S3) {
+        if (selectedChip == FESP_CHIP_ESP32C3 ||
+            selectedChip == FESP_CHIP_ESP32C6 ||
+            selectedChip == FESP_CHIP_ESP32S2 ||
+            selectedChip == FESP_CHIP_ESP32S3) {
             EnableWindow(hXtal, FALSE);
         }
 
@@ -69,9 +71,9 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
                                    g_flash.size);
                 /* Enable/disable XTAL freq combo based on chip type */
                 HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
-                BOOL xtalEditable =
-                    (chipSel == FESP_CHIP_ESP8266 || chipSel == FESP_CHIP_ESP32 ||
-                     chipSel == FESP_CHIP_ESP32C2);
+                BOOL xtalEditable = (chipSel == FESP_CHIP_ESP8266 ||
+                                     chipSel == FESP_CHIP_ESP32 ||
+                                     chipSel == FESP_CHIP_ESP32C2);
                 EnableWindow(hXtal, xtalEditable);
                 /* Update XTAL freq display for fixed-xtal chips */
                 if (!xtalEditable) {
@@ -142,7 +144,6 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
                         HeapFree(GetProcessHeap(), 0, oldFlashData);
                     }
 
-                    FEsptoolSetModifiedCallback(OnDeviceModified);
                     g_deviceModified = TRUE;
                     EndDialog(hDlg, IDOK);
                 } else {

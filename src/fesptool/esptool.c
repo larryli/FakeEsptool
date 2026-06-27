@@ -7,7 +7,7 @@
 #include "../fesptool_hal.h"
 #include "../utils/deflate.h"
 #include "../utils/encrypt.h"
-#include "esptool_priv.h"
+#include "fesp.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -787,20 +787,18 @@ static void handle_flash_defl_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 
 #if FESP_HAL_LOG_HAS_DEBUG
     /* Log key availability */
-    {
-        int key_len = 0;
-        int key_offset =
-            fesp_efuse_get_encryption_key_offset(ctx->chip, &key_len);
-        FESP_HAL_LOGD(TAG, "efuse_size=%d", key_offset, key_len,
-                      ctx->chip->efuse, ctx->chip->efuse_size);
-        if (key_offset >= 0 && ctx->chip->efuse &&
-            key_offset + key_len <= ctx->chip->efuse_size) {
-            const uint8_t *key = &ctx->chip->efuse[key_offset];
-            FESP_HAL_LOGD(TAG, "%02X %02X %02X %02X %02X", key[0], key[1],
-                          key[2], key[3], key[4], key[5], key[6], key[7]);
-        } else {
-            FESP_HAL_LOGD(TAG, "FLASH_DEFL_BEGIN: No encryption key available");
-        }
+    int key_len = 0;
+    int key_offset =
+        fesp_efuse_get_encryption_key_offset(ctx->chip, &key_len);
+    FESP_HAL_LOGD(TAG, "efuse_size=%d", key_offset, key_len,
+                    ctx->chip->efuse, ctx->chip->efuse_size);
+    if (key_offset >= 0 && ctx->chip->efuse &&
+        key_offset + key_len <= ctx->chip->efuse_size) {
+        const uint8_t *key = &ctx->chip->efuse[key_offset];
+        FESP_HAL_LOGD(TAG, "%02X %02X %02X %02X %02X", key[0], key[1],
+                        key[2], key[3], key[4], key[5], key[6], key[7]);
+    } else {
+        FESP_HAL_LOGD(TAG, "FLASH_DEFL_BEGIN: No encryption key available");
     }
 #endif
 
@@ -1748,14 +1746,12 @@ bool fesp_process_frame(fesp_ctx_t *ctx, const uint8_t *frame, int frame_len)
     default:
         /* ROM returns ROM_INVALID_RECV_MSG (0x05) for unsupported commands */
         FESP_HAL_LOGI(TAG, "  Unknown command: 0x%02X", pkt->command);
-        {
-            /* Response format: [status_byte_1 != 0][ROM_INVALID_RECV_MSG] +
-             * padding */
-            uint8_t err_data[4] = {0x01, 0x05, 0x00, 0x00};
-            uint8_t status_len = FESP_STATUS_LEN(ctx);
-            fesp_send_response_ex(ctx, pkt->command, pkt->value, FESP_OK,
-                                  status_len, err_data, 4);
-        }
+        /* Response format: [status_byte_1 != 0][ROM_INVALID_RECV_MSG] +
+            * padding */
+        uint8_t err_data[4] = {0x01, 0x05, 0x00, 0x00};
+        uint8_t status_len = FESP_STATUS_LEN(ctx);
+        fesp_send_response_ex(ctx, pkt->command, pkt->value, FESP_OK,
+                                status_len, err_data, 4);
         return false;
     }
 

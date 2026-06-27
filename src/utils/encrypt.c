@@ -83,10 +83,11 @@ static void aes_key_expand_128(AES_CTX *ctx, const BYTE key[16])
     ctx->nr = 10;
 
     /* Copy key to first 4 words */
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < 4; i++) {
         for (j = 0; j < 4; j++) {
             words[i][j] = key[i * 4 + j];
         }
+    }
 
     /* Generate remaining words */
     for (i = 4; i < 44; i++) {
@@ -117,10 +118,11 @@ static void aes_key_expand_128(AES_CTX *ctx, const BYTE key[16])
     }
 
     /* Convert words to round keys */
-    for (i = 0; i < 11; i++)
+    for (i = 0; i < 11; i++) {
         for (j = 0; j < 16; j++) {
             ctx->round_key[i * 16 + j] = words[i * 4 + j / 4][j % 4];
         }
+    }
 }
 
 /*
@@ -134,10 +136,11 @@ static void aes_key_expand_256(AES_CTX *ctx, const BYTE key[32])
     ctx->nr = 14;
 
     /* Copy key to first 8 words */
-    for (i = 0; i < 8; i++)
+    for (i = 0; i < 8; i++) {
         for (j = 0; j < 4; j++) {
             words[i][j] = key[i * 4 + j];
         }
+    }
 
     /* Generate remaining words */
     for (i = 8; i < 60; i++) {
@@ -174,10 +177,11 @@ static void aes_key_expand_256(AES_CTX *ctx, const BYTE key[32])
     }
 
     /* Convert words to round keys */
-    for (i = 0; i < 15; i++)
+    for (i = 0; i < 15; i++) {
         for (j = 0; j < 16; j++) {
             ctx->round_key[i * 16 + j] = words[i * 4 + j / 4][j % 4];
         }
+    }
 }
 
 /*
@@ -213,48 +217,49 @@ static void aes_ecb_encrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
     int round, row, col;
 
     /* Convert input to state (column-major) */
-    for (row = 0; row < 4; row++)
+    for (row = 0; row < 4; row++) {
         for (col = 0; col < 4; col++) {
             state[row][col] = in[row + col * 4];
         }
+    }
 
     /* Round 0: AddRoundKey */
-    for (col = 0; col < 4; col++)
+    for (col = 0; col < 4; col++) {
         for (row = 0; row < 4; row++) {
             state[row][col] ^= ctx->round_key[row + col * 4];
         }
+    }
 
     /* Rounds 1 to nr-1 */
     for (round = 1; round < ctx->nr; round++) {
         /* SubBytes */
-        for (row = 0; row < 4; row++)
+        for (row = 0; row < 4; row++) {
             for (col = 0; col < 4; col++) {
                 state[row][col] = sbox[state[row][col]];
             }
+        }
 
         /* ShiftRows */
-        {
-            BYTE temp;
-            /* Row 1: shift left by 1 */
-            temp = state[1][0];
-            state[1][0] = state[1][1];
-            state[1][1] = state[1][2];
-            state[1][2] = state[1][3];
-            state[1][3] = temp;
-            /* Row 2: shift left by 2 */
-            temp = state[2][0];
-            state[2][0] = state[2][2];
-            state[2][2] = temp;
-            temp = state[2][1];
-            state[2][1] = state[2][3];
-            state[2][3] = temp;
-            /* Row 3: shift left by 3 (or right by 1) */
-            temp = state[3][3];
-            state[3][3] = state[3][2];
-            state[3][2] = state[3][1];
-            state[3][1] = state[3][0];
-            state[3][0] = temp;
-        }
+        BYTE temp;
+        /* Row 1: shift left by 1 */
+        temp = state[1][0];
+        state[1][0] = state[1][1];
+        state[1][1] = state[1][2];
+        state[1][2] = state[1][3];
+        state[1][3] = temp;
+        /* Row 2: shift left by 2 */
+        temp = state[2][0];
+        state[2][0] = state[2][2];
+        state[2][2] = temp;
+        temp = state[2][1];
+        state[2][1] = state[2][3];
+        state[2][3] = temp;
+        /* Row 3: shift left by 3 (or right by 1) */
+        temp = state[3][3];
+        state[3][3] = state[3][2];
+        state[3][2] = state[3][1];
+        state[3][1] = state[3][0];
+        state[3][0] = temp;
 
         /* MixColumns */
         for (col = 0; col < 4; col++) {
@@ -269,10 +274,11 @@ static void aes_ecb_encrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
         }
 
         /* AddRoundKey */
-        for (col = 0; col < 4; col++)
+        for (col = 0; col < 4; col++) {
             for (row = 0; row < 4; row++) {
                 state[row][col] ^= ctx->round_key[round * 16 + row + col * 4];
             }
+        }
     }
 
     /* Final round: SubBytes, ShiftRows, AddRoundKey (no MixColumns) */
@@ -283,37 +289,37 @@ static void aes_ecb_encrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
         }
 
     /* ShiftRows */
-    {
-        BYTE temp;
-        temp = state[1][0];
-        state[1][0] = state[1][1];
-        state[1][1] = state[1][2];
-        state[1][2] = state[1][3];
-        state[1][3] = temp;
-        temp = state[2][0];
-        state[2][0] = state[2][2];
-        state[2][2] = temp;
-        temp = state[2][1];
-        state[2][1] = state[2][3];
-        state[2][3] = temp;
-        temp = state[3][3];
-        state[3][3] = state[3][2];
-        state[3][2] = state[3][1];
-        state[3][1] = state[3][0];
-        state[3][0] = temp;
-    }
+    BYTE temp;
+    temp = state[1][0];
+    state[1][0] = state[1][1];
+    state[1][1] = state[1][2];
+    state[1][2] = state[1][3];
+    state[1][3] = temp;
+    temp = state[2][0];
+    state[2][0] = state[2][2];
+    state[2][2] = temp;
+    temp = state[2][1];
+    state[2][1] = state[2][3];
+    state[2][3] = temp;
+    temp = state[3][3];
+    state[3][3] = state[3][2];
+    state[3][2] = state[3][1];
+    state[3][1] = state[3][0];
+    state[3][0] = temp;
 
     /* AddRoundKey */
-    for (col = 0; col < 4; col++)
+    for (col = 0; col < 4; col++) {
         for (row = 0; row < 4; row++) {
             state[row][col] ^= ctx->round_key[ctx->nr * 16 + row + col * 4];
         }
+    }
 
     /* Convert state to output (column-major) */
-    for (row = 0; row < 4; row++)
+    for (row = 0; row < 4; row++) {
         for (col = 0; col < 4; col++) {
             out[row + col * 4] = state[row][col];
         }
+    }
 }
 
 /*
@@ -325,43 +331,44 @@ static void aes_ecb_decrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
     int round, row, col;
 
     /* Convert input to state (column-major) */
-    for (row = 0; row < 4; row++)
+    for (row = 0; row < 4; row++) {
         for (col = 0; col < 4; col++) {
             state[row][col] = in[row + col * 4];
         }
+    }
 
     /* AddRoundKey (final round) */
-    for (col = 0; col < 4; col++)
+    for (col = 0; col < 4; col++) {
         for (row = 0; row < 4; row++) {
             state[row][col] ^= ctx->round_key[ctx->nr * 16 + row + col * 4];
         }
-
-    /* InvShiftRows */
-    {
-        BYTE temp;
-        temp = state[1][3];
-        state[1][3] = state[1][2];
-        state[1][2] = state[1][1];
-        state[1][1] = state[1][0];
-        state[1][0] = temp;
-        temp = state[2][0];
-        state[2][0] = state[2][2];
-        state[2][2] = temp;
-        temp = state[2][1];
-        state[2][1] = state[2][3];
-        state[2][3] = temp;
-        temp = state[3][0];
-        state[3][0] = state[3][1];
-        state[3][1] = state[3][2];
-        state[3][2] = state[3][3];
-        state[3][3] = temp;
     }
 
+    /* InvShiftRows */
+    BYTE temp;
+    temp = state[1][3];
+    state[1][3] = state[1][2];
+    state[1][2] = state[1][1];
+    state[1][1] = state[1][0];
+    state[1][0] = temp;
+    temp = state[2][0];
+    state[2][0] = state[2][2];
+    state[2][2] = temp;
+    temp = state[2][1];
+    state[2][1] = state[2][3];
+    state[2][3] = temp;
+    temp = state[3][0];
+    state[3][0] = state[3][1];
+    state[3][1] = state[3][2];
+    state[3][2] = state[3][3];
+    state[3][3] = temp;
+
     /* InvSubBytes */
-    for (row = 0; row < 4; row++)
+    for (row = 0; row < 4; row++) {
         for (col = 0; col < 4; col++) {
             state[row][col] = inv_sbox[state[row][col]];
         }
+    }
 
     /* Rounds nr-1 to 1 */
     for (round = ctx->nr - 1; round > 0; round--) {
@@ -388,44 +395,45 @@ static void aes_ecb_decrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
         }
 
         /* InvShiftRows */
-        {
-            BYTE temp;
-            temp = state[1][3];
-            state[1][3] = state[1][2];
-            state[1][2] = state[1][1];
-            state[1][1] = state[1][0];
-            state[1][0] = temp;
-            temp = state[2][0];
-            state[2][0] = state[2][2];
-            state[2][2] = temp;
-            temp = state[2][1];
-            state[2][1] = state[2][3];
-            state[2][3] = temp;
-            temp = state[3][0];
-            state[3][0] = state[3][1];
-            state[3][1] = state[3][2];
-            state[3][2] = state[3][3];
-            state[3][3] = temp;
-        }
+        BYTE temp;
+        temp = state[1][3];
+        state[1][3] = state[1][2];
+        state[1][2] = state[1][1];
+        state[1][1] = state[1][0];
+        state[1][0] = temp;
+        temp = state[2][0];
+        state[2][0] = state[2][2];
+        state[2][2] = temp;
+        temp = state[2][1];
+        state[2][1] = state[2][3];
+        state[2][3] = temp;
+        temp = state[3][0];
+        state[3][0] = state[3][1];
+        state[3][1] = state[3][2];
+        state[3][2] = state[3][3];
+        state[3][3] = temp;
 
         /* InvSubBytes */
-        for (row = 0; row < 4; row++)
+        for (row = 0; row < 4; row++) {
             for (col = 0; col < 4; col++) {
                 state[row][col] = inv_sbox[state[row][col]];
             }
+        }
     }
 
     /* AddRoundKey (round 0) */
-    for (col = 0; col < 4; col++)
+    for (col = 0; col < 4; col++) {
         for (row = 0; row < 4; row++) {
             state[row][col] ^= ctx->round_key[row + col * 4];
         }
+    }
 
     /* Convert state to output (column-major) */
-    for (row = 0; row < 4; row++)
+    for (row = 0; row < 4; row++) {
         for (col = 0; col < 4; col++) {
             out[row + col * 4] = state[row][col];
         }
+    }
 }
 
 /*

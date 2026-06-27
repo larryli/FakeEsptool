@@ -19,23 +19,19 @@
 #include <stdint.h>
 #include <windows.h>
 
+#include "serial.h"
+
 /* ========================================================================
  * Engine-side tool functions (snake_case)
  * ======================================================================== */
 
 /* Serial write */
-typedef DWORD (*ESP_HAL_WRITE_CB)(const BYTE *data, DWORD len);
-void FEsptoolSetWriteCallback(ESP_HAL_WRITE_CB cb);
 DWORD fesp_hal_write(const BYTE *data, DWORD len);
 
 /* Baud rate change */
-typedef BOOL (*ESP_HAL_BAUDRATE_CB)(DWORD baudRate);
-void FEsptoolSetBaudRateCallback(ESP_HAL_BAUDRATE_CB cb);
 BOOL fesp_hal_set_baud_rate(DWORD baudRate);
 
 /* Device modification notification */
-typedef void (*ESP_HAL_MODIFIED_CB)(void);
-void FEsptoolSetModifiedCallback(ESP_HAL_MODIFIED_CB cb);
 void fesp_hal_modified(void);
 
 /* Memory */
@@ -63,12 +59,6 @@ int fesp_hal_decrypt_data(void *ctx, const BYTE *in_buf, BYTE *out_buf,
  * GUI-side log macros (FESPTOOL_HAL_xxx)
  * ======================================================================== */
 
-/* Log callback registration */
-typedef void (*ESP_HAL_LOGLINE_CB)(const char *tag, bool is_error,
-                                   const char *fmt, va_list ap, void *ctx);
-void FEsptoolSetLogCallback(ESP_HAL_LOGLINE_CB cb, void *ctx);
-
-/* Info/Error log: forward to fesp_hal_log_i/e (implemented in .c) */
 void fesp_hal_log_i(const char *tag, const char *fmt, ...);
 void fesp_hal_log_e(const char *tag, const char *fmt, ...);
 
@@ -86,11 +76,9 @@ void Trace_Write(const char *tag, const char *fmt, ...);
 #endif
 
 /* ========================================================================
- * GUI-side registration functions (PascalCase, no Hal in name)
+ * Initialization (PascalCase)
  * ======================================================================== */
 
-void FEsptoolSetWriteCallback(ESP_HAL_WRITE_CB cb);
-void FEsptoolSetBaudRateCallback(ESP_HAL_BAUDRATE_CB cb);
-void FEsptoolSetModifiedCallback(ESP_HAL_MODIFIED_CB cb);
+void FEsptoolInit(HWND hWnd, SERIAL_CTX *serial);
 
 #endif /* FESPTOOL_HAL_H */
