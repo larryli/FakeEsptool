@@ -14,6 +14,12 @@
 static const char *TAG = "DEV";
 #endif
 
+/*
+ * DeviceFile_Save - Save device state to .esp file
+ *
+ * Writes chip config, eFuse data, and flash data to binary file.
+ * On failure, deletes the partially written file.
+ */
 BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
                      const WCHAR *filename)
 {
@@ -78,6 +84,13 @@ BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
     return TRUE;
 }
 
+/*
+ * DeviceFile_Load - Load device state from .esp file
+ *
+ * Reads chip config, eFuse data, and flash data from binary file.
+ * Validates magic number and version. Calls fesp_chip_close/fesp_flash_close
+ * internally before re-initializing with loaded data.
+ */
 BOOL DeviceFile_Load(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
                      const WCHAR *filename)
 {
