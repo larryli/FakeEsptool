@@ -118,10 +118,11 @@ void fesp_reset_state(fesp_ctx_t *ctx);
 bool fesp_feed(fesp_ctx_t *ctx, const uint8_t *data, int len);
 bool fesp_process_frame(fesp_ctx_t *ctx, const uint8_t *frame, int frame_len);
 void fesp_send_response(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
-                          uint32_t status, const uint8_t *data, uint16_t data_len);
+                        uint32_t status, const uint8_t *data,
+                        uint16_t data_len);
 void fesp_send_response_ex(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
-                            uint32_t status, uint8_t status_len, const uint8_t *data,
-                            uint16_t data_len);
+                           uint32_t status, uint8_t status_len,
+                           const uint8_t *data, uint16_t data_len);
 uint8_t fesp_calc_checksum(const uint8_t *data, int len);
 
 #endif /* FESP_ESPTOOL_H */

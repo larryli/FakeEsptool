@@ -56,47 +56,47 @@ typedef struct {
 
 static const CHIP_CONFIG chip_configs[FESP_CHIP_COUNT] = {
     [FESP_CHIP_ESP8266] = {"ESP8266",
-                      FESP_CHIP_ID_ESP8266,
-                      IMAGE_FESP_CHIP_ID_ESP8266,
-                      96,
-                      false,
-                      {0x01, 0xC1, 0xF0, 0xFF}},
+                           FESP_CHIP_ID_ESP8266,
+                           IMAGE_FESP_CHIP_ID_ESP8266,
+                           96,
+                           false,
+                           {0x01, 0xC1, 0xF0, 0xFF}},
     [FESP_CHIP_ESP32] = {"ESP32",
-                    FESP_CHIP_ID_ESP32,
-                    IMAGE_FESP_CHIP_ID_ESP32,
-                    288,
-                    false,
-                    {0x83, 0x1D, 0xF0, 0x00}},
+                         FESP_CHIP_ID_ESP32,
+                         IMAGE_FESP_CHIP_ID_ESP32,
+                         288,
+                         false,
+                         {0x83, 0x1D, 0xF0, 0x00}},
     [FESP_CHIP_ESP32S2] = {"ESP32-S2",
-                      FESP_CHIP_ID_ESP32S2,
-                      IMAGE_FESP_CHIP_ID_ESP32S2,
-                      512,
-                      true,
-                      {0xC6, 0x07, 0x00, 0x00}},
+                           FESP_CHIP_ID_ESP32S2,
+                           IMAGE_FESP_CHIP_ID_ESP32S2,
+                           512,
+                           true,
+                           {0xC6, 0x07, 0x00, 0x00}},
     [FESP_CHIP_ESP32S3] = {"ESP32-S3",
-                      FESP_CHIP_ID_ESP32S3,
-                      IMAGE_FESP_CHIP_ID_ESP32S3,
-                      512,
-                      true,
-                      {0x09, 0x00, 0x00, 0x00}},
+                           FESP_CHIP_ID_ESP32S3,
+                           IMAGE_FESP_CHIP_ID_ESP32S3,
+                           512,
+                           true,
+                           {0x09, 0x00, 0x00, 0x00}},
     [FESP_CHIP_ESP32C2] = {"ESP32-C2",
-                      FESP_CHIP_ID_ESP32C2,
-                      FESP_IMAGE_FESP_CHIP_ID_ESP32C2,
-                      512,
-                      false,
-                      {0x6F, 0xA0, 0x41, 0x7C}},
+                           FESP_CHIP_ID_ESP32C2,
+                           FESP_IMAGE_FESP_CHIP_ID_ESP32C2,
+                           512,
+                           false,
+                           {0x6F, 0xA0, 0x41, 0x7C}},
     [FESP_CHIP_ESP32C3] = {"ESP32-C3",
-                      FESP_CHIP_ID_ESP32C3,
-                      IMAGE_FESP_CHIP_ID_ESP32C3,
-                      512,
-                      true,
-                      {0x6F, 0x50, 0x21, 0x69}},
+                           FESP_CHIP_ID_ESP32C3,
+                           IMAGE_FESP_CHIP_ID_ESP32C3,
+                           512,
+                           true,
+                           {0x6F, 0x50, 0x21, 0x69}},
     [FESP_CHIP_ESP32C6] = {"ESP32-C6",
-                      FESP_CHIP_ID_ESP32C6,
-                      IMAGE_FESP_CHIP_ID_ESP32C6,
-                      512,
-                      true,
-                      {0x6F, 0x80, 0xE0, 0x2C}},
+                           FESP_CHIP_ID_ESP32C6,
+                           IMAGE_FESP_CHIP_ID_ESP32C6,
+                           512,
+                           true,
+                           {0x6F, 0x80, 0xE0, 0x2C}},
 };
 
 /*
@@ -136,8 +136,7 @@ static bool init_chip_common(fesp_chip_ctx_t *ctx, fesp_chip_type_t type)
     ctx->page_size = 256;
     ctx->has_usb = cfg->has_usb;
 
-    ctx->efuse =
-        (uint8_t *)fesp_hal_mem_zero_alloc(ctx->efuse_size);
+    ctx->efuse = (uint8_t *)fesp_hal_mem_zero_alloc(ctx->efuse_size);
     if (!ctx->efuse) {
         FESP_HAL_LOGD(TAG, "Failed to allocate eFuse for %s", cfg->name);
         return false;
@@ -168,8 +167,10 @@ static void write_mac_esp8266(fesp_chip_ctx_t *ctx)
 {
     ctx->efuse[0x53] =
         ctx->mac[5]; /* uint8_t[3] of word0: (mac0 >> 24) = MAC[5] */
-    ctx->efuse[0x54] = ctx->mac[4]; /* uint8_t[0] of word1: mac1 & 0xFF = MAC[4] */
-    ctx->efuse[0x55] = ctx->mac[3]; /* uint8_t[1] of word1: (mac1 >> 8) = MAC[3] */
+    ctx->efuse[0x54] =
+        ctx->mac[4]; /* uint8_t[0] of word1: mac1 & 0xFF = MAC[4] */
+    ctx->efuse[0x55] =
+        ctx->mac[3]; /* uint8_t[1] of word1: (mac1 >> 8) = MAC[3] */
     /* word3 for custom OUI: [mac[2], mac[1], mac[0]] in little-endian */
     ctx->efuse[0x5C] = ctx->mac[2]; /* uint8_t[0] of word3: OUI uint8_t 2 */
     ctx->efuse[0x5D] = ctx->mac[1]; /* uint8_t[1] of word3: OUI uint8_t 1 */
@@ -273,18 +274,18 @@ static bool init_esp32(fesp_chip_ctx_t *ctx)
     ctx->efuse[0x03] = 0x80; /* word0 = 0x80001000 */
     ctx->efuse[0x17] = 0xF0; /* FLASH_CRYPT_CONFIG = 0xF at word5 bits[31:28] */
     FESP_HAL_LOGD(TAG,
-                "init_esp32: BLOCK0 defaults set, word0=%02X%02X%02X%02X, "
-                "crypt_cfg=%02X, efuse=%p",
-                ctx->efuse[0x03], ctx->efuse[0x02], ctx->efuse[0x01],
-                ctx->efuse[0x00], ctx->efuse[0x14], ctx->efuse);
+                  "init_esp32: BLOCK0 defaults set, word0=%02X%02X%02X%02X, "
+                  "crypt_cfg=%02X, efuse=%p",
+                  ctx->efuse[0x03], ctx->efuse[0x02], ctx->efuse[0x01],
+                  ctx->efuse[0x00], ctx->efuse[0x14], ctx->efuse);
 
     write_mac_esp32(ctx);
     FESP_HAL_LOGD(TAG, "init_esp32: After MAC write, word0=%02X%02X%02X%02X",
-                ctx->efuse[0x03], ctx->efuse[0x02], ctx->efuse[0x01],
-                ctx->efuse[0x00]);
-    /* ESP32 chip detection uses magic value at 0x40001000 (FESP_CHIP_DETECT_REG),
-       not eFuse. Do NOT call write_chip_id_to_efuse as it would overlap with
-       BLOCK1 (key area at 0x38-0x57). */
+                  ctx->efuse[0x03], ctx->efuse[0x02], ctx->efuse[0x01],
+                  ctx->efuse[0x00]);
+    /* ESP32 chip detection uses magic value at 0x40001000
+       (FESP_CHIP_DETECT_REG), not eFuse. Do NOT call write_chip_id_to_efuse as
+       it would overlap with BLOCK1 (key area at 0x38-0x57). */
 
     /* eFuse controller register offsets (from EFUSE_RD_REG_BASE 0x3FF5A000) */
     ctx->efuse_base = FESP_EFUSE_RD_REG_BASE_ESP32;
@@ -518,11 +519,12 @@ bool fesp_chip_init(fesp_chip_ctx_t *ctx, fesp_chip_type_t type)
     /* Initialize SPI register defaults */
     ctx->spi_regs[FESP_SPI_CMD_OFFS / 4] = 0;
 
-    FESP_HAL_LOGD(TAG,
-                "Chip: %s, eFuse: %d bytes, Flash: %lu KB, SPI_BASE: 0x%08lX, "
-                "SPI_W0: 0x%02X",
-                ctx->name, ctx->efuse_size, ctx->flash_size / 1024,
-                ctx->spi_reg_base, ctx->spi_offs->w0);
+    FESP_HAL_LOGD(
+        TAG,
+        "Chip: %s, eFuse: %d bytes, Flash: %lu KB, SPI_BASE: 0x%08lX, "
+        "SPI_W0: 0x%02X",
+        ctx->name, ctx->efuse_size, ctx->flash_size / 1024, ctx->spi_reg_base,
+        ctx->spi_offs->w0);
     return true;
 
 fail:
@@ -599,7 +601,10 @@ bool fesp_chip_set_mac(fesp_chip_ctx_t *ctx, const uint8_t mac[6])
  *
  * Returns pointer to 6-uint8_t MAC address array.
  */
-const uint8_t *fesp_chip_get_mac(const fesp_chip_ctx_t *ctx) { return ctx->mac; }
+const uint8_t *fesp_chip_get_mac(const fesp_chip_ctx_t *ctx)
+{
+    return ctx->mac;
+}
 
 /*
  * fesp_chip_read_reg - Read register value
@@ -628,8 +633,8 @@ const uint8_t *fesp_chip_get_mac(const fesp_chip_ctx_t *ctx) { return ctx->mac; 
  *
  * Returns true if address is in range and read succeeds, false otherwise.
  */
-static bool try_read_efuse32(const fesp_chip_ctx_t *ctx, uint32_t base, uint32_t size,
-                           uint32_t addr, uint32_t *result)
+static bool try_read_efuse32(const fesp_chip_ctx_t *ctx, uint32_t base,
+                             uint32_t size, uint32_t addr, uint32_t *result)
 {
     if (addr < base || addr >= base + size) {
         return false;
@@ -650,13 +655,13 @@ uint32_t fesp_chip_read_reg(const fesp_chip_ctx_t *ctx, uint32_t addr)
 
     /* 1. eFuse read (using cached base address) */
     if (ctx->efuse_base != 0) {
-        if (try_read_efuse32(ctx, ctx->efuse_base, (uint32_t)ctx->efuse_size, addr,
-                           &val))
+        if (try_read_efuse32(ctx, ctx->efuse_base, (uint32_t)ctx->efuse_size,
+                             addr, &val))
             return val;
         /* ESP32 special: EFUSE_BASE (0x3FF00000) is also valid access path */
         if (ctx->type == FESP_CHIP_ESP32) {
-            if (try_read_efuse32(ctx, FESP_EFUSE_BASE_ESP32, (uint32_t)ctx->efuse_size,
-                               addr, &val))
+            if (try_read_efuse32(ctx, FESP_EFUSE_BASE_ESP32,
+                                 (uint32_t)ctx->efuse_size, addr, &val))
                 return val;
         }
     }
@@ -677,7 +682,8 @@ uint32_t fesp_chip_read_reg(const fesp_chip_ctx_t *ctx, uint32_t addr)
     }
 
     /* 4. UART clock divider register */
-    if (addr == FESP_UART_CLKDIV_REG_ESP8266 || addr == FESP_UART_CLKDIV_REG_ESP32 ||
+    if (addr == FESP_UART_CLKDIV_REG_ESP8266 ||
+        addr == FESP_UART_CLKDIV_REG_ESP32 ||
         addr == FESP_UART_CLKDIV_REG_ESP32S2) {
         uint32_t xtal;
         if (ctx->type == FESP_CHIP_ESP32C3 || ctx->type == FESP_CHIP_ESP32C6 ||
@@ -695,8 +701,7 @@ uint32_t fesp_chip_read_reg(const fesp_chip_ctx_t *ctx, uint32_t addr)
         }
         if (ctx->type == FESP_CHIP_ESP8266) {
             return (2 * xtal) / 115200;
-        }
-        else
+        } else
             return xtal / 115200;
     }
 
@@ -738,17 +743,18 @@ bool fesp_chip_write_reg(fesp_chip_ctx_t *ctx, uint32_t addr, uint32_t val)
 
         if (ctx->type == FESP_CHIP_ESP32) {
             return fesp_chip_write_reg_esp32(ctx, offset, val);
-        }
-        else
+        } else
             return fesp_chip_write_reg_modern(ctx, offset, val);
     }
 
     /* 1b. ESP32: eFuse controller writes at EFUSE_BASE (0x3FF42000) range.
        espefuse sends PGM_DATA and CMD_REG writes to this address range.
-       Translate to EFUSE_RD_REG_BASE offset (-0x10) for fesp_chip_write_reg_esp32.
-       Must be checked BEFORE SPI register handler (same address range). */
+       Translate to EFUSE_RD_REG_BASE offset (-0x10) for
+       fesp_chip_write_reg_esp32. Must be checked BEFORE SPI register handler
+       (same address range). */
     if (ctx->type == FESP_CHIP_ESP32 && ctx->efuse_conf_ofs != 0 &&
-        addr >= FESP_SPI_REG_BASE_ESP32 && addr < FESP_SPI_REG_BASE_ESP32 + 0x100) {
+        addr >= FESP_SPI_REG_BASE_ESP32 &&
+        addr < FESP_SPI_REG_BASE_ESP32 + 0x100) {
         int offset = (int)(addr - FESP_SPI_REG_BASE_ESP32) - 0x10;
         return fesp_chip_write_reg_esp32(ctx, offset, val);
     }
@@ -768,7 +774,7 @@ bool fesp_chip_write_reg(fesp_chip_ctx_t *ctx, uint32_t addr, uint32_t val)
                 if (cmd == FESP_SPIFLASH_RDID) {
                     ctx->spi_regs[ctx->spi_offs->w0 / 4] = ctx->flash_id;
                     FESP_HAL_LOGD(TAG, "SPI RDID: flash_id=0x%08lX",
-                                ctx->flash_id);
+                                  ctx->flash_id);
                 }
 
                 ctx->spi_regs[FESP_SPI_CMD_OFFS / 4] &= ~FESP_SPI_CMD_USR;
@@ -845,21 +851,30 @@ void fesp_chip_set_flash_size(fesp_chip_ctx_t *ctx, uint32_t size)
 /*
  * fesp_chip_get_flash_size - Get flash size in bytes
  */
-uint32_t fesp_chip_get_flash_size(const fesp_chip_ctx_t *ctx) { return ctx->flash_size; }
+uint32_t fesp_chip_get_flash_size(const fesp_chip_ctx_t *ctx)
+{
+    return ctx->flash_size;
+}
 
 /*
  * fesp_chip_get_chip_id - Get chip ID register value
  *
  * Returns the chip ID used for autodetection (e.g. 0x00F01D83 for ESP32).
  */
-uint32_t fesp_chip_get_chip_id(const fesp_chip_ctx_t *ctx) { return ctx->chip_id; }
+uint32_t fesp_chip_get_chip_id(const fesp_chip_ctx_t *ctx)
+{
+    return ctx->chip_id;
+}
 
 /*
  * fesp_chip_get_efuse - Get pointer to eFuse data
  *
  * Returns pointer to eFuse uint8_t array, or NULL if not allocated.
  */
-const uint8_t *fesp_chip_get_efuse(const fesp_chip_ctx_t *ctx) { return ctx->efuse; }
+const uint8_t *fesp_chip_get_efuse(const fesp_chip_ctx_t *ctx)
+{
+    return ctx->efuse;
+}
 
 /*
  * fesp_chip_get_efuse_mut - Get mutable pointer to eFuse data
@@ -869,7 +884,10 @@ uint8_t *fesp_chip_get_efuse_mut(fesp_chip_ctx_t *ctx) { return ctx->efuse; }
 /*
  * fesp_chip_get_efuse_size - Get eFuse size in bytes
  */
-int fesp_chip_get_efuse_size(const fesp_chip_ctx_t *ctx) { return ctx->efuse_size; }
+int fesp_chip_get_efuse_size(const fesp_chip_ctx_t *ctx)
+{
+    return ctx->efuse_size;
+}
 
 /*
  * fesp_chip_get_boot_baud_rate - Get boot message baud rate
@@ -882,7 +900,8 @@ uint32_t fesp_chip_get_boot_baud_rate(const fesp_chip_ctx_t *ctx)
     if (ctx->type == FESP_CHIP_ESP8266) {
         return 74880;
     }
-    if (ctx->type == FESP_CHIP_ESP32C2 && ctx->xtal_freq == FESP_XTAL_FREQ_26M) {
+    if (ctx->type == FESP_CHIP_ESP32C2 &&
+        ctx->xtal_freq == FESP_XTAL_FREQ_26M) {
         return 74880;
     }
     return 115200;
@@ -923,8 +942,9 @@ static const char *ResetCauseStr(uint8_t cause)
  * Returns pointer to buf containing multi-line ASCII string
  * with \r\n line endings, or empty string if buffer is too small.
  */
-const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx, bool download_mode,
-                                uint8_t reset_cause, char *buf, size_t buf_size)
+const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx,
+                                       bool download_mode, uint8_t reset_cause,
+                                       char *buf, size_t buf_size)
 {
     const char *rst = ResetCauseStr(reset_cause);
 
@@ -1105,4 +1125,3 @@ const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx, bool download
 
     return buf;
 }
-

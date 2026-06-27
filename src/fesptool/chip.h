@@ -5,9 +5,9 @@
 #ifndef FESP_CHIP_H
 #define FESP_CHIP_H
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define FESP_CHIP_DETECT_REG 0x40001000
 #define FESP_CHIP_NAME_MAX 32
@@ -87,7 +87,8 @@ const uint8_t *fesp_chip_get_efuse(const fesp_chip_ctx_t *ctx);
 uint8_t *fesp_chip_get_efuse_mut(fesp_chip_ctx_t *ctx);
 int fesp_chip_get_efuse_size(const fesp_chip_ctx_t *ctx);
 uint32_t fesp_chip_get_boot_baud_rate(const fesp_chip_ctx_t *ctx);
-const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx, bool download_mode,
-                                uint8_t reset_cause, char *buf, size_t buf_size);
+const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx,
+                                       bool download_mode, uint8_t reset_cause,
+                                       char *buf, size_t buf_size);
 
 #endif /* FESP_CHIP_H */

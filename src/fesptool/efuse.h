@@ -37,8 +37,10 @@ int fesp_efuse_get_jtag_total_count(const fesp_chip_ctx_t *ctx);
 uint32_t fesp_efuse_get_soft_jtag_flag(const fesp_chip_ctx_t *ctx);
 uint32_t fesp_efuse_get_usb_jtag_flag(const fesp_chip_ctx_t *ctx);
 uint8_t fesp_efuse_get_key_purpose(const fesp_chip_ctx_t *ctx, int block);
-void fesp_efuse_set_key_purpose(fesp_chip_ctx_t *ctx, int block, uint8_t purpose);
-int fesp_efuse_get_encryption_key_offset(const fesp_chip_ctx_t *ctx, int *key_len);
+void fesp_efuse_set_key_purpose(fesp_chip_ctx_t *ctx, int block,
+                                uint8_t purpose);
+int fesp_efuse_get_encryption_key_offset(const fesp_chip_ctx_t *ctx,
+                                         int *key_len);
 void fesp_efuse_set_flash_encryption(fesp_chip_ctx_t *ctx, int mode);
 void fesp_efuse_set_download_mode(fesp_chip_ctx_t *ctx, int mode);
 void fesp_efuse_apply_block0_defaults(fesp_chip_ctx_t *ctx);

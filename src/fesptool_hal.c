@@ -90,10 +90,10 @@ void fesp_hal_log_e(const char *tag, const char *fmt, ...)
  * Engine-side tool functions (forward to utils)
  * ======================================================================== */
 
-#include "utils/mem.h"
-#include "utils/md5.h"
 #include "utils/deflate.h"
 #include "utils/encrypt.h"
+#include "utils/md5.h"
+#include "utils/mem.h"
 
 void *fesp_hal_mem_alloc(DWORD size) { return Mem_Alloc(size); }
 void *fesp_hal_mem_zero_alloc(DWORD size) { return Mem_ZeroAlloc(size); }

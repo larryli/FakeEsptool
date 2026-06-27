@@ -9,8 +9,8 @@
 
 #include "chip.h"
 #include "efuse.h"
+#include "esptool.h"
 #include "flash.h"
 #include "slip.h"
-#include "esptool.h"
 
 #endif /* FESP_H */

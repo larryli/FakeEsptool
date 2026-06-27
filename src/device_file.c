@@ -14,7 +14,8 @@
 static const char *TAG = "DEV";
 #endif
 
-BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash, const WCHAR *filename)
+BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
+                     const WCHAR *filename)
 {
     HANDLE hFile = CreateFileW(filename, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
                                FILE_ATTRIBUTE_NORMAL, NULL);
@@ -50,8 +51,7 @@ BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash, const WCHAR
     /* eFuse (variable) */
     ok = ok && WriteFile(hFile, &efuseSize, 4, &written, NULL) && written == 4;
     if (efuseSize > 0 && chip->efuse)
-        ok = ok &&
-             WriteFile(hFile, chip->efuse, efuseSize, &written, NULL) &&
+        ok = ok && WriteFile(hFile, chip->efuse, efuseSize, &written, NULL) &&
              written == efuseSize;
 
     /* Flash data (variable) */
@@ -62,8 +62,7 @@ BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash, const WCHAR
             DeleteFileW(filename);
             return FALSE;
         }
-        ok = ok &&
-             WriteFile(hFile, flash->data, flashSize, &written, NULL) &&
+        ok = ok && WriteFile(hFile, flash->data, flashSize, &written, NULL) &&
              written == flashSize;
     }
 
@@ -79,7 +78,8 @@ BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash, const WCHAR
     return TRUE;
 }
 
-BOOL DeviceFile_Load(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash, const WCHAR *filename)
+BOOL DeviceFile_Load(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
+                     const WCHAR *filename)
 {
     HANDLE hFile = CreateFileW(filename, GENERIC_READ, 0, NULL, OPEN_EXISTING,
                                FILE_ATTRIBUTE_NORMAL, NULL);

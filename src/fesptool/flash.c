@@ -4,8 +4,8 @@
  * Provides read/write/erase operations on simulated flash memory.
  */
 
-#include "../fesptool_hal.h"
 #include "flash.h"
+#include "../fesptool_hal.h"
 #include <string.h>
 
 #if ENABLE_TRACE
@@ -64,7 +64,8 @@ void fesp_flash_close(fesp_flash_ctx_t *ctx)
  *
  * Returns true on success, false if address range is invalid.
  */
-bool fesp_flash_read(const fesp_flash_ctx_t *ctx, uint32_t addr, uint8_t *buf, uint32_t len)
+bool fesp_flash_read(const fesp_flash_ctx_t *ctx, uint32_t addr, uint8_t *buf,
+                     uint32_t len)
 {
     if (!ctx->data || addr >= ctx->size || len > ctx->size - addr) {
         return false;
@@ -88,7 +89,8 @@ bool fesp_flash_read(const fesp_flash_ctx_t *ctx, uint32_t addr, uint8_t *buf, u
  *
  * Returns true on success, false if address range is invalid.
  */
-bool fesp_flash_write(fesp_flash_ctx_t *ctx, uint32_t addr, const uint8_t *data, uint32_t len)
+bool fesp_flash_write(fesp_flash_ctx_t *ctx, uint32_t addr, const uint8_t *data,
+                      uint32_t len)
 {
     if (!ctx->data || addr >= ctx->size || len > ctx->size - addr) {
         return false;
@@ -120,7 +122,8 @@ bool fesp_flash_erase(fesp_flash_ctx_t *ctx, uint32_t addr, uint32_t len)
     }
 
     /* Align to sector boundaries (4KB) */
-    uint32_t start_sector = (addr / FESP_FLASH_SECTOR_SIZE) * FESP_FLASH_SECTOR_SIZE;
+    uint32_t start_sector =
+        (addr / FESP_FLASH_SECTOR_SIZE) * FESP_FLASH_SECTOR_SIZE;
     uint32_t end_addr = addr + len;
     uint32_t end_sector =
         ((end_addr + FESP_FLASH_SECTOR_SIZE - 1) / FESP_FLASH_SECTOR_SIZE) *
@@ -133,8 +136,9 @@ bool fesp_flash_erase(fesp_flash_ctx_t *ctx, uint32_t addr, uint32_t len)
 
     uint32_t aligned_len = end_sector - start_sector;
 
-    FESP_HAL_LOGD(TAG, "Erase: addr=0x%08lX len=%lu -> aligned: 0x%08lX len=%lu",
-                addr, len, start_sector, aligned_len);
+    FESP_HAL_LOGD(TAG,
+                  "Erase: addr=0x%08lX len=%lu -> aligned: 0x%08lX len=%lu",
+                  addr, len, start_sector, aligned_len);
 
     memset(ctx->data + start_sector, FESP_FLASH_ERASE_PATTERN, aligned_len);
     return true;
@@ -163,7 +167,8 @@ bool fesp_flash_erase_all(fesp_flash_ctx_t *ctx)
  * @len:  Number of bytes to hash
  * @md5:  Buffer to receive 16-uint8_t MD5 hash
  */
-void fesp_flash_calc_md5(const fesp_flash_ctx_t *ctx, uint32_t addr, uint32_t len, uint8_t md5[16])
+void fesp_flash_calc_md5(const fesp_flash_ctx_t *ctx, uint32_t addr,
+                         uint32_t len, uint8_t md5[16])
 {
     memset(md5, 0, 16);
 

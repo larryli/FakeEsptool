@@ -4,8 +4,8 @@
  * Handles SLIP framing for esptool serial communication.
  */
 
-#include "../fesptool_hal.h"
 #include "slip.h"
+#include "../fesptool_hal.h"
 
 #if ENABLE_TRACE
 static const char *TAG = "SLIP";
@@ -102,7 +102,10 @@ bool fesp_slip_is_complete(const fesp_slip_ctx_t *ctx)
  *
  * Returns pointer to internal buffer containing decoded frame data.
  */
-const uint8_t *fesp_slip_get_payload(const fesp_slip_ctx_t *ctx) { return ctx->buf; }
+const uint8_t *fesp_slip_get_payload(const fesp_slip_ctx_t *ctx)
+{
+    return ctx->buf;
+}
 
 /*
  * fesp_slip_get_length - Get decoded frame length

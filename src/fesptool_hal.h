@@ -13,11 +13,11 @@
 #ifndef FESPTOOL_HAL_H
 #define FESPTOOL_HAL_H
 
-#include <windows.h>
 #include <stdarg.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <windows.h>
 
 /* ========================================================================
  * Engine-side tool functions (snake_case)
@@ -41,7 +41,7 @@ void fesp_hal_modified(void);
 /* Memory */
 void *fesp_hal_mem_alloc(DWORD size);
 void *fesp_hal_mem_zero_alloc(DWORD size);
-void  fesp_hal_mem_free(void *ptr);
+void fesp_hal_mem_free(void *ptr);
 
 /* MD5 */
 void fesp_hal_md5_calc(const BYTE *data, DWORD len, BYTE digest[16]);
@@ -49,15 +49,15 @@ void fesp_hal_md5_calc(const BYTE *data, DWORD len, BYTE digest[16]);
 /* DEFLATE decompression */
 void fesp_hal_deflate_init(void *ctx, const BYTE *in_buf, size_t in_len,
                            BYTE *out_buf, size_t out_len);
-int  fesp_hal_deflate_decompress(void *ctx);
+int fesp_hal_deflate_decompress(void *ctx);
 
 /* AES-XTS encrypt/decrypt */
-int fesp_hal_encrypt_init(void *ctx, const BYTE *key,
-                          int key_len, DWORD flash_addr);
-int fesp_hal_encrypt_data(void *ctx, const BYTE *in_buf,
-                          BYTE *out_buf, DWORD len);
-int fesp_hal_decrypt_data(void *ctx, const BYTE *in_buf,
-                          BYTE *out_buf, DWORD len);
+int fesp_hal_encrypt_init(void *ctx, const BYTE *key, int key_len,
+                          DWORD flash_addr);
+int fesp_hal_encrypt_data(void *ctx, const BYTE *in_buf, BYTE *out_buf,
+                          DWORD len);
+int fesp_hal_decrypt_data(void *ctx, const BYTE *in_buf, BYTE *out_buf,
+                          DWORD len);
 
 /* ========================================================================
  * GUI-side log macros (FESPTOOL_HAL_xxx)

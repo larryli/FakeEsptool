@@ -60,8 +60,8 @@ static const FESP_CMD_INFO commandTable[256] = {
 /* Minimum packet size check macro */
 #define CHECK_PKT_SIZE(pkt, min_size)                                          \
     if ((pkt)->size < (min_size)) {                                            \
-        FESP_HAL_LOGD(TAG, "Packet too small: cmd=0x%02X size=%u min=%u",        \
-                    (pkt)->command, (pkt)->size, (min_size));                  \
+        FESP_HAL_LOGD(TAG, "Packet too small: cmd=0x%02X size=%u min=%u",      \
+                      (pkt)->command, (pkt)->size, (min_size));                \
         return;                                                                \
     }
 
@@ -99,7 +99,8 @@ uint8_t fesp_calc_checksum(const uint8_t *data, int len)
 }
 
 /*
- * defl_free_buffer - Free deflate accumulation buffer (without writing to flash)
+ * defl_free_buffer - Free deflate accumulation buffer (without writing to
+ * flash)
  */
 static void defl_free_buffer(fesp_ctx_t *ctx)
 {
@@ -112,7 +113,7 @@ static void defl_free_buffer(fesp_ctx_t *ctx)
 }
 
 /*
- * Esptool_EncryptInPlace - Encrypt data in-place using flash encryption key
+ * encrypt_in_place - Encrypt data in-place using flash encryption key
  *
  * @ctx:        Esptool context
  * @data:       Data buffer to encrypt in-place
@@ -121,8 +122,8 @@ static void defl_free_buffer(fesp_ctx_t *ctx)
  *
  * Returns FESP_OK on success or if encryption not enabled, FESP_FAIL on error.
  */
-static uint32_t Esptool_EncryptInPlace(fesp_ctx_t *ctx, uint8_t *data, uint32_t len,
-                                    uint32_t flash_addr)
+static uint32_t encrypt_in_place(fesp_ctx_t *ctx, uint8_t *data, uint32_t len,
+                                 uint32_t flash_addr)
 {
     if (!ctx->flash_encrypted) {
         return FESP_OK;
@@ -132,10 +133,10 @@ static uint32_t Esptool_EncryptInPlace(fesp_ctx_t *ctx, uint8_t *data, uint32_t 
     int key_offset = fesp_efuse_get_encryption_key_offset(ctx->chip, &key_len);
 
     FESP_HAL_LOGD(TAG,
-                "EncryptInPlace: flash_encrypted=%d key_offset=0x%02X "
-                "key_len=%d efuse=%p efuse_size=%d",
-                ctx->flash_encrypted, key_offset, key_len, ctx->chip->efuse,
-                ctx->chip->efuse_size);
+                  "EncryptInPlace: flash_encrypted=%d key_offset=0x%02X "
+                  "key_len=%d efuse=%p efuse_size=%d",
+                  ctx->flash_encrypted, key_offset, key_len, ctx->chip->efuse,
+                  ctx->chip->efuse_size);
 
     if (key_offset < 0 || !ctx->chip->efuse ||
         key_offset + key_len > ctx->chip->efuse_size) {
@@ -146,16 +147,17 @@ static uint32_t Esptool_EncryptInPlace(fesp_ctx_t *ctx, uint8_t *data, uint32_t 
 
     const uint8_t *key = &ctx->chip->efuse[key_offset];
     FESP_HAL_LOGD(TAG,
-                "EncryptInPlace: Key first 8 bytes: %02X %02X %02X %02X %02X "
-                "%02X %02X %02X",
-                key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7]);
+                  "EncryptInPlace: Key first 8 bytes: %02X %02X %02X %02X %02X "
+                  "%02X %02X %02X",
+                  key[0], key[1], key[2], key[3], key[4], key[5], key[6],
+                  key[7]);
 
     ENCRYPT_CTX enc_ctx;
     int ret = fesp_hal_encrypt_init(&enc_ctx, key, key_len, flash_addr);
     FESP_HAL_LOGD(TAG,
-                "EncryptInPlace: Encrypt_Init ret=%d flash_addr=0x%08lX "
-                "len=%lu key_len=%d",
-                ret, flash_addr, len, key_len);
+                  "EncryptInPlace: Encrypt_Init ret=%d flash_addr=0x%08lX "
+                  "len=%lu key_len=%d",
+                  ret, flash_addr, len, key_len);
 
     if (ret == ENCRYPT_OK) {
         ret = fesp_hal_encrypt_data(&enc_ctx, data, data, len);
@@ -166,14 +168,14 @@ static uint32_t Esptool_EncryptInPlace(fesp_ctx_t *ctx, uint8_t *data, uint32_t 
             TAG,
             "EncryptInPlace: Success, encrypted %lu bytes at offset 0x%08lX",
             len, flash_addr);
-        FESP_HAL_LOGD(TAG,
-                    "EncryptInPlace: Output first 8 bytes: %02X %02X %02X %02X "
-                    "%02X %02X %02X %02X",
-                    data[0], data[1], data[2], data[3], data[4], data[5],
-                    data[6], data[7]);
-        fesp_hal_log_i("ESP",
-                        "  Encrypted %lu bytes at offset 0x%08lX", len,
-                        flash_addr);
+        FESP_HAL_LOGD(
+            TAG,
+            "EncryptInPlace: Output first 8 bytes: %02X %02X %02X %02X "
+            "%02X %02X %02X %02X",
+            data[0], data[1], data[2], data[3], data[4], data[5], data[6],
+            data[7]);
+        fesp_hal_log_i("ESP", "  Encrypted %lu bytes at offset 0x%08lX", len,
+                       flash_addr);
         return FESP_OK;
     }
 
@@ -183,7 +185,7 @@ static uint32_t Esptool_EncryptInPlace(fesp_ctx_t *ctx, uint8_t *data, uint32_t 
 }
 
 /*
- * Esptool_DecryptInPlace - Decrypt data in-place using flash encryption key
+ * decrypt_in_place - Decrypt data in-place using flash encryption key
  *
  * @ctx:        Esptool context
  * @data:       Data buffer to decrypt in-place
@@ -192,8 +194,8 @@ static uint32_t Esptool_EncryptInPlace(fesp_ctx_t *ctx, uint8_t *data, uint32_t 
  *
  * Returns FESP_OK on success or if decryption not needed, FESP_FAIL on error.
  */
-static uint32_t Esptool_DecryptInPlace(fesp_ctx_t *ctx, uint8_t *data, uint32_t len,
-                                    uint32_t flash_addr)
+static uint32_t decrypt_in_place(fesp_ctx_t *ctx, uint8_t *data, uint32_t len,
+                                 uint32_t flash_addr)
 {
     if (!fesp_efuse_is_flash_encryption_enabled(ctx->chip)) {
         return FESP_OK;
@@ -252,11 +254,11 @@ static uint32_t defl_flush_buffer(fesp_ctx_t *ctx)
         ctx->decomp_buf_cap = 0;
     }
     if (!ctx->decomp_buf) {
-        ctx->decomp_buf = (uint8_t *)fesp_hal_mem_zero_alloc(ctx->defl_unc_size);
+        ctx->decomp_buf =
+            (uint8_t *)fesp_hal_mem_zero_alloc(ctx->defl_unc_size);
         if (!ctx->decomp_buf) {
             FESP_HAL_LOGD(TAG, "Failed to allocate decompression buffer");
-            fesp_hal_log_e("ERR",
-                           "  Failed to allocate decompression buffer");
+            fesp_hal_log_e("ERR", "  Failed to allocate decompression buffer");
             defl_free_buffer(ctx);
             return FESP_FAIL;
         }
@@ -266,34 +268,33 @@ static uint32_t defl_flush_buffer(fesp_ctx_t *ctx)
     /* Initialize decompressor */
     DEFLATE_CTX deflate_ctx;
     fesp_hal_deflate_init(&deflate_ctx, ctx->defl_buf, ctx->defl_buf_size,
-                 ctx->decomp_buf, ctx->decomp_buf_cap);
+                          ctx->decomp_buf, ctx->decomp_buf_cap);
 
     /* Decompress */
     int ret = fesp_hal_deflate_decompress(&deflate_ctx);
     if (ret != DEFLATE_OK) {
         FESP_HAL_LOGD(TAG, "Decompression failed: %d", ret);
-        fesp_hal_log_e("ERR", "  Decompression failed: %d",
-                        ret);
+        fesp_hal_log_e("ERR", "  Decompression failed: %d", ret);
         defl_free_buffer(ctx);
         return FESP_FAIL;
     }
 
     uint32_t decomp_size = (uint32_t)deflate_ctx.out_pos;
     FESP_HAL_LOGD(TAG, "Defl flush: %lu -> %lu bytes at offset 0x%08lX",
-                ctx->defl_buf_size, decomp_size, ctx->defl_offset);
-    fesp_hal_log_i("ESP",
-                    "  Decompressed %lu -> %lu bytes at offset 0x%08lX",
-                    ctx->defl_buf_size, decomp_size, ctx->defl_offset);
+                  ctx->defl_buf_size, decomp_size, ctx->defl_offset);
+    fesp_hal_log_i("ESP", "  Decompressed %lu -> %lu bytes at offset 0x%08lX",
+                   ctx->defl_buf_size, decomp_size, ctx->defl_offset);
 
     /* Encrypt if encrypted flag was set */
-    if (Esptool_EncryptInPlace(ctx, ctx->decomp_buf, decomp_size,
-                               ctx->defl_offset) != FESP_OK) {
+    if (encrypt_in_place(ctx, ctx->decomp_buf, decomp_size, ctx->defl_offset) !=
+        FESP_OK) {
         defl_free_buffer(ctx);
         return FESP_FAIL;
     }
 
     /* Write to flash */
-    fesp_flash_write(ctx->flash, ctx->defl_offset, ctx->decomp_buf, decomp_size);
+    fesp_flash_write(ctx->flash, ctx->defl_offset, ctx->decomp_buf,
+                     decomp_size);
 
     defl_free_buffer(ctx);
     return FESP_OK;
@@ -303,7 +304,7 @@ static uint32_t defl_flush_buffer(fesp_ctx_t *ctx)
  * fesp_init - Initialize ESP protocol context
  *
  * Binds protocol context to device chip and flash data.
- * Must be called before any other Esptool_* function.
+ * Must be called before any other fesp_* function.
  *
  * @ctx:   Pointer to protocol context to initialize
  * @chip:  Pointer to chip context (not owned by esptool)
@@ -371,10 +372,6 @@ void fesp_reset_state(fesp_ctx_t *ctx)
     fesp_hal_log_i("ESP", "  Protocol state reset");
 }
 
-
-
-
-
 /*
  * fesp_send_response_ex - Send protocol response with configurable status
  * length
@@ -388,8 +385,8 @@ void fesp_reset_state(fesp_ctx_t *ctx)
  * @data_len:   Data payload length
  */
 void fesp_send_response_ex(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
-                            uint32_t status, uint8_t status_len, const uint8_t *data,
-                            uint16_t data_len)
+                           uint32_t status, uint8_t status_len,
+                           const uint8_t *data, uint16_t data_len)
 {
     uint8_t resp[ESP_RESP_BUF_SIZE];
     int pos = 0;
@@ -398,17 +395,16 @@ void fesp_send_response_ex(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
     uint16_t total_data_len = data_len;
 
     FESP_HAL_LOGD(TAG,
-                "SendResponse cmd=0x%02X req_val=0x%08lX status=0x%08lX "
-                "status_len=%u data_len=%u",
-                cmd, req_val, status, status_len, data_len);
+                  "SendResponse cmd=0x%02X req_val=0x%08lX status=0x%08lX "
+                  "status_len=%u data_len=%u",
+                  cmd, req_val, status, status_len, data_len);
 
     /* Check if data fits in response buffer */
     if (data_len > sizeof(resp) - 8) {
         FESP_HAL_LOGD(TAG, "Response too large: cmd=0x%02X data_len=%u max=%zu",
-                    cmd, data_len, sizeof(resp) - 8);
-        fesp_hal_log_e("ERR",
-                        "Response too large: cmd=0x%02X size=%u", cmd,
-                        data_len);
+                      cmd, data_len, sizeof(resp) - 8);
+        fesp_hal_log_e("ERR", "Response too large: cmd=0x%02X size=%u", cmd,
+                       data_len);
         return;
     }
 
@@ -441,7 +437,7 @@ void fesp_send_response_ex(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
         encoded = (uint8_t *)fesp_hal_mem_alloc(encoded_max);
         if (!encoded) {
             FESP_HAL_LOGD(TAG, "Failed to allocate encoded buffer (%lu bytes)",
-                        encoded_max);
+                          encoded_max);
             return;
         }
         used_heap = true;
@@ -457,11 +453,11 @@ void fesp_send_response_ex(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
     }
 
     const char *cmdName = GetCmdName(cmd);
-    fesp_hal_log_i("ESP", "[RES] %hs size=%u status=0x%08lX",
-                    cmdName, total_data_len, status);
+    fesp_hal_log_i("ESP", "[RES] %hs size=%u status=0x%08lX", cmdName,
+                   total_data_len, status);
 
     FESP_HAL_LOGD(TAG, "TX cmd=0x%02X status=%lu len=%u", cmd, status,
-                total_data_len);
+                  total_data_len);
 }
 
 /*
@@ -477,7 +473,7 @@ void fesp_send_response_ex(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
  * @data_len: Data payload length
  */
 void fesp_send_response(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
-                          uint32_t status, const uint8_t *data, uint16_t data_len)
+                        uint32_t status, const uint8_t *data, uint16_t data_len)
 {
     fesp_send_response_ex(ctx, cmd, req_val, status, 4, data, data_len);
 }
@@ -493,7 +489,8 @@ void fesp_send_response(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
  *
  * Returns true on success, false if frame is too short or malformed.
  */
-static bool parse_packet(const uint8_t *frame, int frame_len, fesp_packet_t *pkt)
+static bool parse_packet(const uint8_t *frame, int frame_len,
+                         fesp_packet_t *pkt)
 {
     if (frame_len < 8) {
         return false;
@@ -537,13 +534,15 @@ static void handle_sync(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Real device returns sync sequence in Value field:
        {0x07, 0x07, 0x12, 0x55} as little-endian uint32_t 0x55120707
        Note: The 4th byte is 0x55 (first padding byte from request), not 0x20 */
-    uint32_t sync_val = ((uint32_t)sync_prefix[0]) | ((uint32_t)sync_prefix[1] << 8) |
-                     ((uint32_t)sync_prefix[2] << 16) | ((uint32_t)0x55 << 24);
+    uint32_t sync_val =
+        ((uint32_t)sync_prefix[0]) | ((uint32_t)sync_prefix[1] << 8) |
+        ((uint32_t)sync_prefix[2] << 16) | ((uint32_t)0x55 << 24);
 
     /* Real device sends 8 consecutive responses per SYNC request.
        Response format: Size=4, Data=4 bytes status (0x00000000) */
     for (int i = 0; i < FESP_SYNC_RESPONSE_COUNT; i++) {
-        fesp_send_response_ex(ctx, FESP_CMD_SYNC, sync_val, FESP_OK, 4, NULL, 4);
+        fesp_send_response_ex(ctx, FESP_CMD_SYNC, sync_val, FESP_OK, 4, NULL,
+                              4);
     }
 }
 
@@ -563,8 +562,7 @@ static void handle_read_reg(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     uint32_t val = fesp_chip_read_reg(ctx->chip, addr);
 
     FESP_HAL_LOGD(TAG, "READ_REG addr=0x%08lX val=0x%08lX", addr, val);
-    fesp_hal_log_i("ESP", "  addr=0x%08lX -> 0x%08lX", addr,
-                    val);
+    fesp_hal_log_i("ESP", "  addr=0x%08lX -> 0x%08lX", addr, val);
 
     /* Cache the register value for use in subsequent responses */
     ctx->last_read_val = val;
@@ -572,16 +570,15 @@ static void handle_read_reg(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Transition to READY state when chip detection register is read */
     if (addr == FESP_CHIP_DETECT_REG && ctx->state == FESP_STATE_SYNCED) {
         ctx->state = FESP_STATE_READY;
-        fesp_hal_log_i("ESP",
-                       "  Chip detected, ready for commands");
+        fesp_hal_log_i("ESP", "  Chip detected, ready for commands");
     }
 
     /* Real device returns register value in Value field (bytes 4-7),
        with status in Data field */
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     uint8_t status_len = FESP_STATUS_LEN(ctx);
-    fesp_send_response_ex(ctx, FESP_CMD_READ_REG, val, FESP_OK, status_len, NULL,
-                           status_len);
+    fesp_send_response_ex(ctx, FESP_CMD_READ_REG, val, FESP_OK, status_len,
+                          NULL, status_len);
 }
 
 /*
@@ -611,12 +608,11 @@ static void handle_write_reg(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     }
 
     FESP_HAL_LOGD(TAG,
-                "WRITE_REG addr=0x%08lX val=0x%08lX "
-                "mask=0x%08lX delay=%lu",
-                addr, val, mask, delayUs);
-    fesp_hal_log_i("ESP",
-                    "  addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr,
-                    val, mask, delayUs);
+                  "WRITE_REG addr=0x%08lX val=0x%08lX "
+                  "mask=0x%08lX delay=%lu",
+                  addr, val, mask, delayUs);
+    fesp_hal_log_i("ESP", "  addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu",
+                   addr, val, mask, delayUs);
 
     /* Apply mask: only bits set in mask are written */
     uint32_t currentVal = fesp_chip_read_reg(ctx->chip, addr);
@@ -626,7 +622,7 @@ static void handle_write_reg(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     fesp_hal_modified();
     /* WRITE_REG always returns 2-byte status, Val field is 0x00000000 */
     fesp_send_response_ex(ctx, FESP_CMD_WRITE_REG, 0x00000000, FESP_OK, 2, NULL,
-                           2);
+                          2);
 }
 
 /*
@@ -649,18 +645,16 @@ static void handle_change_baudrate(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     }
 
     FESP_HAL_LOGD(TAG, "CHANGE_BAUDRATE old=%lu new=%lu", old_baud, new_baud);
-    fesp_hal_log_i("ESP", "  old=%lu new=%lu", old_baud,
-                    new_baud);
+    fesp_hal_log_i("ESP", "  old=%lu new=%lu", old_baud, new_baud);
 
     /* Send response at old baud rate first */
     /* CHANGE_BAUDRATE always returns 2-byte status */
     fesp_send_response_ex(ctx, FESP_CMD_CHANGE_BAUDRATE, ctx->last_read_val,
-                           FESP_OK, 2, NULL, 2);
+                          FESP_OK, 2, NULL, 2);
 
     /* Then switch to new baud rate */
     fesp_hal_set_baud_rate(new_baud);
-    fesp_hal_log_i("ESP", "  Baud rate switched to %lu",
-                    new_baud);
+    fesp_hal_log_i("ESP", "  Baud rate switched to %lu", new_baud);
 }
 
 /*
@@ -681,18 +675,18 @@ static void handle_mem_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     uint32_t bsize = read_le32(pkt->data + 8);
     uint32_t offset = read_le32(pkt->data + 12);
 
-    FESP_HAL_LOGD(TAG, "MEM_BEGIN total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
-                total, blocks, bsize, offset);
-    fesp_hal_log_i("ESP",
-                    "  total=%lu blocks=%lu bsize=%lu offset=0x%08lX", total,
-                    blocks, bsize, offset);
+    FESP_HAL_LOGD(TAG,
+                  "MEM_BEGIN total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
+                  total, blocks, bsize, offset);
+    fesp_hal_log_i("ESP", "  total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
+                   total, blocks, bsize, offset);
 
     ctx->state = FESP_STATE_MEM_WRITING;
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     uint8_t status_len = FESP_STATUS_LEN(ctx);
     fesp_send_response_ex(ctx, FESP_CMD_MEM_BEGIN, ctx->last_read_val, FESP_OK,
-                           status_len, NULL, status_len);
+                          status_len, NULL, status_len);
 }
 
 /*
@@ -720,15 +714,15 @@ static void handle_mem_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         uint8_t received = (uint8_t)(pkt->value & 0xFF);
         if (expected != received) {
             FESP_HAL_LOGD(TAG,
-                        "MEM_DATA checksum mismatch: "
-                        "expected=0x%02X received=0x%02X",
-                        expected, received);
-            fesp_hal_log_i("ESP",
-                "  Checksum mismatch: expected=0x%02X received=0x%02X",
+                          "MEM_DATA checksum mismatch: "
+                          "expected=0x%02X received=0x%02X",
+                          expected, received);
+            fesp_hal_log_i(
+                "ESP", "  Checksum mismatch: expected=0x%02X received=0x%02X",
                 expected, received);
             uint8_t status_len = FESP_STATUS_LEN(ctx);
             fesp_send_response_ex(ctx, FESP_CMD_MEM_DATA, ctx->last_read_val,
-                                   FESP_FAIL, status_len, NULL, status_len);
+                                  FESP_FAIL, status_len, NULL, status_len);
             return;
         }
     }
@@ -736,7 +730,7 @@ static void handle_mem_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     uint8_t status_len = FESP_STATUS_LEN(ctx);
     fesp_send_response_ex(ctx, FESP_CMD_MEM_DATA, ctx->last_read_val, FESP_OK,
-                           status_len, NULL, status_len);
+                          status_len, NULL, status_len);
 }
 
 /*
@@ -762,7 +756,7 @@ static void handle_mem_end(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     uint8_t status_len = FESP_STATUS_LEN(ctx);
     fesp_send_response_ex(ctx, FESP_CMD_MEM_END, ctx->last_read_val, FESP_OK,
-                           status_len, NULL, status_len);
+                          status_len, NULL, status_len);
 
     /* Send "OHAI" handshake after MEM_END to indicate stub is ready.
        Real device sends OHAI regardless of execute flag. */
@@ -810,43 +804,43 @@ static void handle_flash_defl_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         FESP_HAL_LOGD(
             TAG,
             "FLASH_DEFL_BEGIN rejected: release mode, plaintext not allowed");
-        fesp_hal_log_e("ERR",
-                       "  Release mode: plaintext flash disabled");
+        fesp_hal_log_e("ERR", "  Release mode: plaintext flash disabled");
         uint8_t status_len = FESP_STATUS_LEN(ctx);
         fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_BEGIN,
-                               ctx->last_read_val, FESP_FAIL, status_len, NULL,
-                               status_len);
+                              ctx->last_read_val, FESP_FAIL, status_len, NULL,
+                              status_len);
         return;
     }
 
     FESP_HAL_LOGD(TAG,
-                "FLASH_DEFL_BEGIN: flash_encrypted=%d "
-                "fesp_chip_type_t=%d stub_mode=%d",
-                encrypted, ctx->chip->type, ctx->stub_mode);
+                  "FLASH_DEFL_BEGIN: flash_encrypted=%d "
+                  "fesp_chip_type_t=%d stub_mode=%d",
+                  encrypted, ctx->chip->type, ctx->stub_mode);
     FESP_HAL_LOGD(TAG,
-                "FLASH_DEFL_BEGIN: IsFlashEncryptionEnabled=%d "
-                "IsDownloadEncryptDisabled=%d",
-                fesp_efuse_is_flash_encryption_enabled(ctx->chip),
-                fesp_efuse_is_download_encrypt_disabled(ctx->chip));
+                  "FLASH_DEFL_BEGIN: IsFlashEncryptionEnabled=%d "
+                  "IsDownloadEncryptDisabled=%d",
+                  fesp_efuse_is_flash_encryption_enabled(ctx->chip),
+                  fesp_efuse_is_download_encrypt_disabled(ctx->chip));
 
     /* Log key availability */
 #ifdef ENABLE_TRACE_PROTO
     {
         int key_len = 0;
-        int key_offset = fesp_efuse_get_encryption_key_offset(ctx->chip, &key_len);
+        int key_offset =
+            fesp_efuse_get_encryption_key_offset(ctx->chip, &key_len);
         FESP_HAL_LOGD(TAG,
-                    "FLASH_DEFL_BEGIN: key_offset=0x%02X key_len=%d efuse=%p "
-                    "efuse_size=%d",
-                    key_offset, key_len, ctx->chip->efuse,
-                    ctx->chip->efuse_size);
+                      "FLASH_DEFL_BEGIN: key_offset=0x%02X key_len=%d efuse=%p "
+                      "efuse_size=%d",
+                      key_offset, key_len, ctx->chip->efuse,
+                      ctx->chip->efuse_size);
         if (key_offset >= 0 && ctx->chip->efuse &&
             key_offset + key_len <= ctx->chip->efuse_size) {
             const uint8_t *key = &ctx->chip->efuse[key_offset];
             FESP_HAL_LOGD(TAG,
-                        "FLASH_DEFL_BEGIN: Key first 8 bytes: %02X %02X %02X "
-                        "%02X %02X %02X %02X %02X",
-                        key[0], key[1], key[2], key[3], key[4], key[5], key[6],
-                        key[7]);
+                          "FLASH_DEFL_BEGIN: Key first 8 bytes: %02X %02X %02X "
+                          "%02X %02X %02X %02X %02X",
+                          key[0], key[1], key[2], key[3], key[4], key[5],
+                          key[6], key[7]);
         } else {
             FESP_HAL_LOGD(TAG, "FLASH_DEFL_BEGIN: No encryption key available");
         }
@@ -856,17 +850,15 @@ static void handle_flash_defl_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Flush any pending accumulated data from previous session */
     if (ctx->defl_buf && ctx->defl_buf_size > 0) {
         FESP_HAL_LOGD(TAG, "FLASH_DEFL_BEGIN: flushing previous accumulation");
-        fesp_hal_log_i("ESP",
-                       "  Flushing previous compressed data");
+        fesp_hal_log_i("ESP", "  Flushing previous compressed data");
         uint32_t ret = defl_flush_buffer(ctx);
         if (ret != FESP_OK) {
             FESP_HAL_LOGD(TAG, "FLASH_DEFL_BEGIN flush previous failed");
-            fesp_hal_log_e("ERR",
-                           "  Failed to flush previous compressed data");
+            fesp_hal_log_e("ERR", "  Failed to flush previous compressed data");
             uint8_t status_len = FESP_STATUS_LEN(ctx);
             fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_BEGIN,
-                                   ctx->last_read_val, FESP_FAIL, status_len,
-                                   NULL, status_len);
+                                  ctx->last_read_val, FESP_FAIL, status_len,
+                                  NULL, status_len);
             return;
         }
     }
@@ -888,33 +880,31 @@ static void handle_flash_defl_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     if (uncompressed_size > 0) {
         fesp_flash_erase(ctx->flash, offset, uncompressed_size);
         fesp_hal_modified();
-        fesp_hal_log_i("ESP",
-                        "  Flash erased: offset=0x%08lX size=%lu", offset,
-                        uncompressed_size);
+        fesp_hal_log_i("ESP", "  Flash erased: offset=0x%08lX size=%lu", offset,
+                       uncompressed_size);
     }
 
     /* Allocate accumulation buffer */
     if (uncompressed_size > 0) {
-        ctx->defl_buf =
-            (uint8_t *)fesp_hal_mem_alloc(uncompressed_size);
+        ctx->defl_buf = (uint8_t *)fesp_hal_mem_alloc(uncompressed_size);
         if (!ctx->defl_buf) {
             FESP_HAL_LOGD(TAG,
-                        "Failed to allocate deflate buffer: "
-                        "%lu bytes",
-                        uncompressed_size);
+                          "Failed to allocate deflate buffer: "
+                          "%lu bytes",
+                          uncompressed_size);
             fesp_hal_log_e("ERR",
-                            "  Failed to allocate deflate buffer: %lu bytes",
-                            uncompressed_size);
+                           "  Failed to allocate deflate buffer: %lu bytes",
+                           uncompressed_size);
             uint8_t status_len = FESP_STATUS_LEN(ctx);
             fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_BEGIN,
-                                   ctx->last_read_val, FESP_FAIL, status_len,
-                                   NULL, status_len);
+                                  ctx->last_read_val, FESP_FAIL, status_len,
+                                  NULL, status_len);
             return;
         }
         ctx->defl_buf_cap = uncompressed_size;
         ctx->defl_buf_size = 0;
         FESP_HAL_LOGD(TAG, "FLASH_DEFL_BEGIN: allocated %lu bytes buffer",
-                    uncompressed_size);
+                      uncompressed_size);
     }
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
@@ -922,7 +912,7 @@ static void handle_flash_defl_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Use request's value field (checksum) for response Val, not last_read_val
      */
     fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_BEGIN, pkt->value, FESP_OK,
-                           status_len, NULL, status_len);
+                          status_len, NULL, status_len);
 }
 
 /*
@@ -944,7 +934,8 @@ static void handle_flash_defl_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     uint32_t seq = read_le32(pkt->data + 4);
 
     FESP_HAL_LOGD(
-        TAG, "handle_flash_defl_data: seq=%lu data_len=%lu pkt->size=%u state=%d",
+        TAG,
+        "handle_flash_defl_data: seq=%lu data_len=%lu pkt->size=%u state=%d",
         seq, data_len, pkt->size, ctx->state);
     FESP_HAL_LOGD(TAG, "FLASH_DEFL_DATA seq=%lu len=%lu", seq, data_len);
     fesp_hal_log_i("ESP", "  seq=%lu len=%lu", seq, data_len);
@@ -952,14 +943,13 @@ static void handle_flash_defl_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Verify sequence number */
     if (seq != ctx->flash_seq) {
         FESP_HAL_LOGD(TAG,
-                    "FLASH_DEFL_DATA seq mismatch: expected=%lu received=%lu",
-                    ctx->flash_seq, seq);
-        fesp_hal_log_i("ESP",
-                        "  Seq mismatch: expected=%lu received=%lu",
-                        ctx->flash_seq, seq);
+                      "FLASH_DEFL_DATA seq mismatch: expected=%lu received=%lu",
+                      ctx->flash_seq, seq);
+        fesp_hal_log_i("ESP", "  Seq mismatch: expected=%lu received=%lu",
+                       ctx->flash_seq, seq);
         uint8_t status_len = FESP_STATUS_LEN(ctx);
         fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val,
-                               FESP_FAIL, status_len, NULL, status_len);
+                              FESP_FAIL, status_len, NULL, status_len);
         return;
     }
 
@@ -971,17 +961,17 @@ static void handle_flash_defl_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         uint8_t received = (uint8_t)(pkt->value & 0xFF);
         if (expected != received) {
             FESP_HAL_LOGD(TAG,
-                        "FLASH_DEFL_DATA checksum mismatch: expected=0x%02X "
-                        "received=0x%02X",
-                        expected, received);
+                          "FLASH_DEFL_DATA checksum mismatch: expected=0x%02X "
+                          "received=0x%02X",
+                          expected, received);
             fesp_hal_log_i("ESP",
-                            "  Checksum mismatch: expected=0x%02X "
-                            "received=0x%02X",
-                            expected, received);
+                           "  Checksum mismatch: expected=0x%02X "
+                           "received=0x%02X",
+                           expected, received);
             uint8_t status_len = FESP_STATUS_LEN(ctx);
             fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_DATA,
-                                   ctx->last_read_val, FESP_FAIL, status_len,
-                                   NULL, status_len);
+                                  ctx->last_read_val, FESP_FAIL, status_len,
+                                  NULL, status_len);
             return;
         }
 
@@ -989,16 +979,15 @@ static void handle_flash_defl_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         if (ctx->defl_buf_cap > 0 && data_len > 0) {
             /* Check buffer overflow */
             if (ctx->defl_buf_size + data_len > ctx->defl_buf_cap) {
-                FESP_HAL_LOGD(TAG,
-                            "Deflate buffer overflow: size=%lu cap=%lu add=%lu",
-                            ctx->defl_buf_size, ctx->defl_buf_cap, data_len);
-                fesp_hal_log_e("ERR",
-                                "  Deflate buffer overflow");
+                FESP_HAL_LOGD(
+                    TAG, "Deflate buffer overflow: size=%lu cap=%lu add=%lu",
+                    ctx->defl_buf_size, ctx->defl_buf_cap, data_len);
+                fesp_hal_log_e("ERR", "  Deflate buffer overflow");
                 defl_free_buffer(ctx);
                 uint8_t status_len = FESP_STATUS_LEN(ctx);
                 fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_DATA,
-                                       ctx->last_read_val, FESP_FAIL, status_len,
-                                       NULL, status_len);
+                                      ctx->last_read_val, FESP_FAIL, status_len,
+                                      NULL, status_len);
                 return;
             }
 
@@ -1006,10 +995,9 @@ static void handle_flash_defl_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
             ctx->defl_buf_size += data_len;
 
             FESP_HAL_LOGD(TAG, "FLASH_DEFL_DATA accumulated %lu/%lu bytes",
-                        ctx->defl_buf_size, ctx->defl_buf_cap);
-            fesp_hal_log_i("ESP",
-                            "  Accumulated %lu/%lu bytes", ctx->defl_buf_size,
-                            ctx->defl_buf_cap);
+                          ctx->defl_buf_size, ctx->defl_buf_cap);
+            fesp_hal_log_i("ESP", "  Accumulated %lu/%lu bytes",
+                           ctx->defl_buf_size, ctx->defl_buf_cap);
         }
 
         ctx->flash_seq = seq + 1;
@@ -1018,7 +1006,7 @@ static void handle_flash_defl_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     uint8_t status_len = FESP_STATUS_LEN(ctx);
     fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val,
-                           FESP_OK, status_len, NULL, status_len);
+                          FESP_OK, status_len, NULL, status_len);
 }
 
 /*
@@ -1043,7 +1031,7 @@ static void handle_flash_defl_end(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         ctx->state = FESP_STATE_READY;
         uint8_t status_len = FESP_STATUS_LEN(ctx);
         fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_END, ctx->last_read_val,
-                               FESP_FAIL, status_len, NULL, status_len);
+                              FESP_FAIL, status_len, NULL, status_len);
         return;
     }
 
@@ -1052,7 +1040,7 @@ static void handle_flash_defl_end(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     uint8_t status_len = FESP_STATUS_LEN(ctx);
     fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_END, ctx->last_read_val,
-                           FESP_OK, status_len, NULL, status_len);
+                          FESP_OK, status_len, NULL, status_len);
 }
 
 /*
@@ -1079,19 +1067,17 @@ static void handle_read_flash(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     (void)psize;
 
     FESP_HAL_LOGD(TAG, "READ_FLASH addr=0x%08lX len=%lu bsize=%lu psize=%lu",
-                addr, len, bsize, psize);
-    fesp_hal_log_i("ESP", "  addr=0x%08lX len=%lu bsize=%lu",
-                    addr, len, bsize);
+                  addr, len, bsize, psize);
+    fesp_hal_log_i("ESP", "  addr=0x%08lX len=%lu bsize=%lu", addr, len, bsize);
 
     /* Step 1: Send command ACK (2-byte status in command response) */
     fesp_send_response_ex(ctx, FESP_CMD_READ_FLASH, ctx->last_read_val, FESP_OK,
-                           2, NULL, 2);
+                          2, NULL, 2);
 
     /* Allocate buffers once before the loop */
     uint8_t *buf = (uint8_t *)fesp_hal_mem_alloc(bsize);
     if (!buf) {
-        fesp_hal_log_e("ERR",
-                       "  Failed to allocate read buffer");
+        fesp_hal_log_e("ERR", "  Failed to allocate read buffer");
         return;
     }
 
@@ -1099,8 +1085,7 @@ static void handle_read_flash(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     uint8_t *encoded = (uint8_t *)fesp_hal_mem_alloc(encoded_max);
     if (!encoded) {
         fesp_hal_mem_free(buf);
-        fesp_hal_log_e("ERR",
-                       "  Failed to allocate encode buffer");
+        fesp_hal_log_e("ERR", "  Failed to allocate encode buffer");
         return;
     }
 
@@ -1113,14 +1098,13 @@ static void handle_read_flash(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         }
 
         if (!fesp_flash_read(ctx->flash, addr + offset, buf, chunk_size)) {
-            fesp_hal_log_e("ERR",
-                            "  Flash read failed at offset 0x%08lX",
-                            addr + offset);
+            fesp_hal_log_e("ERR", "  Flash read failed at offset 0x%08lX",
+                           addr + offset);
             break;
         }
 
         /* Decrypt if flash encryption is enabled */
-        Esptool_DecryptInPlace(ctx, buf, chunk_size, addr + offset);
+        decrypt_in_place(ctx, buf, chunk_size, addr + offset);
 
         /* SLIP-encode the chunk and send as raw frame */
         int enc_len =
@@ -1140,8 +1124,10 @@ static void handle_read_flash(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     uint8_t md5[16];
     fesp_flash_calc_md5(ctx->flash, addr, len, md5);
 
-    uint8_t md5_encoded[34]; /* 16 bytes * 2 (worst case escaping) + 2 (framing) */
-    int md5_enc_len = fesp_slip_encode(md5, 16, md5_encoded, sizeof(md5_encoded));
+    uint8_t
+        md5_encoded[34]; /* 16 bytes * 2 (worst case escaping) + 2 (framing) */
+    int md5_enc_len =
+        fesp_slip_encode(md5, 16, md5_encoded, sizeof(md5_encoded));
     if (md5_enc_len > 0) {
         fesp_hal_write(md5_encoded, (uint32_t)md5_enc_len);
     }
@@ -1167,8 +1153,8 @@ static void handle_erase_flash(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     fesp_flash_erase_all(ctx->flash);
     fesp_hal_modified();
     /* ERASE_FLASH is stub-only, always returns 2-byte status */
-    fesp_send_response_ex(ctx, FESP_CMD_ERASE_FLASH, ctx->last_read_val, FESP_OK,
-                           2, NULL, 2);
+    fesp_send_response_ex(ctx, FESP_CMD_ERASE_FLASH, ctx->last_read_val,
+                          FESP_OK, 2, NULL, 2);
 }
 
 /*
@@ -1186,8 +1172,7 @@ static void handle_erase_block(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     uint32_t len = read_le32(pkt->data + 4);
 
     FESP_HAL_LOGD(TAG, "ERASE_BLOCK offset=0x%08lX len=%lu", offset, len);
-    fesp_hal_log_i("ESP", "  offset=0x%08lX len=%lu", offset,
-                    len);
+    fesp_hal_log_i("ESP", "  offset=0x%08lX len=%lu", offset, len);
 
     /* Free any pending deflate buffer */
     defl_free_buffer(ctx);
@@ -1196,10 +1181,10 @@ static void handle_erase_block(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     if (fesp_flash_erase(ctx->flash, offset, len)) {
         fesp_hal_modified();
         fesp_send_response_ex(ctx, FESP_CMD_ERASE_REGION, ctx->last_read_val,
-                               FESP_OK, 2, NULL, 2);
+                              FESP_OK, 2, NULL, 2);
     } else {
         fesp_send_response_ex(ctx, FESP_CMD_ERASE_REGION, ctx->last_read_val,
-                               FESP_FAIL, 2, NULL, 2);
+                              FESP_FAIL, 2, NULL, 2);
     }
 }
 
@@ -1238,7 +1223,7 @@ static void handle_flash_md5(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         FESP_HAL_LOGD(TAG, "  MD5 (stub, binary)");
         fesp_hal_log_i("ESP", "  MD5 (stub, binary)");
         fesp_send_response_ex(ctx, FESP_CMD_SPI_FLASH_MD5, ctx->last_read_val,
-                               FESP_OK, 2, resp, 18);
+                              FESP_OK, 2, resp, 18);
     } else {
         /* ROM mode: return 32-byte ASCII hex MD5 + 2-byte status */
         uint8_t resp[34];
@@ -1250,7 +1235,7 @@ static void handle_flash_md5(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         FESP_HAL_LOGD(TAG, "  MD5=%.*s", 32, resp);
         fesp_hal_log_i("ESP", "  MD5=%.*hs", 32, resp);
         fesp_send_response_ex(ctx, FESP_CMD_SPI_FLASH_MD5, ctx->last_read_val,
-                               FESP_OK, 2, resp, 34);
+                              FESP_OK, 2, resp, 34);
     }
 }
 
@@ -1286,11 +1271,10 @@ static void handle_flash_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         fesp_efuse_is_download_encrypt_disabled(ctx->chip)) {
         FESP_HAL_LOGD(
             TAG, "FLASH_BEGIN rejected: release mode, plaintext not allowed");
-        fesp_hal_log_e("ERR",
-                       "  Release mode: plaintext flash disabled");
+        fesp_hal_log_e("ERR", "  Release mode: plaintext flash disabled");
         uint8_t status_len = FESP_STATUS_LEN(ctx);
         fesp_send_response_ex(ctx, FESP_CMD_FLASH_BEGIN, ctx->last_read_val,
-                               FESP_FAIL, status_len, NULL, status_len);
+                              FESP_FAIL, status_len, NULL, status_len);
         return;
     }
 
@@ -1304,26 +1288,25 @@ static void handle_flash_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     ctx->state = FESP_STATE_FLASH_WRITING;
 
     FESP_HAL_LOGD(TAG,
-                "FLASH_BEGIN erase=%lu blocks=%lu bsize=%lu offset=0x%08lX "
-                "encrypted=%lu",
-                erase_size, num_blocks, block_size, offset, encrypted);
-    fesp_hal_log_i("ESP",
-        "  erase=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
+                  "FLASH_BEGIN erase=%lu blocks=%lu bsize=%lu offset=0x%08lX "
+                  "encrypted=%lu",
+                  erase_size, num_blocks, block_size, offset, encrypted);
+    fesp_hal_log_i(
+        "ESP", "  erase=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
         erase_size, num_blocks, block_size, offset, encrypted);
 
     /* Erase the flash region as requested by the host */
     if (erase_size > 0) {
         fesp_flash_erase(ctx->flash, offset, erase_size);
         fesp_hal_modified();
-        fesp_hal_log_i("ESP",
-                        "  Flash erased: offset=0x%08lX size=%lu", offset,
-                        erase_size);
+        fesp_hal_log_i("ESP", "  Flash erased: offset=0x%08lX size=%lu", offset,
+                       erase_size);
     }
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     uint8_t status_len = FESP_STATUS_LEN(ctx);
     fesp_send_response_ex(ctx, FESP_CMD_FLASH_BEGIN, pkt->value, FESP_OK,
-                           status_len, NULL, status_len);
+                          status_len, NULL, status_len);
 }
 
 /*
@@ -1349,13 +1332,12 @@ static void handle_flash_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Verify sequence number */
     if (seq != ctx->flash_seq) {
         FESP_HAL_LOGD(TAG, "FLASH_DATA seq mismatch: expected=%lu received=%lu",
-                    ctx->flash_seq, seq);
-        fesp_hal_log_i("ESP",
-                        "  Seq mismatch: expected=%lu received=%lu",
-                        ctx->flash_seq, seq);
+                      ctx->flash_seq, seq);
+        fesp_hal_log_i("ESP", "  Seq mismatch: expected=%lu received=%lu",
+                       ctx->flash_seq, seq);
         uint8_t status_len = FESP_STATUS_LEN(ctx);
         fesp_send_response_ex(ctx, FESP_CMD_FLASH_DATA, ctx->last_read_val,
-                               FESP_FAIL, status_len, NULL, status_len);
+                              FESP_FAIL, status_len, NULL, status_len);
         return;
     }
 
@@ -1371,24 +1353,23 @@ static void handle_flash_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
                 "FLASH_DATA checksum mismatch: expected=0x%02X received=0x%02X",
                 expected, received);
             fesp_hal_log_i("ESP",
-                            "  Checksum mismatch: expected=0x%02X "
-                            "received=0x%02X",
-                            expected, received);
+                           "  Checksum mismatch: expected=0x%02X "
+                           "received=0x%02X",
+                           expected, received);
             uint8_t status_len = FESP_STATUS_LEN(ctx);
             fesp_send_response_ex(ctx, FESP_CMD_FLASH_DATA, ctx->last_read_val,
-                                   FESP_FAIL, status_len, NULL, status_len);
+                                  FESP_FAIL, status_len, NULL, status_len);
             return;
         }
 
         /* Encrypt if encrypted flag was set */
-        if (Esptool_EncryptInPlace(ctx, payload, data_len, ctx->flash_offset) !=
+        if (encrypt_in_place(ctx, payload, data_len, ctx->flash_offset) !=
             FESP_OK) {
-            fesp_hal_log_e("ERR",
-                            "  Encryption failed at offset 0x%08lX",
-                            ctx->flash_offset);
+            fesp_hal_log_e("ERR", "  Encryption failed at offset 0x%08lX",
+                           ctx->flash_offset);
             uint8_t status_len = FESP_STATUS_LEN(ctx);
             fesp_send_response_ex(ctx, FESP_CMD_FLASH_DATA, ctx->last_read_val,
-                                   FESP_FAIL, status_len, NULL, status_len);
+                                  FESP_FAIL, status_len, NULL, status_len);
             return;
         }
         fesp_flash_write(ctx->flash, ctx->flash_offset, payload, data_len);
@@ -1401,7 +1382,7 @@ static void handle_flash_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     uint8_t status_len = FESP_STATUS_LEN(ctx);
     fesp_send_response_ex(ctx, FESP_CMD_FLASH_DATA, ctx->last_read_val, FESP_OK,
-                           status_len, NULL, status_len);
+                          status_len, NULL, status_len);
 }
 
 /*
@@ -1429,14 +1410,12 @@ static void handle_flash_end(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Flush any pending deflate buffer (ROM mode scenario) */
     if (ctx->defl_buf && ctx->defl_buf_size > 0) {
         FESP_HAL_LOGD(TAG,
-                    "FLASH_END: flushing pending deflate buffer (%lu bytes)",
-                    ctx->defl_buf_size);
-        fesp_hal_log_i("ESP",
-                       "  Flushing pending compressed data");
+                      "FLASH_END: flushing pending deflate buffer (%lu bytes)",
+                      ctx->defl_buf_size);
+        fesp_hal_log_i("ESP", "  Flushing pending compressed data");
         if (defl_flush_buffer(ctx) != FESP_OK) {
             FESP_HAL_LOGD(TAG, "FLASH_END: flush failed");
-            fesp_hal_log_e("ERR",
-                           "  Failed to flush compressed data");
+            fesp_hal_log_e("ERR", "  Failed to flush compressed data");
         }
     }
 
@@ -1445,7 +1424,7 @@ static void handle_flash_end(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
     uint8_t status_len = FESP_STATUS_LEN(ctx);
     fesp_send_response_ex(ctx, FESP_CMD_FLASH_END, pkt->value, FESP_OK,
-                           status_len, NULL, status_len);
+                          status_len, NULL, status_len);
 }
 
 /*
@@ -1473,14 +1452,14 @@ static void handle_get_security_info(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
        Return normal response with failure status (FF 00), matching real device
        behavior. esptool sees status != 0 and falls back to magic value
        detection. */
-    if (ctx->chip->type == FESP_CHIP_ESP8266 || ctx->chip->type == FESP_CHIP_ESP32) {
+    if (ctx->chip->type == FESP_CHIP_ESP8266 ||
+        ctx->chip->type == FESP_CHIP_ESP32) {
         FESP_HAL_LOGD(TAG, "  Not supported on %s, returning failure",
-                    ctx->chip->name);
-        fesp_hal_log_i("ESP", "  Not supported on %hs",
-                        ctx->chip->name);
+                      ctx->chip->name);
+        fesp_hal_log_i("ESP", "  Not supported on %hs", ctx->chip->name);
         uint8_t err[2] = {0xFF, 0x00};
         fesp_send_response_ex(ctx, FESP_CMD_GET_SECURITY_INFO,
-                               ctx->last_read_val, FESP_FAIL, 2, err, 2);
+                              ctx->last_read_val, FESP_FAIL, 2, err, 2);
         return;
     }
 
@@ -1489,13 +1468,12 @@ static void handle_get_security_info(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
        (succeeds). chip_id will be None, causing get_chip_id() to raise
        FatalError, which triggers fallback to magic value detection. */
     if (ctx->chip->type == FESP_CHIP_ESP32S2) {
-        FESP_HAL_LOGD(TAG, "  ESP32-S2: returning 14-byte response (no chip_id)");
-        fesp_hal_log_i("ESP",
-                       "  ESP32-S2: no chip_id in response");
+        FESP_HAL_LOGD(TAG,
+                      "  ESP32-S2: returning 14-byte response (no chip_id)");
+        fesp_hal_log_i("ESP", "  ESP32-S2: no chip_id in response");
         uint32_t flash_crypt_cnt = fesp_efuse_get_flash_crypt_cnt(ctx->chip);
-        fesp_hal_log_i("ESP",
-                        "  flags=0x%08lX flash_crypt_cnt=%u", 0UL,
-                        (unsigned)flash_crypt_cnt);
+        fesp_hal_log_i("ESP", "  flags=0x%08lX flash_crypt_cnt=%u", 0UL,
+                       (unsigned)flash_crypt_cnt);
         uint8_t sec_data[14] = {0};
         /* bytes 0-3:   flags (all zeros) */
         /* byte 4:      flash_crypt_cnt */
@@ -1507,7 +1485,7 @@ static void handle_get_security_info(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         }
         /* bytes 12-13: status = success (0x00, 0x00) */
         fesp_send_response(ctx, FESP_CMD_GET_SECURITY_INFO, ctx->last_read_val,
-                             FESP_OK, sec_data, 14);
+                           FESP_OK, sec_data, 14);
         return;
     }
 
@@ -1516,8 +1494,8 @@ static void handle_get_security_info(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
        [flags:4][flash_crypt_cnt:1][key_purposes:7][chip_id:4][api_version:4][status:2]
        For ESP32 stub, chip_id = EFUSE_CHIP_ID (0x00F01D83). */
     uint32_t chip_id = (ctx->chip->type == FESP_CHIP_ESP32)
-                        ? ctx->chip->chip_id
-                        : ctx->chip->security_chip_id;
+                           ? ctx->chip->chip_id
+                           : ctx->chip->security_chip_id;
     uint32_t flash_crypt_cnt = fesp_efuse_get_flash_crypt_cnt(ctx->chip);
 
     uint8_t sec_data[22] = {0};
@@ -1538,24 +1516,22 @@ static void handle_get_security_info(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* bytes 20-21: status = success (0x00, 0x00) */
 
     FESP_HAL_LOGD(TAG, "  chip_id (IMAGE_CHIP_ID)=%lu (0x%08lX)", chip_id,
-                chip_id);
-    fesp_hal_log_i("ESP", "  flags=0x%08lX flash_crypt_cnt=%u",
-                    0UL, (unsigned)flash_crypt_cnt);
-    fesp_hal_log_i("ESP",
-                    "  chip_id=%lu (0x%08lX) api_version=%lu", chip_id,
-                    chip_id, 0UL);
+                  chip_id);
+    fesp_hal_log_i("ESP", "  flags=0x%08lX flash_crypt_cnt=%u", 0UL,
+                   (unsigned)flash_crypt_cnt);
+    fesp_hal_log_i("ESP", "  chip_id=%lu (0x%08lX) api_version=%lu", chip_id,
+                   chip_id, 0UL);
 
     /* Transition to READY state when chip detection succeeds via
      * GET_SECURITY_INFO */
     if (ctx->state == FESP_STATE_SYNCED) {
         ctx->state = FESP_STATE_READY;
-        fesp_hal_log_i(
-            "ESP",
-            "  Chip detected via security info, ready for commands");
+        fesp_hal_log_i("ESP",
+                       "  Chip detected via security info, ready for commands");
     }
 
     fesp_send_response(ctx, FESP_CMD_GET_SECURITY_INFO, ctx->last_read_val,
-                         FESP_OK, sec_data, 22);
+                       FESP_OK, sec_data, 22);
 }
 
 /*
@@ -1572,7 +1548,7 @@ static void handle_spi_attach(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* SPI_ATTACH: ROM mode 4-byte status, stub mode 2-byte status */
     uint8_t status_len = FESP_STATUS_LEN(ctx);
     fesp_send_response_ex(ctx, FESP_CMD_SPI_ATTACH, ctx->last_read_val, FESP_OK,
-                           status_len, NULL, status_len);
+                          status_len, NULL, status_len);
 }
 
 /*
@@ -1592,7 +1568,7 @@ static void handle_spi_attach(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 static void handle_spi_set_params(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     uint32_t fl_id = 0, total_size = 0, block_size = 0, sector_size = 0,
-          page_size = 0, status_mask = 0;
+             page_size = 0, status_mask = 0;
 
     if (pkt->size >= 24) {
         fl_id = read_le32(pkt->data);
@@ -1604,11 +1580,12 @@ static void handle_spi_set_params(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     }
 
     FESP_HAL_LOGD(TAG,
-                "SPI_SET_PARAMS fl_id=0x%08lX total=%lu block=%lu sector=%lu "
-                "page=%lu mask=0x%08lX",
-                fl_id, total_size, block_size, sector_size, page_size,
-                status_mask);
-    fesp_hal_log_i("ESP",
+                  "SPI_SET_PARAMS fl_id=0x%08lX total=%lu block=%lu sector=%lu "
+                  "page=%lu mask=0x%08lX",
+                  fl_id, total_size, block_size, sector_size, page_size,
+                  status_mask);
+    fesp_hal_log_i(
+        "ESP",
         "  fl_id=0x%08lX total=%lu block=%lu sector=%lu page=%lu mask=0x%08lX",
         fl_id, total_size, block_size, sector_size, page_size, status_mask);
 
@@ -1619,7 +1596,7 @@ static void handle_spi_set_params(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         fesp_hal_log_i("ESP", "  Not supported on ESP8266 ROM");
         uint8_t err_data[4] = {0x01, 0x05, 0x00, 0x00};
         fesp_send_response(ctx, FESP_CMD_SPI_SET_PARAMS, ctx->last_read_val,
-                             FESP_OK, err_data, 4);
+                           FESP_OK, err_data, 4);
         return;
     }
 
@@ -1627,7 +1604,7 @@ static void handle_spi_set_params(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
        ROM mode: 4-byte status; stub mode: 2-byte status. */
     uint8_t status_len = FESP_STATUS_LEN(ctx);
     fesp_send_response_ex(ctx, FESP_CMD_SPI_SET_PARAMS, ctx->last_read_val,
-                           FESP_OK, status_len, NULL, status_len);
+                          FESP_OK, status_len, NULL, status_len);
 }
 
 /*
@@ -1645,7 +1622,7 @@ static void handle_run_user_code(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* RUN_USER_CODE: stub-only, fire-and-forget (client does not wait for
      * response) */
     fesp_send_response_ex(ctx, FESP_CMD_RUN_USER_CODE, ctx->last_read_val,
-                           FESP_OK, 2, NULL, 2);
+                          FESP_OK, 2, NULL, 2);
 
     /* Reset protocol state for next connection */
     fesp_reset_state(ctx);
@@ -1654,8 +1631,9 @@ static void handle_run_user_code(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 /*
  * fesp_process_frame - Process a complete SLIP frame
  *
- * Parses the frame into an fesp_packet_t, validates direction (must be request),
- * checks protocol state, and dispatches to the appropriate command handler.
+ * Parses the frame into an fesp_packet_t, validates direction (must be
+ * request), checks protocol state, and dispatches to the appropriate command
+ * handler.
  *
  * @ctx:       Pointer to esptool context
  * @frame:     Pointer to decoded SLIP frame data
@@ -1681,8 +1659,8 @@ bool fesp_process_frame(fesp_ctx_t *ctx, const uint8_t *frame, int frame_len)
     const char *dirStr = (pkt->direction == FESP_DIR_REQUEST) ? "REQ" : "RES";
 
     /* Log packet summary */
-    fesp_hal_log_i("ESP", "[%s] %hs size=%u val=0x%08lX",
-                    dirStr, cmdName, pkt->size, pkt->value);
+    fesp_hal_log_i("ESP", "[%s] %hs size=%u val=0x%08lX", dirStr, cmdName,
+                   pkt->size, pkt->value);
 
     if (pkt->direction != FESP_DIR_REQUEST) {
         FESP_HAL_LOGD(TAG, "Not a request: 0x%02X", pkt->direction);
@@ -1693,9 +1671,8 @@ bool fesp_process_frame(fesp_ctx_t *ctx, const uint8_t *frame, int frame_len)
      * download mode) */
     if (fesp_efuse_is_download_mode_disabled(ctx->chip)) {
         FESP_HAL_LOGD(TAG, "Download mode disabled, ignoring command 0x%02X",
-                    pkt->command);
-        fesp_hal_log_i("ESP",
-                       "  Download mode disabled, command ignored");
+                      pkt->command);
+        fesp_hal_log_i("ESP", "  Download mode disabled, command ignored");
         return false;
     }
 
@@ -1725,13 +1702,12 @@ bool fesp_process_frame(fesp_ctx_t *ctx, const uint8_t *frame, int frame_len)
         }
         if (!allowed) {
             FESP_HAL_LOGD(TAG, "Secure download: command 0x%02X not allowed",
-                        pkt->command);
-            fesp_hal_log_i("ESP",
-                            "  Secure download: command 0x%02X rejected",
-                            pkt->command);
+                          pkt->command);
+            fesp_hal_log_i("ESP", "  Secure download: command 0x%02X rejected",
+                           pkt->command);
             uint8_t status_len = FESP_STATUS_LEN(ctx);
             fesp_send_response_ex(ctx, pkt->command, pkt->value, FESP_FAIL,
-                                   status_len, NULL, status_len);
+                                  status_len, NULL, status_len);
             return false;
         }
     }
@@ -1810,14 +1786,13 @@ bool fesp_process_frame(fesp_ctx_t *ctx, const uint8_t *frame, int frame_len)
     }
 
     if (!valid) {
-        FESP_HAL_LOGD(TAG, "Command 0x%02X not allowed in state %d", pkt->command,
-                    ctx->state);
-        fesp_hal_log_i("ESP",
-                        "  Command 0x%02X rejected (state=%d)", pkt->command,
-                        ctx->state);
+        FESP_HAL_LOGD(TAG, "Command 0x%02X not allowed in state %d",
+                      pkt->command, ctx->state);
+        fesp_hal_log_i("ESP", "  Command 0x%02X rejected (state=%d)",
+                       pkt->command, ctx->state);
         uint8_t status_len = FESP_STATUS_LEN(ctx);
         fesp_send_response_ex(ctx, pkt->command, pkt->value, FESP_FAIL,
-                               status_len, NULL, status_len);
+                              status_len, NULL, status_len);
         return false;
     }
 
@@ -1888,15 +1863,14 @@ bool fesp_process_frame(fesp_ctx_t *ctx, const uint8_t *frame, int frame_len)
     default:
         /* ROM returns ROM_INVALID_RECV_MSG (0x05) for unsupported commands */
         FESP_HAL_LOGD(TAG, "Unknown cmd: 0x%02X", pkt->command);
-        fesp_hal_log_i("ESP", "  Unknown command: 0x%02X",
-                        pkt->command);
+        fesp_hal_log_i("ESP", "  Unknown command: 0x%02X", pkt->command);
         {
             /* Response format: [status_byte_1 != 0][ROM_INVALID_RECV_MSG] +
              * padding */
             uint8_t err_data[4] = {0x01, 0x05, 0x00, 0x00};
             uint8_t status_len = FESP_STATUS_LEN(ctx);
             fesp_send_response_ex(ctx, pkt->command, pkt->value, FESP_OK,
-                                   status_len, err_data, 4);
+                                  status_len, err_data, 4);
         }
         return false;
     }

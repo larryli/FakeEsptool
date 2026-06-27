@@ -5,8 +5,8 @@
 #ifndef FESP_SLIP_H
 #define FESP_SLIP_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #define FESP_SLIP_END 0xC0
 #define FESP_SLIP_ESC 0xDB

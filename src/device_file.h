@@ -13,7 +13,7 @@
 #include <windows.h>
 
 /* Device file format constants */
-#define DEVICE_FILE_MAGIC 0x45535000   /* "ESP\0" */
+#define DEVICE_FILE_MAGIC 0x45535000 /* "ESP\0" */
 #define DEVICE_FILE_VERSION 1
 
 /*
@@ -27,7 +27,8 @@
  *
  * Returns TRUE on success, FALSE on failure.
  */
-BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash, const WCHAR *filename);
+BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
+                     const WCHAR *filename);
 
 /*
  * DeviceFile_Load - Load device state from .esp file
@@ -41,6 +42,7 @@ BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash, const WCHAR
  *
  * Returns TRUE on success, FALSE on failure.
  */
-BOOL DeviceFile_Load(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash, const WCHAR *filename);
+BOOL DeviceFile_Load(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
+                     const WCHAR *filename);
 
 #endif /* DEVICE_FILE_H */
