@@ -20,25 +20,25 @@ static const char *TAG = "FLASH";
  * @ctx:  Pointer to flash context
  * @size: Flash size in bytes
  *
- * Returns TRUE on success, FALSE on failure (invalid size or memory error).
+ * Returns true on success, false on failure (invalid size or memory error).
  */
-BOOL Flash_Init(FLASH_CTX *ctx, DWORD size)
+bool Flash_Init(FLASH_CTX *ctx, uint32_t size)
 {
     if (size == 0) {
-        return FALSE;
+        return false;
     }
 
-    ctx->data = (BYTE *)EsptoolHal_MemAlloc(size);
+    ctx->data = (uint8_t *)EsptoolHal_MemAlloc(size);
     if (!ctx->data) {
         EsptoolHal_LogD(TAG, "Failed to allocate %lu bytes", size);
-        return FALSE;
+        return false;
     }
 
     memset(ctx->data, FLASH_ERASE_PATTERN, size);
     ctx->size = size;
 
     EsptoolHal_LogD(TAG, "Initialized %lu KB flash", size / 1024);
-    return TRUE;
+    return true;
 }
 
 /*
@@ -62,16 +62,16 @@ void Flash_Close(FLASH_CTX *ctx)
  * @buf:  Buffer to receive data
  * @len:  Number of bytes to read
  *
- * Returns TRUE on success, FALSE if address range is invalid.
+ * Returns true on success, false if address range is invalid.
  */
-BOOL Flash_Read(const FLASH_CTX *ctx, DWORD addr, BYTE *buf, DWORD len)
+bool Flash_Read(const FLASH_CTX *ctx, uint32_t addr, uint8_t *buf, uint32_t len)
 {
     if (!ctx->data || addr >= ctx->size || len > ctx->size - addr) {
-        return FALSE;
+        return false;
     }
 
     memcpy(buf, ctx->data + addr, len);
-    return TRUE;
+    return true;
 }
 
 /*
@@ -86,19 +86,19 @@ BOOL Flash_Read(const FLASH_CTX *ctx, DWORD addr, BYTE *buf, DWORD len)
  * @data: Data to write
  * @len:  Number of bytes to write
  *
- * Returns TRUE on success, FALSE if address range is invalid.
+ * Returns true on success, false if address range is invalid.
  */
-BOOL Flash_Write(FLASH_CTX *ctx, DWORD addr, const BYTE *data, DWORD len)
+bool Flash_Write(FLASH_CTX *ctx, uint32_t addr, const uint8_t *data, uint32_t len)
 {
     if (!ctx->data || addr >= ctx->size || len > ctx->size - addr) {
-        return FALSE;
+        return false;
     }
 
-    for (DWORD i = 0; i < len; i++) {
+    for (uint32_t i = 0; i < len; i++) {
         ctx->data[addr + i] &= data[i];
     }
 
-    return TRUE;
+    return true;
 }
 
 /*
@@ -111,18 +111,18 @@ BOOL Flash_Write(FLASH_CTX *ctx, DWORD addr, const BYTE *data, DWORD len)
  * @addr: Start address (will be aligned to sector boundary)
  * @len:  Number of bytes to erase (will be rounded up to sector boundary)
  *
- * Returns TRUE on success, FALSE if parameters are invalid.
+ * Returns true on success, false if parameters are invalid.
  */
-BOOL Flash_Erase(FLASH_CTX *ctx, DWORD addr, DWORD len)
+bool Flash_Erase(FLASH_CTX *ctx, uint32_t addr, uint32_t len)
 {
     if (!ctx->data || len == 0 || addr >= ctx->size) {
-        return FALSE;
+        return false;
     }
 
     /* Align to sector boundaries (4KB) */
-    DWORD start_sector = (addr / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE;
-    DWORD end_addr = addr + len;
-    DWORD end_sector =
+    uint32_t start_sector = (addr / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE;
+    uint32_t end_addr = addr + len;
+    uint32_t end_sector =
         ((end_addr + FLASH_SECTOR_SIZE - 1) / FLASH_SECTOR_SIZE) *
         FLASH_SECTOR_SIZE;
 
@@ -131,13 +131,13 @@ BOOL Flash_Erase(FLASH_CTX *ctx, DWORD addr, DWORD len)
         end_sector = ctx->size;
     }
 
-    DWORD aligned_len = end_sector - start_sector;
+    uint32_t aligned_len = end_sector - start_sector;
 
     EsptoolHal_LogD(TAG, "Erase: addr=0x%08lX len=%lu -> aligned: 0x%08lX len=%lu",
                 addr, len, start_sector, aligned_len);
 
     memset(ctx->data + start_sector, FLASH_ERASE_PATTERN, aligned_len);
-    return TRUE;
+    return true;
 }
 
 /*
@@ -145,14 +145,14 @@ BOOL Flash_Erase(FLASH_CTX *ctx, DWORD addr, DWORD len)
  *
  * Sets all flash bytes to 0xFF.
  */
-BOOL Flash_EraseAll(FLASH_CTX *ctx)
+bool Flash_EraseAll(FLASH_CTX *ctx)
 {
     if (!ctx->data) {
-        return FALSE;
+        return false;
     }
 
     memset(ctx->data, FLASH_ERASE_PATTERN, ctx->size);
-    return TRUE;
+    return true;
 }
 
 /*
@@ -161,9 +161,9 @@ BOOL Flash_EraseAll(FLASH_CTX *ctx)
  * @ctx:  Pointer to flash context (const, read-only)
  * @addr: Start address in flash
  * @len:  Number of bytes to hash
- * @md5:  Buffer to receive 16-byte MD5 hash
+ * @md5:  Buffer to receive 16-uint8_t MD5 hash
  */
-void Flash_CalcMd5(const FLASH_CTX *ctx, DWORD addr, DWORD len, BYTE md5[16])
+void Flash_CalcMd5(const FLASH_CTX *ctx, uint32_t addr, uint32_t len, uint8_t md5[16])
 {
     memset(md5, 0, 16);
 

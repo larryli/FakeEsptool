@@ -12,8 +12,8 @@
 #include <string.h>
 
 /* Defined in efuse.c */
-BOOL Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, DWORD val);
-BOOL Chip_WriteRegModern(CHIP_CTX *ctx, int offset, DWORD val);
+bool Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, uint32_t val);
+bool Chip_WriteRegModern(CHIP_CTX *ctx, int offset, uint32_t val);
 
 #if ENABLE_TRACE
 static const char *TAG = "CHIP";
@@ -52,11 +52,11 @@ static const SPI_OFFSETS spi_offs_esp8266 = {
 /* Chip configuration table */
 typedef struct {
     const char *name;
-    DWORD chip_id;          /* Magic value for READ_REG detection */
-    DWORD security_chip_id; /* IMAGE_CHIP_ID for GET_SECURITY_INFO */
+    uint32_t chip_id;          /* Magic value for READ_REG detection */
+    uint32_t security_chip_id; /* IMAGE_CHIP_ID for GET_SECURITY_INFO */
     int efuse_size;
-    BOOL has_usb;
-    BYTE chip_id_bytes[4]; /* Chip ID as little-endian bytes for eFuse */
+    bool has_usb;
+    uint8_t chip_id_bytes[4]; /* Chip ID as little-endian bytes for eFuse */
 } CHIP_CONFIG;
 
 static const CHIP_CONFIG chip_configs[CHIP_COUNT] = {
@@ -64,43 +64,43 @@ static const CHIP_CONFIG chip_configs[CHIP_COUNT] = {
                       CHIP_ID_ESP8266,
                       IMAGE_CHIP_ID_ESP8266,
                       96,
-                      FALSE,
+                      false,
                       {0x01, 0xC1, 0xF0, 0xFF}},
     [CHIP_ESP32] = {"ESP32",
                     CHIP_ID_ESP32,
                     IMAGE_CHIP_ID_ESP32,
                     288,
-                    FALSE,
+                    false,
                     {0x83, 0x1D, 0xF0, 0x00}},
     [CHIP_ESP32S2] = {"ESP32-S2",
                       CHIP_ID_ESP32S2,
                       IMAGE_CHIP_ID_ESP32S2,
                       512,
-                      TRUE,
+                      true,
                       {0xC6, 0x07, 0x00, 0x00}},
     [CHIP_ESP32S3] = {"ESP32-S3",
                       CHIP_ID_ESP32S3,
                       IMAGE_CHIP_ID_ESP32S3,
                       512,
-                      TRUE,
+                      true,
                       {0x09, 0x00, 0x00, 0x00}},
     [CHIP_ESP32C2] = {"ESP32-C2",
                       CHIP_ID_ESP32C2,
                       IMAGE_CHIP_ID_ESP32C2,
                       512,
-                      FALSE,
+                      false,
                       {0x6F, 0xA0, 0x41, 0x7C}},
     [CHIP_ESP32C3] = {"ESP32-C3",
                       CHIP_ID_ESP32C3,
                       IMAGE_CHIP_ID_ESP32C3,
                       512,
-                      TRUE,
+                      true,
                       {0x6F, 0x50, 0x21, 0x69}},
     [CHIP_ESP32C6] = {"ESP32-C6",
                       CHIP_ID_ESP32C6,
                       IMAGE_CHIP_ID_ESP32C6,
                       512,
-                      TRUE,
+                      true,
                       {0x6F, 0x80, 0xE0, 0x2C}},
 };
 
@@ -115,16 +115,16 @@ static void WriteChipIdToEfuse(CHIP_CTX *ctx)
     if (!ctx->efuse || ctx->efuse_size < 0x50) {
         return;
     }
-    ctx->efuse[0x4C] = (BYTE)(ctx->chip_id & 0xFF);
-    ctx->efuse[0x4D] = (BYTE)((ctx->chip_id >> 8) & 0xFF);
-    ctx->efuse[0x4E] = (BYTE)((ctx->chip_id >> 16) & 0xFF);
-    ctx->efuse[0x4F] = (BYTE)((ctx->chip_id >> 24) & 0xFF);
+    ctx->efuse[0x4C] = (uint8_t)(ctx->chip_id & 0xFF);
+    ctx->efuse[0x4D] = (uint8_t)((ctx->chip_id >> 8) & 0xFF);
+    ctx->efuse[0x4E] = (uint8_t)((ctx->chip_id >> 16) & 0xFF);
+    ctx->efuse[0x4F] = (uint8_t)((ctx->chip_id >> 24) & 0xFF);
 }
 
 /*
  * InitChipCommon - Common chip initialization
  */
-static BOOL InitChipCommon(CHIP_CTX *ctx, CHIP_TYPE type)
+static bool InitChipCommon(CHIP_CTX *ctx, CHIP_TYPE type)
 {
     const CHIP_CONFIG *cfg = &chip_configs[type];
 
@@ -142,17 +142,17 @@ static BOOL InitChipCommon(CHIP_CTX *ctx, CHIP_TYPE type)
     ctx->has_usb = cfg->has_usb;
 
     ctx->efuse =
-        (BYTE *)EsptoolHal_MemZeroAlloc(ctx->efuse_size);
+        (uint8_t *)EsptoolHal_MemZeroAlloc(ctx->efuse_size);
     if (!ctx->efuse) {
         EsptoolHal_LogD(TAG, "Failed to allocate eFuse for %s", cfg->name);
-        return FALSE;
+        return false;
     }
 
     /* Note: chip_id_bytes are NOT written here because for ESP32,
        efuse[0-3] is BLOCK0 word0 which contains WR_DIS.
        Each chip's init function handles chip_id placement if needed. */
 
-    return TRUE;
+    return true;
 }
 
 /*
@@ -165,20 +165,20 @@ static BOOL InitChipCommon(CHIP_CTX *ctx, CHIP_TYPE type)
  * - BLOCK3 (0x3C-0x5F): EFUSE_DATA14-23 (MAC stored here)
  *
  * MAC eFuse offsets:
- * - word14 (0x50-0x53): MAC[5] at byte[3], MAC[4] at byte[2], ...
- * - word15 (0x54-0x57): MAC[3] at byte[1], MAC[2] at byte[0]
+ * - word14 (0x50-0x53): MAC[5] at uint8_t[3], MAC[4] at uint8_t[2], ...
+ * - word15 (0x54-0x57): MAC[3] at uint8_t[1], MAC[2] at uint8_t[0]
  * - word18 (0x5C-0x5F): Custom OUI (MAC[0-2])
  */
 static void WriteMacEsp8266(CHIP_CTX *ctx)
 {
     ctx->efuse[0x53] =
-        ctx->mac[5]; /* byte[3] of word0: (mac0 >> 24) = MAC[5] */
-    ctx->efuse[0x54] = ctx->mac[4]; /* byte[0] of word1: mac1 & 0xFF = MAC[4] */
-    ctx->efuse[0x55] = ctx->mac[3]; /* byte[1] of word1: (mac1 >> 8) = MAC[3] */
+        ctx->mac[5]; /* uint8_t[3] of word0: (mac0 >> 24) = MAC[5] */
+    ctx->efuse[0x54] = ctx->mac[4]; /* uint8_t[0] of word1: mac1 & 0xFF = MAC[4] */
+    ctx->efuse[0x55] = ctx->mac[3]; /* uint8_t[1] of word1: (mac1 >> 8) = MAC[3] */
     /* word3 for custom OUI: [mac[2], mac[1], mac[0]] in little-endian */
-    ctx->efuse[0x5C] = ctx->mac[2]; /* byte[0] of word3: OUI byte 2 */
-    ctx->efuse[0x5D] = ctx->mac[1]; /* byte[1] of word3: OUI byte 1 */
-    ctx->efuse[0x5E] = ctx->mac[0]; /* byte[2] of word3: OUI byte 0 */
+    ctx->efuse[0x5C] = ctx->mac[2]; /* uint8_t[0] of word3: OUI uint8_t 2 */
+    ctx->efuse[0x5D] = ctx->mac[1]; /* uint8_t[1] of word3: OUI uint8_t 1 */
+    ctx->efuse[0x5E] = ctx->mac[0]; /* uint8_t[2] of word3: OUI uint8_t 0 */
 }
 
 /*
@@ -248,23 +248,23 @@ static void WriteMacAt0x40(CHIP_CTX *ctx)
 /*
  * InitEsp8266 - Initialize ESP8266 chip context
  */
-static BOOL InitEsp8266(CHIP_CTX *ctx)
+static bool InitEsp8266(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP8266)) {
-        return FALSE;
+        return false;
     }
     WriteMacEsp8266(ctx);
     ctx->efuse_base = 0x3FF00000; /* ESP8266 eFuse register base */
-    return TRUE;
+    return true;
 }
 
 /*
  * InitEsp32 - Initialize ESP32 chip context
  */
-static BOOL InitEsp32(CHIP_CTX *ctx)
+static bool InitEsp32(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32)) {
-        return FALSE;
+        return false;
     }
 
     /* Set BLOCK0 default values matching real ESP32 hardware.
@@ -296,23 +296,23 @@ static BOOL InitEsp32(CHIP_CTX *ctx)
     ctx->efuse_conf_ofs = 0x0FC; /* EFUSE_REG_CONF */
     ctx->efuse_cmd_ofs = 0x104;  /* EFUSE_REG_CMD */
 
-    return TRUE;
+    return true;
 }
 
 /*
  * InitEsp32S2 - Initialize ESP32-S2 chip context
  */
-static BOOL InitEsp32S2(CHIP_CTX *ctx)
+static bool InitEsp32S2(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32S2)) {
-        return FALSE;
+        return false;
     }
     WriteMacAt0x44(ctx);
     WriteChipIdToEfuse(ctx);
 
     /* Set chip revision to 1.0 in eFuse.
        ESP32-S2: EFUSE_BLOCK1_ADDR = 0x3F41A044
-       major at word3 (BLOCK1 + 12) bits[19:18] = byte 0x51 bits[3:2] */
+       major at word3 (BLOCK1 + 12) bits[19:18] = uint8_t 0x51 bits[3:2] */
     ctx->efuse[0x51] |= 0x04; /* major=1, bits[19:18] = 01 */
 
     /* eFuse controller register offsets (from EFUSE_BASE 0x3F41A000) */
@@ -320,16 +320,16 @@ static BOOL InitEsp32S2(CHIP_CTX *ctx)
     ctx->efuse_conf_ofs = 0x1CC; /* EFUSE_CONF_REG */
     ctx->efuse_cmd_ofs = 0x1D4;  /* EFUSE_CMD_REG */
 
-    return TRUE;
+    return true;
 }
 
 /*
  * InitEsp32S3 - Initialize ESP32-S3 chip context
  */
-static BOOL InitEsp32S3(CHIP_CTX *ctx)
+static bool InitEsp32S3(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32S3)) {
-        return FALSE;
+        return false;
     }
     WriteMacAt0x44(ctx);
     WriteChipIdToEfuse(ctx);
@@ -337,12 +337,12 @@ static BOOL InitEsp32S3(CHIP_CTX *ctx)
     /* Set chip revision to v0.0 in eFuse via ECO0 detection workaround.
        ESP32-S3's is_eco0() checks:
          (minor_raw & 0x7) == 0 AND blk_version_major == 1 AND blk_version_minor
-       == 1 When is_eco0() returns True, get_major_chip_version() returns 0.
+       == 1 When is_eco0() returns true, get_major_chip_version() returns 0.
 
        blk_version_major at BLOCK2 word4 bits[1:0] (EFUSE_BLOCK2_ADDR + 16)
-         = EFUSE_BASE + 0x5C + 0x10 = offset 0x6C, byte 0x6C bits[1:0]
+         = EFUSE_BASE + 0x5C + 0x10 = offset 0x6C, uint8_t 0x6C bits[1:0]
        blk_version_minor at BLOCK1 word3 bits[26:24] (EFUSE_BLOCK1_ADDR + 12)
-         = EFUSE_BASE + 0x44 + 0x0C = offset 0x50, byte 0x52 bits[2:0] */
+         = EFUSE_BASE + 0x44 + 0x0C = offset 0x50, uint8_t 0x52 bits[2:0] */
     ctx->efuse[0x6C] |= 0x01; /* blk_version_major = 1 */
     ctx->efuse[0x52] |= 0x01; /* blk_version_minor = 1 */
 
@@ -351,24 +351,24 @@ static BOOL InitEsp32S3(CHIP_CTX *ctx)
     ctx->efuse_conf_ofs = 0x1CC; /* EFUSE_CONF_REG */
     ctx->efuse_cmd_ofs = 0x1D4;  /* EFUSE_CMD_REG */
 
-    return TRUE;
+    return true;
 }
 
 /*
  * InitEsp32C2 - Initialize ESP32-C2 chip context
  */
-static BOOL InitEsp32C2(CHIP_CTX *ctx)
+static bool InitEsp32C2(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32C2)) {
-        return FALSE;
+        return false;
     }
     WriteMacAt0x40(ctx);
     WriteChipIdToEfuse(ctx);
 
     /* Set chip revision to 1.0 (major=1, minor=0) in eFuse.
        ESP32-C2 reads revision from EFUSE_BLOCK2_ADDR + 4 (offset 0x44):
-         major = bits[21:20] = byte 0x46 bits[5:4]
-         minor = bits[19:16] = byte 0x46 bits[3:0]
+         major = bits[21:20] = uint8_t 0x46 bits[5:4]
+         minor = bits[19:16] = uint8_t 0x46 bits[3:0]
        Revision 0 (ECO0) causes esptool to disable the stub flasher. */
     ctx->efuse[0x46] |= 0x10; /* major=1, minor=0 */
 
@@ -377,23 +377,23 @@ static BOOL InitEsp32C2(CHIP_CTX *ctx)
     ctx->efuse_conf_ofs = 0x8C; /* EFUSE_CONF_REG */
     ctx->efuse_cmd_ofs = 0x94;  /* EFUSE_CMD_REG */
 
-    return TRUE;
+    return true;
 }
 
 /*
  * InitEsp32C3 - Initialize ESP32-C3 chip context
  */
-static BOOL InitEsp32C3(CHIP_CTX *ctx)
+static bool InitEsp32C3(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32C3)) {
-        return FALSE;
+        return false;
     }
     WriteMacAt0x44(ctx);
     WriteChipIdToEfuse(ctx);
 
     /* Set chip revision to 1.0 in eFuse.
        ESP32-C3: EFUSE_BLOCK1_ADDR = 0x60008844
-       major at word5 (BLOCK1 + 20) bits[25:24] = byte 0x5B bits[1:0] */
+       major at word5 (BLOCK1 + 20) bits[25:24] = uint8_t 0x5B bits[1:0] */
     ctx->efuse[0x5B] |= 0x01; /* major=1, bits[25:24] = 01 */
 
     /* eFuse controller register offsets (from EFUSE_BASE 0x60008800) */
@@ -401,16 +401,16 @@ static BOOL InitEsp32C3(CHIP_CTX *ctx)
     ctx->efuse_conf_ofs = 0x1CC; /* EFUSE_CONF_REG */
     ctx->efuse_cmd_ofs = 0x1D4;  /* EFUSE_CMD_REG */
 
-    return TRUE;
+    return true;
 }
 
 /*
  * InitEsp32C6 - Initialize ESP32-C6 chip context
  */
-static BOOL InitEsp32C6(CHIP_CTX *ctx)
+static bool InitEsp32C6(CHIP_CTX *ctx)
 {
     if (!InitChipCommon(ctx, CHIP_ESP32C6)) {
-        return FALSE;
+        return false;
     }
     WriteMacAt0x44(ctx);
     WriteChipIdToEfuse(ctx);
@@ -423,7 +423,7 @@ static BOOL InitEsp32C6(CHIP_CTX *ctx)
     ctx->efuse_conf_ofs = 0x1CC; /* EFUSE_CONF_REG (same as C3) */
     ctx->efuse_cmd_ofs = 0x1D4;  /* EFUSE_CMD_REG (same as C3) */
 
-    return TRUE;
+    return true;
 }
 
 /*
@@ -435,10 +435,10 @@ static BOOL InitEsp32C6(CHIP_CTX *ctx)
  * @ctx:  Pointer to chip context to initialize
  * @type: Chip type enum (CHIP_ESP8266, CHIP_ESP32, etc.)
  *
- * Returns TRUE on success, FALSE on failure (memory allocation error).
+ * Returns true on success, false on failure (memory allocation error).
  * On failure, any allocated resources are automatically freed.
  */
-BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
+bool Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
 {
     memset(ctx, 0, sizeof(CHIP_CTX));
     ctx->type = type;
@@ -514,7 +514,7 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
         break;
     default:
         EsptoolHal_LogD(TAG, "Unknown chip type: %d", type);
-        return FALSE;
+        return false;
     }
 
     /* Set default flash size and ID */
@@ -528,11 +528,11 @@ BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type)
                 "SPI_W0: 0x%02X",
                 ctx->name, ctx->efuse_size, ctx->flash_size / 1024,
                 ctx->spi_reg_base, ctx->spi_offs->w0);
-    return TRUE;
+    return true;
 
 fail:
     Chip_Close(ctx);
-    return FALSE;
+    return false;
 }
 
 /*
@@ -563,16 +563,16 @@ const char *Chip_GetName(const CHIP_CTX *ctx) { return ctx->name; }
  * correct eFuse offset based on chip type.
  *
  * @ctx: Pointer to chip context
- * @mac: 6-byte MAC address array
+ * @mac: 6-uint8_t MAC address array
  *
- * Returns TRUE on success.
+ * Returns true on success.
  */
-BOOL Chip_SetMac(CHIP_CTX *ctx, const BYTE mac[6])
+bool Chip_SetMac(CHIP_CTX *ctx, const uint8_t mac[6])
 {
     memcpy(ctx->mac, mac, 6);
 
     if (!ctx->efuse) {
-        return TRUE;
+        return true;
     }
 
     /* Update MAC in eFuse at the correct offset for each chip type */
@@ -596,15 +596,15 @@ BOOL Chip_SetMac(CHIP_CTX *ctx, const BYTE mac[6])
         break;
     }
 
-    return TRUE;
+    return true;
 }
 
 /*
  * Chip_GetMac - Get MAC address
  *
- * Returns pointer to 6-byte MAC address array.
+ * Returns pointer to 6-uint8_t MAC address array.
  */
-const BYTE *Chip_GetMac(const CHIP_CTX *ctx) { return ctx->mac; }
+const uint8_t *Chip_GetMac(const CHIP_CTX *ctx) { return ctx->mac; }
 
 /*
  * Chip_ReadReg - Read register value
@@ -631,36 +631,36 @@ const BYTE *Chip_GetMac(const CHIP_CTX *ctx) { return ctx->mac; }
  * @addr:   Register address to read
  * @result: Pointer to receive 32-bit value (set on success only)
  *
- * Returns TRUE if address is in range and read succeeds, FALSE otherwise.
+ * Returns true if address is in range and read succeeds, false otherwise.
  */
-static BOOL TryReadEfuse32(const CHIP_CTX *ctx, DWORD base, DWORD size,
-                           DWORD addr, DWORD *result)
+static bool TryReadEfuse32(const CHIP_CTX *ctx, uint32_t base, uint32_t size,
+                           uint32_t addr, uint32_t *result)
 {
     if (addr < base || addr >= base + size) {
-        return FALSE;
+        return false;
     }
     int offset = (int)(addr - base);
     if (!ctx->efuse || offset + 3 >= ctx->efuse_size) {
-        return FALSE;
+        return false;
     }
-    *result = ctx->efuse[offset] | ((DWORD)ctx->efuse[offset + 1] << 8) |
-              ((DWORD)ctx->efuse[offset + 2] << 16) |
-              ((DWORD)ctx->efuse[offset + 3] << 24);
-    return TRUE;
+    *result = ctx->efuse[offset] | ((uint32_t)ctx->efuse[offset + 1] << 8) |
+              ((uint32_t)ctx->efuse[offset + 2] << 16) |
+              ((uint32_t)ctx->efuse[offset + 3] << 24);
+    return true;
 }
 
-DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
+uint32_t Chip_ReadReg(const CHIP_CTX *ctx, uint32_t addr)
 {
-    DWORD val;
+    uint32_t val;
 
     /* 1. eFuse read (using cached base address) */
     if (ctx->efuse_base != 0) {
-        if (TryReadEfuse32(ctx, ctx->efuse_base, (DWORD)ctx->efuse_size, addr,
+        if (TryReadEfuse32(ctx, ctx->efuse_base, (uint32_t)ctx->efuse_size, addr,
                            &val))
             return val;
         /* ESP32 special: EFUSE_BASE (0x3FF00000) is also valid access path */
         if (ctx->type == CHIP_ESP32) {
-            if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32, (DWORD)ctx->efuse_size,
+            if (TryReadEfuse32(ctx, EFUSE_BASE_ESP32, (uint32_t)ctx->efuse_size,
                                addr, &val))
                 return val;
         }
@@ -684,7 +684,7 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
     /* 4. UART clock divider register */
     if (addr == UART_CLKDIV_REG_ESP8266 || addr == UART_CLKDIV_REG_ESP32 ||
         addr == UART_CLKDIV_REG_ESP32S2) {
-        DWORD xtal;
+        uint32_t xtal;
         if (ctx->type == CHIP_ESP32C3 || ctx->type == CHIP_ESP32C6 ||
             ctx->type == CHIP_ESP32S2 || ctx->type == CHIP_ESP32S3) {
             xtal = 40000000;
@@ -732,9 +732,9 @@ DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr)
  * @addr: Register address to write
  * @val: 32-bit value to write
  *
- * Returns TRUE on success.
+ * Returns true on success.
  */
-BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
+bool Chip_WriteReg(CHIP_CTX *ctx, uint32_t addr, uint32_t val)
 {
     /* 1. eFuse controller write (EFUSE_RD_REG_BASE range) */
     if (ctx->efuse_base != 0 && ctx->efuse_conf_ofs != 0 &&
@@ -767,8 +767,8 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
             ctx->spi_regs[idx] = val;
 
             if (offset == SPI_CMD_OFFS && (val & SPI_CMD_USR)) {
-                DWORD usr2 = ctx->spi_regs[ctx->spi_offs->usr2 / 4];
-                DWORD cmd = usr2 & 0xFFFF;
+                uint32_t usr2 = ctx->spi_regs[ctx->spi_offs->usr2 / 4];
+                uint32_t cmd = usr2 & 0xFFFF;
 
                 if (cmd == SPIFLASH_RDID) {
                     ctx->spi_regs[ctx->spi_offs->w0 / 4] = ctx->flash_id;
@@ -779,10 +779,10 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
                 ctx->spi_regs[SPI_CMD_OFFS / 4] &= ~SPI_CMD_USR;
             }
         }
-        return TRUE;
+        return true;
     }
 
-    return TRUE;
+    return true;
 }
 
 /*
@@ -791,22 +791,22 @@ BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val)
  * Updates the flash size and calculates the JEDEC flash ID based on
  * the new size. The flash ID format is 0xCCDDMM where:
  *   MM = Manufacturer ID (default: Winbond 0xEF)
- *   DD = Device ID high byte (0x40)
+ *   DD = Device ID high uint8_t (0x40)
  *   CC = Capacity identifier (e.g. 0x16 for 4MB)
  *
  * @ctx:  Pointer to chip context
  * @size: Flash size in bytes (e.g. 4*1024*1024 for 4MB)
  */
-void Chip_SetFlashSize(CHIP_CTX *ctx, DWORD size)
+void Chip_SetFlashSize(CHIP_CTX *ctx, uint32_t size)
 {
     ctx->flash_size = size;
 
-    /* Update flash_id capacity byte based on size.
+    /* Update flash_id capacity uint8_t based on size.
        Flash ID format: 0xCCDDMM
          MM = Manufacturer ID
-         DD = Device ID high byte (0x40)
+         DD = Device ID high uint8_t (0x40)
          CC = Capacity identifier */
-    BYTE cap_id;
+    uint8_t cap_id;
     switch (size) {
     case 256 * 1024:
         cap_id = 0x12;
@@ -844,32 +844,32 @@ void Chip_SetFlashSize(CHIP_CTX *ctx, DWORD size)
          0x20 = XMC
          0xC2 = Macronix
          0xE0 = Espressif */
-    ctx->flash_id = ((DWORD)cap_id << 16) | 0x40EF;
+    ctx->flash_id = ((uint32_t)cap_id << 16) | 0x40EF;
 }
 
 /*
  * Chip_GetFlashSize - Get flash size in bytes
  */
-DWORD Chip_GetFlashSize(const CHIP_CTX *ctx) { return ctx->flash_size; }
+uint32_t Chip_GetFlashSize(const CHIP_CTX *ctx) { return ctx->flash_size; }
 
 /*
  * Chip_GetChipId - Get chip ID register value
  *
  * Returns the chip ID used for autodetection (e.g. 0x00F01D83 for ESP32).
  */
-DWORD Chip_GetChipId(const CHIP_CTX *ctx) { return ctx->chip_id; }
+uint32_t Chip_GetChipId(const CHIP_CTX *ctx) { return ctx->chip_id; }
 
 /*
  * Chip_GetEfuse - Get pointer to eFuse data
  *
- * Returns pointer to eFuse byte array, or NULL if not allocated.
+ * Returns pointer to eFuse uint8_t array, or NULL if not allocated.
  */
-const BYTE *Chip_GetEfuse(const CHIP_CTX *ctx) { return ctx->efuse; }
+const uint8_t *Chip_GetEfuse(const CHIP_CTX *ctx) { return ctx->efuse; }
 
 /*
  * Chip_GetEfuseMut - Get mutable pointer to eFuse data
  */
-BYTE *Chip_GetEfuseMut(CHIP_CTX *ctx) { return ctx->efuse; }
+uint8_t *Chip_GetEfuseMut(CHIP_CTX *ctx) { return ctx->efuse; }
 
 /*
  * Chip_GetEfuseSize - Get eFuse size in bytes
@@ -882,7 +882,7 @@ int Chip_GetEfuseSize(const CHIP_CTX *ctx) { return ctx->efuse_size; }
  * Returns the baud rate used for ROM bootloader boot messages.
  * ESP8266 and ESP32-C2 (26MHz XTAL) use 74880, others use 115200.
  */
-DWORD Chip_GetBootBaudRate(const CHIP_CTX *ctx)
+uint32_t Chip_GetBootBaudRate(const CHIP_CTX *ctx)
 {
     if (ctx->type == CHIP_ESP8266) {
         return 74880;
@@ -894,7 +894,7 @@ DWORD Chip_GetBootBaudRate(const CHIP_CTX *ctx)
 }
 
 /* Convert reset cause code to string */
-static const char *ResetCauseStr(BYTE cause)
+static const char *ResetCauseStr(uint8_t cause)
 {
     switch (cause) {
     case 0x01:
@@ -920,7 +920,7 @@ static const char *ResetCauseStr(BYTE cause)
  * Normal boot messages include SPI config and segment loading info.
  *
  * @ctx:           Pointer to chip context
- * @download_mode: TRUE for download mode entry, FALSE for normal flash boot
+ * @download_mode: true for download mode entry, false for normal flash boot
  * @reset_cause:   Reset cause code (0x01=POWERON, 0x02=EXT, 0x03=WDT)
  * @buf:           Output buffer for message
  * @buf_size:      Size of output buffer
@@ -928,8 +928,8 @@ static const char *ResetCauseStr(BYTE cause)
  * Returns pointer to buf containing multi-line ASCII string
  * with \r\n line endings, or empty string if buffer is too small.
  */
-const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode,
-                                BYTE reset_cause, char *buf, size_t buf_size)
+const char *Chip_GetBootMessage(const CHIP_CTX *ctx, bool download_mode,
+                                uint8_t reset_cause, char *buf, size_t buf_size)
 {
     const char *rst = ResetCauseStr(reset_cause);
 

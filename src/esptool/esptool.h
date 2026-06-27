@@ -10,15 +10,6 @@
 #include "chip.h"
 #include "flash.h"
 #include "slip.h"
-#include <windows.h>
-
-/* WM_SERIAL_TX - Serial data transmitted notification
- * Primary definition in main.h. This is a fallback definition.
- * wParam: bytes sent, lParam: pointer to sent data (HeapAlloc'd, receiver
- * frees) */
-#ifndef WM_SERIAL_TX
-#define WM_SERIAL_TX (WM_USER + 2)
-#endif
 
 /* Packet direction */
 #define ESP_DIR_REQUEST 0x00
@@ -95,7 +86,7 @@ typedef enum {
 /* SYNC response count (real device sends 8 identical responses) */
 #define ESP_SYNC_RESPONSE_COUNT 8
 
-/* Maximum data payload size in ESP_PACKET (SLIP_MAX_FRAME minus 8-byte packet
+/* Maximum data payload size in ESP_PACKET (SLIP_MAX_FRAME minus 8-uint8_t packet
  * header: dir+cmd+size+value) */
 #define ESP_PACKET_DATA_MAX (SLIP_MAX_FRAME - 8)
 
@@ -106,26 +97,14 @@ typedef enum {
 #define ESP_FLASH_BLOCK_SIZE 0x1000
 #define ESP_FLASH_ERASE_SIZE 0x10000
 
-/* Callback type for device modification notification */
-typedef void (*ESP_MODIFIED_CB)(void);
-
-/* Callback type for writing data to serial port */
-typedef DWORD (*ESP_WRITE_CB)(const BYTE *data, DWORD len);
-
-/* Callback type for changing baud rate */
-typedef BOOL (*ESP_BAUDRATE_CB)(DWORD baudRate);
-
 /* ESP protocol packet */
 typedef struct {
-    BYTE direction;                 /* Request (0x00) or Response (0x01) */
-    BYTE command;                   /* Command code */
-    WORD size;                      /* Data payload size */
-    DWORD value;                    /* Command-specific value */
-    BYTE data[ESP_PACKET_DATA_MAX]; /* Data payload */
+    uint8_t direction;                 /* Request (0x00) or Response (0x01) */
+    uint8_t command;                   /* Command code */
+    uint16_t size;                      /* Data payload size */
+    uint32_t value;                    /* Command-specific value */
+    uint8_t data[ESP_PACKET_DATA_MAX]; /* Data payload */
 } ESP_PACKET;
-
-/* Forward declaration */
-typedef struct DEVICE_CTX_TAG DEVICE_CTX;
 
 /* ESP protocol context */
 typedef struct {
@@ -134,25 +113,21 @@ typedef struct {
     FLASH_CTX *flash; /* Pointer to device flash (not owned) */
     ESP_PACKET pkt;   /* Pre-allocated packet buffer (avoids stack overflow) */
     ESP_STATE state;  /* Protocol state machine */
-    BOOL synced;      /* SYNC handshake completed */
-    BOOL stub_mode;   /* Stub is running (OHAI received) */
-    HWND hNotify;     /* Window for UI notifications */
-    ESP_MODIFIED_CB onModified;    /* Device modification callback */
-    ESP_WRITE_CB onWrite;          /* Serial write callback */
-    ESP_BAUDRATE_CB onBaudRate;    /* Baud rate change callback */
-    DWORD flash_offset;            /* Current flash write offset */
-    DWORD flash_seq;               /* Current flash write sequence */
-    DWORD last_read_val;           /* Cached value from last READ_REG */
-    DWORD flash_uncompressed_size; /* Uncompressed size for DEFLATE */
-    BYTE *defl_buf;                /* Compressed data accumulation buffer */
-    DWORD defl_buf_size;           /* Current accumulated data size */
-    DWORD defl_buf_cap;   /* Buffer capacity (flash_uncompressed_size) */
-    DWORD defl_offset;    /* Flash offset for current deflate session */
-    DWORD defl_unc_size;  /* Uncompressed size for current deflate session */
-    BOOL flash_encrypted; /* Current flash session uses encryption (encrypted=1)
+    bool synced;      /* SYNC handshake completed */
+    bool stub_mode;   /* Stub is running (OHAI received) */
+    uint32_t flash_offset;            /* Current flash write offset */
+    uint32_t flash_seq;               /* Current flash write sequence */
+    uint32_t last_read_val;           /* Cached value from last READ_REG */
+    uint32_t flash_uncompressed_size; /* Uncompressed size for DEFLATE */
+    uint8_t *defl_buf;                /* Compressed data accumulation buffer */
+    uint32_t defl_buf_size;           /* Current accumulated data size */
+    uint32_t defl_buf_cap;   /* Buffer capacity (flash_uncompressed_size) */
+    uint32_t defl_offset;    /* Flash offset for current deflate session */
+    uint32_t defl_unc_size;  /* Uncompressed size for current deflate session */
+    bool flash_encrypted; /* Current flash session uses encryption (encrypted=1)
                            */
-    BYTE *decomp_buf;     /* Persistent decompression buffer */
-    DWORD decomp_buf_cap; /* Decompression buffer capacity */
+    uint8_t *decomp_buf;     /* Persistent decompression buffer */
+    uint32_t decomp_buf_cap; /* Decompression buffer capacity */
 } ESPTOOL_CTX;
 
 /*
@@ -171,40 +146,20 @@ void Esptool_Close(ESPTOOL_CTX *ctx);
 void Esptool_ResetState(ESPTOOL_CTX *ctx);
 
 /*
- * Esptool_SetNotify - Set notification window for TX data
- */
-void Esptool_SetNotify(ESPTOOL_CTX *ctx, HWND hNotify);
-
-/*
- * Esptool_SetModifiedCallback - Set callback for device modification
- */
-void Esptool_SetModifiedCallback(ESPTOOL_CTX *ctx, ESP_MODIFIED_CB cb);
-
-/*
- * Esptool_SetWriteCallback - Set write callback for sending data to serial port
- */
-void Esptool_SetWriteCallback(ESPTOOL_CTX *ctx, ESP_WRITE_CB cb);
-
-/*
- * Esptool_SetBaudRateCallback - Set baud rate change callback
- */
-void Esptool_SetBaudRateCallback(ESPTOOL_CTX *ctx, ESP_BAUDRATE_CB cb);
-
-/*
  * Esptool_Feed - Feed raw serial data to protocol decoder
  */
-BOOL Esptool_Feed(ESPTOOL_CTX *ctx, const BYTE *data, int len);
+bool Esptool_Feed(ESPTOOL_CTX *ctx, const uint8_t *data, int len);
 
 /*
  * Esptool_ProcessFrame - Process a complete SLIP frame
  */
-BOOL Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const BYTE *frame, int frame_len);
+bool Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const uint8_t *frame, int frame_len);
 
 /*
  * Esptool_SendResponse - Send response packet with status in data
  */
-void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val,
-                          DWORD status, const BYTE *data, WORD data_len);
+void Esptool_SendResponse(ESPTOOL_CTX *ctx, uint8_t cmd, uint32_t req_val,
+                          uint32_t status, const uint8_t *data, uint16_t data_len);
 
 /*
  * Esptool_SendResponseEx - Send response packet with configurable status length
@@ -217,13 +172,13 @@ void Esptool_SendResponse(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val,
  * @data:       Optional data payload (can be NULL if data_len=0)
  * @data_len:   Data payload length in bytes
  */
-void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, BYTE cmd, DWORD req_val,
-                            DWORD status, BYTE status_len, const BYTE *data,
-                            WORD data_len);
+void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, uint8_t cmd, uint32_t req_val,
+                            uint32_t status, uint8_t status_len, const uint8_t *data,
+                            uint16_t data_len);
 
 /*
  * Esptool_CalcChecksum - Calculate XOR checksum
  */
-BYTE Esptool_CalcChecksum(const BYTE *data, int len);
+uint8_t Esptool_CalcChecksum(const uint8_t *data, int len);
 
 #endif

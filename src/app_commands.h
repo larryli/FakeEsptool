@@ -15,7 +15,6 @@
 
 /* Global state (defined in main.c) */
 extern HWND g_hEdit;
-extern DEVICE_CTX g_device;
 extern ESPTOOL_CTX g_esptool;
 extern SERIAL_CTX g_serial;
 extern WCHAR g_szPort[32];

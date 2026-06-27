@@ -19,44 +19,44 @@ static const char *TAG = "SLIP";
 void Slip_Init(SLIP_CTX *ctx)
 {
     ctx->len = 0;
-    ctx->in_frame = FALSE;
-    ctx->escaped = FALSE;
+    ctx->in_frame = false;
+    ctx->escaped = false;
 }
 
 /*
- * Slip_PutByte - Feed a byte to the decoder
+ * Slip_PutByte - Feed a uint8_t to the decoder
  *
- * Processes one byte of SLIP-encoded data. Handles frame delimiters (0xC0)
+ * Processes one uint8_t of SLIP-encoded data. Handles frame delimiters (0xC0)
  * and escape sequences (0xDB 0xDC, 0xDB 0xDD).
  *
  * @ctx: Pointer to SLIP context
- * @b:   Byte to process
+ * @b:   uint8_t to process
  *
- * Returns TRUE when a complete frame has been received.
+ * Returns true when a complete frame has been received.
  */
-BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b)
+bool Slip_PutByte(SLIP_CTX *ctx, uint8_t b)
 {
     if (b == SLIP_END) {
         if (ctx->in_frame && ctx->len > 0) {
-            ctx->in_frame = FALSE;
-            return TRUE;
+            ctx->in_frame = false;
+            return true;
         }
         ctx->len = 0;
-        ctx->in_frame = TRUE;
-        ctx->escaped = FALSE;
-        return FALSE;
+        ctx->in_frame = true;
+        ctx->escaped = false;
+        return false;
     }
 
     if (!ctx->in_frame) {
-        return FALSE;
+        return false;
     }
 
     if (ctx->escaped) {
         if (ctx->len >= SLIP_MAX_FRAME) {
             EsptoolHal_LogD(TAG, "Frame overflow");
-            ctx->in_frame = FALSE;
+            ctx->in_frame = false;
             ctx->len = 0;
-            return FALSE;
+            return false;
         }
         switch (b) {
         case SLIP_ESC_END:
@@ -67,32 +67,32 @@ BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b)
             break;
         default:
             EsptoolHal_LogD(TAG, "Invalid escape: 0x%02X", b);
-            ctx->in_frame = FALSE;
+            ctx->in_frame = false;
             ctx->len = 0;
-            return FALSE;
+            return false;
         }
-        ctx->escaped = FALSE;
+        ctx->escaped = false;
     } else if (b == SLIP_ESC) {
-        ctx->escaped = TRUE;
+        ctx->escaped = true;
     } else {
         if (ctx->len >= SLIP_MAX_FRAME) {
             EsptoolHal_LogD(TAG, "Frame overflow");
-            ctx->in_frame = FALSE;
+            ctx->in_frame = false;
             ctx->len = 0;
-            return FALSE;
+            return false;
         }
         ctx->buf[ctx->len++] = b;
     }
 
-    return FALSE;
+    return false;
 }
 
 /*
  * Slip_IsComplete - Check if a complete frame has been received
  *
- * Returns TRUE if decoder has a complete frame ready for processing.
+ * Returns true if decoder has a complete frame ready for processing.
  */
-BOOL Slip_IsComplete(const SLIP_CTX *ctx)
+bool Slip_IsComplete(const SLIP_CTX *ctx)
 {
     return !ctx->in_frame && ctx->len > 0;
 }
@@ -102,7 +102,7 @@ BOOL Slip_IsComplete(const SLIP_CTX *ctx)
  *
  * Returns pointer to internal buffer containing decoded frame data.
  */
-const BYTE *Slip_GetPayload(const SLIP_CTX *ctx) { return ctx->buf; }
+const uint8_t *Slip_GetPayload(const SLIP_CTX *ctx) { return ctx->buf; }
 
 /*
  * Slip_GetLength - Get decoded frame length
@@ -119,8 +119,8 @@ int Slip_GetLength(const SLIP_CTX *ctx) { return ctx->len; }
 void Slip_Reset(SLIP_CTX *ctx)
 {
     ctx->len = 0;
-    ctx->in_frame = FALSE;
-    ctx->escaped = FALSE;
+    ctx->in_frame = false;
+    ctx->escaped = false;
 }
 
 /*
@@ -135,7 +135,7 @@ void Slip_Reset(SLIP_CTX *ctx)
  *
  * Returns encoded frame length, or 0 on error (buffer too small).
  */
-int Slip_Encode(const BYTE *data, int len, BYTE *out, int out_max)
+int Slip_Encode(const uint8_t *data, int len, uint8_t *out, int out_max)
 {
     int pos = 0;
 

@@ -7,7 +7,8 @@
 #ifndef ESP_CHIP_H
 #define ESP_CHIP_H
 
-#include <windows.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include "efuse.h"
 
 /* Maximum chip name length */
@@ -423,12 +424,12 @@
    | SPI_MOSI_DLEN | 0x24              | 0x28  | N/A     |
    | SPI_MISO_DLEN | 0x28              | 0x2C  | N/A     | */
 typedef struct {
-    BYTE usr;       /* SPI_USR offset */
-    BYTE usr1;      /* SPI_USR1 offset */
-    BYTE usr2;      /* SPI_USR2 offset */
-    BYTE w0;        /* SPI_W0 offset */
-    BYTE mosi_dlen; /* SPI_MOSI_DLEN offset (0 if not supported) */
-    BYTE miso_dlen; /* SPI_MISO_DLEN offset (0 if not supported) */
+    uint8_t usr;       /* SPI_USR offset */
+    uint8_t usr1;      /* SPI_USR1 offset */
+    uint8_t usr2;      /* SPI_USR2 offset */
+    uint8_t w0;        /* SPI_W0 offset */
+    uint8_t mosi_dlen; /* SPI_MOSI_DLEN offset (0 if not supported) */
+    uint8_t miso_dlen; /* SPI_MISO_DLEN offset (0 if not supported) */
 } SPI_OFFSETS;
 
 /* SPI register bit definitions */
@@ -459,41 +460,41 @@ typedef struct CHIP_CTX_TAG {
     CHIP_TYPE type;           /* Chip type */
     char name[CHIP_NAME_MAX]; /* Chip name string */
 
-    BYTE mac[6]; /* MAC address */
+    uint8_t mac[6]; /* MAC address */
 
-    BYTE *efuse;    /* eFuse data (dynamically allocated) */
+    uint8_t *efuse;    /* eFuse data (dynamically allocated) */
     int efuse_size; /* eFuse size in bytes */
 
-    DWORD flash_size; /* Flash size in bytes */
-    DWORD flash_id;   /* Flash JEDEC ID */
-    BYTE xtal_freq;   /* Crystal frequency */
+    uint32_t flash_size; /* Flash size in bytes */
+    uint32_t flash_id;   /* Flash JEDEC ID */
+    uint8_t xtal_freq;   /* Crystal frequency */
 
-    DWORD sector_size; /* Flash sector size */
-    DWORD block_size;  /* Flash block size */
-    DWORD page_size;   /* Flash page size */
+    uint32_t sector_size; /* Flash sector size */
+    uint32_t block_size;  /* Flash block size */
+    uint32_t page_size;   /* Flash page size */
 
-    DWORD chip_id; /* Chip ID register value (magic value for READ_REG) */
-    DWORD security_chip_id; /* IMAGE_CHIP_ID for GET_SECURITY_INFO */
-    DWORD pkg_version;      /* Package version */
-    BOOL has_usb;           /* USB support flag */
+    uint32_t chip_id; /* Chip ID register value (magic value for READ_REG) */
+    uint32_t security_chip_id; /* IMAGE_CHIP_ID for GET_SECURITY_INFO */
+    uint32_t pkg_version;      /* Package version */
+    bool has_usb;           /* USB support flag */
 
-    DWORD spi_reg_base;          /* SPI register base address */
+    uint32_t spi_reg_base;          /* SPI register base address */
     const SPI_OFFSETS *spi_offs; /* SPI register offsets for this chip family */
-    DWORD spi_regs[SPI_REG_COUNT]; /* SPI register file */
+    uint32_t spi_regs[SPI_REG_COUNT]; /* SPI register file */
 
     /* eFuse controller simulation */
-    DWORD efuse_base;   /* eFuse base address for this chip */
-    DWORD pgm_data[32]; /* PGM_DATA staging area for burn (ESP32: 4 blocks × 8
+    uint32_t efuse_base;   /* eFuse base address for this chip */
+    uint32_t pgm_data[32]; /* PGM_DATA staging area for burn (ESP32: 4 blocks × 8
                            words) */
-    DWORD efuse_conf_ofs; /* CONF_REG offset from efuse_base (0 = no controller)
+    uint32_t efuse_conf_ofs; /* CONF_REG offset from efuse_base (0 = no controller)
                            */
-    DWORD efuse_cmd_ofs;  /* CMD_REG offset from efuse_base */
+    uint32_t efuse_cmd_ofs;  /* CMD_REG offset from efuse_base */
 } CHIP_CTX;
 
 /*
  * Chip_Init - Initialize chip context with type-specific defaults
  */
-BOOL Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type);
+bool Chip_Init(CHIP_CTX *ctx, CHIP_TYPE type);
 
 /*
  * Chip_Close - Release chip resources (free eFuse memory)
@@ -508,52 +509,52 @@ const char *Chip_GetName(const CHIP_CTX *ctx);
 /*
  * Chip_SetMac - Set MAC address
  */
-BOOL Chip_SetMac(CHIP_CTX *ctx, const BYTE mac[6]);
+bool Chip_SetMac(CHIP_CTX *ctx, const uint8_t mac[6]);
 
 /*
  * Chip_GetMac - Get MAC address
  */
-const BYTE *Chip_GetMac(const CHIP_CTX *ctx);
+const uint8_t *Chip_GetMac(const CHIP_CTX *ctx);
 
 /*
  * Chip_ReadReg - Read register value (supports eFuse address range)
  */
-DWORD Chip_ReadReg(const CHIP_CTX *ctx, DWORD addr);
+uint32_t Chip_ReadReg(const CHIP_CTX *ctx, uint32_t addr);
 
 /*
  * Chip_WriteReg - Write register value (eFuse OR operation)
  */
-BOOL Chip_WriteReg(CHIP_CTX *ctx, DWORD addr, DWORD val);
+bool Chip_WriteReg(CHIP_CTX *ctx, uint32_t addr, uint32_t val);
 
 /*
  * Chip_SetFlashSize - Set flash size
  */
-void Chip_SetFlashSize(CHIP_CTX *ctx, DWORD size);
+void Chip_SetFlashSize(CHIP_CTX *ctx, uint32_t size);
 
 /*
  * Chip_GetFlashSize - Get flash size
  */
-DWORD Chip_GetFlashSize(const CHIP_CTX *ctx);
+uint32_t Chip_GetFlashSize(const CHIP_CTX *ctx);
 
 /*
  * Chip_GetChipId - Get chip ID
  */
-DWORD Chip_GetChipId(const CHIP_CTX *ctx);
+uint32_t Chip_GetChipId(const CHIP_CTX *ctx);
 
 /*
  * Chip_GetEfuse - Get pointer to eFuse data
  *
- * Returns pointer to eFuse byte array, or NULL if not allocated.
+ * Returns pointer to eFuse uint8_t array, or NULL if not allocated.
  */
-const BYTE *Chip_GetEfuse(const CHIP_CTX *ctx);
+const uint8_t *Chip_GetEfuse(const CHIP_CTX *ctx);
 
 /*
  * Chip_GetEfuseMut - Get mutable pointer to eFuse data
  *
- * Returns pointer to eFuse byte array for writing, or NULL if not allocated.
+ * Returns pointer to eFuse uint8_t array for writing, or NULL if not allocated.
  * Use with caution - eFuse is one-time-programmable in real hardware.
  */
-BYTE *Chip_GetEfuseMut(CHIP_CTX *ctx);
+uint8_t *Chip_GetEfuseMut(CHIP_CTX *ctx);
 
 /*
  * Chip_GetEfuseSize - Get eFuse size in bytes
@@ -565,24 +566,24 @@ int Chip_GetEfuseSize(const CHIP_CTX *ctx);
  *
  * Depends on chip type and crystal frequency.
  */
-DWORD Chip_GetBootBaudRate(const CHIP_CTX *ctx);
+uint32_t Chip_GetBootBaudRate(const CHIP_CTX *ctx);
 
 /*
  * Chip_GetBootMessage - Get boot message text for reset
  *
  * Writes chip-specific boot message to caller-provided buffer.
- * download_mode: TRUE for download mode entry, FALSE for normal flash boot
+ * download_mode: true for download mode entry, false for normal flash boot
  * reset_cause: 0x01=POWERON, 0x02=EXT, 0x03=WDT
  *
  * @ctx:           Pointer to chip context
- * @download_mode: TRUE for download, FALSE for normal boot
+ * @download_mode: true for download, false for normal boot
  * @reset_cause:   Reset cause code
  * @buf:           Output buffer
  * @buf_size:      Size of output buffer
  *
  * Returns pointer to buf, or empty string if buffer is too small.
  */
-const char *Chip_GetBootMessage(const CHIP_CTX *ctx, BOOL download_mode,
-                                BYTE reset_cause, char *buf, size_t buf_size);
+const char *Chip_GetBootMessage(const CHIP_CTX *ctx, bool download_mode,
+                                uint8_t reset_cause, char *buf, size_t buf_size);
 
 #endif

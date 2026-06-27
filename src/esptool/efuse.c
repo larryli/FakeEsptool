@@ -18,7 +18,7 @@ static const char *TAG = "EFUSE";
 
 /* ESP32-C3 eFuse block read-back offsets (from DR_REG_EFUSE_BASE 0x60008800)
  * Source: espefuse/efuse/esp32c3/mem_definition.py __base_rd_regs offsets */
-static const DWORD efuse_block_offsets_c3[] = {
+static const uint32_t efuse_block_offsets_c3[] = {
     0x02C, /* BLOCK0 (6 words) */
     0x044, /* BLOCK1/MAC (6 words) */
     0x05C, /* BLOCK2/SYS_DATA (8 words) */
@@ -33,7 +33,7 @@ static const DWORD efuse_block_offsets_c3[] = {
 };
 
 /* ESP32-C2 eFuse block read-back offsets (from DR_REG_EFUSE_BASE 0x60008800) */
-static const DWORD efuse_block_offsets_c2[] = {
+static const uint32_t efuse_block_offsets_c2[] = {
     0x02C, /* BLOCK0 */
     0x034, /* BLOCK1 */
     0x040, /* BLOCK2 */
@@ -42,7 +42,7 @@ static const DWORD efuse_block_offsets_c2[] = {
 
 /* ESP32-S2/S3 eFuse block read-back offsets (from EFUSE_BASE)
  * Source: espefuse/efuse/esp32s2/mem_definition.py */
-static const DWORD efuse_block_offsets_s2[] = {
+static const uint32_t efuse_block_offsets_s2[] = {
     0x02C, /* BLOCK0 (6 words) */
     0x044, /* BLOCK1/MAC (6 words) */
     0x05C, /* BLOCK2/SYS_DATA (8 words) */
@@ -58,7 +58,7 @@ static const DWORD efuse_block_offsets_s2[] = {
 
 /* ESP32 eFuse block read-back offsets (from EFUSE_RD_REG_BASE 0x3FF5A000)
  * Source: espefuse/efuse/esp32/mem_definition.py */
-static const DWORD efuse_block_offsets_esp32[] = {
+static const uint32_t efuse_block_offsets_esp32[] = {
     0x000, /* BLOCK0 (7 words) */
     0x038, /* BLOCK1/flash_encryption (8 words) */
     0x058, /* BLOCK2/secure_boot (8 words) */
@@ -66,7 +66,7 @@ static const DWORD efuse_block_offsets_esp32[] = {
 };
 
 /* ESP32 eFuse block lengths in words */
-static const BYTE efuse_block_lengths_esp32[] = {
+static const uint8_t efuse_block_lengths_esp32[] = {
     7, /* BLOCK0 */
     8, /* BLOCK1 */
     8, /* BLOCK2 */
@@ -74,7 +74,7 @@ static const BYTE efuse_block_lengths_esp32[] = {
 };
 
 /* ESP32 eFuse block write offsets (from EFUSE_RD_REG_BASE 0x3FF5A000) */
-static const DWORD efuse_block_wr_offsets_esp32[] = {
+static const uint32_t efuse_block_wr_offsets_esp32[] = {
     0x01C, /* BLOCK0 write */
     0x098, /* BLOCK1 write */
     0x0B8, /* BLOCK2 write */
@@ -84,19 +84,19 @@ static const DWORD efuse_block_wr_offsets_esp32[] = {
 /*
  * EfuseWrite32 - Write 32-bit value to eFuse with OR operation
  */
-static void EfuseWrite32(CHIP_CTX *ctx, int offset, DWORD val)
+static void EfuseWrite32(CHIP_CTX *ctx, int offset, uint32_t val)
 {
     if (offset + 3 < ctx->efuse_size) {
 #ifdef ENABLE_TRACE_PROTO
-        BYTE b0 = ctx->efuse[offset];
-        BYTE b1 = ctx->efuse[offset + 1];
-        BYTE b2 = ctx->efuse[offset + 2];
-        BYTE b3 = ctx->efuse[offset + 3];
+        uint8_t b0 = ctx->efuse[offset];
+        uint8_t b1 = ctx->efuse[offset + 1];
+        uint8_t b2 = ctx->efuse[offset + 2];
+        uint8_t b3 = ctx->efuse[offset + 3];
 #endif
-        ctx->efuse[offset] |= (BYTE)(val & 0xFF);
-        ctx->efuse[offset + 1] |= (BYTE)((val >> 8) & 0xFF);
-        ctx->efuse[offset + 2] |= (BYTE)((val >> 16) & 0xFF);
-        ctx->efuse[offset + 3] |= (BYTE)((val >> 24) & 0xFF);
+        ctx->efuse[offset] |= (uint8_t)(val & 0xFF);
+        ctx->efuse[offset + 1] |= (uint8_t)((val >> 8) & 0xFF);
+        ctx->efuse[offset + 2] |= (uint8_t)((val >> 16) & 0xFF);
+        ctx->efuse[offset + 3] |= (uint8_t)((val >> 24) & 0xFF);
         EsptoolHal_LogD(TAG,
                     "eFuse write: offset=0x%X val=0x%08lX "
                     "before=%02X%02X%02X%02X after=%02X%02X%02X%02X",
@@ -109,7 +109,7 @@ static void EfuseWrite32(CHIP_CTX *ctx, int offset, DWORD val)
 /*
  * Chip_WriteRegEsp32 - Handle ESP32 eFuse controller write
  */
-BOOL Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, DWORD val)
+bool Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, uint32_t val)
 {
     int num_blocks = (int)(sizeof(efuse_block_wr_offsets_esp32) /
                            sizeof(efuse_block_wr_offsets_esp32[0]));
@@ -124,14 +124,14 @@ BOOL Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, DWORD val)
                 EsptoolHal_LogD(TAG, "ESP32 BLOCK%d PGM_DATA%d = 0x%08lX", blk,
                             word_idx, val);
             }
-            return TRUE;
+            return true;
         }
     }
 
     /* CONF_REG */
     if (offset == (int)ctx->efuse_conf_ofs) {
         EsptoolHal_LogD(TAG, "EFUSE_CONF = 0x%08lX", val);
-        return TRUE;
+        return true;
     }
 
     /* CMD_REG */
@@ -142,11 +142,11 @@ BOOL Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, DWORD val)
             for (int blk = 0; blk < num_blocks; blk++) {
                 int block_offset = (int)efuse_block_offsets_esp32[blk];
                 int block_len = (int)efuse_block_lengths_esp32[blk];
-                DWORD *blk_pgm = &ctx->pgm_data[blk * 8];
-                BOOL has_data = FALSE;
+                uint32_t *blk_pgm = &ctx->pgm_data[blk * 8];
+                bool has_data = false;
                 for (int i = 0; i < block_len; i++) {
                     if (blk_pgm[i] != 0) {
-                        has_data = TRUE;
+                        has_data = true;
                         break;
                     }
                 }
@@ -162,16 +162,16 @@ BOOL Chip_WriteRegEsp32(CHIP_CTX *ctx, int offset, DWORD val)
             }
             memset(ctx->pgm_data, 0, sizeof(ctx->pgm_data));
         }
-        return TRUE;
+        return true;
     }
 
-    return TRUE;
+    return true;
 }
 
 /*
  * Chip_WriteRegModern - Handle C2/C3/C6/S2/S3 eFuse controller write
  */
-BOOL Chip_WriteRegModern(CHIP_CTX *ctx, int offset, DWORD val)
+bool Chip_WriteRegModern(CHIP_CTX *ctx, int offset, uint32_t val)
 {
 #define EFUSE_PGM_DATA_SIZE 44
 
@@ -182,13 +182,13 @@ BOOL Chip_WriteRegModern(CHIP_CTX *ctx, int offset, DWORD val)
             ctx->pgm_data[idx] = val;
             EsptoolHal_LogD(TAG, "PGM_DATA%d = 0x%08lX", idx, val);
         }
-        return TRUE;
+        return true;
     }
 
     /* CONF_REG */
     if (offset == (int)ctx->efuse_conf_ofs) {
         EsptoolHal_LogD(TAG, "EFUSE_CONF = 0x%08lX", val);
-        return TRUE;
+        return true;
     }
 
     /* CMD_REG */
@@ -196,7 +196,7 @@ BOOL Chip_WriteRegModern(CHIP_CTX *ctx, int offset, DWORD val)
         EsptoolHal_LogD(TAG, "EFUSE_CMD = 0x%08lX", val);
         if (val & 0x02) {
             int block = (int)((val >> 2) & 0xF);
-            const DWORD *block_offsets = NULL;
+            const uint32_t *block_offsets = NULL;
             int num_blocks = 0;
 
             switch (ctx->type) {
@@ -230,31 +230,31 @@ BOOL Chip_WriteRegModern(CHIP_CTX *ctx, int offset, DWORD val)
                             block_offset);
             }
         }
-        return TRUE;
+        return true;
     }
 
 #undef EFUSE_PGM_DATA_SIZE
 
-    return TRUE;
+    return true;
 }
 
 /*
  * ReadEfuseBits - Read bits from eFuse by offset and mask
  *
  * @ctx:    Chip context
- * @offset: Byte offset within eFuse array
+ * @offset: uint8_t offset within eFuse array
  * @mask:   Bit mask to apply
  *
  * Returns the masked value shifted to LSB, or 0 if offset is out of range.
  */
-static DWORD ReadEfuseBits(const CHIP_CTX *ctx, int offset, DWORD mask)
+static uint32_t ReadEfuseBits(const CHIP_CTX *ctx, int offset, uint32_t mask)
 {
     if (!ctx->efuse || offset + 3 >= ctx->efuse_size) {
         return 0;
     }
-    DWORD val = ctx->efuse[offset] | ((DWORD)ctx->efuse[offset + 1] << 8) |
-                ((DWORD)ctx->efuse[offset + 2] << 16) |
-                ((DWORD)ctx->efuse[offset + 3] << 24);
+    uint32_t val = ctx->efuse[offset] | ((uint32_t)ctx->efuse[offset + 1] << 8) |
+                ((uint32_t)ctx->efuse[offset + 2] << 16) |
+                ((uint32_t)ctx->efuse[offset + 3] << 24);
     return val & mask;
 }
 
@@ -262,29 +262,29 @@ static DWORD ReadEfuseBits(const CHIP_CTX *ctx, int offset, DWORD mask)
  * WriteEfuseBits - Write (set) bits in eFuse by offset and mask
  *
  * @ctx:    Chip context
- * @offset: Byte offset within eFuse array
+ * @offset: uint8_t offset within eFuse array
  * @mask:   Bit mask identifying the field
  * @value:  Value to write (will be shifted to mask position)
  *
  * Performs OR-write: only sets bits, never clears.
  */
-static void WriteEfuseBits(CHIP_CTX *ctx, int offset, DWORD mask, DWORD value)
+static void WriteEfuseBits(CHIP_CTX *ctx, int offset, uint32_t mask, uint32_t value)
 {
     if (!ctx->efuse || offset + 3 >= ctx->efuse_size) {
         return;
     }
     int shift = 0;
-    DWORD m = mask;
+    uint32_t m = mask;
     while (m && !(m & 1)) {
         shift++;
         m >>= 1;
     }
-    DWORD shifted = (value << shift) & mask;
+    uint32_t shifted = (value << shift) & mask;
     for (int i = 0; i < 4; i++) {
-        DWORD byte_mask = (mask >> (i * 8)) & 0xFF;
+        uint32_t byte_mask = (mask >> (i * 8)) & 0xFF;
         if (byte_mask)
             ctx->efuse[offset + i] |=
-                (BYTE)(shifted >> (i * 8)) & (BYTE)byte_mask;
+                (uint8_t)(shifted >> (i * 8)) & (uint8_t)byte_mask;
     }
 }
 
@@ -294,15 +294,15 @@ static void WriteEfuseBits(CHIP_CTX *ctx, int offset, DWORD mask, DWORD value)
  * Used by the simulator to allow toggling eFuse state for testing.
  * Real eFuse cannot be cleared.
  */
-static void ClearEfuseBits(CHIP_CTX *ctx, int offset, DWORD mask)
+static void ClearEfuseBits(CHIP_CTX *ctx, int offset, uint32_t mask)
 {
     if (!ctx->efuse || offset + 3 >= ctx->efuse_size) {
         return;
     }
     for (int i = 0; i < 4; i++) {
-        DWORD byte_mask = (mask >> (i * 8)) & 0xFF;
+        uint32_t byte_mask = (mask >> (i * 8)) & 0xFF;
         if (byte_mask) {
-            ctx->efuse[offset + i] &= ~(BYTE)byte_mask;
+            ctx->efuse[offset + i] &= ~(uint8_t)byte_mask;
         }
     }
 }
@@ -310,7 +310,7 @@ static void ClearEfuseBits(CHIP_CTX *ctx, int offset, DWORD mask)
 /*
  * CountBits - Count number of 1-bits in a value
  */
-static int CountBits(DWORD val)
+static int CountBits(uint32_t val)
 {
     int count = 0;
     while (val) {
@@ -368,7 +368,7 @@ void Efuse_ApplyBlock0Defaults(CHIP_CTX *ctx)
  *
  * Returns raw counter value from eFuse.
  */
-DWORD Efuse_GetFlashCryptCnt(const CHIP_CTX *ctx)
+uint32_t Efuse_GetFlashCryptCnt(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
     case CHIP_ESP32:
@@ -407,11 +407,11 @@ DWORD Efuse_GetFlashCryptCnt(const CHIP_CTX *ctx)
  *
  * @ctx: Pointer to chip context (const, read-only)
  *
- * Returns TRUE if flash encryption is enabled.
+ * Returns true if flash encryption is enabled.
  */
-BOOL Efuse_IsFlashEncryptionEnabled(const CHIP_CTX *ctx)
+bool Efuse_IsFlashEncryptionEnabled(const CHIP_CTX *ctx)
 {
-    DWORD cnt = Efuse_GetFlashCryptCnt(ctx);
+    uint32_t cnt = Efuse_GetFlashCryptCnt(ctx);
     return (CountBits(cnt) & 1) != 0;
 }
 
@@ -423,9 +423,9 @@ BOOL Efuse_IsFlashEncryptionEnabled(const CHIP_CTX *ctx)
  *
  * @ctx: Pointer to chip context (const, read-only)
  *
- * Returns TRUE if download encryption is disabled.
+ * Returns true if download encryption is disabled.
  */
-BOOL Efuse_IsDownloadEncryptDisabled(const CHIP_CTX *ctx)
+bool Efuse_IsDownloadEncryptDisabled(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
     case CHIP_ESP32:
@@ -447,7 +447,7 @@ BOOL Efuse_IsDownloadEncryptDisabled(const CHIP_CTX *ctx)
         return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C6,
                              EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C6) != 0;
     default:
-        return FALSE;
+        return false;
     }
 }
 
@@ -460,15 +460,15 @@ BOOL Efuse_IsDownloadEncryptDisabled(const CHIP_CTX *ctx)
  *
  * @ctx: Pointer to chip context (const, read-only)
  *
- * Returns TRUE if download decryption is disabled.
+ * Returns true if download decryption is disabled.
  */
-BOOL Efuse_IsDownloadDecryptDisabled(const CHIP_CTX *ctx)
+bool Efuse_IsDownloadDecryptDisabled(const CHIP_CTX *ctx)
 {
     /* Only ESP32 has DISABLE_DL_DECRYPT field */
     if (ctx->type == CHIP_ESP32)
         return ReadEfuseBits(ctx, EFUSE_OFFS_DISABLE_DL_DECRYPT_ESP32,
                              EFUSE_BIT_DISABLE_DL_DECRYPT_ESP32) != 0;
-    return FALSE;
+    return false;
 }
 
 /*
@@ -478,9 +478,9 @@ BOOL Efuse_IsDownloadDecryptDisabled(const CHIP_CTX *ctx)
  *
  * @ctx: Pointer to chip context (const, read-only)
  *
- * Returns TRUE if download mode is disabled.
+ * Returns true if download mode is disabled.
  */
-BOOL Efuse_IsDownloadModeDisabled(const CHIP_CTX *ctx)
+bool Efuse_IsDownloadModeDisabled(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
     case CHIP_ESP32:
@@ -502,7 +502,7 @@ BOOL Efuse_IsDownloadModeDisabled(const CHIP_CTX *ctx)
         return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C6,
                              EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C6) != 0;
     default:
-        return FALSE;
+        return false;
     }
 }
 
@@ -513,13 +513,13 @@ BOOL Efuse_IsDownloadModeDisabled(const CHIP_CTX *ctx)
  *
  * @ctx: Pointer to chip context (const, read-only)
  *
- * Returns TRUE if secure download mode is enabled.
+ * Returns true if secure download mode is enabled.
  */
-BOOL Efuse_IsSecureDownloadEnabled(const CHIP_CTX *ctx)
+bool Efuse_IsSecureDownloadEnabled(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
     case CHIP_ESP32:
-        return FALSE; /* ESP32 does not support secure download mode */
+        return false; /* ESP32 does not support secure download mode */
     case CHIP_ESP32S2:
         return ReadEfuseBits(ctx, EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32S2,
                              EFUSE_BIT_ENABLE_SECURITY_DL_ESP32S2) != 0;
@@ -536,14 +536,14 @@ BOOL Efuse_IsSecureDownloadEnabled(const CHIP_CTX *ctx)
         return ReadEfuseBits(ctx, EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C6,
                              EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C6) != 0;
     default:
-        return FALSE;
+        return false;
     }
 }
 
 /*
  * Efuse_GetDlEncryptDisabled - Get raw eFuse value for download encrypt disabled
  */
-DWORD Efuse_GetDlEncryptDisabled(const CHIP_CTX *ctx)
+uint32_t Efuse_GetDlEncryptDisabled(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
     case CHIP_ESP32:
@@ -572,7 +572,7 @@ DWORD Efuse_GetDlEncryptDisabled(const CHIP_CTX *ctx)
 /*
  * Efuse_GetDlModeDisabled - Get raw eFuse value for download mode disabled
  */
-DWORD Efuse_GetDlModeDisabled(const CHIP_CTX *ctx)
+uint32_t Efuse_GetDlModeDisabled(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
     case CHIP_ESP32:
@@ -604,13 +604,13 @@ DWORD Efuse_GetDlModeDisabled(const CHIP_CTX *ctx)
  * ESP32: returns ABS_DONE_0 | (ABS_DONE_1 << 1).
  * Others: returns SECURE_BOOT_EN bit value.
  */
-DWORD Efuse_GetSecureBootFlag(const CHIP_CTX *ctx)
+uint32_t Efuse_GetSecureBootFlag(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
     case CHIP_ESP32: {
-        DWORD v0 = ReadEfuseBits(ctx, EFUSE_OFFS_ABS_DONE_0_ESP32,
+        uint32_t v0 = ReadEfuseBits(ctx, EFUSE_OFFS_ABS_DONE_0_ESP32,
                                  EFUSE_BIT_ABS_DONE_0_ESP32) != 0;
-        DWORD v1 = ReadEfuseBits(ctx, EFUSE_OFFS_ABS_DONE_1_ESP32,
+        uint32_t v1 = ReadEfuseBits(ctx, EFUSE_OFFS_ABS_DONE_1_ESP32,
                                  EFUSE_BIT_ABS_DONE_1_ESP32) != 0;
         return v0 | (v1 << 1);
     }
@@ -634,7 +634,7 @@ DWORD Efuse_GetSecureBootFlag(const CHIP_CTX *ctx)
 /*
  * Efuse_GetJtagFlag - Get raw eFuse value for JTAG disable
  */
-DWORD Efuse_GetJtagFlag(const CHIP_CTX *ctx)
+uint32_t Efuse_GetJtagFlag(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
     case CHIP_ESP32:
@@ -664,13 +664,13 @@ DWORD Efuse_GetJtagFlag(const CHIP_CTX *ctx)
  * ESP32-S2/S3/C3/C6: SECURE_BOOT_EN.
  * ESP8266/C2: not supported.
  */
-BOOL Efuse_IsSecureBootEnabled(const CHIP_CTX *ctx)
+bool Efuse_IsSecureBootEnabled(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
     case CHIP_ESP32: {
-        BOOL v1 = ReadEfuseBits(ctx, EFUSE_OFFS_ABS_DONE_0_ESP32,
+        bool v1 = ReadEfuseBits(ctx, EFUSE_OFFS_ABS_DONE_0_ESP32,
                                 EFUSE_BIT_ABS_DONE_0_ESP32) != 0;
-        BOOL v2 = ReadEfuseBits(ctx, EFUSE_OFFS_ABS_DONE_1_ESP32,
+        bool v2 = ReadEfuseBits(ctx, EFUSE_OFFS_ABS_DONE_1_ESP32,
                                 EFUSE_BIT_ABS_DONE_1_ESP32) != 0;
         return v1 || v2;
     }
@@ -687,7 +687,7 @@ BOOL Efuse_IsSecureBootEnabled(const CHIP_CTX *ctx)
         return ReadEfuseBits(ctx, EFUSE_OFFS_SECURE_BOOT_EN_ESP32C6,
                              EFUSE_BIT_SECURE_BOOT_EN_ESP32C6) != 0;
     default:
-        return FALSE;
+        return false;
     }
 }
 
@@ -698,7 +698,7 @@ BOOL Efuse_IsSecureBootEnabled(const CHIP_CTX *ctx)
  * ESP32-S2/S3/C3/C6: DIS_PAD_JTAG.
  * ESP8266/C2: not supported.
  */
-BOOL Efuse_IsJtagDisabled(const CHIP_CTX *ctx)
+bool Efuse_IsJtagDisabled(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
     case CHIP_ESP32:
@@ -717,7 +717,7 @@ BOOL Efuse_IsJtagDisabled(const CHIP_CTX *ctx)
         return ReadEfuseBits(ctx, EFUSE_OFFS_DIS_PAD_JTAG_ESP32C6,
                              EFUSE_BIT_DIS_PAD_JTAG_ESP32C6) != 0;
     default:
-        return FALSE;
+        return false;
     }
 }
 
@@ -790,7 +790,7 @@ int Efuse_GetJtagTotalCount(const CHIP_CTX *ctx)
 /*
  * Efuse_GetSoftJtagFlag - Get raw eFuse value for SOFT_DIS_JTAG
  */
-DWORD Efuse_GetSoftJtagFlag(const CHIP_CTX *ctx)
+uint32_t Efuse_GetSoftJtagFlag(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
     case CHIP_ESP32S2:
@@ -816,7 +816,7 @@ DWORD Efuse_GetSoftJtagFlag(const CHIP_CTX *ctx)
 /*
  * Efuse_GetUsbJtagFlag - Get raw eFuse value for DIS_USB_JTAG
  */
-DWORD Efuse_GetUsbJtagFlag(const CHIP_CTX *ctx)
+uint32_t Efuse_GetUsbJtagFlag(const CHIP_CTX *ctx)
 {
     switch (ctx->type) {
     case CHIP_ESP32S3:
@@ -845,7 +845,7 @@ DWORD Efuse_GetUsbJtagFlag(const CHIP_CTX *ctx)
  *
  * Returns key purpose value (KEY_PURPOSE_*).
  */
-BYTE Efuse_GetKeyPurpose(const CHIP_CTX *ctx, int block)
+uint8_t Efuse_GetKeyPurpose(const CHIP_CTX *ctx, int block)
 {
     if (!ctx->efuse || block < 0) {
         return KEY_PURPOSE_USER;
@@ -873,12 +873,12 @@ BYTE Efuse_GetKeyPurpose(const CHIP_CTX *ctx, int block)
         return KEY_PURPOSE_USER;
     }
 
-    static const DWORD purpose_masks[] = {
+    static const uint32_t purpose_masks[] = {
         EFUSE_MASK_KEY_PURPOSE_0, EFUSE_MASK_KEY_PURPOSE_1,
         EFUSE_MASK_KEY_PURPOSE_2, EFUSE_MASK_KEY_PURPOSE_3,
         EFUSE_MASK_KEY_PURPOSE_4, EFUSE_MASK_KEY_PURPOSE_5,
     };
-    static const BYTE purpose_shifts[] = {24, 28, 0, 4, 8, 12};
+    static const uint8_t purpose_shifts[] = {24, 28, 0, 4, 8, 12};
 
     /* Chip-specific BLOCK0 base offset in eFuse array */
     int block0_base = (ctx->type == CHIP_ESP32S2 || ctx->type == CHIP_ESP32S3 ||
@@ -887,13 +887,13 @@ BYTE Efuse_GetKeyPurpose(const CHIP_CTX *ctx, int block)
                           : 0x00;
 
     /* KEY_PURPOSE_N offsets relative to BLOCK0: word2=0x08, word3=0x0C */
-    static const BYTE rel_offsets[] = {0x08, 0x08, 0x0C, 0x0C, 0x0C, 0x0C};
+    static const uint8_t rel_offsets[] = {0x08, 0x08, 0x0C, 0x0C, 0x0C, 0x0C};
 
     int offset = block0_base + rel_offsets[block];
-    DWORD mask = purpose_masks[block];
+    uint32_t mask = purpose_masks[block];
     int shift = purpose_shifts[block];
 
-    return (BYTE)(ReadEfuseBits(ctx, offset, mask) >> shift);
+    return (uint8_t)(ReadEfuseBits(ctx, offset, mask) >> shift);
 }
 
 /*
@@ -904,7 +904,7 @@ BYTE Efuse_GetKeyPurpose(const CHIP_CTX *ctx, int block)
  *
  * Simulator only: directly modifies eFuse array.
  */
-void Efuse_SetKeyPurpose(CHIP_CTX *ctx, int block, BYTE purpose)
+void Efuse_SetKeyPurpose(CHIP_CTX *ctx, int block, uint8_t purpose)
 {
     if (!ctx->efuse || block < 0 || block > 5) {
         return;
@@ -925,7 +925,7 @@ void Efuse_SetKeyPurpose(CHIP_CTX *ctx, int block, BYTE purpose)
             return;
     }
 
-    static const DWORD purpose_masks[] = {
+    static const uint32_t purpose_masks[] = {
         EFUSE_MASK_KEY_PURPOSE_0, EFUSE_MASK_KEY_PURPOSE_1,
         EFUSE_MASK_KEY_PURPOSE_2, EFUSE_MASK_KEY_PURPOSE_3,
         EFUSE_MASK_KEY_PURPOSE_4, EFUSE_MASK_KEY_PURPOSE_5,
@@ -936,10 +936,10 @@ void Efuse_SetKeyPurpose(CHIP_CTX *ctx, int block, BYTE purpose)
                        ctx->type == CHIP_ESP32C3 || ctx->type == CHIP_ESP32C6)
                           ? 0x2C
                           : 0x00;
-    static const BYTE rel_offsets[] = {0x08, 0x08, 0x0C, 0x0C, 0x0C, 0x0C};
+    static const uint8_t rel_offsets[] = {0x08, 0x08, 0x0C, 0x0C, 0x0C, 0x0C};
 
     int offset = block0_base + rel_offsets[block];
-    DWORD mask = purpose_masks[block];
+    uint32_t mask = purpose_masks[block];
 
     ClearEfuseBits(ctx, offset, mask);
     WriteEfuseBits(ctx, offset, mask, purpose);
@@ -972,11 +972,11 @@ int Efuse_GetEncryptionKeyOffset(const CHIP_CTX *ctx, int *key_len)
     }
 
     /* S2/S3/C3/C6: scan KEY_PURPOSE fields to find XTS_AES key block */
-    static const DWORD key_block_offsets[] = {0x9C, 0xBC,  0xDC,
+    static const uint32_t key_block_offsets[] = {0x9C, 0xBC,  0xDC,
                                               0xFC, 0x11C, 0x13C};
 
     for (int i = 0; i < 6; i++) {
-        BYTE purpose = Efuse_GetKeyPurpose(ctx, i);
+        uint8_t purpose = Efuse_GetKeyPurpose(ctx, i);
         if (purpose == KEY_PURPOSE_XTS_AES_128_KEY ||
             purpose == KEY_PURPOSE_XTS_AES_256_KEY_1 ||
             purpose == KEY_PURPOSE_XTS_AES_256_KEY_2) {

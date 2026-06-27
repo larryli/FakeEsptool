@@ -7,7 +7,8 @@
 #ifndef ESP_SLIP_H
 #define ESP_SLIP_H
 
-#include <windows.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 /* SLIP protocol constants */
 #define SLIP_END 0xC0     /* Frame delimiter */
@@ -21,10 +22,10 @@
 
 /* SLIP decoder context */
 typedef struct {
-    BYTE buf[SLIP_MAX_FRAME]; /* Frame buffer */
+    uint8_t buf[SLIP_MAX_FRAME]; /* Frame buffer */
     int len;                  /* Current frame length */
-    BOOL in_frame;            /* TRUE if inside a frame */
-    BOOL escaped;             /* TRUE if previous byte was ESC */
+    bool in_frame;            /* true if inside a frame */
+    bool escaped;             /* true if previous uint8_t was ESC */
 } SLIP_CTX;
 
 /*
@@ -33,21 +34,21 @@ typedef struct {
 void Slip_Init(SLIP_CTX *ctx);
 
 /*
- * Slip_PutByte - Feed a byte to the decoder
+ * Slip_PutByte - Feed a uint8_t to the decoder
  *
- * Returns TRUE when frame is complete.
+ * Returns true when frame is complete.
  */
-BOOL Slip_PutByte(SLIP_CTX *ctx, BYTE b);
+bool Slip_PutByte(SLIP_CTX *ctx, uint8_t b);
 
 /*
  * Slip_IsComplete - Check if a complete frame has been received
  */
-BOOL Slip_IsComplete(const SLIP_CTX *ctx);
+bool Slip_IsComplete(const SLIP_CTX *ctx);
 
 /*
  * Slip_GetPayload - Get pointer to decoded frame payload
  */
-const BYTE *Slip_GetPayload(const SLIP_CTX *ctx);
+const uint8_t *Slip_GetPayload(const SLIP_CTX *ctx);
 
 /*
  * Slip_GetLength - Get decoded frame length
@@ -64,6 +65,6 @@ void Slip_Reset(SLIP_CTX *ctx);
  *
  * Returns encoded length.
  */
-int Slip_Encode(const BYTE *data, int len, BYTE *out, int out_max);
+int Slip_Encode(const uint8_t *data, int len, uint8_t *out, int out_max);
 
 #endif

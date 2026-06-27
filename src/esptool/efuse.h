@@ -5,7 +5,8 @@
 #ifndef ESP_EFUSE_H
 #define ESP_EFUSE_H
 
-#include <windows.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 /* Forward declaration to avoid circular dependency with chip.h */
 struct CHIP_CTX_TAG;
@@ -339,24 +340,24 @@ typedef struct CHIP_CTX_TAG CHIP_CTX;
  * ============================================================================
  */
 
-DWORD Efuse_GetFlashCryptCnt(const CHIP_CTX *ctx);
-BOOL Efuse_IsFlashEncryptionEnabled(const CHIP_CTX *ctx);
-BOOL Efuse_IsDownloadEncryptDisabled(const CHIP_CTX *ctx);
-BOOL Efuse_IsDownloadDecryptDisabled(const CHIP_CTX *ctx);
-BOOL Efuse_IsDownloadModeDisabled(const CHIP_CTX *ctx);
-BOOL Efuse_IsSecureDownloadEnabled(const CHIP_CTX *ctx);
-DWORD Efuse_GetDlEncryptDisabled(const CHIP_CTX *ctx);
-DWORD Efuse_GetDlModeDisabled(const CHIP_CTX *ctx);
-DWORD Efuse_GetSecureBootFlag(const CHIP_CTX *ctx);
-DWORD Efuse_GetJtagFlag(const CHIP_CTX *ctx);
-BOOL Efuse_IsSecureBootEnabled(const CHIP_CTX *ctx);
-BOOL Efuse_IsJtagDisabled(const CHIP_CTX *ctx);
+uint32_t Efuse_GetFlashCryptCnt(const CHIP_CTX *ctx);
+bool Efuse_IsFlashEncryptionEnabled(const CHIP_CTX *ctx);
+bool Efuse_IsDownloadEncryptDisabled(const CHIP_CTX *ctx);
+bool Efuse_IsDownloadDecryptDisabled(const CHIP_CTX *ctx);
+bool Efuse_IsDownloadModeDisabled(const CHIP_CTX *ctx);
+bool Efuse_IsSecureDownloadEnabled(const CHIP_CTX *ctx);
+uint32_t Efuse_GetDlEncryptDisabled(const CHIP_CTX *ctx);
+uint32_t Efuse_GetDlModeDisabled(const CHIP_CTX *ctx);
+uint32_t Efuse_GetSecureBootFlag(const CHIP_CTX *ctx);
+uint32_t Efuse_GetJtagFlag(const CHIP_CTX *ctx);
+bool Efuse_IsSecureBootEnabled(const CHIP_CTX *ctx);
+bool Efuse_IsJtagDisabled(const CHIP_CTX *ctx);
 int Efuse_GetJtagDisabledCount(const CHIP_CTX *ctx);
 int Efuse_GetJtagTotalCount(const CHIP_CTX *ctx);
-DWORD Efuse_GetSoftJtagFlag(const CHIP_CTX *ctx);
-DWORD Efuse_GetUsbJtagFlag(const CHIP_CTX *ctx);
-BYTE Efuse_GetKeyPurpose(const CHIP_CTX *ctx, int block);
-void Efuse_SetKeyPurpose(CHIP_CTX *ctx, int block, BYTE purpose);
+uint32_t Efuse_GetSoftJtagFlag(const CHIP_CTX *ctx);
+uint32_t Efuse_GetUsbJtagFlag(const CHIP_CTX *ctx);
+uint8_t Efuse_GetKeyPurpose(const CHIP_CTX *ctx, int block);
+void Efuse_SetKeyPurpose(CHIP_CTX *ctx, int block, uint8_t purpose);
 int Efuse_GetEncryptionKeyOffset(const CHIP_CTX *ctx, int *key_len);
 void Efuse_SetFlashEncryption(CHIP_CTX *ctx, int mode);
 void Efuse_SetDownloadMode(CHIP_CTX *ctx, int mode);

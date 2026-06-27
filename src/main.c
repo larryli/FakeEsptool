@@ -213,7 +213,6 @@ void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len,
     if (!ctx || !data || len == 0) {
         return;
     }
-    g_esptool.hNotify = hNotify;
     Esptool_Feed(&g_esptool, data, (int)len);
 }
 
