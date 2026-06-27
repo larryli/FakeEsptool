@@ -85,8 +85,8 @@ fesp_init(&g_esptool, &g_chip, &g_flash);
 | `serial.c/h` | 串口通信，数据收发，信号控制 |
 | `device_file.c/h` | .esp 设备文件格式读写 |
 | `esptool_hal.h/c` | 平台合同：回调 + 工具函数转发 |
-| `fesptool/slip.c/h` | SLIP 协议编解码 |
-| `fesptool/chip.c/h` | 芯片模拟骨架（init、寄存器、MAC、启动日志） |
+| `fesptool/slip.c/h` | SLIP 编解码 |
+| `fesptool/chip.c/h` | 芯片模拟（init、寄存器、MAC、启动日志） |
 | `fesptool/chip_priv.h` | 芯片内部常量和函数声明 |
 | `fesptool/efuse.c/h` | eFuse 模拟（控制器、读写、字段查询） |
 | `fesptool/efuse_priv.h` | eFuse 内部常量和函数声明 |
@@ -103,26 +103,35 @@ fesp_init(&g_esptool, &g_chip, &g_flash);
 
 | 回调 | 说明 |
 |---|---|
-| `EsptoolHal_Write(data, len)` | 写数据到串口 |
-| `EsptoolHal_SetBaudRate(baud)` | 波特率切换 |
-| `EsptoolHal_Modified()` | 设备修改通知 |
-| `EsptoolHal_LogI(tag, fmt, ...)` | Info 日志（GUI 窗口） |
-| `EsptoolHal_LogE(tag, fmt, ...)` | Error 日志（GUI 窗口） |
+| `fesp_hal_write(data, len)` | 写数据到串口 |
+| `fesp_hal_set_baud_rate(baud)` | 波特率切换 |
+| `fesp_hal_modified()` | 设备修改通知 |
+| `FESP_HAL_LOGI(tag, fmt, ...)` | Info 日志（GUI 窗口） |
+| `FESP_HAL_LOGE(tag, fmt, ...)` | Error 日志（GUI 窗口） |
 
 **工具函数（引擎 ← 平台实现）：**
 
 | 函数 | 说明 |
 |---|---|
-| `EsptoolHal_MemAlloc/ZeroAlloc/Free` | 内存管理 |
-| `EsptoolHal_MD5Calc` | MD5 哈希 |
-| `EsptoolHal_DeflateInit/Decompress` | DEFLATE 解压 |
-| `EsptoolHal_EncryptInit/Data`, `DecryptData` | AES-XTS 加解密 |
+| `fesp_hal_mem_alloc/zero_alloc/free` | 内存管理 |
+| `fesp_hal_md5_calc` | MD5 哈希 |
+| `fesp_hal_deflate_init/decompress` | DEFLATE 解压 |
+| `fesp_hal_encrypt_init/data`, `decrypt_data` | AES-XTS 加解密 |
 
 **Debug 日志宏：**
 
 ```c
-EsptoolHal_LogD(TAG, "debug message");  // 编译期可控（ENABLE_TRACE）
+FESP_HAL_LOGD(TAG, "debug message");  // 编译期可控（ENABLE_TRACE）
 ```
+
+**GUI 注册函数（PascalCase）：**
+
+| 函数 | 说明 |
+|---|---|
+| `FEsptoolSetWriteCallback(cb)` | 注册串口写回调 |
+| `FEsptoolSetBaudRateCallback(cb)` | 注册波特率回调 |
+| `FEsptoolSetModifiedCallback(cb)` | 注册设备修改回调 |
+| `FEsptoolSetLogCallback(cb, ctx)` | 注册日志回调 |
 
 ## 编译
 
@@ -267,13 +276,13 @@ ctest --test-dir build_tests --build-config Release
 
 | 枚举值 | 芯片 |
 |--------|------|
-| CHIP_ESP8266 | ESP8266 |
-| CHIP_ESP32 | ESP32 |
-| CHIP_ESP32S2 | ESP32-S2 |
-| CHIP_ESP32S3 | ESP32-S3 |
-| CHIP_ESP32C2 | ESP32-C2 |
-| CHIP_ESP32C3 | ESP32-C3 |
-| CHIP_ESP32C6 | ESP32-C6 |
+| FESP_CHIP_ESP8266 | ESP8266 |
+| FESP_CHIP_ESP32 | ESP32 |
+| FESP_CHIP_ESP32S2 | ESP32-S2 |
+| FESP_CHIP_ESP32S3 | ESP32-S3 |
+| FESP_CHIP_ESP32C2 | ESP32-C2 |
+| FESP_CHIP_ESP32C3 | ESP32-C3 |
+| FESP_CHIP_ESP32C6 | ESP32-C6 |
 
 **eFuse 初始化注意事项：**
 - 新增芯片时必须在初始化函数中设置默认芯片版本到 eFuse，否则 esptool 可能禁用 stub flasher
@@ -323,7 +332,7 @@ ctest --test-dir build_tests --build-config Release
 
 ```c
 #include "fesptool/fesp.h"
-#include "esptool_hal.h"
+#include "fesptool_hal.h"
 
 // 初始化
 fesp_chip_init(&g_chip, FESP_CHIP_ESP32);
@@ -331,10 +340,10 @@ fesp_flash_init(&g_flash, 4 * 1024 * 1024);
 fesp_init(&g_esptool, &g_chip, &g_flash);
 
 // 注册 HAL 回调
-EsptoolHal_SetWriteCallback(OnSerialWrite);
-EsptoolHal_SetBaudRateCallback(OnBaudRateChange);
-EsptoolHal_SetModifiedCallback(OnDeviceModified);
-EsptoolHal_SetLogCallback(OnHalLog, NULL);
+FEsptoolSetWriteCallback(OnSerialWrite);
+FEsptoolSetBaudRateCallback(OnBaudRateChange);
+FEsptoolSetModifiedCallback(OnDeviceModified);
+FEsptoolSetLogCallback(OnHalLog, NULL);
 ```
 
 ## API 参考
@@ -431,13 +440,15 @@ case WM_DROPFILES:
 **数据结构**：
 ```c
 typedef struct {
-    DEVICE_CTX device;      /* 设备头信息 */
-    BYTE *efuse;            /* eFuse 数据快照 */
-    DWORD efuseSize;        /* eFuse 大小 */
-    BYTE *flash;            /* Flash 数据快照 */
-    DWORD flashSize;        /* Flash 大小 */
-    WCHAR filename[MAX_PATH]; /* 输出文件名 */
-    HWND hWnd;              /* 所有者窗口 */
+    fesp_chip_ctx_t chip;        /* Chip context snapshot */
+    fesp_flash_ctx_t flash;      /* Flash context snapshot */
+    WCHAR deviceFile[MAX_PATH];  /* Device file path */
+    uint8_t *efuse;              /* eFuse data snapshot */
+    DWORD efuseSize;             /* eFuse size */
+    uint8_t *flashData;          /* Flash data snapshot */
+    DWORD flashSize;             /* Flash size */
+    WCHAR filename[MAX_PATH];    /* Output filename */
+    HWND hWnd;                   /* Owner window */
 } DEVICE_SNAPSHOT;
 ```
 
@@ -475,15 +486,14 @@ HeapFree(GetProcessHeap(), 0, snapshot);
 
 ### 内存管理
 
-协议层和设备层使用 `utils/mem.h` 提供的内存管理函数，**禁止**直接调用 `HeapAlloc`/`HeapFree`。
+协议层和设备层通过 `fesptool_hal` 使用内存管理函数，**禁止**直接调用 `HeapAlloc`/`HeapFree`。
 
 **函数：**
 
 ```c
-void *Mem_Alloc(DWORD size);              // 未初始化分配
-void *Mem_ZeroAlloc(DWORD size);          // 零初始化分配
-void *Mem_Realloc(void *ptr, DWORD size); // 重新分配
-void  Mem_Free(void *ptr);                // 释放（NULL 安全）
+void *fesp_hal_mem_alloc(DWORD size);          // 未初始化分配
+void *fesp_hal_mem_zero_alloc(DWORD size);      // 零初始化分配
+void  fesp_hal_mem_free(void *ptr);             // 释放（NULL 安全）
 ```
 
 **规范：**
@@ -494,24 +504,24 @@ void *ptr = HeapAlloc(GetProcessHeap(), 0, size);
 void *ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
 HeapFree(GetProcessHeap(), 0, ptr);
 
-// ✓ 正确 - 使用 mem.h
-void *ptr = Mem_Alloc(size);
-void *ptr = Mem_ZeroAlloc(size);
-Mem_Free(ptr);
+// ✓ 正确 - 通过 HAL
+void *ptr = fesp_hal_mem_alloc(size);
+void *ptr = fesp_hal_mem_zero_alloc(size);
+fesp_hal_mem_free(ptr);
 ```
 
 **示例：**
 
 ```c
-BYTE *efuse = (BYTE *)Mem_ZeroAlloc(efuse_size);
+uint8_t *efuse = (uint8_t *)fesp_hal_mem_zero_alloc(efuse_size);
 if (!efuse) {
-    TRACE_FW(TAG, "Failed to allocate eFuse");
-    return FALSE;
+    FESP_HAL_LOGD(TAG, "Failed to allocate eFuse");
+    return false;
 }
 
 // 使用 efuse...
 
-Mem_Free(efuse);
+fesp_hal_mem_free(efuse);
 efuse = NULL;
 ```
 
@@ -539,28 +549,28 @@ cmake --build build --config Release -j
 
 ### 日志
 
-模拟引擎使用三级日志，通过 `esptool_hal.h` 统一接口：
+模拟引擎使用三级日志，通过 `fesptool_hal.h` 统一接口：
 
 ```c
-#include "esptool_hal.h"
+#include "fesptool_hal.h"
 
 static const char *TAG = "ESP";
 
 // Debug 级别 — trace 文件输出（编译期可控）
-EsptoolHal_LogD(TAG, "key_offset=0x%02X", offset);
+FESP_HAL_LOGD(TAG, "key_offset=0x%02X", offset);
 
 // Info 级别 — GUI 窗口输出（始终启用）
-EsptoolHal_LogI(TAG, "Sync handshake");
+EsptoolWrap_Log(TAG, "Sync handshake");
 
 // Error 级别 — GUI 窗口输出（始终启用，可标红）
-EsptoolHal_LogE("ERR", "Encryption failed: %d", ret);
+EsptoolWrap_Log("ERR", "Encryption failed: %d", ret);
 ```
 
 | 级别 | 宏/函数 | 去向 | 编译控制 |
 |---|---|---|---|
-| Debug | `EsptoolHal_LogD(TAG, ...)` | trace .log 文件 | `ENABLE_TRACE` |
-| Info | `EsptoolHal_LogI(tag, fmt, ...)` | GUI 窗口 | 始终启用 |
-| Error | `EsptoolHal_LogE(tag, fmt, ...)` | GUI 窗口（可标红） | 始终启用 |
+| Debug | `FESP_HAL_LOGD(TAG, ...)` | trace .log 文件 | `ENABLE_TRACE` |
+| Info | `EsptoolWrap_Log(tag, fmt, ...)` | GUI 窗口 | 始终启用 |
+| Error | `EsptoolWrap_Log(tag, fmt, ...)` | GUI 窗口（可标红） | 始终启用 |
 
 ### Trace 日志格式
 
@@ -721,21 +731,21 @@ All flash segments verified successfully.
 
 ### 数据结构
 
-`ESPTOOL_CTX` 中新增以下字段：
+`fesp_ctx_t` 中新增以下字段：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `defl_buf` | BYTE* | 压缩数据积累缓冲区 |
-| `defl_buf_size` | DWORD | 当前积累的压缩数据大小 |
-| `defl_buf_cap` | DWORD | 缓冲区容量（等于 `uncompressed_size`） |
-| `defl_offset` | DWORD | 当前 deflate 会话的 Flash 写入偏移 |
-| `defl_unc_size` | DWORD | 当前 deflate 会话的未压缩大小 |
+| `defl_buf` | uint8_t* | 压缩数据积累缓冲区 |
+| `defl_buf_size` | uint32_t | 当前积累的压缩数据大小 |
+| `defl_buf_cap` | uint32_t | 缓冲区容量（等于 `uncompressed_size`） |
+| `defl_offset` | uint32_t | 当前 deflate 会话的 Flash 写入偏移 |
+| `defl_unc_size` | uint32_t | 当前 deflate 会话的未压缩大小 |
 
 ### 辅助函数
 
-**`Defl_FreeBuffer(ctx)`**：释放积累缓冲区，不写入 flash。用于错误处理和资源清理。
+| `defl_free_buffer` | 释放积累缓冲区，不写入 flash。用于错误处理和资源清理。 |
 
-**`Defl_FlushBuffer(ctx)`**：解压积累数据并写入 flash，然后释放缓冲区。返回 `ESP_OK` 或 `ESP_FAIL`。
+| `defl_flush_buffer` | 解压积累数据并写入 flash，然后释放缓冲区。返回 `FESP_OK` 或 `FESP_FAIL`。 |
 
 ### 函数修改说明
 
@@ -743,13 +753,13 @@ All flash segments verified successfully.
 |------|----------|
 | `fesp_init` | 初始化 `defl_buf = NULL`，`defl_buf_size = 0`，`defl_buf_cap = 0` |
 | `fesp_reset_state` | 调用 `Defl_FreeBuffer()`，重置所有 deflate 字段 |
-| `HandleFlashDeflBegin` | 检查并处理上一次积累数据，分配新缓冲区 |
-| `HandleFlashDeflData` | 积累数据到缓冲区，不立即解压 |
-| `HandleFlashDeflEnd` | 调用 `Defl_FlushBuffer()` 解压并写入 |
-| `HandleFlashBegin` | **不释放**缓冲区（等待后续 `FLASH_DEFL_END`） |
-| `HandleFlashEnd` | 检查并 flush 未处理的缓冲区（ROM 模式场景） |
-| `HandleEraseFlash` | 调用 `Defl_FreeBuffer()` 释放缓冲区 |
-| `HandleEraseBlock` | 调用 `Defl_FreeBuffer()` 释放缓冲区 |
+| `handle_flash_defl_begin` | 检查并处理上一次积累数据，分配新缓冲区 |
+| `handle_flash_defl_data` | 积累数据到缓冲区，不立即解压 |
+| `handle_flash_defl_end` | 调用 `defl_flush_buffer` 解压并写入 |
+| `handle_flash_begin` | **不释放**缓冲区（等待后续 `FLASH_DEFL_END`） |
+| `handle_flash_end` | 检查并 flush 未处理的缓冲区（ROM 模式场景） |
+| `handle_erase_flash` | 调用 `defl_free_buffer` 释放缓冲区 |
+| `handle_erase_block` | 调用 `defl_free_buffer` 释放缓冲区 |
 
 ### 资源释放检查点
 
@@ -762,7 +772,7 @@ All flash segments verified successfully.
 | `ERASE_FLASH` | Free | 擦除操作中断烧录 |
 | `ERASE_REGION` | Free | 擦除操作中断烧录 |
 | `RUN_USER_CODE` | Free | 软复位 |
-| `Esptool_ResetState` | Free | 硬件复位 |
+| `fesp_reset_state` | Free | 硬件复位 |
 
 ### 时序分析
 
