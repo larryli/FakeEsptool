@@ -23,7 +23,7 @@ FakeEsptool 是一个 ESP 芯片设备端模拟器，用于模拟 ESP8266/ESP32 
            │
            ▼
 ┌──────────────────────────────────────────────┐
-│  模拟引擎（src/esptool/）— 平台无关           │
+│  模拟引擎（src/fesptool/）— 平台无关          │
 │  esptool.c/h  协议命令解析与响应              │
 │  slip.c/h     SLIP 编解码                    │
 │  chip.c/h     芯片模拟骨架                    │
@@ -43,10 +43,39 @@ g_flash ◄─── g_esptool.flash  (同一块内存)
 
 **初始化**：
 ```c
-Chip_Init(&g_chip, CHIP_ESP32);
-Flash_Init(&g_flash, 4 * 1024 * 1024);
-Esptool_Init(&g_esptool, &g_chip, &g_flash);
+fesp_chip_init(&g_chip, FESP_CHIP_ESP32);
+fesp_flash_init(&g_flash, 4 * 1024 * 1024);
+fesp_init(&g_esptool, &g_chip, &g_flash);
 ```
+
+### 命名规范
+
+模拟引擎使用 `fesp_` 前缀（FakeEsptool 缩写）：
+
+| 类别 | 命名模式 | 示例 |
+|---|---|---|
+| 函数 | `fesp_模块_动作` | `fesp_chip_init`、`fesp_efuse_get_key_purpose` |
+| 结构体 | `fesp_模块_ctx_t` | `fesp_chip_ctx_t`、`fesp_flash_ctx_t` |
+| 枚举 | `FESP_CHIP_名称` | `FESP_CHIP_ESP32`、`FESP_CHIP_ESP32S3` |
+| 常量 | `FESP_类别_名称` | `FESP_OK`、`FESP_CHIP_DETECT_REG` |
+
+### 头文件结构
+
+| 文件 | 可见性 | 内容 |
+|---|---|---|
+| `fesp.h` | 公开 | 聚合器，`#include` 全部公共头 |
+| `chip.h` | 公开 | 芯片类型、结构体、API 函数 |
+| `chip_priv.h` | 内部 | 寄存器地址、偏移量、内部函数 |
+| `efuse.h` | 公开 | eFuse 查询/设置 API、常量 |
+| `efuse_priv.h` | 内部 | eFuse 控制器寄存器、位偏移常量 |
+| `flash.h` | 公开 | Flash 结构体、API 函数 |
+| `slip.h` | 公开 | SLIP 结构体、API 函数 |
+| `esptool.h` | 公开 | 协议结构体、API 函数、命令码 |
+| `esptool_priv.h` | 内部 | 协议内部声明 |
+
+外部使用：`#include "fesptool/fesp.h"`
+
+### 模块表
 
 | 模块 | 职责 |
 |------|------|
@@ -56,22 +85,15 @@ Esptool_Init(&g_esptool, &g_chip, &g_flash);
 | `serial.c/h` | 串口通信，数据收发，信号控制 |
 | `device_file.c/h` | .esp 设备文件格式读写 |
 | `esptool_hal.h/c` | 平台合同：回调 + 工具函数转发 |
-| `esptool/slip.c/h` | SLIP 协议编解码 |
-| `esptool/chip.c/h` | 芯片模拟骨架（init、寄存器、MAC、启动日志） |
-| `esptool/efuse.c/h` | eFuse 模拟（控制器、读写、字段查询） |
-| `esptool/flash.c/h` | Flash 存储模拟 |
-| `esptool/esptool.c/h` | esptool 命令解析与响应 |
-| `dlg/device_props.c` | 设备属性对话框 |
-| `dlg/key_mgmt.c` | 密钥管理对话框 |
-| `dlg/port_select.c` | 串口选择对话框 |
-| `dlg/about.c` | 关于对话框 |
-| `utils/config.c/h` | 配置持久化 |
-| `utils/lang.c/h` | 国际化辅助 |
-| `utils/trace.c/h` | 调试日志 |
-| `utils/mem.c/h` | 内存管理（封装 Heap API，可选泄漏追踪） |
-| `utils/md5.c/h` | MD5 哈希（封装平台相关实现，移植时替换 md5.c） |
-| `utils/deflate.c/h` | DEFLATE 解压（用于压缩模式烧录） |
-| `utils/encrypt.c/h` | AES-XTS 加密/解密（用于加密烧录） |
+| `fesptool/slip.c/h` | SLIP 协议编解码 |
+| `fesptool/chip.c/h` | 芯片模拟骨架（init、寄存器、MAC、启动日志） |
+| `fesptool/chip_priv.h` | 芯片内部常量和函数声明 |
+| `fesptool/efuse.c/h` | eFuse 模拟（控制器、读写、字段查询） |
+| `fesptool/efuse_priv.h` | eFuse 内部常量和函数声明 |
+| `fesptool/flash.c/h` | Flash 存储模拟 |
+| `fesptool/esptool.c/h` | esptool 命令解析与响应 |
+| `fesptool/esptool_priv.h` | 协议内部声明 |
+| `fesptool/fesp.h` | 公开头文件聚合器 |
 
 ### esptool_hal 接口
 
@@ -300,15 +322,13 @@ ctest --test-dir build_tests --build-config Release
 ## 使用示例
 
 ```c
+#include "fesptool/fesp.h"
 #include "esptool_hal.h"
-#include "esptool/chip.h"
-#include "esptool/flash.h"
-#include "esptool/esptool.h"
 
 // 初始化
-Chip_Init(&g_chip, CHIP_ESP32);
-Flash_Init(&g_flash, 4 * 1024 * 1024);
-Esptool_Init(&g_esptool, &g_chip, &g_flash);
+fesp_chip_init(&g_chip, FESP_CHIP_ESP32);
+fesp_flash_init(&g_flash, 4 * 1024 * 1024);
+fesp_init(&g_esptool, &g_chip, &g_flash);
 
 // 注册 HAL 回调
 EsptoolHal_SetWriteCallback(OnSerialWrite);
@@ -721,8 +741,8 @@ All flash segments verified successfully.
 
 | 函数 | 修改内容 |
 |------|----------|
-| `Esptool_Init` | 初始化 `defl_buf = NULL`，`defl_buf_size = 0`，`defl_buf_cap = 0` |
-| `Esptool_ResetState` | 调用 `Defl_FreeBuffer()`，重置所有 deflate 字段 |
+| `fesp_init` | 初始化 `defl_buf = NULL`，`defl_buf_size = 0`，`defl_buf_cap = 0` |
+| `fesp_reset_state` | 调用 `Defl_FreeBuffer()`，重置所有 deflate 字段 |
 | `HandleFlashDeflBegin` | 检查并处理上一次积累数据，分配新缓冲区 |
 | `HandleFlashDeflData` | 积累数据到缓冲区，不立即解压 |
 | `HandleFlashDeflEnd` | 调用 `Defl_FlushBuffer()` 解压并写入 |

@@ -6,7 +6,7 @@
 #define APP_COMMANDS_H
 
 #include "dlg/dlg.h"
-#include "esptool/esptool.h"
+#include "fesptool/esptool.h"
 #include "serial.h"
 #include "utils/config.h"
 #include "utils/lang.h"
@@ -15,7 +15,7 @@
 
 /* Global state (defined in main.c) */
 extern HWND g_hEdit;
-extern ESPTOOL_CTX g_esptool;
+extern fesp_ctx_t g_esptool;
 extern SERIAL_CTX g_serial;
 extern WCHAR g_szPort[32];
 extern WCHAR g_szSelectedPort[32];

@@ -2,12 +2,11 @@
  * device_file.c - .esp device file format implementation
  *
  * Handles save/load of device configuration files.
- * Extracted from esptool/device.c — platform I/O code, not simulation logic.
+ * Extracted from esptool/device.c - platform I/O code, not simulation logic.
  */
 
 #include "device_file.h"
-#include "esptool/chip.h"
-#include "esptool/flash.h"
+#include "fesptool/fesp.h"
 #include "utils/trace.h"
 #include <string.h>
 
@@ -15,7 +14,7 @@
 static const char *TAG = "DEV";
 #endif
 
-BOOL DeviceFile_Save(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename)
+BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash, const WCHAR *filename)
 {
     HANDLE hFile = CreateFileW(filename, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
                                FILE_ATTRIBUTE_NORMAL, NULL);
@@ -80,7 +79,7 @@ BOOL DeviceFile_Save(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename)
     return TRUE;
 }
 
-BOOL DeviceFile_Load(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename)
+BOOL DeviceFile_Load(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash, const WCHAR *filename)
 {
     HANDLE hFile = CreateFileW(filename, GENERIC_READ, 0, NULL, OPEN_EXISTING,
                                FILE_ATTRIBUTE_NORMAL, NULL);
@@ -113,7 +112,7 @@ BOOL DeviceFile_Load(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename)
     }
 
     ok = ok && ReadFile(hFile, &chipType, 4, &read, NULL) && read == 4;
-    if (!ok || chipType >= CHIP_COUNT) {
+    if (!ok || chipType >= FESP_CHIP_COUNT) {
         CloseHandle(hFile);
         TRACE_PROTO(TAG, "Invalid chip type: %lu", chipType);
         return FALSE;
@@ -136,15 +135,15 @@ BOOL DeviceFile_Load(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename)
     }
 
     /* Close existing resources before re-init */
-    Flash_Close(flash);
-    Chip_Close(chip);
+    fesp_flash_close(flash);
+    fesp_chip_close(chip);
 
-    if (!Chip_Init(chip, (CHIP_TYPE)chipType)) {
+    if (!fesp_chip_init(chip, (fesp_chip_type_t)chipType)) {
         CloseHandle(hFile);
         return FALSE;
     }
-    Chip_SetFlashSize(chip, flashSize);
-    Chip_SetMac(chip, mac);
+    fesp_chip_set_flash_size(chip, flashSize);
+    fesp_chip_set_mac(chip, mac);
     chip->xtal_freq = xtalFreq;
 
     /* eFuse (variable) */
@@ -152,7 +151,7 @@ BOOL DeviceFile_Load(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename)
     if (!ok) {
         CloseHandle(hFile);
         TRACE_PROTO(TAG, "Failed to read efuse size");
-        Chip_Close(chip);
+        fesp_chip_close(chip);
         return FALSE;
     }
 
@@ -163,7 +162,7 @@ BOOL DeviceFile_Load(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename)
             if (!ok) {
                 CloseHandle(hFile);
                 TRACE_PROTO(TAG, "Failed to read efuse data");
-                Chip_Close(chip);
+                fesp_chip_close(chip);
                 return FALSE;
             }
         } else {
@@ -173,11 +172,11 @@ BOOL DeviceFile_Load(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename)
         }
     }
 
-    Efuse_ApplyBlock0Defaults(chip);
+    fesp_efuse_apply_block0_defaults(chip);
 
     /* Flash init and data */
-    if (!Flash_Init(flash, flashSize)) {
-        Chip_Close(chip);
+    if (!fesp_flash_init(flash, flashSize)) {
+        fesp_chip_close(chip);
         CloseHandle(hFile);
         return FALSE;
     }
@@ -190,8 +189,8 @@ BOOL DeviceFile_Load(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename)
                         "Failed to read flash data (expected %lu, got %lu)",
                         flashSize, read);
             CloseHandle(hFile);
-            Flash_Close(flash);
-            Chip_Close(chip);
+            fesp_flash_close(flash);
+            fesp_chip_close(chip);
             return FALSE;
         }
     }

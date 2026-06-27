@@ -17,7 +17,7 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
                                     LPARAM lParam)
 {
     static BYTE mac[6];
-    static CHIP_TYPE selectedChip;
+    static fesp_chip_type_t selectedChip;
     static DWORD selectedFlash;
 
     (void)lParam;
@@ -46,8 +46,8 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
         SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"26MHz");
         SendMessageW(hXtal, CB_SETCURSEL, g_chip.xtal_freq, 0);
         /* Disable XTAL freq for fixed-xtal chips */
-        if (selectedChip == CHIP_ESP32C3 || selectedChip == CHIP_ESP32C6 ||
-            selectedChip == CHIP_ESP32S2 || selectedChip == CHIP_ESP32S3) {
+        if (selectedChip == FESP_CHIP_ESP32C3 || selectedChip == FESP_CHIP_ESP32C6 ||
+            selectedChip == FESP_CHIP_ESP32S2 || selectedChip == FESP_CHIP_ESP32S3) {
             EnableWindow(hXtal, FALSE);
         }
 
@@ -65,13 +65,13 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
                 HWND hChip = GetDlgItem(hDlg, IDC_CHIP_COMBO);
                 int chipSel = (int)SendMessageW(hChip, CB_GETCURSEL, 0, 0);
                 HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
-                PopulateFlashSizes(hFlash, (CHIP_TYPE)chipSel,
+                PopulateFlashSizes(hFlash, (fesp_chip_type_t)chipSel,
                                    g_flash.size);
                 /* Enable/disable XTAL freq combo based on chip type */
                 HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
                 BOOL xtalEditable =
-                    (chipSel == CHIP_ESP8266 || chipSel == CHIP_ESP32 ||
-                     chipSel == CHIP_ESP32C2);
+                    (chipSel == FESP_CHIP_ESP8266 || chipSel == FESP_CHIP_ESP32 ||
+                     chipSel == FESP_CHIP_ESP32C2);
                 EnableWindow(hXtal, xtalEditable);
                 /* Update XTAL freq display for fixed-xtal chips */
                 if (!xtalEditable) {
@@ -97,7 +97,7 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
         case IDOK: {
             HWND hChip = GetDlgItem(hDlg, IDC_CHIP_COMBO);
             int chipSel = (int)SendMessageW(hChip, CB_GETCURSEL, 0, 0);
-            selectedChip = (CHIP_TYPE)chipSel;
+            selectedChip = (fesp_chip_type_t)chipSel;
 
             HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
             selectedFlash = GetFlashSizeFromCombo(hFlash, selectedChip);
@@ -126,12 +126,12 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
                 BYTE *oldFlashData = g_flash.data;
                 g_flash.data = NULL; /* Prevent double-free */
 
-                Flash_Close(&g_flash);
-                Chip_Close(&g_chip);
-                if (Chip_Init(&g_chip, selectedChip) &&
-                    Flash_Init(&g_flash, selectedFlash)) {
-                    Chip_SetFlashSize(&g_chip, selectedFlash);
-                    Chip_SetMac(&g_chip, mac);
+                fesp_flash_close(&g_flash);
+                fesp_chip_close(&g_chip);
+                if (fesp_chip_init(&g_chip, selectedChip) &&
+                    fesp_flash_init(&g_flash, selectedFlash)) {
+                    fesp_chip_set_flash_size(&g_chip, selectedFlash);
+                    fesp_chip_set_mac(&g_chip, mac);
                     g_chip.xtal_freq = xtalFreq;
 
                     /* Copy old flash data if same size or larger */
@@ -142,7 +142,7 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
                         HeapFree(GetProcessHeap(), 0, oldFlashData);
                     }
 
-                    EsptoolHal_SetModifiedCallback(OnDeviceModified);
+                    FEsptoolSetModifiedCallback(OnDeviceModified);
                     g_deviceModified = TRUE;
                     EndDialog(hDlg, IDOK);
                 } else {

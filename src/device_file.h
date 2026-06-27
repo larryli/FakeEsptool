@@ -8,8 +8,8 @@
 #ifndef DEVICE_FILE_H
 #define DEVICE_FILE_H
 
-#include "esptool/chip.h"
-#include "esptool/flash.h"
+#include "fesptool/chip.h"
+#include "fesptool/flash.h"
 #include <windows.h>
 
 /* Device file format constants */
@@ -27,7 +27,7 @@
  *
  * Returns TRUE on success, FALSE on failure.
  */
-BOOL DeviceFile_Save(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename);
+BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash, const WCHAR *filename);
 
 /*
  * DeviceFile_Load - Load device state from .esp file
@@ -41,6 +41,6 @@ BOOL DeviceFile_Save(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename);
  *
  * Returns TRUE on success, FALSE on failure.
  */
-BOOL DeviceFile_Load(CHIP_CTX *chip, FLASH_CTX *flash, const WCHAR *filename);
+BOOL DeviceFile_Load(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash, const WCHAR *filename);
 
 #endif /* DEVICE_FILE_H */

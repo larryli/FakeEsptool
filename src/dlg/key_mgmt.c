@@ -37,29 +37,29 @@
 static const WCHAR *GetPurposeName(BYTE purpose)
 {
     switch (purpose) {
-    case KEY_PURPOSE_USER:
+    case FESP_KEY_PURPOSE_USER:
         return L"USER (0)";
-    case KEY_PURPOSE_RESERVED:
+    case FESP_KEY_PURPOSE_RESERVED:
         return L"RESERVED (1)";
-    case KEY_PURPOSE_XTS_AES_256_KEY_1:
+    case FESP_KEY_PURPOSE_XTS_AES_256_KEY_1:
         return L"XTS-AES-256-1 (2)";
-    case KEY_PURPOSE_XTS_AES_256_KEY_2:
+    case FESP_KEY_PURPOSE_XTS_AES_256_KEY_2:
         return L"XTS-AES-256-2 (3)";
-    case KEY_PURPOSE_XTS_AES_128_KEY:
+    case FESP_KEY_PURPOSE_XTS_AES_128_KEY:
         return L"XTS-AES-128 (4)";
-    case KEY_PURPOSE_HMAC_DOWN_ALL:
+    case FESP_KEY_PURPOSE_HMAC_DOWN_ALL:
         return L"HMAC-DOWN-ALL (5)";
-    case KEY_PURPOSE_HMAC_DOWN_JTAG:
+    case FESP_KEY_PURPOSE_HMAC_DOWN_JTAG:
         return L"HMAC-DOWN-JTAG (6)";
-    case KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE:
+    case FESP_KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE:
         return L"HMAC-DOWN-SIG (7)";
-    case KEY_PURPOSE_HMAC_UP:
+    case FESP_KEY_PURPOSE_HMAC_UP:
         return L"HMAC-UP (8)";
-    case KEY_PURPOSE_SECURE_BOOT_DIGEST0:
+    case FESP_KEY_PURPOSE_SECURE_BOOT_DIGEST0:
         return L"SEC-BOOT-DIG0 (9)";
-    case KEY_PURPOSE_SECURE_BOOT_DIGEST1:
+    case FESP_KEY_PURPOSE_SECURE_BOOT_DIGEST1:
         return L"SEC-BOOT-DIG1 (10)";
-    case KEY_PURPOSE_SECURE_BOOT_DIGEST2:
+    case FESP_KEY_PURPOSE_SECURE_BOOT_DIGEST2:
         return L"SEC-BOOT-DIG2 (11)";
     default:
         return L"UNKNOWN";
@@ -128,25 +128,25 @@ static const KEY_BLOCK_INFO key_blocks_esp32c6[] = {
 static const KEY_BLOCK_INFO *GetKeyBlocks(int *count)
 {
     switch (g_chip.type) {
-    case CHIP_ESP8266:
+    case FESP_CHIP_ESP8266:
         *count = 0;
         return NULL;
-    case CHIP_ESP32:
+    case FESP_CHIP_ESP32:
         *count = KEY_BLOCKS_ESP32_COUNT;
         return key_blocks_esp32;
-    case CHIP_ESP32S2:
+    case FESP_CHIP_ESP32S2:
         *count = KEY_BLOCKS_ESP32S2_COUNT;
         return key_blocks_esp32s2;
-    case CHIP_ESP32S3:
+    case FESP_CHIP_ESP32S3:
         *count = KEY_BLOCKS_ESP32S3_COUNT;
         return key_blocks_esp32s3;
-    case CHIP_ESP32C2:
+    case FESP_CHIP_ESP32C2:
         *count = KEY_BLOCKS_ESP32C2_COUNT;
         return key_blocks_esp32c2;
-    case CHIP_ESP32C3:
+    case FESP_CHIP_ESP32C3:
         *count = KEY_BLOCKS_ESP32C3_COUNT;
         return key_blocks_esp32c3;
-    case CHIP_ESP32C6:
+    case FESP_CHIP_ESP32C6:
         *count = KEY_BLOCKS_ESP32C6_COUNT;
         return key_blocks_esp32c6;
     default:
@@ -164,7 +164,7 @@ static const KEY_BLOCK_INFO *GetKeyBlocks(int *count)
  *
  * Returns TRUE if the range is valid, FALSE otherwise.
  */
-static BOOL IsValidKeyRange(const CHIP_CTX *chip, int offset, int size)
+static BOOL IsValidKeyRange(const fesp_chip_ctx_t *chip, int offset, int size)
 {
     if (!chip) {
         return FALSE;
@@ -172,11 +172,11 @@ static BOOL IsValidKeyRange(const CHIP_CTX *chip, int offset, int size)
     if (offset < 0 || size <= 0 || size > KEY_SIZE_MAX) {
         return FALSE;
     }
-    const BYTE *efuse = Chip_GetEfuse(chip);
+    const BYTE *efuse = fesp_chip_get_efuse(chip);
     if (!efuse) {
         return FALSE;
     }
-    int efuse_size = Chip_GetEfuseSize(chip);
+    int efuse_size = fesp_chip_get_efuse_size(chip);
     if (efuse_size <= 0) {
         return FALSE;
     }
@@ -195,12 +195,12 @@ static BOOL IsValidKeyRange(const CHIP_CTX *chip, int offset, int size)
  *
  * Returns TRUE if key is empty or invalid range, FALSE if key is set.
  */
-static BOOL IsKeyEmpty(const CHIP_CTX *chip, int offset, int size)
+static BOOL IsKeyEmpty(const fesp_chip_ctx_t *chip, int offset, int size)
 {
     if (!IsValidKeyRange(chip, offset, size)) {
         return TRUE;
     }
-    const BYTE *efuse = Chip_GetEfuse(chip);
+    const BYTE *efuse = fesp_chip_get_efuse(chip);
     for (int i = 0; i < size; i++) {
         if (efuse[offset + i] != 0x00) {
             return FALSE;
@@ -220,7 +220,7 @@ static BOOL IsKeyEmpty(const CHIP_CTX *chip, int offset, int size)
  *
  * Formats key as "01 02 03 ..." hex string.
  */
-static void FormatKeyHex(const CHIP_CTX *chip, int offset, int size, WCHAR *buf,
+static void FormatKeyHex(const fesp_chip_ctx_t *chip, int offset, int size, WCHAR *buf,
                          int bufChars)
 {
     if (!IsValidKeyRange(chip, offset, size) || !buf || bufChars < 4) {
@@ -230,7 +230,7 @@ static void FormatKeyHex(const CHIP_CTX *chip, int offset, int size, WCHAR *buf,
         return;
     }
 
-    const BYTE *efuse = Chip_GetEfuse(chip);
+    const BYTE *efuse = fesp_chip_get_efuse(chip);
     WCHAR *p = buf;
     WCHAR *end = buf + bufChars;
 
@@ -254,7 +254,7 @@ static void FormatKeyHex(const CHIP_CTX *chip, int offset, int size, WCHAR *buf,
  *
  * Returns TRUE on success, FALSE on invalid range.
  */
-static BOOL ReadKey(const CHIP_CTX *chip, int offset, int size, BYTE *key)
+static BOOL ReadKey(const fesp_chip_ctx_t *chip, int offset, int size, BYTE *key)
 {
     if (!key) {
         return FALSE;
@@ -263,7 +263,7 @@ static BOOL ReadKey(const CHIP_CTX *chip, int offset, int size, BYTE *key)
         memset(key, 0, size);
         return FALSE;
     }
-    const BYTE *efuse = Chip_GetEfuse(chip);
+    const BYTE *efuse = fesp_chip_get_efuse(chip);
     memcpy(key, efuse + offset, size);
     return TRUE;
 }
@@ -278,7 +278,7 @@ static BOOL ReadKey(const CHIP_CTX *chip, int offset, int size, BYTE *key)
  *
  * Returns TRUE on success, FALSE on invalid range.
  */
-static BOOL WriteKey(CHIP_CTX *chip, int offset, int size, const BYTE *key)
+static BOOL WriteKey(fesp_chip_ctx_t *chip, int offset, int size, const BYTE *key)
 {
     if (!key) {
         return FALSE;
@@ -286,7 +286,7 @@ static BOOL WriteKey(CHIP_CTX *chip, int offset, int size, const BYTE *key)
     if (!IsValidKeyRange(chip, offset, size)) {
         return FALSE;
     }
-    BYTE *efuse = Chip_GetEfuseMut(chip);
+    BYTE *efuse = fesp_chip_get_efuse_mut(chip);
     if (!efuse) {
         return FALSE;
     }
@@ -378,7 +378,7 @@ static void RefreshListView(HWND hList, int selectIndex)
         int idx = ListView_InsertItem(hList, &item);
 
         /* Column 1: Purpose (from eFuse KEY_PURPOSE field) */
-        BYTE purpose = Efuse_GetKeyPurpose(&g_chip, i);
+        BYTE purpose = fesp_efuse_get_key_purpose(&g_chip, i);
         ListView_SetItemText(hList, idx, 1, (LPWSTR)GetPurposeName(purpose));
 
         /* Column 2: Status (set/empty) */
@@ -426,9 +426,9 @@ static void RefreshListView(HWND hList, int selectIndex)
     /* Purpose button: enabled only for S2/S3/C3/C6 (not ESP32/C2/ESP8266) */
     if (hPurpose) {
         BOOL canChange = !connected && count > 0 &&
-                         g_chip.type != CHIP_ESP8266 &&
-                         g_chip.type != CHIP_ESP32 &&
-                         g_chip.type != CHIP_ESP32C2;
+                         g_chip.type != FESP_CHIP_ESP8266 &&
+                         g_chip.type != FESP_CHIP_ESP32 &&
+                         g_chip.type != FESP_CHIP_ESP32C2;
         EnableWindow(hPurpose, canChange);
     }
 }
@@ -692,27 +692,27 @@ static void HandlePurpose(HWND hDlg, HWND hList)
     }
 
     /* Build purpose list */
-    BYTE currentPurpose = Efuse_GetKeyPurpose(&g_chip, sel);
-    BOOL isS3Key5 = ((g_chip.type == CHIP_ESP32S3 ||
-                      g_chip.type == CHIP_ESP32C3 ||
-                      g_chip.type == CHIP_ESP32C6) &&
+    BYTE currentPurpose = fesp_efuse_get_key_purpose(&g_chip, sel);
+    BOOL isS3Key5 = ((g_chip.type == FESP_CHIP_ESP32S3 ||
+                      g_chip.type == FESP_CHIP_ESP32C3 ||
+                      g_chip.type == FESP_CHIP_ESP32C6) &&
                      sel == 5);
 
     /* Simple dialog using MessageBox with choices isn't ideal;
        use a combo box in a dialog. For simplicity, use a track popup menu. */
     HMENU hMenu = CreatePopupMenu();
     const BYTE purposes[] = {
-        KEY_PURPOSE_USER,
-        KEY_PURPOSE_XTS_AES_128_KEY,
-        KEY_PURPOSE_XTS_AES_256_KEY_1,
-        KEY_PURPOSE_XTS_AES_256_KEY_2,
-        KEY_PURPOSE_HMAC_DOWN_ALL,
-        KEY_PURPOSE_HMAC_DOWN_JTAG,
-        KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE,
-        KEY_PURPOSE_HMAC_UP,
-        KEY_PURPOSE_SECURE_BOOT_DIGEST0,
-        KEY_PURPOSE_SECURE_BOOT_DIGEST1,
-        KEY_PURPOSE_SECURE_BOOT_DIGEST2,
+        FESP_KEY_PURPOSE_USER,
+        FESP_KEY_PURPOSE_XTS_AES_128_KEY,
+        FESP_KEY_PURPOSE_XTS_AES_256_KEY_1,
+        FESP_KEY_PURPOSE_XTS_AES_256_KEY_2,
+        FESP_KEY_PURPOSE_HMAC_DOWN_ALL,
+        FESP_KEY_PURPOSE_HMAC_DOWN_JTAG,
+        FESP_KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE,
+        FESP_KEY_PURPOSE_HMAC_UP,
+        FESP_KEY_PURPOSE_SECURE_BOOT_DIGEST0,
+        FESP_KEY_PURPOSE_SECURE_BOOT_DIGEST1,
+        FESP_KEY_PURPOSE_SECURE_BOOT_DIGEST2,
     };
     for (int i = 0; i < (int)(sizeof(purposes) / sizeof(purposes[0])); i++) {
         BYTE p = purposes[i];
@@ -721,9 +721,9 @@ static void HandlePurpose(HWND hDlg, HWND hList)
             flags |= MF_CHECKED;
         }
         /* ESP32-S3/C3/C6 KEY5: disable XTS_AES purposes */
-        if (isS3Key5 && (p == KEY_PURPOSE_XTS_AES_128_KEY ||
-                         p == KEY_PURPOSE_XTS_AES_256_KEY_1 ||
-                         p == KEY_PURPOSE_XTS_AES_256_KEY_2))
+        if (isS3Key5 && (p == FESP_KEY_PURPOSE_XTS_AES_128_KEY ||
+                         p == FESP_KEY_PURPOSE_XTS_AES_256_KEY_1 ||
+                         p == FESP_KEY_PURPOSE_XTS_AES_256_KEY_2))
             flags |= MF_DISABLED;
         AppendMenuW(hMenu, flags, (UINT_PTR)(p + 1), GetPurposeName(p));
     }
@@ -746,7 +746,7 @@ static void HandlePurpose(HWND hDlg, HWND hList)
     }
 
     /* Set new purpose */
-    Efuse_SetKeyPurpose(&g_chip, sel, newPurpose);
+    fesp_efuse_set_key_purpose(&g_chip, sel, newPurpose);
     g_deviceModified = TRUE;
 
     /* Refresh list and keep selection */

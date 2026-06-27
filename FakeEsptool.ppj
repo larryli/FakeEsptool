@@ -19,7 +19,7 @@ AS = poasm.exe#
 RC = porc.exe#
 LINK = polink.exe#
 SIGN = posign.exe#
-INCLUDE = $(PellesCDir)\Include\Win;$(PellesCDir)\Include;src;src\utils;src\esptool;res#
+INCLUDE = $(PellesCDir)\Include\Win;$(PellesCDir)\Include;src;src\utils;src\fesptool;res#
 LIB = $(PellesCDir)\Lib\Win64;$(PellesCDir)\Lib#
 POC_PROJECT_EXECUTOR = #
 POC_PROJECT_ARGUMENTS = #
@@ -36,7 +36,7 @@ AS = poasm.exe#
 RC = porc.exe#
 LINK = polink.exe#
 SIGN = posign.exe#
-INCLUDE = $(PellesCDir)\Include\Win;$(PellesCDir)\Include;src;src\utils;src\esptool;res#
+INCLUDE = $(PellesCDir)\Include\Win;$(PellesCDir)\Include;src;src\utils;src\fesptool;res#
 LIB = $(PellesCDir)\Lib\Win64;$(PellesCDir)\Lib#
 POC_PROJECT_EXECUTOR = #
 POC_PROJECT_ARGUMENTS = #
@@ -56,10 +56,12 @@ FakeEsptool.exe: \
 	output\chip.obj \
 	output\config.obj \
 	output\deflate.obj \
-	output\device.obj \
+	output\device_file.obj \
 	output\device_props.obj \
+	output\efuse.obj \
 	output\encrypt.obj \
 	output\esptool.obj \
+	output\fesptool_hal.obj \
 	output\flash.obj \
 	output\key_mgmt.obj \
 	output\lang.obj \
@@ -80,12 +82,10 @@ output\main.obj: \
 	src\main.c \
 	src\app_commands.h \
 	src\app_logview.h \
+	src\device_file.h \
 	src\dlg\dlg.h \
-	src\esptool\chip.h \
-	src\esptool\device.h \
-	src\esptool\esptool.h \
-	src\esptool\flash.h \
-	src\esptool\slip.h \
+	src\fesptool\fesp.h \
+	src\fesptool_hal.h \
 	src\main.h \
 	src\resource.h \
 	src\serial.h \
@@ -101,6 +101,7 @@ output\serial.obj: \
 	src\serial.c \
 	src\main.h \
 	src\resource.h \
+	src\serial.c \
 	src\serial.h \
 	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
@@ -132,8 +133,10 @@ output\trace.obj: \
 # Build slip.obj.
 # 
 output\slip.obj: \
-	src\esptool\slip.c \
-	src\esptool\slip.h \
+	src\fesptool\slip.c \
+	src\fesptool\fesp.h \
+	src\fesptool\slip.c \
+	src\fesptool\slip.h \
 	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
@@ -141,8 +144,21 @@ output\slip.obj: \
 # Build chip.obj.
 # 
 output\chip.obj: \
-	src\esptool\chip.c \
-	src\esptool\chip.h \
+	src\fesptool\chip.c \
+	src\fesptool\chip.h \
+	src\fesptool\chip_priv.h \
+	src\fesptool\efuse.h \
+	src\utils\trace.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build efuse.obj.
+# 
+output\efuse.obj: \
+	src\fesptool\efuse.c \
+	src\fesptool\chip.h \
+	src\fesptool\efuse.h \
+	src\fesptool\efuse_priv.h \
 	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
@@ -150,8 +166,8 @@ output\chip.obj: \
 # Build flash.obj.
 # 
 output\flash.obj: \
-	src\esptool\flash.c \
-	src\esptool\flash.h \
+	src\fesptool\flash.c \
+	src\fesptool\flash.h \
 	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
@@ -159,25 +175,34 @@ output\flash.obj: \
 # Build esptool.obj.
 # 
 output\esptool.obj: \
-	src\esptool\esptool.c \
-	src\esptool\chip.h \
-	src\esptool\esptool.h \
-	src\esptool\flash.h \
-	src\esptool\slip.h \
-	src\serial.h \
+	src\fesptool\esptool.c \
+	src\fesptool\esptool.h \
+	src\fesptool\esptool_priv.h \
+	src\fesptool_hal.h \
 	src\utils\deflate.h \
-	src\utils\encrypt.h \
-	src\utils\trace.h
+	src\utils\encrypt.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
-# Build device.obj.
+# Build fesptool_hal.obj.
 # 
-output\device.obj: \
-	src\esptool\device.c \
-	src\esptool\chip.h \
-	src\esptool\device.h \
-	src\esptool\flash.h \
+output\fesptool_hal.obj: \
+	src\fesptool_hal.c \
+	src\fesptool_hal.h \
+	src\utils\deflate.h \
+	src\utils\encrypt.h \
+	src\utils\md5.h \
+	src\utils\mem.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build device_file.obj.
+# 
+output\device_file.obj: \
+	src\device_file.c \
+	src\device_file.h \
+	src\fesptool\chip.h \
+	src\fesptool\flash.h \
 	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
@@ -210,25 +235,13 @@ output\app_logview.obj: \
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
-# Build about.obj.
-# 
-output\about.obj: \
-	src\dlg\about.c \
-	src\resource.h \
-	src\utils\lang.h
-	$(CC) $(CCFLAGS) "$!" -Fo"$@"
-
-# 
 # Build device_props.obj.
 # 
 output\device_props.obj: \
 	src\dlg\device_props.c \
 	src\dlg\dlg.h \
-	src\esptool\chip.h \
-	src\esptool\device.h \
-	src\esptool\esptool.h \
-	src\esptool\flash.h \
-	src\esptool\slip.h \
+	src\fesptool\fesp.h \
+	src\fesptool_hal.h \
 	src\resource.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
@@ -238,11 +251,12 @@ output\device_props.obj: \
 output\port_select.obj: \
 	src\dlg\port_select.c \
 	src\dlg\dlg.h \
-	src\esptool\chip.h \
-	src\esptool\device.h \
-	src\esptool\esptool.h \
-	src\esptool\flash.h \
-	src\esptool\slip.h \
+	src\dlg\port_select.c \
+	src\fesptool\chip.h \
+	src\fesptool\esptool.h \
+	src\fesptool\fesp.h \
+	src\fesptool\flash.h \
+	src\fesptool\slip.h \
 	src\resource.h \
 	src\serial.h \
 	src\utils\config.h \
@@ -256,12 +270,14 @@ output\app_commands.obj: \
 	src\app_commands.c \
 	src\app_commands.h \
 	src\app_logview.h \
+	src\device_file.h \
 	src\dlg\dlg.h \
-	src\esptool\chip.h \
-	src\esptool\device.h \
-	src\esptool\esptool.h \
-	src\esptool\flash.h \
-	src\esptool\slip.h \
+	src\fesptool\chip.h \
+	src\fesptool\esptool.h \
+	src\fesptool\fesp.h \
+	src\fesptool\flash.h \
+	src\fesptool\slip.h \
+	src\fesptool_hal.h \
 	src\main.h \
 	src\resource.h \
 	src\serial.h \
@@ -277,11 +293,13 @@ output\key_mgmt.obj: \
 	src\dlg\key_mgmt.c \
 	src\app_commands.h \
 	src\dlg\dlg.h \
-	src\esptool\chip.h \
-	src\esptool\device.h \
-	src\esptool\esptool.h \
-	src\esptool\flash.h \
-	src\esptool\slip.h \
+	src\dlg\key_mgmt.c \
+	src\fesptool\chip.h \
+	src\fesptool\esptool.h \
+	src\fesptool\fesp.h \
+	src\fesptool\flash.h \
+	src\fesptool\slip.h \
+	src\fesptool_hal.h \
 	src\resource.h \
 	src\serial.h \
 	src\utils\config.h \
@@ -311,6 +329,15 @@ output\mem.obj: \
 output\md5.obj: \
 	src\utils\md5.c \
 	src\utils\md5.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build about.obj.
+# 
+output\about.obj: \
+	src\dlg\about.c \
+	src\resource.h \
+	src\utils\lang.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 .SILENT:

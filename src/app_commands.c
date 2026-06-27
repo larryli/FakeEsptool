@@ -6,10 +6,10 @@
 
 #include "app_commands.h"
 #include "app_logview.h"
-#include "esptool/chip.h"
+#include "fesptool/chip.h"
 #include "device_file.h"
-#include "esptool/chip.h"
-#include "esptool/flash.h"
+#include "fesptool/chip.h"
+#include "fesptool/flash.h"
 #include "main.h"
 #include "resource.h"
 #include <commdlg.h>
@@ -246,8 +246,8 @@ static void UpdateEncryptionMenu(HMENU hMenu)
 {
     ENCRYPT_STATE state = g_encryptState;
     if (g_chip.name[0]) {
-        BOOL encrypted = Efuse_IsFlashEncryptionEnabled(&g_chip);
-        BOOL release = Efuse_IsDownloadEncryptDisabled(&g_chip);
+        BOOL encrypted = fesp_efuse_is_flash_encryption_enabled(&g_chip);
+        BOOL release = fesp_efuse_is_download_encrypt_disabled(&g_chip);
         if (encrypted && release) {
             state = ENCRYPT_STATE_RELEASE;
         } else if (encrypted) {
@@ -278,8 +278,8 @@ static void UpdateDownloadMenu(HMENU hMenu)
 {
     DOWNLOAD_MODE mode = g_downloadMode;
     if (g_chip.name[0]) {
-        BOOL dl_disabled = Efuse_IsDownloadModeDisabled(&g_chip);
-        BOOL secure = Efuse_IsSecureDownloadEnabled(&g_chip);
+        BOOL dl_disabled = fesp_efuse_is_download_mode_disabled(&g_chip);
+        BOOL secure = fesp_efuse_is_secure_download_enabled(&g_chip);
         if (dl_disabled) {
             mode = DOWNLOAD_MODE_DISABLED;
         } else if (secure) {
@@ -309,7 +309,7 @@ void Main_CmdEncryptState(HWND hWnd, int state)
 {
     g_encryptState = (ENCRYPT_STATE)state;
     if (g_chip.name[0]) {
-        Efuse_SetFlashEncryption(&g_chip, state);
+        fesp_efuse_set_flash_encryption(&g_chip, state);
         g_deviceModified = TRUE;
     }
     UpdateEncryptionMenu(GetMenu(hWnd));
@@ -326,7 +326,7 @@ void Main_CmdDownloadMode(HWND hWnd, int mode)
 {
     g_downloadMode = (DOWNLOAD_MODE)mode;
     if (g_chip.name[0]) {
-        Efuse_SetDownloadMode(&g_chip, mode);
+        fesp_efuse_set_download_mode(&g_chip, mode);
         g_deviceModified = TRUE;
     }
     UpdateDownloadMenu(GetMenu(hWnd));
@@ -341,8 +341,8 @@ void Main_CmdDownloadMode(HWND hWnd, int mode)
 static UINT GetEncryptStateStrId(void)
 {
     if (g_chip.name[0]) {
-        BOOL encrypted = Efuse_IsFlashEncryptionEnabled(&g_chip);
-        BOOL release = Efuse_IsDownloadEncryptDisabled(&g_chip);
+        BOOL encrypted = fesp_efuse_is_flash_encryption_enabled(&g_chip);
+        BOOL release = fesp_efuse_is_download_encrypt_disabled(&g_chip);
         if (encrypted && release) {
             return IDS_ENCRYPT_RELEASE;
         }
@@ -369,8 +369,8 @@ static UINT GetEncryptStateStrId(void)
 static UINT GetDownloadModeStrId(void)
 {
     if (g_chip.name[0]) {
-        BOOL dl_disabled = Efuse_IsDownloadModeDisabled(&g_chip);
-        BOOL secure = Efuse_IsSecureDownloadEnabled(&g_chip);
+        BOOL dl_disabled = fesp_efuse_is_download_mode_disabled(&g_chip);
+        BOOL secure = fesp_efuse_is_secure_download_enabled(&g_chip);
         if (dl_disabled) {
             return IDS_DOWNLOAD_DISABLED;
         }
@@ -402,7 +402,7 @@ void UpdateMenuState(HWND hWnd)
     HMENU hMenu = GetMenu(hWnd);
     BOOL connected = Serial_IsOpen(&g_serial);
     BOOL canReconnect = CanReconnect();
-    BOOL canKeyMgmt = g_chip.type != CHIP_ESP8266;
+    BOOL canKeyMgmt = g_chip.type != FESP_CHIP_ESP8266;
 
     EnableMenuItem(hMenu, IDM_CONNECT, connected ? MF_GRAYED : MF_ENABLED);
     EnableMenuItem(hMenu, IDM_DISCONNECT, connected ? MF_ENABLED : MF_GRAYED);
@@ -416,9 +416,9 @@ void UpdateMenuState(HWND hWnd)
 
     /* Disable encryption and download mode menus for unsupported chips */
     {
-        BOOL canEncrypt = g_chip.type != CHIP_ESP8266;
-        BOOL canDlMode = g_chip.type != CHIP_ESP8266;
-        BOOL canDlSecure = canDlMode && g_chip.type != CHIP_ESP32;
+        BOOL canEncrypt = g_chip.type != FESP_CHIP_ESP8266;
+        BOOL canDlMode = g_chip.type != FESP_CHIP_ESP8266;
+        BOOL canDlSecure = canDlMode && g_chip.type != FESP_CHIP_ESP32;
         EnableMenuItem(hMenu, IDM_ENCRYPT_NONE,
                        canEncrypt ? MF_ENABLED : MF_GRAYED);
         EnableMenuItem(hMenu, IDM_ENCRYPT_DEV,
@@ -535,8 +535,8 @@ void UpdateStatusBar(void)
 
         /* Tooltip: "40MHz AA:BB:CC:DD:EE:FF" */
         const char *xtal =
-            (g_chip.xtal_freq == XTAL_FREQ_26M) ? "26MHz" : "40MHz";
-        const BYTE *mac = Chip_GetMac(&g_chip);
+            (g_chip.xtal_freq == FESP_XTAL_FREQ_26M) ? "26MHz" : "40MHz";
+        const BYTE *mac = fesp_chip_get_mac(&g_chip);
         WCHAR tipBuf[64];
         wsprintfW(tipBuf, L"%hs %02X:%02X:%02X:%02X:%02X:%02X", xtal, mac[0],
                   mac[1], mac[2], mac[3], mac[4], mac[5]);
@@ -553,13 +553,13 @@ void UpdateStatusBar(void)
                      (LPARAM)LoadStr(GetEncryptStateStrId()));
 
         /* Tooltip: eFuse field values (ESP8266 not supported) */
-        if (g_chip.type == CHIP_ESP8266) {
+        if (g_chip.type == FESP_CHIP_ESP8266) {
             SetPartTooltip(1, L"");
         } else {
-            DWORD crypt = Efuse_GetFlashCryptCnt(&g_chip);
-            DWORD dlEnc = Efuse_GetDlEncryptDisabled(&g_chip);
+            DWORD crypt = fesp_efuse_get_flash_crypt_cnt(&g_chip);
+            DWORD dlEnc = fesp_efuse_get_dl_encrypt_disabled(&g_chip);
             const char *f1 = "SPI_BOOT_CRYPT_CNT";
-            const char *f2 = (g_chip.type == CHIP_ESP32)
+            const char *f2 = (g_chip.type == FESP_CHIP_ESP32)
                                  ? "DISABLE_DL_ENCRYPT"
                                  : "DIS_DOWNLOAD_MANUAL_ENCRYPT";
             WCHAR t1[64], t2[64];
@@ -580,16 +580,16 @@ void UpdateStatusBar(void)
                      (LPARAM)LoadStr(GetDownloadModeStrId()));
 
         /* Tooltip: eFuse field value (ESP8266 not supported) */
-        if (g_chip.type == CHIP_ESP8266) {
+        if (g_chip.type == FESP_CHIP_ESP8266) {
             SetPartTooltip(2, L"");
         } else {
-            DWORD dlMode = Efuse_GetDlModeDisabled(&g_chip);
+            DWORD dlMode = fesp_efuse_get_dl_mode_disabled(&g_chip);
             const char *field;
             switch (g_chip.type) {
-            case CHIP_ESP32:
+            case FESP_CHIP_ESP32:
                 field = "UART_DOWNLOAD_DIS";
                 break;
-            case CHIP_ESP32S3:
+            case FESP_CHIP_ESP32S3:
                 field = "DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE";
                 break;
             default:
@@ -607,17 +607,17 @@ void UpdateStatusBar(void)
 
     /* Part 4: Secure Boot status */
     if (g_chip.name[0]) {
-        BOOL sb = Efuse_IsSecureBootEnabled(&g_chip);
+        BOOL sb = fesp_efuse_is_secure_boot_enabled(&g_chip);
         SendMessageW(g_hStatusbar, SB_SETTEXT, 3,
                      (LPARAM)LoadStr(sb ? IDS_SB_SECURE_BOOT_ENABLED
                                         : IDS_SB_SECURE_BOOT_DISABLED));
 
         /* Tooltip: eFuse field value */
-        DWORD sbFlag = Efuse_GetSecureBootFlag(&g_chip);
-        if (g_chip.type == CHIP_ESP8266 ||
-            g_chip.type == CHIP_ESP32C2) {
+        DWORD sbFlag = fesp_efuse_get_secure_boot_flag(&g_chip);
+        if (g_chip.type == FESP_CHIP_ESP8266 ||
+            g_chip.type == FESP_CHIP_ESP32C2) {
             SetPartTooltip(3, L"");
-        } else if (g_chip.type == CHIP_ESP32) {
+        } else if (g_chip.type == FESP_CHIP_ESP32) {
             WCHAR t1[64], t2[64];
             wsprintfW(t1, LoadStr(IDS_TIP_EFUSE_FIELD), "ABS_DONE_0",
                       (int)(sbFlag & 1));
@@ -639,8 +639,8 @@ void UpdateStatusBar(void)
 
     /* Part 5: JTAG status */
     if (g_chip.name[0]) {
-        int jtagDis = Efuse_GetJtagDisabledCount(&g_chip);
-        int jtagTotal = Efuse_GetJtagTotalCount(&g_chip);
+        int jtagDis = fesp_efuse_get_jtag_disabled_count(&g_chip);
+        int jtagTotal = fesp_efuse_get_jtag_total_count(&g_chip);
         UINT strId;
         if (jtagTotal == 0) {
             strId = IDS_SB_JTAG_ENABLED;
@@ -659,21 +659,21 @@ void UpdateStatusBar(void)
         } else {
             WCHAR lines[4][64];
             int n = 0;
-            if (g_chip.type == CHIP_ESP32) {
+            if (g_chip.type == FESP_CHIP_ESP32) {
                 wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
                           "JTAG_DISABLE",
-                          (int)Efuse_GetJtagFlag(&g_chip));
+                          (int)fesp_efuse_get_jtag_flag(&g_chip));
             } else {
                 wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
                           "DIS_PAD_JTAG",
-                          (int)Efuse_GetJtagFlag(&g_chip));
+                          (int)fesp_efuse_get_jtag_flag(&g_chip));
                 wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
                           "SOFT_DIS_JTAG",
-                          (int)Efuse_GetSoftJtagFlag(&g_chip));
+                          (int)fesp_efuse_get_soft_jtag_flag(&g_chip));
                 if (jtagTotal >= 3) {
                     wsprintfW(lines[n++], LoadStr(IDS_TIP_EFUSE_FIELD),
                               "DIS_USB_JTAG",
-                              (int)Efuse_GetUsbJtagFlag(&g_chip));
+                              (int)fesp_efuse_get_usb_jtag_flag(&g_chip));
                 }
             }
             WCHAR tipBuf[192];
@@ -798,16 +798,16 @@ void Main_CmdNewDevice(HWND hWnd)
 
     /* Create default device: ESP32, 40MHz, 4MB */
     static const BYTE defaultMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0x01};
-    Flash_Close(&g_flash);
-    Chip_Close(&g_chip);
-    if (Chip_Init(&g_chip, CHIP_ESP32) &&
-        Flash_Init(&g_flash, 4 * 1024 * 1024)) {
-        Chip_SetFlashSize(&g_chip, 4 * 1024 * 1024);
-        Chip_SetMac(&g_chip, defaultMac);
-        g_chip.xtal_freq = XTAL_FREQ_40M;
+    fesp_flash_close(&g_flash);
+    fesp_chip_close(&g_chip);
+    if (fesp_chip_init(&g_chip, FESP_CHIP_ESP32) &&
+        fesp_flash_init(&g_flash, 4 * 1024 * 1024)) {
+        fesp_chip_set_flash_size(&g_chip, 4 * 1024 * 1024);
+        fesp_chip_set_mac(&g_chip, defaultMac);
+        g_chip.xtal_freq = FESP_XTAL_FREQ_40M;
         g_deviceModified = FALSE;
         g_deviceFile[0] = 0;
-        EsptoolHal_SetModifiedCallback(OnDeviceModified);
+        FEsptoolSetModifiedCallback(OnDeviceModified);
         UpdateMenuState(hWnd);
         UpdateStatusBar();
         UpdateTitle(hWnd);
@@ -843,10 +843,10 @@ void Main_CmdOpenDevice(HWND hWnd)
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_FILEMUSTEXIST;
     if (GetOpenFileNameW(&ofn)) {
-        Flash_Close(&g_flash);
-        Chip_Close(&g_chip);
+        fesp_flash_close(&g_flash);
+        fesp_chip_close(&g_chip);
         if (DeviceFile_Load(&g_chip, &g_flash, szFile)) {
-            EsptoolHal_SetModifiedCallback(OnDeviceModified);
+            FEsptoolSetModifiedCallback(OnDeviceModified);
             Config_SetLastDeviceFile(szFile);
             UpdateMenuState(hWnd);
             UpdateStatusBar();
@@ -879,10 +879,10 @@ BOOL Main_OpenDeviceFile(HWND hWnd, const WCHAR *filePath)
         return FALSE;
     }
 
-    Flash_Close(&g_flash);
-    Chip_Close(&g_chip);
+    fesp_flash_close(&g_flash);
+    fesp_chip_close(&g_chip);
     if (DeviceFile_Load(&g_chip, &g_flash, filePath)) {
-        EsptoolHal_SetModifiedCallback(OnDeviceModified);
+        FEsptoolSetModifiedCallback(OnDeviceModified);
         Config_SetLastDeviceFile(filePath);
         UpdateMenuState(hWnd);
         UpdateStatusBar();
@@ -1276,8 +1276,8 @@ void Main_OnFlashExport(HWND hMainWnd)
  * Thread frees this structure when done.
  */
 typedef struct {
-    CHIP_CTX chip;             /* Chip context snapshot */
-    FLASH_CTX flash;           /* Flash context snapshot */
+    fesp_chip_ctx_t chip;             /* Chip context snapshot */
+    fesp_flash_ctx_t flash;           /* Flash context snapshot */
     WCHAR deviceFile[MAX_PATH]; /* Device file path */
     BYTE *efuse;              /* eFuse data snapshot */
     DWORD efuseSize;          /* eFuse size */
@@ -1363,7 +1363,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
 #define COUNT_BITS(v) count_set_bits(v)
 
     switch (snap->chip.type) {
-    case CHIP_ESP32: {
+    case FESP_CHIP_ESP32: {
         DWORD flash_crypt_cnt = READ_EFUSE_BITS(0x00, 0x7FUL << 20) >> 20;
         DWORD dl_encrypt = READ_EFUSE_BITS(0x18, 1UL << 7) >> 7;
         DWORD dl_decrypt = READ_EFUSE_BITS(0x18, 1UL << 8) >> 8;
@@ -1377,7 +1377,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         fwprintf(f, L"UART_DOWNLOAD_DIS:   %lu\n", uart_dis);
         break;
     }
-    case CHIP_ESP32S2: {
+    case FESP_CHIP_ESP32S2: {
         DWORD crypt_cnt = READ_EFUSE_BITS(0x34, 7UL << 18) >> 18;
         DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 20) >> 20;
         DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 4) >> 4;
@@ -1389,7 +1389,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:    %lu\n", sec_dl);
         break;
     }
-    case CHIP_ESP32S3: {
+    case FESP_CHIP_ESP32S3: {
         DWORD crypt_cnt = READ_EFUSE_BITS(0x34, 7UL << 18) >> 18;
         DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 20) >> 20;
         DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 4) >> 4;
@@ -1402,7 +1402,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:          %lu\n", sec_dl);
         break;
     }
-    case CHIP_ESP32C2: {
+    case FESP_CHIP_ESP32C2: {
         DWORD crypt_cnt = READ_EFUSE_BITS(0x30, 7UL << 7) >> 7;
         DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 6) >> 6;
         DWORD dl_mode = READ_EFUSE_BITS(0x30, 1UL << 14) >> 14;
@@ -1414,8 +1414,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:    %lu\n", sec_dl);
         break;
     }
-    case CHIP_ESP32C3:
-    case CHIP_ESP32C6: {
+    case FESP_CHIP_ESP32C3:
+    case FESP_CHIP_ESP32C6: {
         DWORD crypt_cnt = READ_EFUSE_BITS(0x34, 7UL << 18) >> 18;
         DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 20) >> 20;
         DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 4) >> 4;
@@ -1439,7 +1439,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     fwprintf(f, L"[JTAG & Secure Boot]\n");
 
     switch (snap->chip.type) {
-    case CHIP_ESP32: {
+    case FESP_CHIP_ESP32: {
         DWORD jtag_dis = READ_EFUSE_BITS(0x18, 1UL << 6) >> 6;
         DWORD abs_done0 = READ_EFUSE_BITS(0x18, 1UL << 4) >> 4;
         DWORD abs_done1 = READ_EFUSE_BITS(0x18, 1UL << 5) >> 5;
@@ -1448,7 +1448,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         fwprintf(f, L"ABS_DONE_1:      %lu (Secure Boot V2)\n", abs_done1);
         break;
     }
-    case CHIP_ESP32S2: {
+    case FESP_CHIP_ESP32S2: {
         DWORD pad_jtag = READ_EFUSE_BITS(0x30, 1UL << 19) >> 19;
         DWORD soft_jtag = READ_EFUSE_BITS(0x30, 1UL << 17) >> 17;
         DWORD force_dl = READ_EFUSE_BITS(0x30, 1UL << 12) >> 12;
@@ -1467,7 +1467,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         fwprintf(f, L"SECURE_BOOT_KEY_REVOKE2:    %lu\n", revoke2);
         break;
     }
-    case CHIP_ESP32S3: {
+    case FESP_CHIP_ESP32S3: {
         DWORD pad_jtag = READ_EFUSE_BITS(0x30, 1UL << 19) >> 19;
         DWORD soft_jtag = (READ_EFUSE_BITS(0x30, 7UL << 16) >> 16);
         DWORD usb_jtag = READ_EFUSE_BITS(0x38, 1UL << 22) >> 22;
@@ -1491,14 +1491,14 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         fwprintf(f, L"SECURE_BOOT_KEY_REVOKE2:    %lu\n", revoke2);
         break;
     }
-    case CHIP_ESP32C2: {
+    case FESP_CHIP_ESP32C2: {
         DWORD force_dl = READ_EFUSE_BITS(0x30, 1UL << 14) >> 14;
         fwprintf(f, L"DIS_FORCE_DOWNLOAD:         %lu\n", force_dl);
         fwprintf(f, L"(JTAG and Secure Boot not supported)\n");
         break;
     }
-    case CHIP_ESP32C3:
-    case CHIP_ESP32C6: {
+    case FESP_CHIP_ESP32C3:
+    case FESP_CHIP_ESP32C6: {
         DWORD pad_jtag = READ_EFUSE_BITS(0x30, 1UL << 19) >> 19;
         DWORD soft_jtag = (READ_EFUSE_BITS(0x30, 7UL << 16) >> 16);
         DWORD usb_jtag = READ_EFUSE_BITS(0x30, 1UL << 9) >> 9;
@@ -1546,7 +1546,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     int key_count = 0;
 
     switch (snap->chip.type) {
-    case CHIP_ESP32: {
+    case FESP_CHIP_ESP32: {
         static const KEY_INFO esp32_keys[] = {
             {"BLOCK1", 0x38, 32},
             {"BLOCK2", 0x58, 32},
@@ -1556,8 +1556,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         key_count = 3;
         break;
     }
-    case CHIP_ESP32S2:
-    case CHIP_ESP32S3: {
+    case FESP_CHIP_ESP32S2:
+    case FESP_CHIP_ESP32S3: {
         static const KEY_INFO s2s3_keys[] = {
             {"KEY0", 0x9C, 32}, {"KEY1", 0xBC, 32},  {"KEY2", 0xDC, 32},
             {"KEY3", 0xFC, 32}, {"KEY4", 0x11C, 32}, {"KEY5", 0x13C, 32},
@@ -1566,7 +1566,7 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         key_count = 6;
         break;
     }
-    case CHIP_ESP32C2: {
+    case FESP_CHIP_ESP32C2: {
         static const KEY_INFO c2_keys[] = {
             {"KEY0", 0x60, 32},
         };
@@ -1574,8 +1574,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         key_count = 1;
         break;
     }
-    case CHIP_ESP32C3:
-    case CHIP_ESP32C6: {
+    case FESP_CHIP_ESP32C3:
+    case FESP_CHIP_ESP32C6: {
         static const KEY_INFO c3c6_keys[] = {
             {"KEY0", 0x9C, 32}, {"KEY1", 0xBC, 32},  {"KEY2", 0xDC, 32},
             {"KEY3", 0xFC, 32}, {"KEY4", 0x11C, 32}, {"KEY5", 0x13C, 32},
@@ -1605,43 +1605,43 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         }
 
         /* Get actual KEY_PURPOSE from eFuse */
-        BYTE purpose = Efuse_GetKeyPurpose(&snap->chip, i);
+        BYTE purpose = fesp_efuse_get_key_purpose(&snap->chip, i);
         const WCHAR *purposeStr;
         switch (purpose) {
-        case KEY_PURPOSE_USER:
+        case FESP_KEY_PURPOSE_USER:
             purposeStr = L"USER (0)";
             break;
-        case KEY_PURPOSE_RESERVED:
+        case FESP_KEY_PURPOSE_RESERVED:
             purposeStr = L"RESERVED (1)";
             break;
-        case KEY_PURPOSE_XTS_AES_256_KEY_1:
+        case FESP_KEY_PURPOSE_XTS_AES_256_KEY_1:
             purposeStr = L"XTS-AES-256-1 (2)";
             break;
-        case KEY_PURPOSE_XTS_AES_256_KEY_2:
+        case FESP_KEY_PURPOSE_XTS_AES_256_KEY_2:
             purposeStr = L"XTS-AES-256-2 (3)";
             break;
-        case KEY_PURPOSE_XTS_AES_128_KEY:
+        case FESP_KEY_PURPOSE_XTS_AES_128_KEY:
             purposeStr = L"XTS-AES-128 (4)";
             break;
-        case KEY_PURPOSE_HMAC_DOWN_ALL:
+        case FESP_KEY_PURPOSE_HMAC_DOWN_ALL:
             purposeStr = L"HMAC-DOWN-ALL (5)";
             break;
-        case KEY_PURPOSE_HMAC_DOWN_JTAG:
+        case FESP_KEY_PURPOSE_HMAC_DOWN_JTAG:
             purposeStr = L"HMAC-DOWN-JTAG (6)";
             break;
-        case KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE:
+        case FESP_KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE:
             purposeStr = L"HMAC-DOWN-SIG (7)";
             break;
-        case KEY_PURPOSE_HMAC_UP:
+        case FESP_KEY_PURPOSE_HMAC_UP:
             purposeStr = L"HMAC-UP (8)";
             break;
-        case KEY_PURPOSE_SECURE_BOOT_DIGEST0:
+        case FESP_KEY_PURPOSE_SECURE_BOOT_DIGEST0:
             purposeStr = L"SEC-BOOT-DIG0 (9)";
             break;
-        case KEY_PURPOSE_SECURE_BOOT_DIGEST1:
+        case FESP_KEY_PURPOSE_SECURE_BOOT_DIGEST1:
             purposeStr = L"SEC-BOOT-DIG1 (10)";
             break;
-        case KEY_PURPOSE_SECURE_BOOT_DIGEST2:
+        case FESP_KEY_PURPOSE_SECURE_BOOT_DIGEST2:
             purposeStr = L"SEC-BOOT-DIG2 (11)";
             break;
         default:

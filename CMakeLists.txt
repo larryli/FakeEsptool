@@ -17,12 +17,12 @@ add_executable(FakeEsptool WIN32
     src/main.c
     src/serial.c
     src/device_file.c
-    src/esptool_hal.c
-    src/esptool/slip.c
-    src/esptool/chip.c
-    src/esptool/efuse.c
-    src/esptool/flash.c
-    src/esptool/esptool.c
+    src/fesptool_hal.c
+    src/fesptool/slip.c
+    src/fesptool/chip.c
+    src/fesptool/efuse.c
+    src/fesptool/flash.c
+    src/fesptool/esptool.c
     src/utils/config.c
     src/utils/lang.c
     src/utils/trace.c

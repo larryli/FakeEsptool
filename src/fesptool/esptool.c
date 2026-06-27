@@ -4,10 +4,10 @@
  * Parses SLIP frames, routes commands, and sends responses.
  */
 
-#include "../esptool_hal.h"
+#include "../fesptool_hal.h"
 #include "../utils/deflate.h"
 #include "../utils/encrypt.h"
-#include "esptool.h"
+#include "esptool_priv.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -18,10 +18,10 @@ static const char *TAG = "ESP";
 /* Command info structure */
 typedef struct {
     const char *name;
-} ESP_CMD_INFO;
+} FESP_CMD_INFO;
 
 /* Command table for protocol logging */
-static const ESP_CMD_INFO commandTable[256] = {
+static const FESP_CMD_INFO commandTable[256] = {
     [0x02] = {"FLASH_BEGIN"},
     [0x03] = {"FLASH_DATA"},
     [0x04] = {"FLASH_END"},
@@ -60,7 +60,7 @@ static const ESP_CMD_INFO commandTable[256] = {
 /* Minimum packet size check macro */
 #define CHECK_PKT_SIZE(pkt, min_size)                                          \
     if ((pkt)->size < (min_size)) {                                            \
-        EsptoolHal_LogD(TAG, "Packet too small: cmd=0x%02X size=%u min=%u",        \
+        FESP_HAL_LOGD(TAG, "Packet too small: cmd=0x%02X size=%u min=%u",        \
                     (pkt)->command, (pkt)->size, (min_size));                  \
         return;                                                                \
     }
@@ -73,12 +73,12 @@ static const char *GetCmdName(uint8_t cmd)
 }
 
 /* Little-endian byte readers */
-static inline uint16_t ReadLE16(const uint8_t *p)
+static inline uint16_t read_le16(const uint8_t *p)
 {
     return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
 }
 
-static inline uint32_t ReadLE32(const uint8_t *p)
+static inline uint32_t read_le32(const uint8_t *p)
 {
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
            ((uint32_t)p[3] << 24);
@@ -89,7 +89,7 @@ static inline uint32_t ReadLE32(const uint8_t *p)
    Full response data is all zeros (4-byte status). */
 static const uint8_t sync_prefix[3] = {0x07, 0x07, 0x12};
 
-uint8_t Esptool_CalcChecksum(const uint8_t *data, int len)
+uint8_t fesp_calc_checksum(const uint8_t *data, int len)
 {
     uint8_t sum = 0xEF;
     for (int i = 0; i < len; i++) {
@@ -99,12 +99,12 @@ uint8_t Esptool_CalcChecksum(const uint8_t *data, int len)
 }
 
 /*
- * Defl_FreeBuffer - Free deflate accumulation buffer (without writing to flash)
+ * defl_free_buffer - Free deflate accumulation buffer (without writing to flash)
  */
-static void Defl_FreeBuffer(ESPTOOL_CTX *ctx)
+static void defl_free_buffer(fesp_ctx_t *ctx)
 {
     if (ctx->defl_buf) {
-        EsptoolHal_MemFree(ctx->defl_buf);
+        fesp_hal_mem_free(ctx->defl_buf);
         ctx->defl_buf = NULL;
     }
     ctx->defl_buf_size = 0;
@@ -119,19 +119,19 @@ static void Defl_FreeBuffer(ESPTOOL_CTX *ctx)
  * @len:        Data length in bytes
  * @flash_addr: Flash address for tweak calculation
  *
- * Returns ESP_OK on success or if encryption not enabled, ESP_FAIL on error.
+ * Returns FESP_OK on success or if encryption not enabled, FESP_FAIL on error.
  */
-static uint32_t Esptool_EncryptInPlace(ESPTOOL_CTX *ctx, uint8_t *data, uint32_t len,
+static uint32_t Esptool_EncryptInPlace(fesp_ctx_t *ctx, uint8_t *data, uint32_t len,
                                     uint32_t flash_addr)
 {
     if (!ctx->flash_encrypted) {
-        return ESP_OK;
+        return FESP_OK;
     }
 
     int key_len = 0;
-    int key_offset = Efuse_GetEncryptionKeyOffset(ctx->chip, &key_len);
+    int key_offset = fesp_efuse_get_encryption_key_offset(ctx->chip, &key_len);
 
-    EsptoolHal_LogD(TAG,
+    FESP_HAL_LOGD(TAG,
                 "EncryptInPlace: flash_encrypted=%d key_offset=0x%02X "
                 "key_len=%d efuse=%p efuse_size=%d",
                 ctx->flash_encrypted, key_offset, key_len, ctx->chip->efuse,
@@ -139,47 +139,47 @@ static uint32_t Esptool_EncryptInPlace(ESPTOOL_CTX *ctx, uint8_t *data, uint32_t
 
     if (key_offset < 0 || !ctx->chip->efuse ||
         key_offset + key_len > ctx->chip->efuse_size) {
-        EsptoolHal_LogD(TAG, "EncryptInPlace: No encryption key available");
-        EsptoolHal_LogE("ERR", "  No encryption key in eFuse");
-        return ESP_FAIL;
+        FESP_HAL_LOGD(TAG, "EncryptInPlace: No encryption key available");
+        fesp_hal_log_e("ERR", "  No encryption key in eFuse");
+        return FESP_FAIL;
     }
 
     const uint8_t *key = &ctx->chip->efuse[key_offset];
-    EsptoolHal_LogD(TAG,
+    FESP_HAL_LOGD(TAG,
                 "EncryptInPlace: Key first 8 bytes: %02X %02X %02X %02X %02X "
                 "%02X %02X %02X",
                 key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7]);
 
     ENCRYPT_CTX enc_ctx;
-    int ret = EsptoolHal_EncryptInit(&enc_ctx, key, key_len, flash_addr);
-    EsptoolHal_LogD(TAG,
+    int ret = fesp_hal_encrypt_init(&enc_ctx, key, key_len, flash_addr);
+    FESP_HAL_LOGD(TAG,
                 "EncryptInPlace: Encrypt_Init ret=%d flash_addr=0x%08lX "
                 "len=%lu key_len=%d",
                 ret, flash_addr, len, key_len);
 
     if (ret == ENCRYPT_OK) {
-        ret = EsptoolHal_EncryptData(&enc_ctx, data, data, len);
+        ret = fesp_hal_encrypt_data(&enc_ctx, data, data, len);
     }
 
     if (ret == ENCRYPT_OK) {
-        EsptoolHal_LogD(
+        FESP_HAL_LOGD(
             TAG,
             "EncryptInPlace: Success, encrypted %lu bytes at offset 0x%08lX",
             len, flash_addr);
-        EsptoolHal_LogD(TAG,
+        FESP_HAL_LOGD(TAG,
                     "EncryptInPlace: Output first 8 bytes: %02X %02X %02X %02X "
                     "%02X %02X %02X %02X",
                     data[0], data[1], data[2], data[3], data[4], data[5],
                     data[6], data[7]);
-        EsptoolHal_LogI("ESP",
+        fesp_hal_log_i("ESP",
                         "  Encrypted %lu bytes at offset 0x%08lX", len,
                         flash_addr);
-        return ESP_OK;
+        return FESP_OK;
     }
 
-    EsptoolHal_LogD(TAG, "EncryptInPlace: Encryption failed ret=%d", ret);
-    EsptoolHal_LogE("ERR", "  Encryption failed: %d", ret);
-    return ESP_FAIL;
+    FESP_HAL_LOGD(TAG, "EncryptInPlace: Encryption failed ret=%d", ret);
+    fesp_hal_log_e("ERR", "  Encryption failed: %d", ret);
+    return FESP_FAIL;
 }
 
 /*
@@ -190,117 +190,117 @@ static uint32_t Esptool_EncryptInPlace(ESPTOOL_CTX *ctx, uint8_t *data, uint32_t
  * @len:        Data length in bytes
  * @flash_addr: Flash address for tweak calculation
  *
- * Returns ESP_OK on success or if decryption not needed, ESP_FAIL on error.
+ * Returns FESP_OK on success or if decryption not needed, FESP_FAIL on error.
  */
-static uint32_t Esptool_DecryptInPlace(ESPTOOL_CTX *ctx, uint8_t *data, uint32_t len,
+static uint32_t Esptool_DecryptInPlace(fesp_ctx_t *ctx, uint8_t *data, uint32_t len,
                                     uint32_t flash_addr)
 {
-    if (!Efuse_IsFlashEncryptionEnabled(ctx->chip)) {
-        return ESP_OK;
+    if (!fesp_efuse_is_flash_encryption_enabled(ctx->chip)) {
+        return FESP_OK;
     }
 
     /* ESP32: DISABLE_DL_DECRYPT disables decryption in download mode */
-    if (Efuse_IsDownloadDecryptDisabled(ctx->chip)) {
-        EsptoolHal_LogD(
+    if (fesp_efuse_is_download_decrypt_disabled(ctx->chip)) {
+        FESP_HAL_LOGD(
             TAG,
             "DecryptInPlace: DISABLE_DL_DECRYPT set, returning ciphertext");
-        return ESP_OK;
+        return FESP_OK;
     }
 
     int key_len = 0;
-    int key_offset = Efuse_GetEncryptionKeyOffset(ctx->chip, &key_len);
+    int key_offset = fesp_efuse_get_encryption_key_offset(ctx->chip, &key_len);
 
     if (key_offset < 0 || !ctx->chip->efuse ||
         key_offset + key_len > ctx->chip->efuse_size) {
-        EsptoolHal_LogD(TAG, "DecryptInPlace: No encryption key available");
-        return ESP_FAIL;
+        FESP_HAL_LOGD(TAG, "DecryptInPlace: No encryption key available");
+        return FESP_FAIL;
     }
 
     const uint8_t *key = &ctx->chip->efuse[key_offset];
     ENCRYPT_CTX enc_ctx;
-    int ret = EsptoolHal_EncryptInit(&enc_ctx, key, key_len, flash_addr);
+    int ret = fesp_hal_encrypt_init(&enc_ctx, key, key_len, flash_addr);
 
     if (ret == ENCRYPT_OK) {
-        ret = EsptoolHal_DecryptData(&enc_ctx, data, data, len);
+        ret = fesp_hal_decrypt_data(&enc_ctx, data, data, len);
     }
 
     if (ret == ENCRYPT_OK) {
-        EsptoolHal_LogD(
+        FESP_HAL_LOGD(
             TAG,
             "DecryptInPlace: Success, decrypted %lu bytes at offset 0x%08lX",
             len, flash_addr);
-        return ESP_OK;
+        return FESP_OK;
     }
 
-    EsptoolHal_LogD(TAG, "DecryptInPlace: Decryption failed ret=%d", ret);
-    return ESP_FAIL;
+    FESP_HAL_LOGD(TAG, "DecryptInPlace: Decryption failed ret=%d", ret);
+    return FESP_FAIL;
 }
 
 /* Flush deflate accumulation buffer: decompress and write to flash.
-   Returns ESP_OK on success, ESP_FAIL on failure. */
-static uint32_t Defl_FlushBuffer(ESPTOOL_CTX *ctx)
+   Returns FESP_OK on success, FESP_FAIL on failure. */
+static uint32_t defl_flush_buffer(fesp_ctx_t *ctx)
 {
     if (!ctx->defl_buf || ctx->defl_buf_size == 0 || ctx->defl_unc_size == 0) {
-        Defl_FreeBuffer(ctx);
-        return ESP_OK;
+        defl_free_buffer(ctx);
+        return FESP_OK;
     }
 
     /* Reuse or allocate decompression buffer */
     if (ctx->decomp_buf && ctx->decomp_buf_cap < ctx->defl_unc_size) {
-        EsptoolHal_MemFree(ctx->decomp_buf);
+        fesp_hal_mem_free(ctx->decomp_buf);
         ctx->decomp_buf = NULL;
         ctx->decomp_buf_cap = 0;
     }
     if (!ctx->decomp_buf) {
-        ctx->decomp_buf = (uint8_t *)EsptoolHal_MemZeroAlloc(ctx->defl_unc_size);
+        ctx->decomp_buf = (uint8_t *)fesp_hal_mem_zero_alloc(ctx->defl_unc_size);
         if (!ctx->decomp_buf) {
-            EsptoolHal_LogD(TAG, "Failed to allocate decompression buffer");
-            EsptoolHal_LogE("ERR",
+            FESP_HAL_LOGD(TAG, "Failed to allocate decompression buffer");
+            fesp_hal_log_e("ERR",
                            "  Failed to allocate decompression buffer");
-            Defl_FreeBuffer(ctx);
-            return ESP_FAIL;
+            defl_free_buffer(ctx);
+            return FESP_FAIL;
         }
         ctx->decomp_buf_cap = ctx->defl_unc_size;
     }
 
     /* Initialize decompressor */
     DEFLATE_CTX deflate_ctx;
-    EsptoolHal_DeflateInit(&deflate_ctx, ctx->defl_buf, ctx->defl_buf_size,
+    fesp_hal_deflate_init(&deflate_ctx, ctx->defl_buf, ctx->defl_buf_size,
                  ctx->decomp_buf, ctx->decomp_buf_cap);
 
     /* Decompress */
-    int ret = EsptoolHal_DeflateDecompress(&deflate_ctx);
+    int ret = fesp_hal_deflate_decompress(&deflate_ctx);
     if (ret != DEFLATE_OK) {
-        EsptoolHal_LogD(TAG, "Decompression failed: %d", ret);
-        EsptoolHal_LogE("ERR", "  Decompression failed: %d",
+        FESP_HAL_LOGD(TAG, "Decompression failed: %d", ret);
+        fesp_hal_log_e("ERR", "  Decompression failed: %d",
                         ret);
-        Defl_FreeBuffer(ctx);
-        return ESP_FAIL;
+        defl_free_buffer(ctx);
+        return FESP_FAIL;
     }
 
     uint32_t decomp_size = (uint32_t)deflate_ctx.out_pos;
-    EsptoolHal_LogD(TAG, "Defl flush: %lu -> %lu bytes at offset 0x%08lX",
+    FESP_HAL_LOGD(TAG, "Defl flush: %lu -> %lu bytes at offset 0x%08lX",
                 ctx->defl_buf_size, decomp_size, ctx->defl_offset);
-    EsptoolHal_LogI("ESP",
+    fesp_hal_log_i("ESP",
                     "  Decompressed %lu -> %lu bytes at offset 0x%08lX",
                     ctx->defl_buf_size, decomp_size, ctx->defl_offset);
 
     /* Encrypt if encrypted flag was set */
     if (Esptool_EncryptInPlace(ctx, ctx->decomp_buf, decomp_size,
-                               ctx->defl_offset) != ESP_OK) {
-        Defl_FreeBuffer(ctx);
-        return ESP_FAIL;
+                               ctx->defl_offset) != FESP_OK) {
+        defl_free_buffer(ctx);
+        return FESP_FAIL;
     }
 
     /* Write to flash */
-    Flash_Write(ctx->flash, ctx->defl_offset, ctx->decomp_buf, decomp_size);
+    fesp_flash_write(ctx->flash, ctx->defl_offset, ctx->decomp_buf, decomp_size);
 
-    Defl_FreeBuffer(ctx);
-    return ESP_OK;
+    defl_free_buffer(ctx);
+    return FESP_OK;
 }
 
 /*
- * Esptool_Init - Initialize ESP protocol context
+ * fesp_init - Initialize ESP protocol context
  *
  * Binds protocol context to device chip and flash data.
  * Must be called before any other Esptool_* function.
@@ -309,13 +309,13 @@ static uint32_t Defl_FlushBuffer(ESPTOOL_CTX *ctx)
  * @chip:  Pointer to chip context (not owned by esptool)
  * @flash: Pointer to flash context (not owned by esptool)
  */
-void Esptool_Init(ESPTOOL_CTX *ctx, CHIP_CTX *chip, FLASH_CTX *flash)
+void fesp_init(fesp_ctx_t *ctx, fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash)
 {
-    memset(ctx, 0, sizeof(ESPTOOL_CTX));
-    Slip_Init(&ctx->slip);
+    memset(ctx, 0, sizeof(fesp_ctx_t));
+    fesp_slip_init(&ctx->slip);
     ctx->chip = chip;
     ctx->flash = flash;
-    ctx->state = ESP_STATE_IDLE;
+    ctx->state = FESP_STATE_IDLE;
     ctx->synced = false;
     ctx->stub_mode = false;
     ctx->defl_buf = NULL;
@@ -326,37 +326,37 @@ void Esptool_Init(ESPTOOL_CTX *ctx, CHIP_CTX *chip, FLASH_CTX *flash)
 }
 
 /*
- * Esptool_Close - Release persistent resources
+ * fesp_close - Release persistent resources
  *
  * Frees decompression buffer and any pending deflate buffer.
  * Call when shutting down the protocol handler.
  *
  * @ctx: Pointer to protocol context
  */
-void Esptool_Close(ESPTOOL_CTX *ctx)
+void fesp_close(fesp_ctx_t *ctx)
 {
-    Defl_FreeBuffer(ctx);
+    defl_free_buffer(ctx);
     if (ctx->decomp_buf) {
-        EsptoolHal_MemFree(ctx->decomp_buf);
+        fesp_hal_mem_free(ctx->decomp_buf);
         ctx->decomp_buf = NULL;
         ctx->decomp_buf_cap = 0;
     }
 }
 
 /*
- * Esptool_ResetState - Reset protocol state machine
+ * fesp_reset_state - Reset protocol state machine
  *
  * Resets protocol state to IDLE, frees pending deflate buffer,
  * and clears all session data. Called on download mode entry.
  *
  * @ctx: Pointer to protocol context
  */
-void Esptool_ResetState(ESPTOOL_CTX *ctx)
+void fesp_reset_state(fesp_ctx_t *ctx)
 {
     /* Free deflate buffer without writing (reset scenario) */
-    Defl_FreeBuffer(ctx);
+    defl_free_buffer(ctx);
 
-    ctx->state = ESP_STATE_IDLE;
+    ctx->state = FESP_STATE_IDLE;
     ctx->synced = false;
     ctx->stub_mode = false;
     ctx->flash_offset = 0;
@@ -366,9 +366,9 @@ void Esptool_ResetState(ESPTOOL_CTX *ctx)
     ctx->defl_offset = 0;
     ctx->defl_unc_size = 0;
     ctx->flash_encrypted = false;
-    Slip_Reset(&ctx->slip);
-    EsptoolHal_LogD(TAG, "Protocol state reset to IDLE");
-    EsptoolHal_LogI("ESP", "  Protocol state reset");
+    fesp_slip_reset(&ctx->slip);
+    FESP_HAL_LOGD(TAG, "Protocol state reset to IDLE");
+    fesp_hal_log_i("ESP", "  Protocol state reset");
 }
 
 
@@ -376,18 +376,18 @@ void Esptool_ResetState(ESPTOOL_CTX *ctx)
 
 
 /*
- * Esptool_SendResponseEx - Send protocol response with configurable status
+ * fesp_send_response_ex - Send protocol response with configurable status
  * length
  *
  * @ctx:        Protocol context
  * @cmd:        Command code (response will echo this)
  * @req_val:    Value field in response (usually last READ_REG value)
- * @status:     Status code (ESP_OK or ESP_FAIL)
+ * @status:     Status code (FESP_OK or FESP_FAIL)
  * @status_len: Status length in bytes (2 for stub, 4 for ROM)
  * @data:       Optional data payload (can be NULL)
  * @data_len:   Data payload length
  */
-void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, uint8_t cmd, uint32_t req_val,
+void fesp_send_response_ex(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
                             uint32_t status, uint8_t status_len, const uint8_t *data,
                             uint16_t data_len)
 {
@@ -397,22 +397,22 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, uint8_t cmd, uint32_t req_val,
     /* Calculate total size: header(8) + data_len */
     uint16_t total_data_len = data_len;
 
-    EsptoolHal_LogD(TAG,
+    FESP_HAL_LOGD(TAG,
                 "SendResponse cmd=0x%02X req_val=0x%08lX status=0x%08lX "
                 "status_len=%u data_len=%u",
                 cmd, req_val, status, status_len, data_len);
 
     /* Check if data fits in response buffer */
     if (data_len > sizeof(resp) - 8) {
-        EsptoolHal_LogD(TAG, "Response too large: cmd=0x%02X data_len=%u max=%zu",
+        FESP_HAL_LOGD(TAG, "Response too large: cmd=0x%02X data_len=%u max=%zu",
                     cmd, data_len, sizeof(resp) - 8);
-        EsptoolHal_LogE("ERR",
+        fesp_hal_log_e("ERR",
                         "Response too large: cmd=0x%02X size=%u", cmd,
                         data_len);
         return;
     }
 
-    resp[pos++] = ESP_DIR_RESPONSE;
+    resp[pos++] = FESP_DIR_RESPONSE;
     resp[pos++] = cmd;
     resp[pos++] = (uint8_t)(total_data_len & 0xFF);
     resp[pos++] = (uint8_t)(total_data_len >> 8);
@@ -438,52 +438,52 @@ void Esptool_SendResponseEx(ESPTOOL_CTX *ctx, uint8_t cmd, uint32_t req_val,
     if (encoded_max <= sizeof(encoded_stack)) {
         encoded = encoded_stack;
     } else {
-        encoded = (uint8_t *)EsptoolHal_MemAlloc(encoded_max);
+        encoded = (uint8_t *)fesp_hal_mem_alloc(encoded_max);
         if (!encoded) {
-            EsptoolHal_LogD(TAG, "Failed to allocate encoded buffer (%lu bytes)",
+            FESP_HAL_LOGD(TAG, "Failed to allocate encoded buffer (%lu bytes)",
                         encoded_max);
             return;
         }
         used_heap = true;
     }
 
-    int enc_len = Slip_Encode(resp, pos, encoded, encoded_max);
+    int enc_len = fesp_slip_encode(resp, pos, encoded, encoded_max);
     if (enc_len > 0) {
-        EsptoolHal_Write(encoded, (uint32_t)enc_len);
+        fesp_hal_write(encoded, (uint32_t)enc_len);
     }
 
     if (used_heap) {
-        EsptoolHal_MemFree(encoded);
+        fesp_hal_mem_free(encoded);
     }
 
     const char *cmdName = GetCmdName(cmd);
-    EsptoolHal_LogI("ESP", "[RES] %hs size=%u status=0x%08lX",
+    fesp_hal_log_i("ESP", "[RES] %hs size=%u status=0x%08lX",
                     cmdName, total_data_len, status);
 
-    EsptoolHal_LogD(TAG, "TX cmd=0x%02X status=%lu len=%u", cmd, status,
+    FESP_HAL_LOGD(TAG, "TX cmd=0x%02X status=%lu len=%u", cmd, status,
                 total_data_len);
 }
 
 /*
- * Esptool_SendResponse - Send protocol response with 4-byte status
+ * fesp_send_response - Send protocol response with 4-byte status
  *
- * Convenience wrapper for Esptool_SendResponseEx with status_len=4.
+ * Convenience wrapper for fesp_send_response_ex with status_len=4.
  *
  * @ctx:      Pointer to protocol context
  * @cmd:      Command code (response will echo this)
  * @req_val:  Value field in response
- * @status:   Status code (ESP_OK or ESP_FAIL)
+ * @status:   Status code (FESP_OK or FESP_FAIL)
  * @data:     Optional data payload (can be NULL)
  * @data_len: Data payload length
  */
-void Esptool_SendResponse(ESPTOOL_CTX *ctx, uint8_t cmd, uint32_t req_val,
+void fesp_send_response(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
                           uint32_t status, const uint8_t *data, uint16_t data_len)
 {
-    Esptool_SendResponseEx(ctx, cmd, req_val, status, 4, data, data_len);
+    fesp_send_response_ex(ctx, cmd, req_val, status, 4, data, data_len);
 }
 
 /*
- * ParsePacket - Parse raw SLIP frame into ESP_PACKET structure
+ * parse_packet - Parse raw SLIP frame into fesp_packet_t structure
  *
  * Extracts direction, command, size, value, and data fields from frame.
  *
@@ -493,7 +493,7 @@ void Esptool_SendResponse(ESPTOOL_CTX *ctx, uint8_t cmd, uint32_t req_val,
  *
  * Returns true on success, false if frame is too short or malformed.
  */
-static bool ParsePacket(const uint8_t *frame, int frame_len, ESP_PACKET *pkt)
+static bool parse_packet(const uint8_t *frame, int frame_len, fesp_packet_t *pkt)
 {
     if (frame_len < 8) {
         return false;
@@ -501,8 +501,8 @@ static bool ParsePacket(const uint8_t *frame, int frame_len, ESP_PACKET *pkt)
 
     pkt->direction = frame[0];
     pkt->command = frame[1];
-    pkt->size = ReadLE16(frame + 2);
-    pkt->value = ReadLE32(frame + 4);
+    pkt->size = read_le16(frame + 2);
+    pkt->value = read_le32(frame + 4);
 
     if (pkt->size > 0) {
         if (frame_len < 8 + pkt->size) {
@@ -518,7 +518,7 @@ static bool ParsePacket(const uint8_t *frame, int frame_len, ESP_PACKET *pkt)
 }
 
 /*
- * HandleSync - Handle SYNC command (0x08)
+ * handle_sync - Handle SYNC command (0x08)
  *
  * Synchronizes with esptool client. Transitions state to SYNCED.
  * Sends 8 consecutive responses as real device does.
@@ -526,11 +526,11 @@ static bool ParsePacket(const uint8_t *frame, int frame_len, ESP_PACKET *pkt)
  * @ctx: Pointer to protocol context
  * @pkt: Pointer to parsed request packet
  */
-static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_sync(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
-    EsptoolHal_LogD(TAG, "SYNC received");
-    EsptoolHal_LogI("ESP", "  Sync handshake");
-    ctx->state = ESP_STATE_SYNCED;
+    FESP_HAL_LOGD(TAG, "SYNC received");
+    fesp_hal_log_i("ESP", "  Sync handshake");
+    ctx->state = FESP_STATE_SYNCED;
     ctx->synced = true;
     ctx->stub_mode = false;
 
@@ -542,13 +542,13 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
     /* Real device sends 8 consecutive responses per SYNC request.
        Response format: Size=4, Data=4 bytes status (0x00000000) */
-    for (int i = 0; i < ESP_SYNC_RESPONSE_COUNT; i++) {
-        Esptool_SendResponseEx(ctx, ESP_CMD_SYNC, sync_val, ESP_OK, 4, NULL, 4);
+    for (int i = 0; i < FESP_SYNC_RESPONSE_COUNT; i++) {
+        fesp_send_response_ex(ctx, FESP_CMD_SYNC, sync_val, FESP_OK, 4, NULL, 4);
     }
 }
 
 /*
- * HandleReadReg - Handle READ_REG command (0x0A)
+ * handle_read_reg - Handle READ_REG command (0x0A)
  *
  * Reads a register value. Transitions to READY when chip detection
  * register (0x40001000) is read.
@@ -556,36 +556,36 @@ static void HandleSync(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * @ctx: Pointer to protocol context
  * @pkt: Pointer to parsed request packet (data = 4-byte address)
  */
-static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_read_reg(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
-    uint32_t addr = ReadLE32(pkt->data);
-    uint32_t val = Chip_ReadReg(ctx->chip, addr);
+    uint32_t addr = read_le32(pkt->data);
+    uint32_t val = fesp_chip_read_reg(ctx->chip, addr);
 
-    EsptoolHal_LogD(TAG, "READ_REG addr=0x%08lX val=0x%08lX", addr, val);
-    EsptoolHal_LogI("ESP", "  addr=0x%08lX -> 0x%08lX", addr,
+    FESP_HAL_LOGD(TAG, "READ_REG addr=0x%08lX val=0x%08lX", addr, val);
+    fesp_hal_log_i("ESP", "  addr=0x%08lX -> 0x%08lX", addr,
                     val);
 
     /* Cache the register value for use in subsequent responses */
     ctx->last_read_val = val;
 
     /* Transition to READY state when chip detection register is read */
-    if (addr == CHIP_DETECT_REG && ctx->state == ESP_STATE_SYNCED) {
-        ctx->state = ESP_STATE_READY;
-        EsptoolHal_LogI("ESP",
+    if (addr == FESP_CHIP_DETECT_REG && ctx->state == FESP_STATE_SYNCED) {
+        ctx->state = FESP_STATE_READY;
+        fesp_hal_log_i("ESP",
                        "  Chip detected, ready for commands");
     }
 
     /* Real device returns register value in Value field (bytes 4-7),
        with status in Data field */
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    uint8_t status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_READ_REG, val, ESP_OK, status_len, NULL,
+    uint8_t status_len = FESP_STATUS_LEN(ctx);
+    fesp_send_response_ex(ctx, FESP_CMD_READ_REG, val, FESP_OK, status_len, NULL,
                            status_len);
 }
 
 /*
- * HandleWriteReg - Handle WRITE_REG command (0x09)
+ * handle_write_reg - Handle WRITE_REG command (0x09)
  *
  * Writes a register value with optional mask.
  * Request format: [addr:4][value:4][mask:4][delay_us:4]
@@ -593,44 +593,44 @@ static void HandleReadReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * @ctx: Pointer to protocol context
  * @pkt: Pointer to parsed request packet
  */
-static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_write_reg(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 8);
     /* WRITE_REG request format (16 bytes = 4 x 32-bit words):
        [addr:4][value:4][mask:4][delay_us:4] */
-    uint32_t addr = ReadLE32(pkt->data);
-    uint32_t val = ReadLE32(pkt->data + 4);
+    uint32_t addr = read_le32(pkt->data);
+    uint32_t val = read_le32(pkt->data + 4);
     uint32_t mask = 0xFFFFFFFF;
     uint32_t delayUs = 0;
 
     if (pkt->size >= 12) {
-        mask = ReadLE32(pkt->data + 8);
+        mask = read_le32(pkt->data + 8);
     }
     if (pkt->size >= 16) {
-        delayUs = ReadLE32(pkt->data + 12);
+        delayUs = read_le32(pkt->data + 12);
     }
 
-    EsptoolHal_LogD(TAG,
+    FESP_HAL_LOGD(TAG,
                 "WRITE_REG addr=0x%08lX val=0x%08lX "
                 "mask=0x%08lX delay=%lu",
                 addr, val, mask, delayUs);
-    EsptoolHal_LogI("ESP",
+    fesp_hal_log_i("ESP",
                     "  addr=0x%08lX val=0x%08lX mask=0x%08lX delay=%lu", addr,
                     val, mask, delayUs);
 
     /* Apply mask: only bits set in mask are written */
-    uint32_t currentVal = Chip_ReadReg(ctx->chip, addr);
+    uint32_t currentVal = fesp_chip_read_reg(ctx->chip, addr);
     uint32_t newVal = (currentVal & ~mask) | (val & mask);
-    Chip_WriteReg(ctx->chip, addr, newVal);
+    fesp_chip_write_reg(ctx->chip, addr, newVal);
 
-    EsptoolHal_Modified();
+    fesp_hal_modified();
     /* WRITE_REG always returns 2-byte status, Val field is 0x00000000 */
-    Esptool_SendResponseEx(ctx, ESP_CMD_WRITE_REG, 0x00000000, ESP_OK, 2, NULL,
+    fesp_send_response_ex(ctx, FESP_CMD_WRITE_REG, 0x00000000, FESP_OK, 2, NULL,
                            2);
 }
 
 /*
- * HandleChangeBaudrate - Handle CHANGE_BAUDRATE command (0x0F)
+ * handle_change_baudrate - Handle CHANGE_BAUDRATE command (0x0F)
  *
  * Changes serial port baud rate. Response sent at old rate,
  * then switches to new rate.
@@ -638,33 +638,33 @@ static void HandleWriteReg(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * @ctx: Pointer to protocol context
  * @pkt: Pointer to parsed request packet (data = [new_baud:4][old_baud:4])
  */
-static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_change_baudrate(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
-    uint32_t new_baud = ReadLE32(pkt->data);
+    uint32_t new_baud = read_le32(pkt->data);
     uint32_t old_baud = 115200;
 
     if (pkt->size >= 8) {
-        old_baud = ReadLE32(pkt->data + 4);
+        old_baud = read_le32(pkt->data + 4);
     }
 
-    EsptoolHal_LogD(TAG, "CHANGE_BAUDRATE old=%lu new=%lu", old_baud, new_baud);
-    EsptoolHal_LogI("ESP", "  old=%lu new=%lu", old_baud,
+    FESP_HAL_LOGD(TAG, "CHANGE_BAUDRATE old=%lu new=%lu", old_baud, new_baud);
+    fesp_hal_log_i("ESP", "  old=%lu new=%lu", old_baud,
                     new_baud);
 
     /* Send response at old baud rate first */
     /* CHANGE_BAUDRATE always returns 2-byte status */
-    Esptool_SendResponseEx(ctx, ESP_CMD_CHANGE_BAUDRATE, ctx->last_read_val,
-                           ESP_OK, 2, NULL, 2);
+    fesp_send_response_ex(ctx, FESP_CMD_CHANGE_BAUDRATE, ctx->last_read_val,
+                           FESP_OK, 2, NULL, 2);
 
     /* Then switch to new baud rate */
-    EsptoolHal_SetBaudRate(new_baud);
-    EsptoolHal_LogI("ESP", "  Baud rate switched to %lu",
+    fesp_hal_set_baud_rate(new_baud);
+    fesp_hal_log_i("ESP", "  Baud rate switched to %lu",
                     new_baud);
 }
 
 /*
- * HandleMemBegin - Handle MEM_BEGIN command (0x05)
+ * handle_mem_begin - Handle MEM_BEGIN command (0x05)
  *
  * Starts memory write session for Stub upload.
  * Transitions state to MEM_WRITING.
@@ -673,30 +673,30 @@ static void HandleChangeBaudrate(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * @pkt: Pointer to parsed request packet (data =
  * [total:4][blocks:4][bsize:4][offset:4])
  */
-static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_mem_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
-    uint32_t total = ReadLE32(pkt->data);
-    uint32_t blocks = ReadLE32(pkt->data + 4);
-    uint32_t bsize = ReadLE32(pkt->data + 8);
-    uint32_t offset = ReadLE32(pkt->data + 12);
+    uint32_t total = read_le32(pkt->data);
+    uint32_t blocks = read_le32(pkt->data + 4);
+    uint32_t bsize = read_le32(pkt->data + 8);
+    uint32_t offset = read_le32(pkt->data + 12);
 
-    EsptoolHal_LogD(TAG, "MEM_BEGIN total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
+    FESP_HAL_LOGD(TAG, "MEM_BEGIN total=%lu blocks=%lu bsize=%lu offset=0x%08lX",
                 total, blocks, bsize, offset);
-    EsptoolHal_LogI("ESP",
+    fesp_hal_log_i("ESP",
                     "  total=%lu blocks=%lu bsize=%lu offset=0x%08lX", total,
                     blocks, bsize, offset);
 
-    ctx->state = ESP_STATE_MEM_WRITING;
+    ctx->state = FESP_STATE_MEM_WRITING;
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    uint8_t status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_MEM_BEGIN, ctx->last_read_val, ESP_OK,
+    uint8_t status_len = FESP_STATUS_LEN(ctx);
+    fesp_send_response_ex(ctx, FESP_CMD_MEM_BEGIN, ctx->last_read_val, FESP_OK,
                            status_len, NULL, status_len);
 }
 
 /*
- * HandleMemData - Handle MEM_DATA command (0x07)
+ * handle_mem_data - Handle MEM_DATA command (0x07)
  *
  * Receives a block of data for Stub upload.
  * Verifies checksum before acknowledging.
@@ -704,43 +704,43 @@ static void HandleMemBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * @ctx: Pointer to protocol context
  * @pkt: Pointer to parsed request packet
  */
-static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_mem_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
-    uint32_t seq = ReadLE32(pkt->data);
+    uint32_t seq = read_le32(pkt->data);
 
-    EsptoolHal_LogD(TAG, "MEM_DATA seq=%lu len=%u", seq, pkt->size);
-    EsptoolHal_LogI("ESP", "  seq=%lu len=%u", seq, pkt->size);
+    FESP_HAL_LOGD(TAG, "MEM_DATA seq=%lu len=%u", seq, pkt->size);
+    fesp_hal_log_i("ESP", "  seq=%lu len=%u", seq, pkt->size);
 
     /* Verify checksum: payload starts at offset 16 */
     if (pkt->size > 16) {
         const uint8_t *payload = &pkt->data[16];
         int payload_len = pkt->size - 16;
-        uint8_t expected = Esptool_CalcChecksum(payload, payload_len);
+        uint8_t expected = fesp_calc_checksum(payload, payload_len);
         uint8_t received = (uint8_t)(pkt->value & 0xFF);
         if (expected != received) {
-            EsptoolHal_LogD(TAG,
+            FESP_HAL_LOGD(TAG,
                         "MEM_DATA checksum mismatch: "
                         "expected=0x%02X received=0x%02X",
                         expected, received);
-            EsptoolHal_LogI("ESP",
+            fesp_hal_log_i("ESP",
                 "  Checksum mismatch: expected=0x%02X received=0x%02X",
                 expected, received);
-            uint8_t status_len = ESP_STATUS_LEN(ctx);
-            Esptool_SendResponseEx(ctx, ESP_CMD_MEM_DATA, ctx->last_read_val,
-                                   ESP_FAIL, status_len, NULL, status_len);
+            uint8_t status_len = FESP_STATUS_LEN(ctx);
+            fesp_send_response_ex(ctx, FESP_CMD_MEM_DATA, ctx->last_read_val,
+                                   FESP_FAIL, status_len, NULL, status_len);
             return;
         }
     }
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    uint8_t status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_MEM_DATA, ctx->last_read_val, ESP_OK,
+    uint8_t status_len = FESP_STATUS_LEN(ctx);
+    fesp_send_response_ex(ctx, FESP_CMD_MEM_DATA, ctx->last_read_val, FESP_OK,
                            status_len, NULL, status_len);
 }
 
 /*
- * HandleMemEnd - Handle MEM_END command (0x06)
+ * handle_mem_end - Handle MEM_END command (0x06)
  *
  * Completes memory write session. Sends "OHAI" handshake
  * to indicate Stub is ready. Transitions state to READY.
@@ -748,37 +748,37 @@ static void HandleMemData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * @ctx: Pointer to protocol context
  * @pkt: Pointer to parsed request packet (data = [execute:4][entry_point:4])
  */
-static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_mem_end(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
-    uint32_t execute = ReadLE32(pkt->data);
+    uint32_t execute = read_le32(pkt->data);
 
-    EsptoolHal_LogD(TAG, "MEM_END execute=%lu", execute);
-    EsptoolHal_LogI("ESP", "  execute=%lu", execute);
-    EsptoolHal_LogD(TAG, "MEM_END: stub_mode before=%d", ctx->stub_mode);
+    FESP_HAL_LOGD(TAG, "MEM_END execute=%lu", execute);
+    fesp_hal_log_i("ESP", "  execute=%lu", execute);
+    FESP_HAL_LOGD(TAG, "MEM_END: stub_mode before=%d", ctx->stub_mode);
 
-    ctx->state = ESP_STATE_READY;
+    ctx->state = FESP_STATE_READY;
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    uint8_t status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_MEM_END, ctx->last_read_val, ESP_OK,
+    uint8_t status_len = FESP_STATUS_LEN(ctx);
+    fesp_send_response_ex(ctx, FESP_CMD_MEM_END, ctx->last_read_val, FESP_OK,
                            status_len, NULL, status_len);
 
     /* Send "OHAI" handshake after MEM_END to indicate stub is ready.
        Real device sends OHAI regardless of execute flag. */
     if (!ctx->stub_mode) {
         uint8_t ohai[] = {0xC0, 'O', 'H', 'A', 'I', 0xC0};
-        EsptoolHal_Write(ohai, sizeof(ohai));
+        fesp_hal_write(ohai, sizeof(ohai));
         ctx->stub_mode = true;
-        EsptoolHal_LogI("ESP", "  Stub mode: OHAI sent");
-        EsptoolHal_LogD(TAG, "MEM_END: OHAI sent, stub_mode=true");
+        fesp_hal_log_i("ESP", "  Stub mode: OHAI sent");
+        FESP_HAL_LOGD(TAG, "MEM_END: OHAI sent, stub_mode=true");
     } else {
-        EsptoolHal_LogD(TAG, "MEM_END: stub_mode already true, skipping OHAI");
+        FESP_HAL_LOGD(TAG, "MEM_END: stub_mode already true, skipping OHAI");
     }
 }
 
 /*
- * HandleFlashDeflBegin - Handle compressed flash write begin command
+ * handle_flash_defl_begin - Handle compressed flash write begin command
  *
  * FLASH_DEFL_BEGIN (0x10) starts a compressed flash write session.
  * The command erases the specified flash region and prepares for
@@ -790,51 +790,51 @@ static void HandleMemEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  *
  * Request format: [uncompressed_size:4][num_blocks:4][block_size:4][offset:4]
  */
-static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_flash_defl_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
     /* FLASH_DEFL_BEGIN format:
        [uncompressed_size:4][num_blocks:4][block_size:4][offset:4] */
-    uint32_t uncompressed_size = ReadLE32(pkt->data);
-    uint32_t offset = ReadLE32(pkt->data + 12);
+    uint32_t uncompressed_size = read_le32(pkt->data);
+    uint32_t offset = read_le32(pkt->data + 12);
 
     /* ROM mode sends extra 4 bytes for encrypted flag */
     uint32_t encrypted = 0;
     if (pkt->size >= 20) {
-        encrypted = ReadLE32(pkt->data + 16);
+        encrypted = read_le32(pkt->data + 16);
     }
 
     /* Release mode: reject plaintext writes when encryption is active */
-    if (!encrypted && Efuse_IsFlashEncryptionEnabled(ctx->chip) &&
-        Efuse_IsDownloadEncryptDisabled(ctx->chip)) {
-        EsptoolHal_LogD(
+    if (!encrypted && fesp_efuse_is_flash_encryption_enabled(ctx->chip) &&
+        fesp_efuse_is_download_encrypt_disabled(ctx->chip)) {
+        FESP_HAL_LOGD(
             TAG,
             "FLASH_DEFL_BEGIN rejected: release mode, plaintext not allowed");
-        EsptoolHal_LogE("ERR",
+        fesp_hal_log_e("ERR",
                        "  Release mode: plaintext flash disabled");
-        uint8_t status_len = ESP_STATUS_LEN(ctx);
-        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN,
-                               ctx->last_read_val, ESP_FAIL, status_len, NULL,
+        uint8_t status_len = FESP_STATUS_LEN(ctx);
+        fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_BEGIN,
+                               ctx->last_read_val, FESP_FAIL, status_len, NULL,
                                status_len);
         return;
     }
 
-    EsptoolHal_LogD(TAG,
+    FESP_HAL_LOGD(TAG,
                 "FLASH_DEFL_BEGIN: flash_encrypted=%d "
-                "chip_type=%d stub_mode=%d",
+                "fesp_chip_type_t=%d stub_mode=%d",
                 encrypted, ctx->chip->type, ctx->stub_mode);
-    EsptoolHal_LogD(TAG,
+    FESP_HAL_LOGD(TAG,
                 "FLASH_DEFL_BEGIN: IsFlashEncryptionEnabled=%d "
                 "IsDownloadEncryptDisabled=%d",
-                Efuse_IsFlashEncryptionEnabled(ctx->chip),
-                Efuse_IsDownloadEncryptDisabled(ctx->chip));
+                fesp_efuse_is_flash_encryption_enabled(ctx->chip),
+                fesp_efuse_is_download_encrypt_disabled(ctx->chip));
 
     /* Log key availability */
 #ifdef ENABLE_TRACE_PROTO
     {
         int key_len = 0;
-        int key_offset = Efuse_GetEncryptionKeyOffset(ctx->chip, &key_len);
-        EsptoolHal_LogD(TAG,
+        int key_offset = fesp_efuse_get_encryption_key_offset(ctx->chip, &key_len);
+        FESP_HAL_LOGD(TAG,
                     "FLASH_DEFL_BEGIN: key_offset=0x%02X key_len=%d efuse=%p "
                     "efuse_size=%d",
                     key_offset, key_len, ctx->chip->efuse,
@@ -842,35 +842,35 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         if (key_offset >= 0 && ctx->chip->efuse &&
             key_offset + key_len <= ctx->chip->efuse_size) {
             const uint8_t *key = &ctx->chip->efuse[key_offset];
-            EsptoolHal_LogD(TAG,
+            FESP_HAL_LOGD(TAG,
                         "FLASH_DEFL_BEGIN: Key first 8 bytes: %02X %02X %02X "
                         "%02X %02X %02X %02X %02X",
                         key[0], key[1], key[2], key[3], key[4], key[5], key[6],
                         key[7]);
         } else {
-            EsptoolHal_LogD(TAG, "FLASH_DEFL_BEGIN: No encryption key available");
+            FESP_HAL_LOGD(TAG, "FLASH_DEFL_BEGIN: No encryption key available");
         }
     }
 #endif
 
     /* Flush any pending accumulated data from previous session */
     if (ctx->defl_buf && ctx->defl_buf_size > 0) {
-        EsptoolHal_LogD(TAG, "FLASH_DEFL_BEGIN: flushing previous accumulation");
-        EsptoolHal_LogI("ESP",
+        FESP_HAL_LOGD(TAG, "FLASH_DEFL_BEGIN: flushing previous accumulation");
+        fesp_hal_log_i("ESP",
                        "  Flushing previous compressed data");
-        uint32_t ret = Defl_FlushBuffer(ctx);
-        if (ret != ESP_OK) {
-            EsptoolHal_LogD(TAG, "FLASH_DEFL_BEGIN flush previous failed");
-            EsptoolHal_LogE("ERR",
+        uint32_t ret = defl_flush_buffer(ctx);
+        if (ret != FESP_OK) {
+            FESP_HAL_LOGD(TAG, "FLASH_DEFL_BEGIN flush previous failed");
+            fesp_hal_log_e("ERR",
                            "  Failed to flush previous compressed data");
-            uint8_t status_len = ESP_STATUS_LEN(ctx);
-            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN,
-                                   ctx->last_read_val, ESP_FAIL, status_len,
+            uint8_t status_len = FESP_STATUS_LEN(ctx);
+            fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_BEGIN,
+                                   ctx->last_read_val, FESP_FAIL, status_len,
                                    NULL, status_len);
             return;
         }
     }
-    /* Note: Defl_FreeBuffer is called inside Defl_FlushBuffer on both success
+    /* Note: defl_free_buffer is called inside defl_flush_buffer on both success
      * and failure */
 
     /* Save deflate session info */
@@ -882,13 +882,13 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     ctx->flash_seq = 0;
     ctx->flash_uncompressed_size = uncompressed_size;
     ctx->flash_encrypted = (encrypted != 0);
-    ctx->state = ESP_STATE_FLASH_WRITING;
+    ctx->state = FESP_STATE_FLASH_WRITING;
 
     /* Erase the flash region (use uncompressed_size for erase calculation) */
     if (uncompressed_size > 0) {
-        Flash_Erase(ctx->flash, offset, uncompressed_size);
-        EsptoolHal_Modified();
-        EsptoolHal_LogI("ESP",
+        fesp_flash_erase(ctx->flash, offset, uncompressed_size);
+        fesp_hal_modified();
+        fesp_hal_log_i("ESP",
                         "  Flash erased: offset=0x%08lX size=%lu", offset,
                         uncompressed_size);
     }
@@ -896,37 +896,37 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* Allocate accumulation buffer */
     if (uncompressed_size > 0) {
         ctx->defl_buf =
-            (uint8_t *)EsptoolHal_MemAlloc(uncompressed_size);
+            (uint8_t *)fesp_hal_mem_alloc(uncompressed_size);
         if (!ctx->defl_buf) {
-            EsptoolHal_LogD(TAG,
+            FESP_HAL_LOGD(TAG,
                         "Failed to allocate deflate buffer: "
                         "%lu bytes",
                         uncompressed_size);
-            EsptoolHal_LogE("ERR",
+            fesp_hal_log_e("ERR",
                             "  Failed to allocate deflate buffer: %lu bytes",
                             uncompressed_size);
-            uint8_t status_len = ESP_STATUS_LEN(ctx);
-            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN,
-                                   ctx->last_read_val, ESP_FAIL, status_len,
+            uint8_t status_len = FESP_STATUS_LEN(ctx);
+            fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_BEGIN,
+                                   ctx->last_read_val, FESP_FAIL, status_len,
                                    NULL, status_len);
             return;
         }
         ctx->defl_buf_cap = uncompressed_size;
         ctx->defl_buf_size = 0;
-        EsptoolHal_LogD(TAG, "FLASH_DEFL_BEGIN: allocated %lu bytes buffer",
+        FESP_HAL_LOGD(TAG, "FLASH_DEFL_BEGIN: allocated %lu bytes buffer",
                     uncompressed_size);
     }
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    uint8_t status_len = ESP_STATUS_LEN(ctx);
+    uint8_t status_len = FESP_STATUS_LEN(ctx);
     /* Use request's value field (checksum) for response Val, not last_read_val
      */
-    Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_BEGIN, pkt->value, ESP_OK,
+    fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_BEGIN, pkt->value, FESP_OK,
                            status_len, NULL, status_len);
 }
 
 /*
- * HandleFlashDeflData - Handle compressed flash data block
+ * handle_flash_defl_data - Handle compressed flash data block
  *
  * FLASH_DEFL_DATA (0x11) receives a block of compressed data.
  * Data is accumulated in the deflate buffer for later decompression.
@@ -937,29 +937,29 @@ static void HandleFlashDeflBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * The sequence number must match the expected value, and the checksum
  * (XOR of payload) is verified before accumulating the data.
  */
-static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_flash_defl_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
-    uint32_t data_len = ReadLE32(pkt->data);
-    uint32_t seq = ReadLE32(pkt->data + 4);
+    uint32_t data_len = read_le32(pkt->data);
+    uint32_t seq = read_le32(pkt->data + 4);
 
-    EsptoolHal_LogD(
-        TAG, "HandleFlashDeflData: seq=%lu data_len=%lu pkt->size=%u state=%d",
+    FESP_HAL_LOGD(
+        TAG, "handle_flash_defl_data: seq=%lu data_len=%lu pkt->size=%u state=%d",
         seq, data_len, pkt->size, ctx->state);
-    EsptoolHal_LogD(TAG, "FLASH_DEFL_DATA seq=%lu len=%lu", seq, data_len);
-    EsptoolHal_LogI("ESP", "  seq=%lu len=%lu", seq, data_len);
+    FESP_HAL_LOGD(TAG, "FLASH_DEFL_DATA seq=%lu len=%lu", seq, data_len);
+    fesp_hal_log_i("ESP", "  seq=%lu len=%lu", seq, data_len);
 
     /* Verify sequence number */
     if (seq != ctx->flash_seq) {
-        EsptoolHal_LogD(TAG,
+        FESP_HAL_LOGD(TAG,
                     "FLASH_DEFL_DATA seq mismatch: expected=%lu received=%lu",
                     ctx->flash_seq, seq);
-        EsptoolHal_LogI("ESP",
+        fesp_hal_log_i("ESP",
                         "  Seq mismatch: expected=%lu received=%lu",
                         ctx->flash_seq, seq);
-        uint8_t status_len = ESP_STATUS_LEN(ctx);
-        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val,
-                               ESP_FAIL, status_len, NULL, status_len);
+        uint8_t status_len = FESP_STATUS_LEN(ctx);
+        fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val,
+                               FESP_FAIL, status_len, NULL, status_len);
         return;
     }
 
@@ -967,20 +967,20 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         const uint8_t *payload = &pkt->data[16];
 
         /* Verify checksum */
-        uint8_t expected = Esptool_CalcChecksum(payload, (int)data_len);
+        uint8_t expected = fesp_calc_checksum(payload, (int)data_len);
         uint8_t received = (uint8_t)(pkt->value & 0xFF);
         if (expected != received) {
-            EsptoolHal_LogD(TAG,
+            FESP_HAL_LOGD(TAG,
                         "FLASH_DEFL_DATA checksum mismatch: expected=0x%02X "
                         "received=0x%02X",
                         expected, received);
-            EsptoolHal_LogI("ESP",
+            fesp_hal_log_i("ESP",
                             "  Checksum mismatch: expected=0x%02X "
                             "received=0x%02X",
                             expected, received);
-            uint8_t status_len = ESP_STATUS_LEN(ctx);
-            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA,
-                                   ctx->last_read_val, ESP_FAIL, status_len,
+            uint8_t status_len = FESP_STATUS_LEN(ctx);
+            fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_DATA,
+                                   ctx->last_read_val, FESP_FAIL, status_len,
                                    NULL, status_len);
             return;
         }
@@ -989,15 +989,15 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         if (ctx->defl_buf_cap > 0 && data_len > 0) {
             /* Check buffer overflow */
             if (ctx->defl_buf_size + data_len > ctx->defl_buf_cap) {
-                EsptoolHal_LogD(TAG,
+                FESP_HAL_LOGD(TAG,
                             "Deflate buffer overflow: size=%lu cap=%lu add=%lu",
                             ctx->defl_buf_size, ctx->defl_buf_cap, data_len);
-                EsptoolHal_LogE("ERR",
+                fesp_hal_log_e("ERR",
                                 "  Deflate buffer overflow");
-                Defl_FreeBuffer(ctx);
-                uint8_t status_len = ESP_STATUS_LEN(ctx);
-                Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA,
-                                       ctx->last_read_val, ESP_FAIL, status_len,
+                defl_free_buffer(ctx);
+                uint8_t status_len = FESP_STATUS_LEN(ctx);
+                fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_DATA,
+                                       ctx->last_read_val, FESP_FAIL, status_len,
                                        NULL, status_len);
                 return;
             }
@@ -1005,9 +1005,9 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             memcpy(ctx->defl_buf + ctx->defl_buf_size, payload, data_len);
             ctx->defl_buf_size += data_len;
 
-            EsptoolHal_LogD(TAG, "FLASH_DEFL_DATA accumulated %lu/%lu bytes",
+            FESP_HAL_LOGD(TAG, "FLASH_DEFL_DATA accumulated %lu/%lu bytes",
                         ctx->defl_buf_size, ctx->defl_buf_cap);
-            EsptoolHal_LogI("ESP",
+            fesp_hal_log_i("ESP",
                             "  Accumulated %lu/%lu bytes", ctx->defl_buf_size,
                             ctx->defl_buf_cap);
         }
@@ -1016,47 +1016,47 @@ static void HandleFlashDeflData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     }
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    uint8_t status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val,
-                           ESP_OK, status_len, NULL, status_len);
+    uint8_t status_len = FESP_STATUS_LEN(ctx);
+    fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_DATA, ctx->last_read_val,
+                           FESP_OK, status_len, NULL, status_len);
 }
 
 /*
- * HandleFlashDeflEnd - Handle compressed flash write end command
+ * handle_flash_defl_end - Handle compressed flash write end command
  *
  * FLASH_DEFL_END (0x12) completes a compressed flash write session.
  * Decompresses all accumulated data and writes it to flash.
  *
  * Request format: [reboot:4] (0=don't reboot, 1=reboot)
  */
-static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_flash_defl_end(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
-    EsptoolHal_LogD(TAG, "FLASH_DEFL_END");
-    EsptoolHal_LogI("ESP", "  End compressed flash download");
+    FESP_HAL_LOGD(TAG, "FLASH_DEFL_END");
+    fesp_hal_log_i("ESP", "  End compressed flash download");
 
     /* Decompress accumulated data and write to flash */
-    uint32_t ret = Defl_FlushBuffer(ctx);
-    if (ret != ESP_OK) {
-        EsptoolHal_LogD(TAG, "FLASH_DEFL_END flush failed");
-        EsptoolHal_LogE("ERR", "  Decompression flush failed");
-        ctx->state = ESP_STATE_READY;
-        uint8_t status_len = ESP_STATUS_LEN(ctx);
-        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_END, ctx->last_read_val,
-                               ESP_FAIL, status_len, NULL, status_len);
+    uint32_t ret = defl_flush_buffer(ctx);
+    if (ret != FESP_OK) {
+        FESP_HAL_LOGD(TAG, "FLASH_DEFL_END flush failed");
+        fesp_hal_log_e("ERR", "  Decompression flush failed");
+        ctx->state = FESP_STATE_READY;
+        uint8_t status_len = FESP_STATUS_LEN(ctx);
+        fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_END, ctx->last_read_val,
+                               FESP_FAIL, status_len, NULL, status_len);
         return;
     }
 
-    ctx->state = ESP_STATE_READY;
+    ctx->state = FESP_STATE_READY;
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    uint8_t status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DEFL_END, ctx->last_read_val,
-                           ESP_OK, status_len, NULL, status_len);
+    uint8_t status_len = FESP_STATUS_LEN(ctx);
+    fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_END, ctx->last_read_val,
+                           FESP_OK, status_len, NULL, status_len);
 }
 
 /*
- * HandleReadFlash - Handle flash read command (stub-only)
+ * handle_read_flash - Handle flash read command (stub-only)
  *
  * READ_FLASH (0xD2) reads data from flash memory.
  *
@@ -1068,38 +1068,38 @@ static void HandleFlashDeflEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  *
  * Request format: [flash_offset:4][read_len:4][block_size:4][packet_size:4]
  */
-static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_read_flash(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
-    uint32_t addr = ReadLE32(pkt->data);
-    uint32_t len = ReadLE32(pkt->data + 4);
-    uint32_t bsize = ReadLE32(pkt->data + 8);
-    uint32_t psize = ReadLE32(pkt->data + 12);
+    uint32_t addr = read_le32(pkt->data);
+    uint32_t len = read_le32(pkt->data + 4);
+    uint32_t bsize = read_le32(pkt->data + 8);
+    uint32_t psize = read_le32(pkt->data + 12);
 
     (void)psize;
 
-    EsptoolHal_LogD(TAG, "READ_FLASH addr=0x%08lX len=%lu bsize=%lu psize=%lu",
+    FESP_HAL_LOGD(TAG, "READ_FLASH addr=0x%08lX len=%lu bsize=%lu psize=%lu",
                 addr, len, bsize, psize);
-    EsptoolHal_LogI("ESP", "  addr=0x%08lX len=%lu bsize=%lu",
+    fesp_hal_log_i("ESP", "  addr=0x%08lX len=%lu bsize=%lu",
                     addr, len, bsize);
 
     /* Step 1: Send command ACK (2-byte status in command response) */
-    Esptool_SendResponseEx(ctx, ESP_CMD_READ_FLASH, ctx->last_read_val, ESP_OK,
+    fesp_send_response_ex(ctx, FESP_CMD_READ_FLASH, ctx->last_read_val, FESP_OK,
                            2, NULL, 2);
 
     /* Allocate buffers once before the loop */
-    uint8_t *buf = (uint8_t *)EsptoolHal_MemAlloc(bsize);
+    uint8_t *buf = (uint8_t *)fesp_hal_mem_alloc(bsize);
     if (!buf) {
-        EsptoolHal_LogE("ERR",
+        fesp_hal_log_e("ERR",
                        "  Failed to allocate read buffer");
         return;
     }
 
     uint32_t encoded_max = bsize * 2 + 2;
-    uint8_t *encoded = (uint8_t *)EsptoolHal_MemAlloc(encoded_max);
+    uint8_t *encoded = (uint8_t *)fesp_hal_mem_alloc(encoded_max);
     if (!encoded) {
-        EsptoolHal_MemFree(buf);
-        EsptoolHal_LogE("ERR",
+        fesp_hal_mem_free(buf);
+        fesp_hal_log_e("ERR",
                        "  Failed to allocate encode buffer");
         return;
     }
@@ -1112,8 +1112,8 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
             chunk_size = bsize;
         }
 
-        if (!Flash_Read(ctx->flash, addr + offset, buf, chunk_size)) {
-            EsptoolHal_LogE("ERR",
+        if (!fesp_flash_read(ctx->flash, addr + offset, buf, chunk_size)) {
+            fesp_hal_log_e("ERR",
                             "  Flash read failed at offset 0x%08lX",
                             addr + offset);
             break;
@@ -1124,87 +1124,87 @@ static void HandleReadFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
 
         /* SLIP-encode the chunk and send as raw frame */
         int enc_len =
-            Slip_Encode(buf, (int)chunk_size, encoded, (int)encoded_max);
+            fesp_slip_encode(buf, (int)chunk_size, encoded, (int)encoded_max);
         if (enc_len > 0) {
-            EsptoolHal_Write(encoded, (uint32_t)enc_len);
+            fesp_hal_write(encoded, (uint32_t)enc_len);
         }
 
         offset += chunk_size;
     }
 
     /* Free buffers after the loop */
-    EsptoolHal_MemFree(encoded);
-    EsptoolHal_MemFree(buf);
+    fesp_hal_mem_free(encoded);
+    fesp_hal_mem_free(buf);
 
     /* Step 3: Calculate and send 16-byte MD5 digest as final SLIP frame */
     uint8_t md5[16];
-    Flash_CalcMd5(ctx->flash, addr, len, md5);
+    fesp_flash_calc_md5(ctx->flash, addr, len, md5);
 
     uint8_t md5_encoded[34]; /* 16 bytes * 2 (worst case escaping) + 2 (framing) */
-    int md5_enc_len = Slip_Encode(md5, 16, md5_encoded, sizeof(md5_encoded));
+    int md5_enc_len = fesp_slip_encode(md5, 16, md5_encoded, sizeof(md5_encoded));
     if (md5_enc_len > 0) {
-        EsptoolHal_Write(md5_encoded, (uint32_t)md5_enc_len);
+        fesp_hal_write(md5_encoded, (uint32_t)md5_enc_len);
     }
 
-    EsptoolHal_LogD(TAG, "READ_FLASH complete: %lu bytes sent", len);
-    EsptoolHal_LogI("ESP", "  Read complete: %lu bytes", len);
+    FESP_HAL_LOGD(TAG, "READ_FLASH complete: %lu bytes sent", len);
+    fesp_hal_log_i("ESP", "  Read complete: %lu bytes", len);
 }
 
 /*
- * HandleEraseFlash - Handle erase entire flash command (stub-only)
+ * handle_erase_flash - Handle erase entire flash command (stub-only)
  *
  * ERASE_FLASH (0xD0) erases the entire flash memory.
  * Also frees any pending deflate buffer.
  */
-static void HandleEraseFlash(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_erase_flash(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
-    EsptoolHal_LogD(TAG, "ERASE_FLASH");
-    EsptoolHal_LogI("ESP", "  Erase entire flash");
+    FESP_HAL_LOGD(TAG, "ERASE_FLASH");
+    fesp_hal_log_i("ESP", "  Erase entire flash");
 
     /* Free any pending deflate buffer */
-    Defl_FreeBuffer(ctx);
+    defl_free_buffer(ctx);
 
-    Flash_EraseAll(ctx->flash);
-    EsptoolHal_Modified();
+    fesp_flash_erase_all(ctx->flash);
+    fesp_hal_modified();
     /* ERASE_FLASH is stub-only, always returns 2-byte status */
-    Esptool_SendResponseEx(ctx, ESP_CMD_ERASE_FLASH, ctx->last_read_val, ESP_OK,
+    fesp_send_response_ex(ctx, FESP_CMD_ERASE_FLASH, ctx->last_read_val, FESP_OK,
                            2, NULL, 2);
 }
 
 /*
- * HandleEraseBlock - Handle erase flash region command (stub-only)
+ * handle_erase_block - Handle erase flash region command (stub-only)
  *
  * ERASE_REGION (0xD1) erases a specified flash region.
  * Request format: [offset:4][erase_len:4]
  *
  * Flash erase is sector-aligned (4KB boundaries).
  */
-static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_erase_block(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 8);
-    uint32_t offset = ReadLE32(pkt->data);
-    uint32_t len = ReadLE32(pkt->data + 4);
+    uint32_t offset = read_le32(pkt->data);
+    uint32_t len = read_le32(pkt->data + 4);
 
-    EsptoolHal_LogD(TAG, "ERASE_BLOCK offset=0x%08lX len=%lu", offset, len);
-    EsptoolHal_LogI("ESP", "  offset=0x%08lX len=%lu", offset,
+    FESP_HAL_LOGD(TAG, "ERASE_BLOCK offset=0x%08lX len=%lu", offset, len);
+    fesp_hal_log_i("ESP", "  offset=0x%08lX len=%lu", offset,
                     len);
 
     /* Free any pending deflate buffer */
-    Defl_FreeBuffer(ctx);
+    defl_free_buffer(ctx);
 
     /* ERASE_REGION is stub-only, always returns 2-byte status */
-    if (Flash_Erase(ctx->flash, offset, len)) {
-        EsptoolHal_Modified();
-        Esptool_SendResponseEx(ctx, ESP_CMD_ERASE_REGION, ctx->last_read_val,
-                               ESP_OK, 2, NULL, 2);
+    if (fesp_flash_erase(ctx->flash, offset, len)) {
+        fesp_hal_modified();
+        fesp_send_response_ex(ctx, FESP_CMD_ERASE_REGION, ctx->last_read_val,
+                               FESP_OK, 2, NULL, 2);
     } else {
-        Esptool_SendResponseEx(ctx, ESP_CMD_ERASE_REGION, ctx->last_read_val,
-                               ESP_FAIL, 2, NULL, 2);
+        fesp_send_response_ex(ctx, FESP_CMD_ERASE_REGION, ctx->last_read_val,
+                               FESP_FAIL, 2, NULL, 2);
     }
 }
 
 /*
- * HandleFlashMd5 - Handle flash MD5 calculation command
+ * handle_flash_md5 - Handle flash MD5 calculation command
  *
  * SPI_FLASH_MD5 (0x13) calculates MD5 hash of a flash region.
  *
@@ -1214,17 +1214,17 @@ static void HandleEraseBlock(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * - ROM mode:   32-byte ASCII hex MD5 + 2-byte status
  * - Stub mode:  16-byte binary MD5 + 2-byte status
  */
-static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_flash_md5(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 8);
-    uint32_t addr = ReadLE32(pkt->data);
-    uint32_t len = ReadLE32(pkt->data + 4);
+    uint32_t addr = read_le32(pkt->data);
+    uint32_t len = read_le32(pkt->data + 4);
 
-    EsptoolHal_LogD(TAG, "FLASH_MD5 addr=0x%08lX len=%lu", addr, len);
-    EsptoolHal_LogI("ESP", "  addr=0x%08lX len=%lu", addr, len);
+    FESP_HAL_LOGD(TAG, "FLASH_MD5 addr=0x%08lX len=%lu", addr, len);
+    fesp_hal_log_i("ESP", "  addr=0x%08lX len=%lu", addr, len);
 
     uint8_t md5[16];
-    Flash_CalcMd5(ctx->flash, addr, len, md5);
+    fesp_flash_calc_md5(ctx->flash, addr, len, md5);
 
     /* Response format: [data:N][status:2]
        ROM mode:   [md5_hex:32][status:2] = 34 bytes
@@ -1235,10 +1235,10 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         memcpy(&resp[0], md5, 16);
         resp[16] = 0x00; /* status byte 1 (success) */
         resp[17] = 0x00; /* status byte 2 (success) */
-        EsptoolHal_LogD(TAG, "  MD5 (stub, binary)");
-        EsptoolHal_LogI("ESP", "  MD5 (stub, binary)");
-        Esptool_SendResponseEx(ctx, ESP_CMD_SPI_FLASH_MD5, ctx->last_read_val,
-                               ESP_OK, 2, resp, 18);
+        FESP_HAL_LOGD(TAG, "  MD5 (stub, binary)");
+        fesp_hal_log_i("ESP", "  MD5 (stub, binary)");
+        fesp_send_response_ex(ctx, FESP_CMD_SPI_FLASH_MD5, ctx->last_read_val,
+                               FESP_OK, 2, resp, 18);
     } else {
         /* ROM mode: return 32-byte ASCII hex MD5 + 2-byte status */
         uint8_t resp[34];
@@ -1247,15 +1247,15 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         }
         resp[32] = 0x00; /* status byte 1 (success) */
         resp[33] = 0x00; /* status byte 2 (success) */
-        EsptoolHal_LogD(TAG, "  MD5=%.*s", 32, resp);
-        EsptoolHal_LogI("ESP", "  MD5=%.*hs", 32, resp);
-        Esptool_SendResponseEx(ctx, ESP_CMD_SPI_FLASH_MD5, ctx->last_read_val,
-                               ESP_OK, 2, resp, 34);
+        FESP_HAL_LOGD(TAG, "  MD5=%.*s", 32, resp);
+        fesp_hal_log_i("ESP", "  MD5=%.*hs", 32, resp);
+        fesp_send_response_ex(ctx, FESP_CMD_SPI_FLASH_MD5, ctx->last_read_val,
+                               FESP_OK, 2, resp, 34);
     }
 }
 
 /*
- * HandleFlashBegin - Handle flash write begin command
+ * handle_flash_begin - Handle flash write begin command
  *
  * FLASH_BEGIN (0x02) starts a flash write session.
  * Erases the specified flash region and prepares for receiving data blocks.
@@ -1267,67 +1267,67 @@ static void HandleFlashMd5(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * Note: Does NOT free deflate buffer, as client may send FLASH_BEGIN
  * before FLASH_DEFL_END in some scenarios.
  */
-static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_flash_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
-    uint32_t erase_size = ReadLE32(pkt->data);
-    uint32_t num_blocks = ReadLE32(pkt->data + 4);
-    uint32_t block_size = ReadLE32(pkt->data + 8);
-    uint32_t offset = ReadLE32(pkt->data + 12);
+    uint32_t erase_size = read_le32(pkt->data);
+    uint32_t num_blocks = read_le32(pkt->data + 4);
+    uint32_t block_size = read_le32(pkt->data + 8);
+    uint32_t offset = read_le32(pkt->data + 12);
 
     /* ROM mode sends extra 4 bytes for encrypted flag */
     uint32_t encrypted = 0;
     if (pkt->size >= 20) {
-        encrypted = ReadLE32(pkt->data + 16);
+        encrypted = read_le32(pkt->data + 16);
     }
 
     /* Release mode: reject plaintext writes when encryption is active */
-    if (!encrypted && Efuse_IsFlashEncryptionEnabled(ctx->chip) &&
-        Efuse_IsDownloadEncryptDisabled(ctx->chip)) {
-        EsptoolHal_LogD(
+    if (!encrypted && fesp_efuse_is_flash_encryption_enabled(ctx->chip) &&
+        fesp_efuse_is_download_encrypt_disabled(ctx->chip)) {
+        FESP_HAL_LOGD(
             TAG, "FLASH_BEGIN rejected: release mode, plaintext not allowed");
-        EsptoolHal_LogE("ERR",
+        fesp_hal_log_e("ERR",
                        "  Release mode: plaintext flash disabled");
-        uint8_t status_len = ESP_STATUS_LEN(ctx);
-        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_BEGIN, ctx->last_read_val,
-                               ESP_FAIL, status_len, NULL, status_len);
+        uint8_t status_len = FESP_STATUS_LEN(ctx);
+        fesp_send_response_ex(ctx, FESP_CMD_FLASH_BEGIN, ctx->last_read_val,
+                               FESP_FAIL, status_len, NULL, status_len);
         return;
     }
 
     /* Note: Do NOT free deflate buffer here.
        Client may send FLASH_BEGIN before FLASH_DEFL_END.
-       The buffer will be flushed by HandleFlashDeflEnd. */
+       The buffer will be flushed by handle_flash_defl_end. */
 
     ctx->flash_offset = offset;
     ctx->flash_seq = 0;
     ctx->flash_encrypted = (encrypted != 0);
-    ctx->state = ESP_STATE_FLASH_WRITING;
+    ctx->state = FESP_STATE_FLASH_WRITING;
 
-    EsptoolHal_LogD(TAG,
+    FESP_HAL_LOGD(TAG,
                 "FLASH_BEGIN erase=%lu blocks=%lu bsize=%lu offset=0x%08lX "
                 "encrypted=%lu",
                 erase_size, num_blocks, block_size, offset, encrypted);
-    EsptoolHal_LogI("ESP",
+    fesp_hal_log_i("ESP",
         "  erase=%lu blocks=%lu bsize=%lu offset=0x%08lX encrypted=%lu",
         erase_size, num_blocks, block_size, offset, encrypted);
 
     /* Erase the flash region as requested by the host */
     if (erase_size > 0) {
-        Flash_Erase(ctx->flash, offset, erase_size);
-        EsptoolHal_Modified();
-        EsptoolHal_LogI("ESP",
+        fesp_flash_erase(ctx->flash, offset, erase_size);
+        fesp_hal_modified();
+        fesp_hal_log_i("ESP",
                         "  Flash erased: offset=0x%08lX size=%lu", offset,
                         erase_size);
     }
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    uint8_t status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_BEGIN, pkt->value, ESP_OK,
+    uint8_t status_len = FESP_STATUS_LEN(ctx);
+    fesp_send_response_ex(ctx, FESP_CMD_FLASH_BEGIN, pkt->value, FESP_OK,
                            status_len, NULL, status_len);
 }
 
 /*
- * HandleFlashData - Handle flash write data block
+ * handle_flash_data - Handle flash write data block
  *
  * FLASH_DATA (0x03) receives a block of uncompressed data to write to flash.
  *
@@ -1337,25 +1337,25 @@ static void HandleFlashBegin(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * Flash write uses AND operation to simulate real Flash behavior
  * (bits can only be cleared, not set).
  */
-static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_flash_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 16);
-    uint32_t data_len = ReadLE32(pkt->data);
-    uint32_t seq = ReadLE32(pkt->data + 4);
+    uint32_t data_len = read_le32(pkt->data);
+    uint32_t seq = read_le32(pkt->data + 4);
 
-    EsptoolHal_LogD(TAG, "FLASH_DATA seq=%lu len=%lu", seq, data_len);
-    EsptoolHal_LogI("ESP", "  seq=%lu len=%lu", seq, data_len);
+    FESP_HAL_LOGD(TAG, "FLASH_DATA seq=%lu len=%lu", seq, data_len);
+    fesp_hal_log_i("ESP", "  seq=%lu len=%lu", seq, data_len);
 
     /* Verify sequence number */
     if (seq != ctx->flash_seq) {
-        EsptoolHal_LogD(TAG, "FLASH_DATA seq mismatch: expected=%lu received=%lu",
+        FESP_HAL_LOGD(TAG, "FLASH_DATA seq mismatch: expected=%lu received=%lu",
                     ctx->flash_seq, seq);
-        EsptoolHal_LogI("ESP",
+        fesp_hal_log_i("ESP",
                         "  Seq mismatch: expected=%lu received=%lu",
                         ctx->flash_seq, seq);
-        uint8_t status_len = ESP_STATUS_LEN(ctx);
-        Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val,
-                               ESP_FAIL, status_len, NULL, status_len);
+        uint8_t status_len = FESP_STATUS_LEN(ctx);
+        fesp_send_response_ex(ctx, FESP_CMD_FLASH_DATA, ctx->last_read_val,
+                               FESP_FAIL, status_len, NULL, status_len);
         return;
     }
 
@@ -1363,49 +1363,49 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         uint8_t *payload = (uint8_t *)&pkt->data[16];
 
         /* Verify checksum */
-        uint8_t expected = Esptool_CalcChecksum(payload, (int)data_len);
+        uint8_t expected = fesp_calc_checksum(payload, (int)data_len);
         uint8_t received = (uint8_t)(pkt->value & 0xFF);
         if (expected != received) {
-            EsptoolHal_LogD(
+            FESP_HAL_LOGD(
                 TAG,
                 "FLASH_DATA checksum mismatch: expected=0x%02X received=0x%02X",
                 expected, received);
-            EsptoolHal_LogI("ESP",
+            fesp_hal_log_i("ESP",
                             "  Checksum mismatch: expected=0x%02X "
                             "received=0x%02X",
                             expected, received);
-            uint8_t status_len = ESP_STATUS_LEN(ctx);
-            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val,
-                                   ESP_FAIL, status_len, NULL, status_len);
+            uint8_t status_len = FESP_STATUS_LEN(ctx);
+            fesp_send_response_ex(ctx, FESP_CMD_FLASH_DATA, ctx->last_read_val,
+                                   FESP_FAIL, status_len, NULL, status_len);
             return;
         }
 
         /* Encrypt if encrypted flag was set */
         if (Esptool_EncryptInPlace(ctx, payload, data_len, ctx->flash_offset) !=
-            ESP_OK) {
-            EsptoolHal_LogE("ERR",
+            FESP_OK) {
+            fesp_hal_log_e("ERR",
                             "  Encryption failed at offset 0x%08lX",
                             ctx->flash_offset);
-            uint8_t status_len = ESP_STATUS_LEN(ctx);
-            Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val,
-                                   ESP_FAIL, status_len, NULL, status_len);
+            uint8_t status_len = FESP_STATUS_LEN(ctx);
+            fesp_send_response_ex(ctx, FESP_CMD_FLASH_DATA, ctx->last_read_val,
+                                   FESP_FAIL, status_len, NULL, status_len);
             return;
         }
-        Flash_Write(ctx->flash, ctx->flash_offset, payload, data_len);
+        fesp_flash_write(ctx->flash, ctx->flash_offset, payload, data_len);
 
         ctx->flash_offset += data_len;
         ctx->flash_seq = seq + 1;
     }
 
-    EsptoolHal_Modified();
+    fesp_hal_modified();
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    uint8_t status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_DATA, ctx->last_read_val, ESP_OK,
+    uint8_t status_len = FESP_STATUS_LEN(ctx);
+    fesp_send_response_ex(ctx, FESP_CMD_FLASH_DATA, ctx->last_read_val, FESP_OK,
                            status_len, NULL, status_len);
 }
 
 /*
- * HandleFlashEnd - Handle flash write end command
+ * handle_flash_end - Handle flash write end command
  *
  * FLASH_END (0x04) completes a flash write session.
  * Optionally triggers a soft reboot.
@@ -1418,38 +1418,38 @@ static void HandleFlashData(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  *
  * In scenario 2, we need to flush the pending deflate buffer.
  */
-static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_flash_end(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     CHECK_PKT_SIZE(pkt, 4);
-    uint32_t reboot = ReadLE32(pkt->data);
+    uint32_t reboot = read_le32(pkt->data);
 
-    EsptoolHal_LogD(TAG, "FLASH_END reboot=%lu", reboot);
-    EsptoolHal_LogI("ESP", "  reboot=%lu", reboot);
+    FESP_HAL_LOGD(TAG, "FLASH_END reboot=%lu", reboot);
+    fesp_hal_log_i("ESP", "  reboot=%lu", reboot);
 
     /* Flush any pending deflate buffer (ROM mode scenario) */
     if (ctx->defl_buf && ctx->defl_buf_size > 0) {
-        EsptoolHal_LogD(TAG,
+        FESP_HAL_LOGD(TAG,
                     "FLASH_END: flushing pending deflate buffer (%lu bytes)",
                     ctx->defl_buf_size);
-        EsptoolHal_LogI("ESP",
+        fesp_hal_log_i("ESP",
                        "  Flushing pending compressed data");
-        if (Defl_FlushBuffer(ctx) != ESP_OK) {
-            EsptoolHal_LogD(TAG, "FLASH_END: flush failed");
-            EsptoolHal_LogE("ERR",
+        if (defl_flush_buffer(ctx) != FESP_OK) {
+            FESP_HAL_LOGD(TAG, "FLASH_END: flush failed");
+            fesp_hal_log_e("ERR",
                            "  Failed to flush compressed data");
         }
     }
 
-    ctx->state = ESP_STATE_READY;
+    ctx->state = FESP_STATE_READY;
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
-    uint8_t status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_FLASH_END, pkt->value, ESP_OK,
+    uint8_t status_len = FESP_STATUS_LEN(ctx);
+    fesp_send_response_ex(ctx, FESP_CMD_FLASH_END, pkt->value, FESP_OK,
                            status_len, NULL, status_len);
 }
 
 /*
- * HandleGetSecurityInfo - Handle get security info command
+ * handle_get_security_info - Handle get security info command
  *
  * GET_SECURITY_INFO (0x14) returns chip security configuration.
  * Response format depends on chip type:
@@ -1464,23 +1464,23 @@ static void HandleFlashEnd(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * Response data format: [payload:N][status:2]
  * Status bytes are at the END of the data field.
  */
-static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_get_security_info(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
-    EsptoolHal_LogD(TAG, "GET_SECURITY_INFO");
-    EsptoolHal_LogI("ESP", "  Get security info");
+    FESP_HAL_LOGD(TAG, "GET_SECURITY_INFO");
+    fesp_hal_log_i("ESP", "  Get security info");
 
     /* ESP8266/ESP32 ROM and stub do not support GET_SECURITY_INFO.
        Return normal response with failure status (FF 00), matching real device
        behavior. esptool sees status != 0 and falls back to magic value
        detection. */
-    if (ctx->chip->type == CHIP_ESP8266 || ctx->chip->type == CHIP_ESP32) {
-        EsptoolHal_LogD(TAG, "  Not supported on %s, returning failure",
+    if (ctx->chip->type == FESP_CHIP_ESP8266 || ctx->chip->type == FESP_CHIP_ESP32) {
+        FESP_HAL_LOGD(TAG, "  Not supported on %s, returning failure",
                     ctx->chip->name);
-        EsptoolHal_LogI("ESP", "  Not supported on %hs",
+        fesp_hal_log_i("ESP", "  Not supported on %hs",
                         ctx->chip->name);
         uint8_t err[2] = {0xFF, 0x00};
-        Esptool_SendResponseEx(ctx, ESP_CMD_GET_SECURITY_INFO,
-                               ctx->last_read_val, ESP_FAIL, 2, err, 2);
+        fesp_send_response_ex(ctx, FESP_CMD_GET_SECURITY_INFO,
+                               ctx->last_read_val, FESP_FAIL, 2, err, 2);
         return;
     }
 
@@ -1488,12 +1488,12 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
        esptool tries resp_data_len=20 first (fails), then resp_data_len=12
        (succeeds). chip_id will be None, causing get_chip_id() to raise
        FatalError, which triggers fallback to magic value detection. */
-    if (ctx->chip->type == CHIP_ESP32S2) {
-        EsptoolHal_LogD(TAG, "  ESP32-S2: returning 14-byte response (no chip_id)");
-        EsptoolHal_LogI("ESP",
+    if (ctx->chip->type == FESP_CHIP_ESP32S2) {
+        FESP_HAL_LOGD(TAG, "  ESP32-S2: returning 14-byte response (no chip_id)");
+        fesp_hal_log_i("ESP",
                        "  ESP32-S2: no chip_id in response");
-        uint32_t flash_crypt_cnt = Efuse_GetFlashCryptCnt(ctx->chip);
-        EsptoolHal_LogI("ESP",
+        uint32_t flash_crypt_cnt = fesp_efuse_get_flash_crypt_cnt(ctx->chip);
+        fesp_hal_log_i("ESP",
                         "  flags=0x%08lX flash_crypt_cnt=%u", 0UL,
                         (unsigned)flash_crypt_cnt);
         uint8_t sec_data[14] = {0};
@@ -1503,11 +1503,11 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
         /* bytes 5-11:  key_purposes (7 bytes, one per key block KEY0-KEY5 +
          * reserved) */
         for (int i = 0; i < 7; i++) {
-            sec_data[5 + i] = Efuse_GetKeyPurpose(ctx->chip, i);
+            sec_data[5 + i] = fesp_efuse_get_key_purpose(ctx->chip, i);
         }
         /* bytes 12-13: status = success (0x00, 0x00) */
-        Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val,
-                             ESP_OK, sec_data, 14);
+        fesp_send_response(ctx, FESP_CMD_GET_SECURITY_INFO, ctx->last_read_val,
+                             FESP_OK, sec_data, 14);
         return;
     }
 
@@ -1515,10 +1515,10 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
        IMAGE_CHIP_ID.
        [flags:4][flash_crypt_cnt:1][key_purposes:7][chip_id:4][api_version:4][status:2]
        For ESP32 stub, chip_id = EFUSE_CHIP_ID (0x00F01D83). */
-    uint32_t chip_id = (ctx->chip->type == CHIP_ESP32)
+    uint32_t chip_id = (ctx->chip->type == FESP_CHIP_ESP32)
                         ? ctx->chip->chip_id
                         : ctx->chip->security_chip_id;
-    uint32_t flash_crypt_cnt = Efuse_GetFlashCryptCnt(ctx->chip);
+    uint32_t flash_crypt_cnt = fesp_efuse_get_flash_crypt_cnt(ctx->chip);
 
     uint8_t sec_data[22] = {0};
     /* bytes 0-3:   flags (all zeros) */
@@ -1527,7 +1527,7 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* bytes 5-11:  key_purposes (7 bytes, one per key block KEY0-KEY5 +
      * reserved) */
     for (int i = 0; i < 7; i++) {
-        sec_data[5 + i] = Efuse_GetKeyPurpose(ctx->chip, i);
+        sec_data[5 + i] = fesp_efuse_get_key_purpose(ctx->chip, i);
     }
     /* bytes 12-15: chip_id (IMAGE_CHIP_ID, little-endian) */
     sec_data[12] = (uint8_t)(chip_id & 0xFF);
@@ -1537,46 +1537,46 @@ static void HandleGetSecurityInfo(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
     /* bytes 16-19: api_version (0) */
     /* bytes 20-21: status = success (0x00, 0x00) */
 
-    EsptoolHal_LogD(TAG, "  chip_id (IMAGE_CHIP_ID)=%lu (0x%08lX)", chip_id,
+    FESP_HAL_LOGD(TAG, "  chip_id (IMAGE_CHIP_ID)=%lu (0x%08lX)", chip_id,
                 chip_id);
-    EsptoolHal_LogI("ESP", "  flags=0x%08lX flash_crypt_cnt=%u",
+    fesp_hal_log_i("ESP", "  flags=0x%08lX flash_crypt_cnt=%u",
                     0UL, (unsigned)flash_crypt_cnt);
-    EsptoolHal_LogI("ESP",
+    fesp_hal_log_i("ESP",
                     "  chip_id=%lu (0x%08lX) api_version=%lu", chip_id,
                     chip_id, 0UL);
 
     /* Transition to READY state when chip detection succeeds via
      * GET_SECURITY_INFO */
-    if (ctx->state == ESP_STATE_SYNCED) {
-        ctx->state = ESP_STATE_READY;
-        EsptoolHal_LogI(
+    if (ctx->state == FESP_STATE_SYNCED) {
+        ctx->state = FESP_STATE_READY;
+        fesp_hal_log_i(
             "ESP",
             "  Chip detected via security info, ready for commands");
     }
 
-    Esptool_SendResponse(ctx, ESP_CMD_GET_SECURITY_INFO, ctx->last_read_val,
-                         ESP_OK, sec_data, 22);
+    fesp_send_response(ctx, FESP_CMD_GET_SECURITY_INFO, ctx->last_read_val,
+                         FESP_OK, sec_data, 22);
 }
 
 /*
- * HandleSpiAttach - Handle SPI flash attach command
+ * handle_spi_attach - Handle SPI flash attach command
  *
  * SPI_ATTACH (0x0D) initializes the SPI flash controller.
  * In the simulator, this is a no-op that always succeeds.
  */
-static void HandleSpiAttach(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_spi_attach(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
-    EsptoolHal_LogD(TAG, "SPI_ATTACH");
-    EsptoolHal_LogI("ESP", "  Attach SPI flash");
+    FESP_HAL_LOGD(TAG, "SPI_ATTACH");
+    fesp_hal_log_i("ESP", "  Attach SPI flash");
 
     /* SPI_ATTACH: ROM mode 4-byte status, stub mode 2-byte status */
-    uint8_t status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_SPI_ATTACH, ctx->last_read_val, ESP_OK,
+    uint8_t status_len = FESP_STATUS_LEN(ctx);
+    fesp_send_response_ex(ctx, FESP_CMD_SPI_ATTACH, ctx->last_read_val, FESP_OK,
                            status_len, NULL, status_len);
 }
 
 /*
- * HandleSpiSetParams - Handle SPI flash parameters command
+ * handle_spi_set_params - Handle SPI flash parameters command
  *
  * SPI_SET_PARAMS (0x0B) configures flash chip parameters.
  *
@@ -1589,72 +1589,72 @@ static void HandleSpiAttach(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  * In the simulator, flash parameters are configured separately.
  * This handler logs the parameters and returns success.
  */
-static void HandleSpiSetParams(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_spi_set_params(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
     uint32_t fl_id = 0, total_size = 0, block_size = 0, sector_size = 0,
           page_size = 0, status_mask = 0;
 
     if (pkt->size >= 24) {
-        fl_id = ReadLE32(pkt->data);
-        total_size = ReadLE32(pkt->data + 4);
-        block_size = ReadLE32(pkt->data + 8);
-        sector_size = ReadLE32(pkt->data + 12);
-        page_size = ReadLE32(pkt->data + 16);
-        status_mask = ReadLE32(pkt->data + 20);
+        fl_id = read_le32(pkt->data);
+        total_size = read_le32(pkt->data + 4);
+        block_size = read_le32(pkt->data + 8);
+        sector_size = read_le32(pkt->data + 12);
+        page_size = read_le32(pkt->data + 16);
+        status_mask = read_le32(pkt->data + 20);
     }
 
-    EsptoolHal_LogD(TAG,
+    FESP_HAL_LOGD(TAG,
                 "SPI_SET_PARAMS fl_id=0x%08lX total=%lu block=%lu sector=%lu "
                 "page=%lu mask=0x%08lX",
                 fl_id, total_size, block_size, sector_size, page_size,
                 status_mask);
-    EsptoolHal_LogI("ESP",
+    fesp_hal_log_i("ESP",
         "  fl_id=0x%08lX total=%lu block=%lu sector=%lu page=%lu mask=0x%08lX",
         fl_id, total_size, block_size, sector_size, page_size, status_mask);
 
     /* ESP8266 ROM does not support SPI_SET_PARAMS.
        Return ROM_INVALID_RECV_MSG error so esptool falls back gracefully. */
-    if (ctx->chip->type == CHIP_ESP8266 && !ctx->stub_mode) {
-        EsptoolHal_LogD(TAG, "  Not supported on ESP8266 ROM, returning error");
-        EsptoolHal_LogI("ESP", "  Not supported on ESP8266 ROM");
+    if (ctx->chip->type == FESP_CHIP_ESP8266 && !ctx->stub_mode) {
+        FESP_HAL_LOGD(TAG, "  Not supported on ESP8266 ROM, returning error");
+        fesp_hal_log_i("ESP", "  Not supported on ESP8266 ROM");
         uint8_t err_data[4] = {0x01, 0x05, 0x00, 0x00};
-        Esptool_SendResponse(ctx, ESP_CMD_SPI_SET_PARAMS, ctx->last_read_val,
-                             ESP_OK, err_data, 4);
+        fesp_send_response(ctx, FESP_CMD_SPI_SET_PARAMS, ctx->last_read_val,
+                             FESP_OK, err_data, 4);
         return;
     }
 
     /* ESP32+ ROM and all stubs: return success.
        ROM mode: 4-byte status; stub mode: 2-byte status. */
-    uint8_t status_len = ESP_STATUS_LEN(ctx);
-    Esptool_SendResponseEx(ctx, ESP_CMD_SPI_SET_PARAMS, ctx->last_read_val,
-                           ESP_OK, status_len, NULL, status_len);
+    uint8_t status_len = FESP_STATUS_LEN(ctx);
+    fesp_send_response_ex(ctx, FESP_CMD_SPI_SET_PARAMS, ctx->last_read_val,
+                           FESP_OK, status_len, NULL, status_len);
 }
 
 /*
- * HandleRunUserCode - Handle soft reset command (stub-only)
+ * handle_run_user_code - Handle soft reset command (stub-only)
  *
  * RUN_USER_CODE (0xD3) triggers a soft reset by jumping to user code.
  * This is a fire-and-forget command - client does not wait for response.
  * After sending response, resets protocol state for next connection.
  */
-static void HandleRunUserCode(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
+static void handle_run_user_code(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 {
-    EsptoolHal_LogD(TAG, "RUN_USER_CODE");
-    EsptoolHal_LogI("ESP", "  Run user code (soft reset)");
+    FESP_HAL_LOGD(TAG, "RUN_USER_CODE");
+    fesp_hal_log_i("ESP", "  Run user code (soft reset)");
 
     /* RUN_USER_CODE: stub-only, fire-and-forget (client does not wait for
      * response) */
-    Esptool_SendResponseEx(ctx, ESP_CMD_RUN_USER_CODE, ctx->last_read_val,
-                           ESP_OK, 2, NULL, 2);
+    fesp_send_response_ex(ctx, FESP_CMD_RUN_USER_CODE, ctx->last_read_val,
+                           FESP_OK, 2, NULL, 2);
 
     /* Reset protocol state for next connection */
-    Esptool_ResetState(ctx);
+    fesp_reset_state(ctx);
 }
 
 /*
- * Esptool_ProcessFrame - Process a complete SLIP frame
+ * fesp_process_frame - Process a complete SLIP frame
  *
- * Parses the frame into an ESP_PACKET, validates direction (must be request),
+ * Parses the frame into an fesp_packet_t, validates direction (must be request),
  * checks protocol state, and dispatches to the appropriate command handler.
  *
  * @ctx:       Pointer to esptool context
@@ -1663,14 +1663,14 @@ static void HandleRunUserCode(ESPTOOL_CTX *ctx, const ESP_PACKET *pkt)
  *
  * Returns true if frame was processed successfully, false on error.
  */
-bool Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const uint8_t *frame, int frame_len)
+bool fesp_process_frame(fesp_ctx_t *ctx, const uint8_t *frame, int frame_len)
 {
-    ESP_PACKET *pkt = &ctx->pkt;
+    fesp_packet_t *pkt = &ctx->pkt;
 
-    EsptoolHal_LogD(TAG, "RX frame len=%d", frame_len);
+    FESP_HAL_LOGD(TAG, "RX frame len=%d", frame_len);
 
-    if (!ParsePacket(frame, frame_len, pkt)) {
-        EsptoolHal_LogD(TAG, "Invalid packet");
+    if (!parse_packet(frame, frame_len, pkt)) {
+        FESP_HAL_LOGD(TAG, "Invalid packet");
         return false;
     }
 
@@ -1678,45 +1678,45 @@ bool Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const uint8_t *frame, int frame_len)
     const char *cmdName = GetCmdName(pkt->command);
 
     /* Get direction string */
-    const char *dirStr = (pkt->direction == ESP_DIR_REQUEST) ? "REQ" : "RES";
+    const char *dirStr = (pkt->direction == FESP_DIR_REQUEST) ? "REQ" : "RES";
 
     /* Log packet summary */
-    EsptoolHal_LogI("ESP", "[%s] %hs size=%u val=0x%08lX",
+    fesp_hal_log_i("ESP", "[%s] %hs size=%u val=0x%08lX",
                     dirStr, cmdName, pkt->size, pkt->value);
 
-    if (pkt->direction != ESP_DIR_REQUEST) {
-        EsptoolHal_LogD(TAG, "Not a request: 0x%02X", pkt->direction);
+    if (pkt->direction != FESP_DIR_REQUEST) {
+        FESP_HAL_LOGD(TAG, "Not a request: 0x%02X", pkt->direction);
         return false;
     }
 
     /* Download mode disabled: ignore all commands (simulate ROM not entering
      * download mode) */
-    if (Efuse_IsDownloadModeDisabled(ctx->chip)) {
-        EsptoolHal_LogD(TAG, "Download mode disabled, ignoring command 0x%02X",
+    if (fesp_efuse_is_download_mode_disabled(ctx->chip)) {
+        FESP_HAL_LOGD(TAG, "Download mode disabled, ignoring command 0x%02X",
                     pkt->command);
-        EsptoolHal_LogI("ESP",
+        fesp_hal_log_i("ESP",
                        "  Download mode disabled, command ignored");
         return false;
     }
 
     /* Secure download mode: only allow flash-related commands */
-    if (Efuse_IsSecureDownloadEnabled(ctx->chip)) {
+    if (fesp_efuse_is_secure_download_enabled(ctx->chip)) {
         bool allowed = false;
         switch (pkt->command) {
-        case ESP_CMD_SYNC:
-        case ESP_CMD_READ_REG:
-        case ESP_CMD_WRITE_REG:
-        case ESP_CMD_SPI_ATTACH:
-        case ESP_CMD_CHANGE_BAUDRATE:
-        case ESP_CMD_GET_SECURITY_INFO:
-        case ESP_CMD_FLASH_BEGIN:
-        case ESP_CMD_FLASH_DATA:
-        case ESP_CMD_FLASH_END:
-        case ESP_CMD_FLASH_DEFL_BEGIN:
-        case ESP_CMD_FLASH_DEFL_DATA:
-        case ESP_CMD_FLASH_DEFL_END:
-        case ESP_CMD_SPI_SET_PARAMS:
-        case ESP_CMD_SPI_FLASH_MD5:
+        case FESP_CMD_SYNC:
+        case FESP_CMD_READ_REG:
+        case FESP_CMD_WRITE_REG:
+        case FESP_CMD_SPI_ATTACH:
+        case FESP_CMD_CHANGE_BAUDRATE:
+        case FESP_CMD_GET_SECURITY_INFO:
+        case FESP_CMD_FLASH_BEGIN:
+        case FESP_CMD_FLASH_DATA:
+        case FESP_CMD_FLASH_END:
+        case FESP_CMD_FLASH_DEFL_BEGIN:
+        case FESP_CMD_FLASH_DEFL_DATA:
+        case FESP_CMD_FLASH_DEFL_END:
+        case FESP_CMD_SPI_SET_PARAMS:
+        case FESP_CMD_SPI_FLASH_MD5:
             allowed = true;
             break;
         default:
@@ -1724,13 +1724,13 @@ bool Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const uint8_t *frame, int frame_len)
             break;
         }
         if (!allowed) {
-            EsptoolHal_LogD(TAG, "Secure download: command 0x%02X not allowed",
+            FESP_HAL_LOGD(TAG, "Secure download: command 0x%02X not allowed",
                         pkt->command);
-            EsptoolHal_LogI("ESP",
+            fesp_hal_log_i("ESP",
                             "  Secure download: command 0x%02X rejected",
                             pkt->command);
-            uint8_t status_len = ESP_STATUS_LEN(ctx);
-            Esptool_SendResponseEx(ctx, pkt->command, pkt->value, ESP_FAIL,
+            uint8_t status_len = FESP_STATUS_LEN(ctx);
+            fesp_send_response_ex(ctx, pkt->command, pkt->value, FESP_FAIL,
                                    status_len, NULL, status_len);
             return false;
         }
@@ -1740,50 +1740,50 @@ bool Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const uint8_t *frame, int frame_len)
     bool valid = true;
     switch (pkt->command) {
     /* SYNC is always allowed (resets to SYNCED) */
-    case ESP_CMD_SYNC:
+    case FESP_CMD_SYNC:
         break;
 
     /* Commands allowed in IDLE state (before SYNC) - none except SYNC */
     /* Commands allowed in SYNCED state (after SYNC, before chip detection) */
-    case ESP_CMD_READ_REG:
-    case ESP_CMD_WRITE_REG:
-    case ESP_CMD_SPI_ATTACH:
-    case ESP_CMD_CHANGE_BAUDRATE:
-    case ESP_CMD_GET_SECURITY_INFO:
-        if (ctx->state < ESP_STATE_SYNCED) {
+    case FESP_CMD_READ_REG:
+    case FESP_CMD_WRITE_REG:
+    case FESP_CMD_SPI_ATTACH:
+    case FESP_CMD_CHANGE_BAUDRATE:
+    case FESP_CMD_GET_SECURITY_INFO:
+        if (ctx->state < FESP_STATE_SYNCED) {
             valid = false;
         }
         break;
 
     /* Commands allowed in READY state (after chip detection) */
-    case ESP_CMD_FLASH_BEGIN:
-    case ESP_CMD_FLASH_DEFL_BEGIN:
-    case ESP_CMD_MEM_BEGIN:
-    case ESP_CMD_SPI_FLASH_MD5:
-    case ESP_CMD_SPI_SET_PARAMS:
-    case ESP_CMD_ERASE_FLASH:
-    case ESP_CMD_ERASE_REGION:
-    case ESP_CMD_READ_FLASH:
-    case ESP_CMD_RUN_USER_CODE:
-        if (ctx->state < ESP_STATE_READY) {
+    case FESP_CMD_FLASH_BEGIN:
+    case FESP_CMD_FLASH_DEFL_BEGIN:
+    case FESP_CMD_MEM_BEGIN:
+    case FESP_CMD_SPI_FLASH_MD5:
+    case FESP_CMD_SPI_SET_PARAMS:
+    case FESP_CMD_ERASE_FLASH:
+    case FESP_CMD_ERASE_REGION:
+    case FESP_CMD_READ_FLASH:
+    case FESP_CMD_RUN_USER_CODE:
+        if (ctx->state < FESP_STATE_READY) {
             valid = false;
         }
         break;
 
     /* Flash data commands require FLASH_WRITING state */
-    case ESP_CMD_FLASH_DATA:
-    case ESP_CMD_FLASH_END:
-    case ESP_CMD_FLASH_DEFL_DATA:
-    case ESP_CMD_FLASH_DEFL_END:
-        if (ctx->state != ESP_STATE_FLASH_WRITING) {
+    case FESP_CMD_FLASH_DATA:
+    case FESP_CMD_FLASH_END:
+    case FESP_CMD_FLASH_DEFL_DATA:
+    case FESP_CMD_FLASH_DEFL_END:
+        if (ctx->state != FESP_STATE_FLASH_WRITING) {
             valid = false;
         }
         break;
 
     /* Memory data commands require MEM_WRITING state */
-    case ESP_CMD_MEM_DATA:
-    case ESP_CMD_MEM_END:
-        if (ctx->state != ESP_STATE_MEM_WRITING) {
+    case FESP_CMD_MEM_DATA:
+    case FESP_CMD_MEM_END:
+        if (ctx->state != FESP_STATE_MEM_WRITING) {
             valid = false;
         }
         break;
@@ -1792,16 +1792,16 @@ bool Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const uint8_t *frame, int frame_len)
        These commands are stub-only and used by ESP32-S3 etc. for NAND flash.
        Listed here explicitly for documentation; they will return
        ROM_INVALID_RECV_MSG. */
-    case ESP_CMD_SPI_NAND_ATTACH:
-    case ESP_CMD_SPI_NAND_READ_SPARE:
-    case ESP_CMD_SPI_NAND_WRITE_SPARE:
-    case ESP_CMD_SPI_NAND_READ_FLASH:
-    case ESP_CMD_SPI_NAND_WRITE_FLASH_BEGIN:
-    case ESP_CMD_SPI_NAND_WRITE_FLASH_DATA:
-    case ESP_CMD_SPI_NAND_ERASE_FLASH:
-    case ESP_CMD_SPI_NAND_ERASE_REGION:
-    case ESP_CMD_SPI_NAND_READ_PAGE_DEBUG:
-    case ESP_CMD_SPI_NAND_WRITE_FLASH_END:
+    case FESP_CMD_SPI_NAND_ATTACH:
+    case FESP_CMD_SPI_NAND_READ_SPARE:
+    case FESP_CMD_SPI_NAND_WRITE_SPARE:
+    case FESP_CMD_SPI_NAND_READ_FLASH:
+    case FESP_CMD_SPI_NAND_WRITE_FLASH_BEGIN:
+    case FESP_CMD_SPI_NAND_WRITE_FLASH_DATA:
+    case FESP_CMD_SPI_NAND_ERASE_FLASH:
+    case FESP_CMD_SPI_NAND_ERASE_REGION:
+    case FESP_CMD_SPI_NAND_READ_PAGE_DEBUG:
+    case FESP_CMD_SPI_NAND_WRITE_FLASH_END:
         /* Fall through to default - not implemented */
 
     default:
@@ -1810,92 +1810,92 @@ bool Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const uint8_t *frame, int frame_len)
     }
 
     if (!valid) {
-        EsptoolHal_LogD(TAG, "Command 0x%02X not allowed in state %d", pkt->command,
+        FESP_HAL_LOGD(TAG, "Command 0x%02X not allowed in state %d", pkt->command,
                     ctx->state);
-        EsptoolHal_LogI("ESP",
+        fesp_hal_log_i("ESP",
                         "  Command 0x%02X rejected (state=%d)", pkt->command,
                         ctx->state);
-        uint8_t status_len = ESP_STATUS_LEN(ctx);
-        Esptool_SendResponseEx(ctx, pkt->command, pkt->value, ESP_FAIL,
+        uint8_t status_len = FESP_STATUS_LEN(ctx);
+        fesp_send_response_ex(ctx, pkt->command, pkt->value, FESP_FAIL,
                                status_len, NULL, status_len);
         return false;
     }
 
     switch (pkt->command) {
-    case ESP_CMD_SYNC:
-        HandleSync(ctx, pkt);
+    case FESP_CMD_SYNC:
+        handle_sync(ctx, pkt);
         break;
-    case ESP_CMD_READ_REG:
-        HandleReadReg(ctx, pkt);
+    case FESP_CMD_READ_REG:
+        handle_read_reg(ctx, pkt);
         break;
-    case ESP_CMD_WRITE_REG:
-        HandleWriteReg(ctx, pkt);
+    case FESP_CMD_WRITE_REG:
+        handle_write_reg(ctx, pkt);
         break;
-    case ESP_CMD_SPI_SET_PARAMS:
-        HandleSpiSetParams(ctx, pkt);
+    case FESP_CMD_SPI_SET_PARAMS:
+        handle_spi_set_params(ctx, pkt);
         break;
-    case ESP_CMD_SPI_ATTACH:
-        HandleSpiAttach(ctx, pkt);
+    case FESP_CMD_SPI_ATTACH:
+        handle_spi_attach(ctx, pkt);
         break;
-    case ESP_CMD_CHANGE_BAUDRATE:
-        HandleChangeBaudrate(ctx, pkt);
+    case FESP_CMD_CHANGE_BAUDRATE:
+        handle_change_baudrate(ctx, pkt);
         break;
-    case ESP_CMD_FLASH_BEGIN:
-        HandleFlashBegin(ctx, pkt);
+    case FESP_CMD_FLASH_BEGIN:
+        handle_flash_begin(ctx, pkt);
         break;
-    case ESP_CMD_FLASH_DATA:
-        HandleFlashData(ctx, pkt);
+    case FESP_CMD_FLASH_DATA:
+        handle_flash_data(ctx, pkt);
         break;
-    case ESP_CMD_FLASH_END:
-        HandleFlashEnd(ctx, pkt);
+    case FESP_CMD_FLASH_END:
+        handle_flash_end(ctx, pkt);
         break;
-    case ESP_CMD_MEM_BEGIN:
-        HandleMemBegin(ctx, pkt);
+    case FESP_CMD_MEM_BEGIN:
+        handle_mem_begin(ctx, pkt);
         break;
-    case ESP_CMD_MEM_DATA:
-        HandleMemData(ctx, pkt);
+    case FESP_CMD_MEM_DATA:
+        handle_mem_data(ctx, pkt);
         break;
-    case ESP_CMD_MEM_END:
-        HandleMemEnd(ctx, pkt);
+    case FESP_CMD_MEM_END:
+        handle_mem_end(ctx, pkt);
         break;
-    case ESP_CMD_FLASH_DEFL_BEGIN:
-        HandleFlashDeflBegin(ctx, pkt);
+    case FESP_CMD_FLASH_DEFL_BEGIN:
+        handle_flash_defl_begin(ctx, pkt);
         break;
-    case ESP_CMD_FLASH_DEFL_DATA:
-        HandleFlashDeflData(ctx, pkt);
+    case FESP_CMD_FLASH_DEFL_DATA:
+        handle_flash_defl_data(ctx, pkt);
         break;
-    case ESP_CMD_FLASH_DEFL_END:
-        HandleFlashDeflEnd(ctx, pkt);
+    case FESP_CMD_FLASH_DEFL_END:
+        handle_flash_defl_end(ctx, pkt);
         break;
-    case ESP_CMD_SPI_FLASH_MD5:
-        HandleFlashMd5(ctx, pkt);
+    case FESP_CMD_SPI_FLASH_MD5:
+        handle_flash_md5(ctx, pkt);
         break;
-    case ESP_CMD_ERASE_FLASH:
-        HandleEraseFlash(ctx, pkt);
+    case FESP_CMD_ERASE_FLASH:
+        handle_erase_flash(ctx, pkt);
         break;
-    case ESP_CMD_ERASE_REGION:
-        HandleEraseBlock(ctx, pkt);
+    case FESP_CMD_ERASE_REGION:
+        handle_erase_block(ctx, pkt);
         break;
-    case ESP_CMD_READ_FLASH:
-        HandleReadFlash(ctx, pkt);
+    case FESP_CMD_READ_FLASH:
+        handle_read_flash(ctx, pkt);
         break;
-    case ESP_CMD_GET_SECURITY_INFO:
-        HandleGetSecurityInfo(ctx, pkt);
+    case FESP_CMD_GET_SECURITY_INFO:
+        handle_get_security_info(ctx, pkt);
         break;
-    case ESP_CMD_RUN_USER_CODE:
-        HandleRunUserCode(ctx, pkt);
+    case FESP_CMD_RUN_USER_CODE:
+        handle_run_user_code(ctx, pkt);
         break;
     default:
         /* ROM returns ROM_INVALID_RECV_MSG (0x05) for unsupported commands */
-        EsptoolHal_LogD(TAG, "Unknown cmd: 0x%02X", pkt->command);
-        EsptoolHal_LogI("ESP", "  Unknown command: 0x%02X",
+        FESP_HAL_LOGD(TAG, "Unknown cmd: 0x%02X", pkt->command);
+        fesp_hal_log_i("ESP", "  Unknown command: 0x%02X",
                         pkt->command);
         {
             /* Response format: [status_byte_1 != 0][ROM_INVALID_RECV_MSG] +
              * padding */
             uint8_t err_data[4] = {0x01, 0x05, 0x00, 0x00};
-            uint8_t status_len = ESP_STATUS_LEN(ctx);
-            Esptool_SendResponseEx(ctx, pkt->command, pkt->value, ESP_OK,
+            uint8_t status_len = FESP_STATUS_LEN(ctx);
+            fesp_send_response_ex(ctx, pkt->command, pkt->value, FESP_OK,
                                    status_len, err_data, 4);
         }
         return false;
@@ -1905,10 +1905,10 @@ bool Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const uint8_t *frame, int frame_len)
 }
 
 /*
- * Esptool_Feed - Feed raw serial data to protocol decoder
+ * fesp_feed - Feed raw serial data to protocol decoder
  *
  * Processes incoming bytes through SLIP decoder. When a complete
- * frame is assembled, dispatches to Esptool_ProcessFrame.
+ * frame is assembled, dispatches to fesp_process_frame.
  *
  * @ctx: Pointer to protocol context
  * @data: Pointer to raw serial data
@@ -1916,21 +1916,21 @@ bool Esptool_ProcessFrame(ESPTOOL_CTX *ctx, const uint8_t *frame, int frame_len)
  *
  * Returns true if at least one complete frame was processed.
  */
-bool Esptool_Feed(ESPTOOL_CTX *ctx, const uint8_t *data, int len)
+bool fesp_feed(fesp_ctx_t *ctx, const uint8_t *data, int len)
 {
     bool got_frame = false;
 
     for (int i = 0; i < len; i++) {
-        if (Slip_PutByte(&ctx->slip, data[i])) {
-            const uint8_t *payload = Slip_GetPayload(&ctx->slip);
-            int plen = Slip_GetLength(&ctx->slip);
+        if (fesp_slip_put_byte(&ctx->slip, data[i])) {
+            const uint8_t *payload = fesp_slip_get_payload(&ctx->slip);
+            int plen = fesp_slip_get_length(&ctx->slip);
 
             if (plen >= 8) {
-                Esptool_ProcessFrame(ctx, payload, plen);
+                fesp_process_frame(ctx, payload, plen);
                 got_frame = true;
             }
 
-            Slip_Reset(&ctx->slip);
+            fesp_slip_reset(&ctx->slip);
         }
     }
 

@@ -5,10 +5,10 @@
 #ifndef DLG_H
 #define DLG_H
 
-#include "../esptool/chip.h"
-#include "../esptool/flash.h"
-#include "../esptool/esptool.h"
-#include "../esptool_hal.h"
+#include "../fesptool/chip.h"
+#include "../fesptool/flash.h"
+#include "../fesptool/esptool.h"
+#include "../fesptool_hal.h"
 #include "../resource.h"
 #include "../utils/lang.h"
 #include <commctrl.h>
@@ -16,22 +16,22 @@
 #include <windows.h>
 
 /* Global state (defined in main.c) */
-extern CHIP_CTX g_chip;
-extern FLASH_CTX g_flash;
+extern fesp_chip_ctx_t g_chip;
+extern fesp_flash_ctx_t g_flash;
 extern WCHAR g_deviceFile[MAX_PATH];
 extern BOOL g_deviceModified;
-extern ESPTOOL_CTX g_esptool;
+extern fesp_ctx_t g_esptool;
 extern WCHAR g_szSelectedPort[32];
 
 /*
  * PopulateFlashSizes - Populate flash size combo box
  */
-void PopulateFlashSizes(HWND hFlash, CHIP_TYPE chip, DWORD currentSize);
+void PopulateFlashSizes(HWND hFlash, fesp_chip_type_t chip, DWORD currentSize);
 
 /*
  * GetFlashSizeFromCombo - Get flash size from combo box selection
  */
-DWORD GetFlashSizeFromCombo(HWND hFlash, CHIP_TYPE chip);
+DWORD GetFlashSizeFromCombo(HWND hFlash, fesp_chip_type_t chip);
 
 /*
  * OnDeviceModified - Callback when device data is modified by protocol

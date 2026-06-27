@@ -4,7 +4,7 @@
  * Handles SLIP framing for esptool serial communication.
  */
 
-#include "../esptool_hal.h"
+#include "../fesptool_hal.h"
 #include "slip.h"
 
 #if ENABLE_TRACE
@@ -12,11 +12,11 @@ static const char *TAG = "SLIP";
 #endif
 
 /*
- * Slip_Init - Initialize SLIP decoder
+ * fesp_slip_init - Initialize SLIP decoder
  *
  * Resets decoder state for receiving a new frame.
  */
-void Slip_Init(SLIP_CTX *ctx)
+void fesp_slip_init(fesp_slip_ctx_t *ctx)
 {
     ctx->len = 0;
     ctx->in_frame = false;
@@ -24,7 +24,7 @@ void Slip_Init(SLIP_CTX *ctx)
 }
 
 /*
- * Slip_PutByte - Feed a uint8_t to the decoder
+ * fesp_slip_put_byte - Feed a uint8_t to the decoder
  *
  * Processes one uint8_t of SLIP-encoded data. Handles frame delimiters (0xC0)
  * and escape sequences (0xDB 0xDC, 0xDB 0xDD).
@@ -34,9 +34,9 @@ void Slip_Init(SLIP_CTX *ctx)
  *
  * Returns true when a complete frame has been received.
  */
-bool Slip_PutByte(SLIP_CTX *ctx, uint8_t b)
+bool fesp_slip_put_byte(fesp_slip_ctx_t *ctx, uint8_t b)
 {
-    if (b == SLIP_END) {
+    if (b == FESP_SLIP_END) {
         if (ctx->in_frame && ctx->len > 0) {
             ctx->in_frame = false;
             return true;
@@ -52,31 +52,31 @@ bool Slip_PutByte(SLIP_CTX *ctx, uint8_t b)
     }
 
     if (ctx->escaped) {
-        if (ctx->len >= SLIP_MAX_FRAME) {
-            EsptoolHal_LogD(TAG, "Frame overflow");
+        if (ctx->len >= FESP_SLIP_MAX_FRAME) {
+            FESP_HAL_LOGD(TAG, "Frame overflow");
             ctx->in_frame = false;
             ctx->len = 0;
             return false;
         }
         switch (b) {
-        case SLIP_ESC_END:
-            ctx->buf[ctx->len++] = SLIP_END;
+        case FESP_SLIP_ESC_END:
+            ctx->buf[ctx->len++] = FESP_SLIP_END;
             break;
-        case SLIP_ESC_ESC:
-            ctx->buf[ctx->len++] = SLIP_ESC;
+        case FESP_SLIP_ESC_ESC:
+            ctx->buf[ctx->len++] = FESP_SLIP_ESC;
             break;
         default:
-            EsptoolHal_LogD(TAG, "Invalid escape: 0x%02X", b);
+            FESP_HAL_LOGD(TAG, "Invalid escape: 0x%02X", b);
             ctx->in_frame = false;
             ctx->len = 0;
             return false;
         }
         ctx->escaped = false;
-    } else if (b == SLIP_ESC) {
+    } else if (b == FESP_SLIP_ESC) {
         ctx->escaped = true;
     } else {
-        if (ctx->len >= SLIP_MAX_FRAME) {
-            EsptoolHal_LogD(TAG, "Frame overflow");
+        if (ctx->len >= FESP_SLIP_MAX_FRAME) {
+            FESP_HAL_LOGD(TAG, "Frame overflow");
             ctx->in_frame = false;
             ctx->len = 0;
             return false;
@@ -88,35 +88,35 @@ bool Slip_PutByte(SLIP_CTX *ctx, uint8_t b)
 }
 
 /*
- * Slip_IsComplete - Check if a complete frame has been received
+ * fesp_slip_is_complete - Check if a complete frame has been received
  *
  * Returns true if decoder has a complete frame ready for processing.
  */
-bool Slip_IsComplete(const SLIP_CTX *ctx)
+bool fesp_slip_is_complete(const fesp_slip_ctx_t *ctx)
 {
     return !ctx->in_frame && ctx->len > 0;
 }
 
 /*
- * Slip_GetPayload - Get pointer to decoded frame payload
+ * fesp_slip_get_payload - Get pointer to decoded frame payload
  *
  * Returns pointer to internal buffer containing decoded frame data.
  */
-const uint8_t *Slip_GetPayload(const SLIP_CTX *ctx) { return ctx->buf; }
+const uint8_t *fesp_slip_get_payload(const fesp_slip_ctx_t *ctx) { return ctx->buf; }
 
 /*
- * Slip_GetLength - Get decoded frame length
+ * fesp_slip_get_length - Get decoded frame length
  *
  * Returns length of decoded frame data in bytes.
  */
-int Slip_GetLength(const SLIP_CTX *ctx) { return ctx->len; }
+int fesp_slip_get_length(const fesp_slip_ctx_t *ctx) { return ctx->len; }
 
 /*
- * Slip_Reset - Reset decoder state
+ * fesp_slip_reset - Reset decoder state
  *
  * Prepares decoder for receiving the next frame.
  */
-void Slip_Reset(SLIP_CTX *ctx)
+void fesp_slip_reset(fesp_slip_ctx_t *ctx)
 {
     ctx->len = 0;
     ctx->in_frame = false;
@@ -124,7 +124,7 @@ void Slip_Reset(SLIP_CTX *ctx)
 }
 
 /*
- * Slip_Encode - Encode data into SLIP frame
+ * fesp_slip_encode - Encode data into SLIP frame
  *
  * Wraps data with SLIP frame delimiters and escapes special bytes.
  *
@@ -135,24 +135,24 @@ void Slip_Reset(SLIP_CTX *ctx)
  *
  * Returns encoded frame length, or 0 on error (buffer too small).
  */
-int Slip_Encode(const uint8_t *data, int len, uint8_t *out, int out_max)
+int fesp_slip_encode(const uint8_t *data, int len, uint8_t *out, int out_max)
 {
     int pos = 0;
 
     if (out_max < 3) {
         return 0;
     }
-    out[pos++] = SLIP_END;
+    out[pos++] = FESP_SLIP_END;
 
     for (int i = 0; i < len && pos < out_max - 1; i++) {
         switch (data[i]) {
-        case SLIP_END:
-            out[pos++] = SLIP_ESC;
-            out[pos++] = SLIP_ESC_END;
+        case FESP_SLIP_END:
+            out[pos++] = FESP_SLIP_ESC;
+            out[pos++] = FESP_SLIP_ESC_END;
             break;
-        case SLIP_ESC:
-            out[pos++] = SLIP_ESC;
-            out[pos++] = SLIP_ESC_ESC;
+        case FESP_SLIP_ESC:
+            out[pos++] = FESP_SLIP_ESC;
+            out[pos++] = FESP_SLIP_ESC_ESC;
             break;
         default:
             out[pos++] = data[i];
@@ -163,7 +163,7 @@ int Slip_Encode(const uint8_t *data, int len, uint8_t *out, int out_max)
     if (pos >= out_max) {
         return 0;
     }
-    out[pos++] = SLIP_END;
+    out[pos++] = FESP_SLIP_END;
 
     return pos;
 }

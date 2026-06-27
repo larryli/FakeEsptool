@@ -10,10 +10,10 @@
 #include "app_logview.h"
 #include "device_file.h"
 #include "dlg/dlg.h"
-#include "esptool/chip.h"
-#include "esptool/flash.h"
-#include "esptool/esptool.h"
-#include "esptool_hal.h"
+#include "fesptool/chip.h"
+#include "fesptool/flash.h"
+#include "fesptool/esptool.h"
+#include "fesptool_hal.h"
 #include "resource.h"
 #include "serial.h"
 #include "utils/config.h"
@@ -69,11 +69,11 @@ static const DWORD esp32_flash_sizes[] = {
  * @chip:       Chip type enum
  * @currentSize: Current flash size to select
  */
-void PopulateFlashSizes(HWND hFlash, CHIP_TYPE chip, DWORD currentSize)
+void PopulateFlashSizes(HWND hFlash, fesp_chip_type_t chip, DWORD currentSize)
 {
     SendMessageW(hFlash, CB_RESETCONTENT, 0, 0);
 
-    BOOL isEsp8266 = (chip == CHIP_ESP8266);
+    BOOL isEsp8266 = (chip == FESP_CHIP_ESP8266);
     const WCHAR **names = isEsp8266 ? esp8266_flash_names : esp32_flash_names;
     const DWORD *sizes = isEsp8266 ? esp8266_flash_sizes : esp32_flash_sizes;
     int count = isEsp8266 ? ESP8266_FLASH_COUNT : ESP32_FLASH_COUNT;
@@ -99,13 +99,13 @@ void PopulateFlashSizes(HWND hFlash, CHIP_TYPE chip, DWORD currentSize)
  *
  * Returns flash size in bytes.
  */
-DWORD GetFlashSizeFromCombo(HWND hFlash, CHIP_TYPE chip)
+DWORD GetFlashSizeFromCombo(HWND hFlash, fesp_chip_type_t chip)
 {
     int sel = (int)SendMessageW(hFlash, CB_GETCURSEL, 0, 0);
     if (sel < 0) {
         sel = 0;
     }
-    BOOL isEsp8266 = (chip == CHIP_ESP8266);
+    BOOL isEsp8266 = (chip == FESP_CHIP_ESP8266);
     const DWORD *sizes = isEsp8266 ? esp8266_flash_sizes : esp32_flash_sizes;
     int count = isEsp8266 ? ESP8266_FLASH_COUNT : ESP32_FLASH_COUNT;
     if (sel >= count) {
@@ -120,11 +120,11 @@ SERIAL_CTX g_serial = {.hPort = NULL,
                        .hStartEvent = NULL,
                        .hNotify = NULL,
                        .bRunning = FALSE};
-CHIP_CTX g_chip = {0};
-FLASH_CTX g_flash = {0};
+fesp_chip_ctx_t g_chip = {0};
+fesp_flash_ctx_t g_flash = {0};
 WCHAR g_deviceFile[MAX_PATH] = {0};
 BOOL g_deviceModified = FALSE;
-ESPTOOL_CTX g_esptool = {0};
+fesp_ctx_t g_esptool = {0};
 static HWND g_hWnd = NULL; /* Main window handle */
 HWND g_hToolbar = NULL;
 HWND g_hStatusbar = NULL;
@@ -213,7 +213,7 @@ void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len,
     if (!ctx || !data || len == 0) {
         return;
     }
-    Esptool_Feed(&g_esptool, data, (int)len);
+    fesp_feed(&g_esptool, data, (int)len);
 }
 
 /* Signal state for download mode detection */
@@ -241,15 +241,15 @@ void ResetSignalState(void)
 static void OutputBootMessage(SERIAL_CTX *ctx, BOOL download_mode,
                               BYTE reset_cause, HWND hNotify)
 {
-    Esptool_ResetState(&g_esptool);
+    fesp_reset_state(&g_esptool);
 
-    DWORD bootBaud = Chip_GetBootBaudRate(&g_chip);
+    DWORD bootBaud = fesp_chip_get_boot_baud_rate(&g_chip);
     Serial_SetBaudRate(ctx, bootBaud);
     Serial_PostLogF(hNotify, L"CFG", L"Baud rate: %lu", bootBaud);
 
     char boot_msg_buf[512];
     const char *msg =
-        Chip_GetBootMessage(&g_chip, download_mode, reset_cause,
+        fesp_chip_get_boot_message(&g_chip, (bool)download_mode, reset_cause,
                             boot_msg_buf, sizeof(boot_msg_buf));
     if (msg[0]) {
         Serial_WriteData(ctx, (const BYTE *)msg, (DWORD)strlen(msg), hNotify);
@@ -975,7 +975,7 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
     if (cmdFilePath && cmdFilePath[0]) {
         TRACE_FW(TAG, "Opening command line file: %ls", cmdFilePath);
         if (DeviceFile_Load(&g_chip, &g_flash, cmdFilePath)) {
-            EsptoolHal_SetModifiedCallback(OnDeviceModified);
+            FEsptoolSetModifiedCallback(OnDeviceModified);
             Config_SetLastDeviceFile(cmdFilePath);
             g_deviceModified = FALSE;
             wcscpy(g_deviceFile, cmdFilePath);
@@ -1004,7 +1004,7 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
                                   MB_YESNO | MB_ICONQUESTION);
             if (ret == IDYES) {
                 if (DeviceFile_Load(&g_chip, &g_flash, lastFile)) {
-                    EsptoolHal_SetModifiedCallback(OnDeviceModified);
+                    FEsptoolSetModifiedCallback(OnDeviceModified);
                     g_deviceModified = FALSE;
                     wcscpy(g_deviceFile, lastFile);
                     UpdateMenuState(hWnd);
@@ -1019,14 +1019,14 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
     /* No last file or user declined - create default device */
     {
         static const BYTE defaultMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0x01};
-        if (Chip_Init(&g_chip, CHIP_ESP32) &&
-            Flash_Init(&g_flash, 4 * 1024 * 1024)) {
-            Chip_SetFlashSize(&g_chip, 4 * 1024 * 1024);
-            Chip_SetMac(&g_chip, defaultMac);
-            g_chip.xtal_freq = XTAL_FREQ_40M;
+        if (fesp_chip_init(&g_chip, FESP_CHIP_ESP32) &&
+            fesp_flash_init(&g_flash, 4 * 1024 * 1024)) {
+            fesp_chip_set_flash_size(&g_chip, 4 * 1024 * 1024);
+            fesp_chip_set_mac(&g_chip, defaultMac);
+            g_chip.xtal_freq = FESP_XTAL_FREQ_40M;
             g_deviceModified = FALSE;
             g_deviceFile[0] = 0;
-            EsptoolHal_SetModifiedCallback(OnDeviceModified);
+            FEsptoolSetModifiedCallback(OnDeviceModified);
             UpdateMenuState(hWnd);
             UpdateStatusBar();
             UpdateTitle(hWnd);
@@ -1131,9 +1131,9 @@ static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam)
         g_hDevNotify = NULL;
     }
     Serial_Close(&g_serial);
-    Esptool_Close(&g_esptool);
-    Flash_Close(&g_flash);
-    Chip_Close(&g_chip);
+    fesp_close(&g_esptool);
+    fesp_flash_close(&g_flash);
+    fesp_chip_close(&g_chip);
     if (g_hRichEdit) {
         FreeLibrary(g_hRichEdit);
         g_hRichEdit = NULL;
@@ -1159,13 +1159,13 @@ static BOOL Main_Init(HINSTANCE hInstance)
     InitCommonControlsEx(&icex);
 
     /* Initialize esptool protocol with pointers to device data */
-    Esptool_Init(&g_esptool, &g_chip, &g_flash);
+    fesp_init(&g_esptool, &g_chip, &g_flash);
 
     /* Register HAL callbacks */
-    EsptoolHal_SetWriteCallback(OnSerialWrite);
-    EsptoolHal_SetBaudRateCallback(OnBaudRateChange);
-    EsptoolHal_SetModifiedCallback(OnDeviceModified);
-    EsptoolHal_SetLogCallback(OnHalLog, NULL);
+    FEsptoolSetWriteCallback(OnSerialWrite);
+    FEsptoolSetBaudRateCallback(OnBaudRateChange);
+    FEsptoolSetModifiedCallback(OnDeviceModified);
+    FEsptoolSetLogCallback(OnHalLog, NULL);
 
     WNDCLASSEXW wc = {
         .cbSize = sizeof(WNDCLASSEXW),
