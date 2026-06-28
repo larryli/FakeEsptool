@@ -72,8 +72,32 @@ target_compile_definitions(test_encrypt PRIVATE
     _CRT_SECURE_NO_WARNINGS
 )
 
+# Test executable: test_md5
+add_executable(test_md5
+    test_md5.c
+    ../src/utils/md5.c
+)
+
+# Include directories
+target_include_directories(test_md5 PRIVATE ../src)
+
+# Compiler options
+target_compile_options(test_md5 PRIVATE /utf-8)
+
+# Link CryptoAPI
+target_link_libraries(test_md5 PRIVATE advapi32)
+
+# Preprocessor definitions
+target_compile_definitions(test_md5 PRIVATE
+    UNICODE
+    _UNICODE
+    WIN32_LEAN_AND_MEAN
+    _CRT_SECURE_NO_WARNINGS
+)
+
 # Enable testing
 enable_testing()
 add_test(NAME test_deflate COMMAND test_deflate)
 add_test(NAME test_encrypt COMMAND test_encrypt)
 add_test(NAME test_slip COMMAND test_slip)
+add_test(NAME test_md5 COMMAND test_md5)
