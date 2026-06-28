@@ -6,10 +6,9 @@
 #define DLG_H
 
 #include "../fesptool/chip.h"
-#include "../fesptool/esptool.h"
 #include "../fesptool/flash.h"
-#include "../fesptool_hal.h"
 #include "../resource.h"
+#include "../serial.h"
 #include "../utils/lang.h"
 #include <commctrl.h>
 #include <commdlg.h>
@@ -20,7 +19,6 @@ extern fesp_chip_ctx_t g_chip;
 extern fesp_flash_ctx_t g_flash;
 extern WCHAR g_deviceFile[MAX_PATH];
 extern BOOL g_deviceModified;
-extern fesp_ctx_t g_esptool;
 extern WCHAR g_szSelectedPort[32];
 
 /*

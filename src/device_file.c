@@ -6,7 +6,7 @@
  */
 
 #include "device_file.h"
-#include "fesptool/fesp.h"
+#include "fesptool/efuse.h"
 #include "utils/trace.h"
 #include <string.h>
 

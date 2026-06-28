@@ -47,7 +47,7 @@ void fesp_hal_md5_calc(const BYTE *data, DWORD len, BYTE digest[16]);
 #define FESP_HAL_DEFLATE_ERROR -1
 #define FESP_HAL_DEFLATE_BAD_INPUT -2
 
-/* DEFLATE context (opaque, size足够容纳实现结构体) */
+/* DEFLATE context */
 typedef struct {
     char _opaque[256];
 } fesp_hal_deflate_ctx_t;
@@ -62,7 +62,7 @@ size_t fesp_hal_deflate_get_output_pos(const fesp_hal_deflate_ctx_t *ctx);
 #define FESP_HAL_ENCRYPT_OK 0
 #define FESP_HAL_ENCRYPT_BAD_INPUT -2
 
-/* AES-XTS context (opaque, size足够容纳实现结构体) */
+/* AES-XTS context */
 typedef struct {
     char _opaque[128];
 } fesp_hal_encrypt_ctx_t;

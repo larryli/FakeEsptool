@@ -84,7 +84,11 @@ output\main.obj: \
 	src\app_logview.h \
 	src\device_file.h \
 	src\dlg\dlg.h \
-	src\fesptool\fesp.h \
+	src\fesptool\chip.h \
+	src\fesptool\efuse.h \
+	src\fesptool\esptool.h \
+	src\fesptool\flash.h \
+	src\fesptool\slip.h \
 	src\fesptool_hal.h \
 	src\main.h \
 	src\resource.h \
@@ -99,9 +103,10 @@ output\main.obj: \
 # 
 output\serial.obj: \
 	src\serial.c \
+	src\fesptool\chip.h \
+	src\fesptool\flash.h \
 	src\main.h \
 	src\resource.h \
-	src\serial.c \
 	src\serial.h \
 	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
@@ -134,10 +139,9 @@ output\trace.obj: \
 # 
 output\slip.obj: \
 	src\fesptool\slip.c \
-	src\fesptool\fesp.h \
-	src\fesptool\slip.c \
 	src\fesptool\slip.h \
-	src\utils\trace.h
+	src\fesptool_hal.h \
+	src\serial.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -148,7 +152,12 @@ output\chip.obj: \
 	src\fesptool\chip.h \
 	src\fesptool\chip_priv.h \
 	src\fesptool\efuse.h \
-	src\utils\trace.h
+	src\fesptool\esptool.h \
+	src\fesptool\fesp.h \
+	src\fesptool\flash.h \
+	src\fesptool\slip.h \
+	src\fesptool_hal.h \
+	src\serial.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -159,7 +168,12 @@ output\efuse.obj: \
 	src\fesptool\chip.h \
 	src\fesptool\efuse.h \
 	src\fesptool\efuse_priv.h \
-	src\utils\trace.h
+	src\fesptool\esptool.h \
+	src\fesptool\fesp.h \
+	src\fesptool\flash.h \
+	src\fesptool\slip.h \
+	src\fesptool_hal.h \
+	src\serial.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -168,7 +182,8 @@ output\efuse.obj: \
 output\flash.obj: \
 	src\fesptool\flash.c \
 	src\fesptool\flash.h \
-	src\utils\trace.h
+	src\fesptool_hal.h \
+	src\serial.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -176,10 +191,14 @@ output\flash.obj: \
 # 
 output\esptool.obj: \
 	src\fesptool\esptool.c \
+	src\fesptool\chip.h \
+	src\fesptool\efuse.h \
 	src\fesptool\esptool.h \
+	src\fesptool\fesp.h \
+	src\fesptool\flash.h \
+	src\fesptool\slip.h \
 	src\fesptool_hal.h \
-	src\utils\deflate.h \
-	src\utils\encrypt.h
+	src\serial.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -187,11 +206,23 @@ output\esptool.obj: \
 # 
 output\fesptool_hal.obj: \
 	src\fesptool_hal.c \
+	src\app_commands.h \
+	src\dlg\dlg.h \
+	src\fesptool\chip.h \
+	src\fesptool\efuse.h \
+	src\fesptool\esptool.h \
+	src\fesptool\flash.h \
+	src\fesptool\slip.h \
 	src\fesptool_hal.h \
+	src\resource.h \
+	src\serial.h \
+	src\utils\config.h \
 	src\utils\deflate.h \
 	src\utils\encrypt.h \
+	src\utils\lang.h \
 	src\utils\md5.h \
-	src\utils\mem.h
+	src\utils\mem.h \
+	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -201,6 +232,7 @@ output\device_file.obj: \
 	src\device_file.c \
 	src\device_file.h \
 	src\fesptool\chip.h \
+	src\fesptool\efuse.h \
 	src\fesptool\flash.h \
 	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
@@ -221,7 +253,8 @@ output\main.res: \
 # 
 output\deflate.obj: \
 	src\utils\deflate.c \
-	src\utils\deflate.h
+	src\utils\deflate.h \
+	src\utils\mem.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -239,9 +272,11 @@ output\app_logview.obj: \
 output\device_props.obj: \
 	src\dlg\device_props.c \
 	src\dlg\dlg.h \
-	src\fesptool\fesp.h \
-	src\fesptool_hal.h \
-	src\resource.h
+	src\fesptool\chip.h \
+	src\fesptool\flash.h \
+	src\resource.h \
+	src\serial.h \
+	src\utils\lang.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -250,12 +285,8 @@ output\device_props.obj: \
 output\port_select.obj: \
 	src\dlg\port_select.c \
 	src\dlg\dlg.h \
-	src\dlg\port_select.c \
 	src\fesptool\chip.h \
-	src\fesptool\esptool.h \
-	src\fesptool\fesp.h \
 	src\fesptool\flash.h \
-	src\fesptool\slip.h \
 	src\resource.h \
 	src\serial.h \
 	src\utils\config.h \
@@ -272,11 +303,10 @@ output\app_commands.obj: \
 	src\device_file.h \
 	src\dlg\dlg.h \
 	src\fesptool\chip.h \
+	src\fesptool\efuse.h \
 	src\fesptool\esptool.h \
-	src\fesptool\fesp.h \
 	src\fesptool\flash.h \
 	src\fesptool\slip.h \
-	src\fesptool_hal.h \
 	src\main.h \
 	src\resource.h \
 	src\serial.h \
@@ -292,13 +322,11 @@ output\key_mgmt.obj: \
 	src\dlg\key_mgmt.c \
 	src\app_commands.h \
 	src\dlg\dlg.h \
-	src\dlg\key_mgmt.c \
 	src\fesptool\chip.h \
+	src\fesptool\efuse.h \
 	src\fesptool\esptool.h \
-	src\fesptool\fesp.h \
 	src\fesptool\flash.h \
 	src\fesptool\slip.h \
-	src\fesptool_hal.h \
 	src\resource.h \
 	src\serial.h \
 	src\utils\config.h \

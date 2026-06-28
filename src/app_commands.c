@@ -7,8 +7,6 @@
 #include "app_commands.h"
 #include "app_logview.h"
 #include "device_file.h"
-#include "fesptool/chip.h"
-#include "fesptool/flash.h"
 #include "main.h"
 #include "resource.h"
 #include <commdlg.h>

@@ -4,7 +4,6 @@
  * Enumerates available serial ports and allows user to select one.
  */
 
-#include "../serial.h"
 #include "../utils/config.h"
 #include "../utils/lang.h"
 #include "dlg.h"
