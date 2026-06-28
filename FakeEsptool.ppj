@@ -83,7 +83,6 @@ output\main.obj: \
 	src\main.c \
 	src\app_commands.h \
 	src\app_logview.h \
-	src\app_protocol.h \
 	src\device_file.h \
 	src\dlg\dlg.h \
 	src\fesptool\chip.h \
@@ -195,7 +194,6 @@ output\esptool.obj: \
 output\fesptool_hal.obj: \
 	src\fesptool_hal.c \
 	src\app_commands.h \
-	src\app_protocol.h \
 	src\dlg\dlg.h \
 	src\fesptool\chip.h \
 	src\fesptool\efuse.h \
@@ -205,7 +203,6 @@ output\fesptool_hal.obj: \
 	src\fesptool_hal.h \
 	src\resource.h \
 	src\serial.h \
-	src\utils\config.h \
 	src\utils\deflate.h \
 	src\utils\encrypt.h \
 	src\utils\lang.h \
@@ -311,7 +308,6 @@ output\app_commands.obj: \
 output\key_mgmt.obj: \
 	src\dlg\key_mgmt.c \
 	src\app_commands.h \
-	src\app_protocol.h \
 	src\dlg\dlg.h \
 	src\fesptool\chip.h \
 	src\fesptool\efuse.h \
@@ -320,9 +316,7 @@ output\key_mgmt.obj: \
 	src\fesptool\slip.h \
 	src\resource.h \
 	src\serial.h \
-	src\utils\config.h \
-	src\utils\lang.h \
-	src\utils\trace.h
+	src\utils\lang.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 

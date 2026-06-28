@@ -7,6 +7,7 @@
 
 #include "fesptool_hal.h"
 #include "app_commands.h"
+#include "dlg/dlg.h"
 #include "serial.h"
 #include "utils/trace.h"
 #include <stdio.h>

@@ -6,9 +6,14 @@
 
 #include "app_commands.h"
 #include "app_logview.h"
+#include "app_protocol.h"
 #include "device_file.h"
+#include "dlg/dlg.h"
 #include "main.h"
 #include "resource.h"
+#include "utils/config.h"
+#include "utils/lang.h"
+#include "utils/trace.h"
 #include <commdlg.h>
 #include <richedit.h>
 #include <stdio.h>

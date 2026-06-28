@@ -5,13 +5,8 @@
 #ifndef APP_COMMANDS_H
 #define APP_COMMANDS_H
 
-#include "app_protocol.h"
-#include "dlg/dlg.h"
 #include "fesptool/esptool.h"
 #include "serial.h"
-#include "utils/config.h"
-#include "utils/lang.h"
-#include "utils/trace.h"
 #include <windows.h>
 
 /* Global state (defined in main.c) */

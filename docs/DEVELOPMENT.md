@@ -79,6 +79,7 @@ fesp_init(&g_esptool, &g_chip, &g_flash);
 |------|------|
 | `main.c` | 程序入口，窗口过程，消息分发 |
 | `app_commands.c/h` | 菜单和工具栏命令处理 |
+| `app_protocol.c/h` | 协议信号状态机（DTR/RTS 检测、启动消息） |
 | `app_logview.c/h` | 日志视图和字体管理 |
 | `serial.c/h` | 串口通信，数据收发，信号控制 |
 | `device_file.c/h` | .esp 设备文件格式读写 |
