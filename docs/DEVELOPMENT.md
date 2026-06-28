@@ -691,10 +691,16 @@ All flash segments verified successfully.
 
 **测试文件**：
 
-| 文件 | 测试内容 |
-|------|----------|
-| `test_deflate.c` | DEFLATE 解压器测试 |
-| `test_encrypt.c` | AES-XTS 加密/解密测试 |
+| 文件 | 测试内容 | 用例数 |
+|------|----------|--------|
+| `test_deflate.c` | DEFLATE 解压器测试 | 30 |
+| `test_encrypt.c` | AES-XTS 加密/解密测试 | 36 |
+| `test_slip.c` | SLIP 协议编解码测试 | 85 |
+| `test_md5.c` | MD5 哈希测试（RFC 1321） | 14 |
+| `test_flash.c` | Flash 存储模拟测试 | 38 |
+| `test_chip.c` | ESP 芯片模拟测试 | 57 |
+| `test_efuse.c` | eFuse 模拟测试 | 33 |
+| `test_esptool.c` | esptool 协议处理器测试 | 58 |
 
 **测试数据**：
 
@@ -704,12 +710,35 @@ All flash segments verified successfully.
 | `encrypt_test_data.h` | 加密测试数据（由 `generate_encrypt_test_data.py` 生成） |
 | `test_data/` | 加密测试数据目录（.bin 文件，可重新生成） |
 
+**测试 Stub**：
+
+| 文件 | 说明 |
+|------|------|
+| `stubs/fesptool_hal.h` | 最小 HAL 头文件 stub（FESP_HAL_LOGD 宏） |
+| `stubs/hal.c` | 完整 HAL stub（内存、MD5、串口 I/O、deflate、encrypt、日志） |
+| `stubs/hal_test.h` | 测试辅助函数声明（stub_reset、stub_get_resp_len 等） |
+
 **添加新测试**：
 
 1. 在 `tests/` 目录创建新的测试文件（如 `test_xxx.c`）
 2. 更新 `tests/CMakeLists.txt`，添加新的测试目标
 3. 使用 `TEST_ASSERT` 宏编写测试用例
 4. 运行测试验证
+
+**构建与运行**：
+
+```powershell
+# 配置测试
+cmake -B build_tests -S tests
+
+# 编译测试
+cmake --build build_tests --config Release
+
+# 运行全部测试
+foreach ($t in @("test_deflate","test_encrypt","test_slip","test_md5","test_flash","test_chip","test_efuse","test_esptool")) {
+    & "build_tests\Release\$t.exe"
+}
+```
 
 ### CI/CD
 
