@@ -113,12 +113,12 @@ void fesp_hal_md5_calc(const BYTE *data, DWORD len, BYTE digest[16])
 void fesp_hal_deflate_init(fesp_hal_deflate_ctx_t *ctx, const BYTE *in_buf,
                            size_t in_len, BYTE *out_buf, size_t out_len)
 {
-    deflate_init((DEFLATE_CTX *)ctx, in_buf, in_len, out_buf, out_len);
+    Deflate_Init((DEFLATE_CTX *)ctx, in_buf, in_len, out_buf, out_len);
 }
 
 int fesp_hal_deflate_decompress(fesp_hal_deflate_ctx_t *ctx)
 {
-    return deflate_decompress((DEFLATE_CTX *)ctx);
+    return Deflate_Decompress((DEFLATE_CTX *)ctx);
 }
 
 size_t fesp_hal_deflate_get_output_pos(const fesp_hal_deflate_ctx_t *ctx)

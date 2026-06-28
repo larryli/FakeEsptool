@@ -55,7 +55,7 @@ typedef struct {
  * ctx: Decompressor context (must be initialized)
  * Returns: DEFLATE_OK on success, negative error code on failure
  */
-int deflate_decompress(DEFLATE_CTX *ctx);
+int Deflate_Decompress(DEFLATE_CTX *ctx);
 
 /*
  * Initialize decompressor context
@@ -66,7 +66,7 @@ int deflate_decompress(DEFLATE_CTX *ctx);
  * out_buf: Output buffer for decompressed data
  * out_len: Size of output buffer
  */
-void deflate_init(DEFLATE_CTX *ctx, const BYTE *in_buf, size_t in_len,
+void Deflate_Init(DEFLATE_CTX *ctx, const BYTE *in_buf, size_t in_len,
                   BYTE *out_buf, size_t out_len);
 
 #endif /* DEFLATE_H */

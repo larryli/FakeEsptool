@@ -40,8 +40,8 @@ static void test_uncompressed_block(void)
     BYTE output[32] = {0};
     DEFLATE_CTX ctx;
 
-    deflate_init(&ctx, input, sizeof(input), output, sizeof(output));
-    int ret = deflate_decompress(&ctx);
+    Deflate_Init(&ctx, input, sizeof(input), output, sizeof(output));
+    int ret = Deflate_Decompress(&ctx);
 
     TEST_ASSERT(ret == DEFLATE_OK, "Decompression returns OK");
     TEST_ASSERT(ctx.out_pos == 5, "Output length is 5");
@@ -56,9 +56,9 @@ static void test_real_hello(void)
     BYTE output[256] = {0};
     DEFLATE_CTX ctx;
 
-    deflate_init(&ctx, test_hello_compressed, sizeof(test_hello_compressed),
+    Deflate_Init(&ctx, test_hello_compressed, sizeof(test_hello_compressed),
                  output, sizeof(output));
-    int ret = deflate_decompress(&ctx);
+    int ret = Deflate_Decompress(&ctx);
 
     TEST_ASSERT(ret == DEFLATE_OK, "Decompression returns OK");
     TEST_ASSERT(ctx.out_pos == sizeof(test_hello_original),
@@ -76,9 +76,9 @@ static void test_real_repeat(void)
     BYTE output[1024] = {0};
     DEFLATE_CTX ctx;
 
-    deflate_init(&ctx, test_repeat_compressed, sizeof(test_repeat_compressed),
+    Deflate_Init(&ctx, test_repeat_compressed, sizeof(test_repeat_compressed),
                  output, sizeof(output));
-    int ret = deflate_decompress(&ctx);
+    int ret = Deflate_Decompress(&ctx);
 
     TEST_ASSERT(ret == DEFLATE_OK, "Decompression returns OK");
     TEST_ASSERT(ctx.out_pos == sizeof(test_repeat_original),
@@ -99,9 +99,9 @@ static void test_real_binary(void)
     printf("  Original size: %zu\n", sizeof(test_binary_original));
     printf("  Compressed size: %zu\n", sizeof(test_binary_compressed));
 
-    deflate_init(&ctx, test_binary_compressed, sizeof(test_binary_compressed),
+    Deflate_Init(&ctx, test_binary_compressed, sizeof(test_binary_compressed),
                  output, sizeof(output));
-    int ret = deflate_decompress(&ctx);
+    int ret = Deflate_Decompress(&ctx);
 
     printf("  Output size: %zu\n", ctx.out_pos);
 
@@ -129,9 +129,9 @@ static void test_real_zeros(void)
     }
     printf("\n");
 
-    deflate_init(&ctx, test_zeros_compressed, sizeof(test_zeros_compressed),
+    Deflate_Init(&ctx, test_zeros_compressed, sizeof(test_zeros_compressed),
                  output, sizeof(output));
-    int ret = deflate_decompress(&ctx);
+    int ret = Deflate_Decompress(&ctx);
 
     printf("  Return code: %d\n", ret);
     printf("  Output size: %zu\n", ctx.out_pos);
@@ -152,9 +152,9 @@ static void test_real_pseudo_random(void)
     BYTE output[1024] = {0};
     DEFLATE_CTX ctx;
 
-    deflate_init(&ctx, test_pseudo_random_compressed,
+    Deflate_Init(&ctx, test_pseudo_random_compressed,
                  sizeof(test_pseudo_random_compressed), output, sizeof(output));
-    int ret = deflate_decompress(&ctx);
+    int ret = Deflate_Decompress(&ctx);
 
     TEST_ASSERT(ret == DEFLATE_OK, "Decompression returns OK");
     TEST_ASSERT(ctx.out_pos == sizeof(test_pseudo_random_original),
@@ -172,9 +172,9 @@ static void test_real_single_byte(void)
     BYTE output[256] = {0};
     DEFLATE_CTX ctx;
 
-    deflate_init(&ctx, test_single_byte_compressed,
+    Deflate_Init(&ctx, test_single_byte_compressed,
                  sizeof(test_single_byte_compressed), output, sizeof(output));
-    int ret = deflate_decompress(&ctx);
+    int ret = Deflate_Decompress(&ctx);
 
     TEST_ASSERT(ret == DEFLATE_OK, "Decompression returns OK");
     TEST_ASSERT(ctx.out_pos == sizeof(test_single_byte_original),
@@ -192,9 +192,9 @@ static void test_real_all_bytes(void)
     BYTE output[512] = {0};
     DEFLATE_CTX ctx;
 
-    deflate_init(&ctx, test_all_bytes_compressed,
+    Deflate_Init(&ctx, test_all_bytes_compressed,
                  sizeof(test_all_bytes_compressed), output, sizeof(output));
-    int ret = deflate_decompress(&ctx);
+    int ret = Deflate_Decompress(&ctx);
 
     TEST_ASSERT(ret == DEFLATE_OK, "Decompression returns OK");
     TEST_ASSERT(ctx.out_pos == sizeof(test_all_bytes_original),
@@ -212,8 +212,8 @@ static void test_empty_input(void)
     BYTE output[32] = {0};
     DEFLATE_CTX ctx;
 
-    deflate_init(&ctx, NULL, 0, output, sizeof(output));
-    int ret = deflate_decompress(&ctx);
+    Deflate_Init(&ctx, NULL, 0, output, sizeof(output));
+    int ret = Deflate_Decompress(&ctx);
 
     TEST_ASSERT(ret == DEFLATE_BAD_INPUT, "Empty input returns BAD_INPUT");
 }
@@ -227,8 +227,8 @@ static void test_invalid_block_type(void)
     BYTE output[32] = {0};
     DEFLATE_CTX ctx;
 
-    deflate_init(&ctx, input, sizeof(input), output, sizeof(output));
-    int ret = deflate_decompress(&ctx);
+    Deflate_Init(&ctx, input, sizeof(input), output, sizeof(output));
+    int ret = Deflate_Decompress(&ctx);
 
     TEST_ASSERT(ret == DEFLATE_BAD_INPUT,
                 "Invalid block type returns BAD_INPUT");
@@ -242,9 +242,9 @@ static void test_output_too_small(void)
     BYTE output[3] = {0}; /* Too small for 5 bytes */
     DEFLATE_CTX ctx;
 
-    deflate_init(&ctx, test_hello_compressed, sizeof(test_hello_compressed),
+    Deflate_Init(&ctx, test_hello_compressed, sizeof(test_hello_compressed),
                  output, sizeof(output));
-    int ret = deflate_decompress(&ctx);
+    int ret = Deflate_Decompress(&ctx);
 
     TEST_ASSERT(ret == DEFLATE_ERROR, "Small buffer returns ERROR");
 }
@@ -265,8 +265,8 @@ static void test_multiple_blocks(void)
     BYTE output[32] = {0};
     DEFLATE_CTX ctx;
 
-    deflate_init(&ctx, input, sizeof(input), output, sizeof(output));
-    int ret = deflate_decompress(&ctx);
+    Deflate_Init(&ctx, input, sizeof(input), output, sizeof(output));
+    int ret = Deflate_Decompress(&ctx);
 
     TEST_ASSERT(ret == DEFLATE_OK, "Multiple blocks returns OK");
     TEST_ASSERT(ctx.out_pos == 5, "Output length is 5");

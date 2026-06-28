@@ -571,7 +571,7 @@ static int deflate_process_block(DEFLATE_CTX *ctx)
  *   DEFLATE_BAD_INPUT - Invalid compressed data
  *   DEFLATE_NO_MEMORY - Memory allocation failure
  */
-int deflate_decompress(DEFLATE_CTX *ctx)
+int Deflate_Decompress(DEFLATE_CTX *ctx)
 {
     int ret;
 
@@ -587,7 +587,7 @@ int deflate_decompress(DEFLATE_CTX *ctx)
 }
 
 /*
- * deflate_init - Initialize decompressor context
+ * Deflate_Init - Initialize decompressor context
  *
  * Sets up the decompressor for processing compressed data.
  * Automatically detects and skips zlib header if present.
@@ -598,7 +598,7 @@ int deflate_decompress(DEFLATE_CTX *ctx)
  * @out_buf: Output buffer for decompressed data
  * @out_len: Size of output buffer in bytes
  */
-void deflate_init(DEFLATE_CTX *ctx, const BYTE *in_buf, size_t in_len,
+void Deflate_Init(DEFLATE_CTX *ctx, const BYTE *in_buf, size_t in_len,
                   BYTE *out_buf, size_t out_len)
 {
     ctx->in_buf = in_buf;
