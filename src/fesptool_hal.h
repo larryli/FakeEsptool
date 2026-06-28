@@ -42,18 +42,38 @@ void fesp_hal_mem_free(void *ptr);
 /* MD5 */
 void fesp_hal_md5_calc(const BYTE *data, DWORD len, BYTE digest[16]);
 
+/* DEFLATE return codes */
+#define FESP_HAL_DEFLATE_OK 0
+#define FESP_HAL_DEFLATE_ERROR -1
+#define FESP_HAL_DEFLATE_BAD_INPUT -2
+
+/* DEFLATE context (opaque, size足够容纳实现结构体) */
+typedef struct {
+    char _opaque[256];
+} fesp_hal_deflate_ctx_t;
+
 /* DEFLATE decompression */
-void fesp_hal_deflate_init(void *ctx, const BYTE *in_buf, size_t in_len,
-                           BYTE *out_buf, size_t out_len);
-int fesp_hal_deflate_decompress(void *ctx);
+void fesp_hal_deflate_init(fesp_hal_deflate_ctx_t *ctx, const BYTE *in_buf,
+                           size_t in_len, BYTE *out_buf, size_t out_len);
+int fesp_hal_deflate_decompress(fesp_hal_deflate_ctx_t *ctx);
+size_t fesp_hal_deflate_get_output_pos(const fesp_hal_deflate_ctx_t *ctx);
+
+/* AES-XTS encrypt/decrypt return codes */
+#define FESP_HAL_ENCRYPT_OK 0
+#define FESP_HAL_ENCRYPT_BAD_INPUT -2
+
+/* AES-XTS context (opaque, size足够容纳实现结构体) */
+typedef struct {
+    char _opaque[128];
+} fesp_hal_encrypt_ctx_t;
 
 /* AES-XTS encrypt/decrypt */
-int fesp_hal_encrypt_init(void *ctx, const BYTE *key, int key_len,
-                          DWORD flash_addr);
-int fesp_hal_encrypt_data(void *ctx, const BYTE *in_buf, BYTE *out_buf,
-                          DWORD len);
-int fesp_hal_decrypt_data(void *ctx, const BYTE *in_buf, BYTE *out_buf,
-                          DWORD len);
+int fesp_hal_encrypt_init(fesp_hal_encrypt_ctx_t *ctx, const BYTE *key,
+                          int key_len, DWORD flash_addr);
+int fesp_hal_encrypt_data(fesp_hal_encrypt_ctx_t *ctx, const BYTE *in_buf,
+                          BYTE *out_buf, DWORD len);
+int fesp_hal_decrypt_data(fesp_hal_encrypt_ctx_t *ctx, const BYTE *in_buf,
+                          BYTE *out_buf, DWORD len);
 
 /* ========================================================================
  * GUI-side log macros (FESPTOOL_HAL_xxx)

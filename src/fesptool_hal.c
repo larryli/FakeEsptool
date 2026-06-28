@@ -110,28 +110,36 @@ void fesp_hal_md5_calc(const BYTE *data, DWORD len, BYTE digest[16])
     MD5_Calc(data, len, digest);
 }
 
-void fesp_hal_deflate_init(void *ctx, const BYTE *in_buf, size_t in_len,
-                           BYTE *out_buf, size_t out_len)
+void fesp_hal_deflate_init(fesp_hal_deflate_ctx_t *ctx, const BYTE *in_buf,
+                           size_t in_len, BYTE *out_buf, size_t out_len)
 {
-    deflate_init(ctx, in_buf, in_len, out_buf, out_len);
+    deflate_init((DEFLATE_CTX *)ctx, in_buf, in_len, out_buf, out_len);
 }
 
-int fesp_hal_deflate_decompress(void *ctx) { return deflate_decompress(ctx); }
-
-int fesp_hal_encrypt_init(void *ctx, const BYTE *key, int key_len,
-                          DWORD flash_addr)
+int fesp_hal_deflate_decompress(fesp_hal_deflate_ctx_t *ctx)
 {
-    return Encrypt_Init(ctx, key, key_len, flash_addr);
+    return deflate_decompress((DEFLATE_CTX *)ctx);
 }
 
-int fesp_hal_encrypt_data(void *ctx, const BYTE *in_buf, BYTE *out_buf,
-                          DWORD len)
+size_t fesp_hal_deflate_get_output_pos(const fesp_hal_deflate_ctx_t *ctx)
 {
-    return Encrypt_Data(ctx, in_buf, out_buf, len);
+    return ((const DEFLATE_CTX *)ctx)->out_pos;
 }
 
-int fesp_hal_decrypt_data(void *ctx, const BYTE *in_buf, BYTE *out_buf,
-                          DWORD len)
+int fesp_hal_encrypt_init(fesp_hal_encrypt_ctx_t *ctx, const BYTE *key,
+                          int key_len, DWORD flash_addr)
 {
-    return Decrypt_Data(ctx, in_buf, out_buf, len);
+    return Encrypt_Init((ENCRYPT_CTX *)ctx, key, key_len, flash_addr);
+}
+
+int fesp_hal_encrypt_data(fesp_hal_encrypt_ctx_t *ctx, const BYTE *in_buf,
+                          BYTE *out_buf, DWORD len)
+{
+    return Encrypt_Data((ENCRYPT_CTX *)ctx, in_buf, out_buf, len);
+}
+
+int fesp_hal_decrypt_data(fesp_hal_encrypt_ctx_t *ctx, const BYTE *in_buf,
+                          BYTE *out_buf, DWORD len)
+{
+    return Decrypt_Data((ENCRYPT_CTX *)ctx, in_buf, out_buf, len);
 }

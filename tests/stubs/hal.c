@@ -5,6 +5,7 @@
  * so esptool.c and other modules can link in test context.
  */
 
+#include "../src/fesptool_hal.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -95,38 +96,40 @@ BOOL stub_get_modified(void) { return s_modified_called; }
  * DEFLATE stubs (no-op, return success)
  * ======================================================================== */
 
-void deflate_init(void *ctx, const void *in_buf, size_t in_len,
-                  void *out_buf, size_t out_len)
+/* Internal deflate context for stub (stores output position) */
+typedef struct {
+    size_t out_pos;
+} STUB_DEFLATE_CTX;
+
+void fesp_hal_deflate_init(fesp_hal_deflate_ctx_t *ctx, const BYTE *in_buf,
+                           size_t in_len, BYTE *out_buf, size_t out_len)
 {
-    (void)ctx;
     (void)in_buf;
     (void)in_len;
     (void)out_buf;
+    STUB_DEFLATE_CTX *stub = (STUB_DEFLATE_CTX *)ctx;
+    stub->out_pos = in_len; /* Simulate: output size = input size */
     (void)out_len;
 }
 
-int deflate_decompress(void *ctx)
+int fesp_hal_deflate_decompress(fesp_hal_deflate_ctx_t *ctx)
 {
     (void)ctx;
     return 0; /* DEFLATE_OK */
 }
 
-void fesp_hal_deflate_init(void *ctx, const BYTE *in_buf, size_t in_len,
-                           BYTE *out_buf, size_t out_len)
+size_t fesp_hal_deflate_get_output_pos(const fesp_hal_deflate_ctx_t *ctx)
 {
-    deflate_init(ctx, in_buf, in_len, out_buf, out_len);
-}
-
-int fesp_hal_deflate_decompress(void *ctx)
-{
-    return deflate_decompress(ctx);
+    const STUB_DEFLATE_CTX *stub = (const STUB_DEFLATE_CTX *)ctx;
+    return stub->out_pos;
 }
 
 /* ========================================================================
  * ENCRYPT stubs (passthrough, return success)
  * ======================================================================== */
 
-int Encrypt_Init(void *ctx, const BYTE *key, int key_len, DWORD flash_addr)
+int fesp_hal_encrypt_init(fesp_hal_encrypt_ctx_t *ctx, const BYTE *key,
+                          int key_len, DWORD flash_addr)
 {
     (void)ctx;
     (void)key;
@@ -135,7 +138,8 @@ int Encrypt_Init(void *ctx, const BYTE *key, int key_len, DWORD flash_addr)
     return 0; /* ENCRYPT_OK */
 }
 
-int Encrypt_Data(void *ctx, const BYTE *in_buf, BYTE *out_buf, DWORD len)
+int fesp_hal_encrypt_data(fesp_hal_encrypt_ctx_t *ctx, const BYTE *in_buf,
+                          BYTE *out_buf, DWORD len)
 {
     (void)ctx;
     if (in_buf && out_buf && len > 0)
@@ -143,30 +147,13 @@ int Encrypt_Data(void *ctx, const BYTE *in_buf, BYTE *out_buf, DWORD len)
     return 0;
 }
 
-int Decrypt_Data(void *ctx, const BYTE *in_buf, BYTE *out_buf, DWORD len)
+int fesp_hal_decrypt_data(fesp_hal_encrypt_ctx_t *ctx, const BYTE *in_buf,
+                          BYTE *out_buf, DWORD len)
 {
     (void)ctx;
     if (in_buf && out_buf && len > 0)
         memcpy(out_buf, in_buf, len);
     return 0;
-}
-
-int fesp_hal_encrypt_init(void *ctx, const BYTE *key, int key_len,
-                          DWORD flash_addr)
-{
-    return Encrypt_Init(ctx, key, key_len, flash_addr);
-}
-
-int fesp_hal_encrypt_data(void *ctx, const BYTE *in_buf, BYTE *out_buf,
-                          DWORD len)
-{
-    return Encrypt_Data(ctx, in_buf, out_buf, len);
-}
-
-int fesp_hal_decrypt_data(void *ctx, const BYTE *in_buf, BYTE *out_buf,
-                          DWORD len)
-{
-    return Decrypt_Data(ctx, in_buf, out_buf, len);
 }
 
 /* ========================================================================

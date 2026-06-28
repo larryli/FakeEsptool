@@ -5,8 +5,6 @@
  */
 
 #include "../fesptool_hal.h"
-#include "../utils/deflate.h"
-#include "../utils/encrypt.h"
 #include "fesp.h"
 #include <stdio.h>
 #include <string.h>
@@ -149,18 +147,18 @@ static uint32_t encrypt_in_place(fesp_ctx_t *ctx, uint8_t *data, uint32_t len,
                   key[0], key[1], key[2], key[3], key[4], key[5], key[6],
                   key[7]);
 
-    ENCRYPT_CTX enc_ctx;
+    fesp_hal_encrypt_ctx_t enc_ctx;
     int ret = fesp_hal_encrypt_init(&enc_ctx, key, key_len, flash_addr);
     FESP_HAL_LOGD(TAG,
                   "EncryptInPlace: Encrypt_Init ret=%d flash_addr=0x%08lX "
                   "len=%lu key_len=%d",
                   ret, flash_addr, len, key_len);
 
-    if (ret == ENCRYPT_OK) {
+    if (ret == FESP_HAL_ENCRYPT_OK) {
         ret = fesp_hal_encrypt_data(&enc_ctx, data, data, len);
     }
 
-    if (ret == ENCRYPT_OK) {
+    if (ret == FESP_HAL_ENCRYPT_OK) {
         FESP_HAL_LOGD(
             TAG,
             "EncryptInPlace: Success, encrypted %lu bytes at offset 0x%08lX",
@@ -215,14 +213,14 @@ static uint32_t decrypt_in_place(fesp_ctx_t *ctx, uint8_t *data, uint32_t len,
     }
 
     const uint8_t *key = &ctx->chip->efuse[key_offset];
-    ENCRYPT_CTX enc_ctx;
+    fesp_hal_encrypt_ctx_t enc_ctx;
     int ret = fesp_hal_encrypt_init(&enc_ctx, key, key_len, flash_addr);
 
-    if (ret == ENCRYPT_OK) {
+    if (ret == FESP_HAL_ENCRYPT_OK) {
         ret = fesp_hal_decrypt_data(&enc_ctx, data, data, len);
     }
 
-    if (ret == ENCRYPT_OK) {
+    if (ret == FESP_HAL_ENCRYPT_OK) {
         FESP_HAL_LOGD(
             TAG,
             "DecryptInPlace: Success, decrypted %lu bytes at offset 0x%08lX",
@@ -261,19 +259,19 @@ static uint32_t defl_flush_buffer(fesp_ctx_t *ctx)
     }
 
     /* Initialize decompressor */
-    DEFLATE_CTX deflate_ctx;
+    fesp_hal_deflate_ctx_t deflate_ctx;
     fesp_hal_deflate_init(&deflate_ctx, ctx->defl_buf, ctx->defl_buf_size,
                           ctx->decomp_buf, ctx->decomp_buf_cap);
 
     /* Decompress */
     int ret = fesp_hal_deflate_decompress(&deflate_ctx);
-    if (ret != DEFLATE_OK) {
+    if (ret != FESP_HAL_DEFLATE_OK) {
         FESP_HAL_LOGE(TAG, "  Decompression failed: %d", ret);
         defl_free_buffer(ctx);
         return FESP_FAIL;
     }
 
-    uint32_t decomp_size = (uint32_t)deflate_ctx.out_pos;
+    uint32_t decomp_size = (uint32_t)fesp_hal_deflate_get_output_pos(&deflate_ctx);
     FESP_HAL_LOGI(TAG, "  Decompressed %lu -> %lu bytes at offset 0x%08lX",
                   ctx->defl_buf_size, decomp_size, ctx->defl_offset);
 
