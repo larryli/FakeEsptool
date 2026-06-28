@@ -76,10 +76,7 @@
 |------|------|
 | `fesp_init(ctx, chip, flash)` | 初始化上下文，绑定设备数据指针 |
 | `fesp_reset_state(ctx)` | 重置协议状态（进入下载模式时调用） |
-| `FEsptoolSetNotify (deprecated) (deprecated)(ctx, hNotify)` | 设置通知窗口 |
-| `FEsptoolSetModifiedCallback(ctx, cb)` | 设置修改回调 |
-| `FEsptoolSetWriteCallback(ctx, cb)` | 设置串口写回调 |
-| `FEsptoolSetBaudRateCallback(ctx, cb)` | 设置波特率修改回调 |
+| `FEsptoolInit(hWnd, serial)` | 初始化 HAL（传入窗口句柄和串口上下文） |
 | `fesp_feed(ctx, data, len)` | 喂入串口数据 |
 | `fesp_process_frame(ctx, frame, frame_len)` | 处理一帧数据 |
 | `fesp_send_response(ctx, cmd, req_val, status, data, len)` | 发送响应（4字节状态） |

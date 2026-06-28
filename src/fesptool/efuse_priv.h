@@ -7,7 +7,8 @@
 #ifndef FESP_EFUSE_PRIV_H
 #define FESP_EFUSE_PRIV_H
 
-#include "fesp.h"
+#include "chip_priv.h"
+#include "efuse.h"
 
 /* ============================================================================
  * eFuse controller command registers per chip type

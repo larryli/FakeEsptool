@@ -7,29 +7,29 @@ FakeEsptool 是一个 ESP 芯片设备端模拟器，用于模拟 ESP8266/ESP32 
 ## 架构概览
 
 ```
-┌──────────────────────────────────────────────┐
-│  GUI 层                                       │
-│  main.c  app_commands.c  dlg/*.c  serial.c   │
-│  device_file.c（.esp 文件格式）               │
-└──────────┬───────────────────────────────────┘
-           │ 直接调用
-           ▼
-┌──────────────────────────────────────────────┐
-│  fesptool_hal.h/c  — 平台合同（HAL）          │
-│  直调串口 API：Write / SetBaudRate            │
-│  直调 GUI：Modified / LogI / LogE             │
-│  工具：Mem_* / MD5 / Deflate / Encrypt       │
-└──────────┬───────────────────────────────────┘
-           │
-           ▼
-┌──────────────────────────────────────────────┐
-│  模拟引擎（src/fesptool/）— 平台无关          │
-│  esptool.c/h  协议命令解析与响应              │
-│  slip.c/h     SLIP 编解码                    │
-│  chip.c/h     芯片模拟骨架                    │
-│  efuse.c/h    eFuse 模拟                     │
-│  flash.c/h    Flash 存储模拟                  │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  GUI 层                                               │
+│  main.c  app_commands.c  dlg/*.c  serial.c           │
+│  device_file.c（.esp 文件格式）                       │
+│                                                       │
+│  冷路径：直接调用 fesptool 引擎操作设备状态            │
+│  （chip.c/efuse.c/flash.c — 芯片属性、eFuse、存储）   │
+└──────────┬───────────────────────────┬───────────────┘
+           │ 热路径：FEsptoolInit       │ 直接调用
+           ▼                           ▼
+┌──────────────────────┐  ┌────────────────────────────┐
+│  fesptool_hal.h/c    │  │  模拟引擎（src/fesptool/）  │
+│  — 平台合同（HAL）   │  │  — 设备状态操作             │
+│  串口 I/O + 日志     │  │  esptool.c/h  协议处理     │
+│  Deflate/Encrypt     │  │  chip.c/h     芯片模拟     │
+│  Mem/MD5             │  │  efuse.c/h    eFuse 模拟   │
+└──────────┬───────────┘  │  flash.c/h    Flash 存储   │
+           │               │  slip.c/h     SLIP 编解码  │
+           ▼               └────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  模拟引擎（src/fesptool/）— 平台无关                  │
+│  通过 fesptool_hal.h 调用平台 I/O                    │
+└──────────────────────────────────────────────────────┘
 ```
 
 ### 数据共享机制
@@ -63,7 +63,6 @@ fesp_init(&g_esptool, &g_chip, &g_flash);
 
 | 文件 | 可见性 | 内容 |
 |---|---|---|
-| `fesp.h` | 公开 | 聚合器，`#include` 全部公共头 |
 | `chip.h` | 公开 | 芯片类型、结构体、API 函数 |
 | `chip_priv.h` | 内部 | 寄存器地址、偏移量、内部函数 |
 | `efuse.h` | 公开 | eFuse 查询/设置 API、常量 |
@@ -71,9 +70,8 @@ fesp_init(&g_esptool, &g_chip, &g_flash);
 | `flash.h` | 公开 | Flash 结构体、API 函数 |
 | `slip.h` | 公开 | SLIP 结构体、API 函数 |
 | `esptool.h` | 公开 | 协议结构体、API 函数、命令码 |
-| `esptool_priv.h` | 内部 | 协议内部声明 |
 
-外部使用：`#include "fesptool/fesp.h"`
+外部使用：按需 include 具体头文件（如 `#include "fesptool/chip.h"`）。
 
 ### 模块表
 
@@ -92,7 +90,6 @@ fesp_init(&g_esptool, &g_chip, &g_flash);
 | `fesptool/efuse_priv.h` | eFuse 内部常量和函数声明 |
 | `fesptool/flash.c/h` | Flash 存储模拟 |
 | `fesptool/esptool.c/h` | esptool 命令解析与响应 |
-| `fesptool/fesp.h` | 公开头文件聚合器 |
 
 ### fesptool_hal 接口
 
@@ -120,8 +117,18 @@ fesp_init(&g_esptool, &g_chip, &g_flash);
 |---|---|
 | `fesp_hal_mem_alloc/zero_alloc/free` | 内存管理 |
 | `fesp_hal_md5_calc` | MD5 哈希 |
-| `fesp_hal_deflate_init/decompress` | DEFLATE 解压 |
-| `fesp_hal_encrypt_init/data`, `decrypt_data` | AES-XTS 加解密 |
+| `fesp_hal_deflate_init/decompress` | DEFLATE 解压（不透明上下文） |
+| `fesp_hal_encrypt_init/data`, `decrypt_data` | AES-XTS 加解密（不透明上下文） |
+| `fesp_hal_deflate_get_output_pos` | 获取解压输出位置 |
+
+**不透明上下文类型：**
+
+引擎通过 HAL 层的不透明类型操作 Deflate/Encrypt 上下文，无需直接依赖 `utils/deflate.h` 和 `utils/encrypt.h`：
+
+```c
+typedef struct { char _opaque[256]; } fesp_hal_deflate_ctx_t;
+typedef struct { char _opaque[128]; } fesp_hal_encrypt_ctx_t;
+```
 
 **Debug 日志宏：**
 
@@ -131,7 +138,10 @@ FESP_HAL_LOGD(TAG, "debug message");  // 编译期可控（ENABLE_TRACE）
 
 **设计原则：**
 
-胶水层不引入额外抽象。`fesptool_hal.c` 直接 include `serial.h` 和 `app_commands.h`，调用平台 API，不做回调转发。GUI 只需提供一个 `FEsptoolInit` 调用和一个 `OnDeviceModified` 函数。
+- 胶水层是耦合剂，不引入额外抽象
+- `fesptool_hal.c` 直接 include `serial.h` 和 `app_commands.h`，调用平台 API
+- 引擎与平台实现完全通过 HAL 抽象隔离（不透明类型 + 访问器函数）
+- GUI 直接操作 fesptool 引擎完成设备状态修改（冷路径）
 
 ## 编译
 
@@ -331,7 +341,9 @@ ctest --test-dir build_tests --build-config Release
 ## 使用示例
 
 ```c
-#include "fesptool/fesp.h"
+#include "fesptool/chip.h"
+#include "fesptool/flash.h"
+#include "fesptool/esptool.h"
 #include "fesptool_hal.h"
 
 // 初始化

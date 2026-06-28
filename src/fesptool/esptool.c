@@ -5,7 +5,11 @@
  */
 
 #include "../fesptool_hal.h"
-#include "fesp.h"
+#include "chip.h"
+#include "efuse.h"
+#include "flash.h"
+#include "slip.h"
+#include "esptool.h"
 #include <stdio.h>
 #include <string.h>
 

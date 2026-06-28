@@ -7,7 +7,7 @@
 #ifndef FESP_CHIP_PRIV_H
 #define FESP_CHIP_PRIV_H
 
-#include "fesp.h"
+#include "chip.h"
 
 /* ============================================================================
  * eFuse base addresses per chip type

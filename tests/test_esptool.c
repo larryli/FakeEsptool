@@ -4,7 +4,11 @@
  * Tests init/close, checksum, SLIP frame processing, and basic commands.
  */
 
-#include "../src/fesptool/fesp.h"
+#include "../src/fesptool/chip.h"
+#include "../src/fesptool/efuse.h"
+#include "../src/fesptool/flash.h"
+#include "../src/fesptool/slip.h"
+#include "../src/fesptool/esptool.h"
 #include "hal_test.h"
 #include <stdio.h>
 #include <string.h>
