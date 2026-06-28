@@ -32,6 +32,26 @@ target_compile_definitions(test_deflate PRIVATE
     _CRT_SECURE_NO_WARNINGS
 )
 
+# Test executable: test_slip
+add_executable(test_slip
+    test_slip.c
+    ../src/fesptool/slip.c
+)
+
+# Include directories (stubs first to override real fesptool_hal.h)
+target_include_directories(test_slip PRIVATE stubs ../src)
+
+# Compiler options
+target_compile_options(test_slip PRIVATE /utf-8)
+
+# Preprocessor definitions
+target_compile_definitions(test_slip PRIVATE
+    UNICODE
+    _UNICODE
+    WIN32_LEAN_AND_MEAN
+    _CRT_SECURE_NO_WARNINGS
+)
+
 # Test executable: test_encrypt
 add_executable(test_encrypt
     test_encrypt.c
@@ -56,3 +76,4 @@ target_compile_definitions(test_encrypt PRIVATE
 enable_testing()
 add_test(NAME test_deflate COMMAND test_deflate)
 add_test(NAME test_encrypt COMMAND test_encrypt)
+add_test(NAME test_slip COMMAND test_slip)
