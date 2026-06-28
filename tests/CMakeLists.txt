@@ -116,6 +116,28 @@ target_compile_definitions(test_flash PRIVATE
     _CRT_SECURE_NO_WARNINGS
 )
 
+# Test executable: test_chip
+add_executable(test_chip
+    test_chip.c
+    ../src/fesptool/chip.c
+    ../src/fesptool/efuse.c
+    stubs/hal.c
+)
+
+# Include directories (stubs first to override real headers)
+target_include_directories(test_chip PRIVATE stubs ../src)
+
+# Compiler options
+target_compile_options(test_chip PRIVATE /utf-8)
+
+# Preprocessor definitions
+target_compile_definitions(test_chip PRIVATE
+    UNICODE
+    _UNICODE
+    WIN32_LEAN_AND_MEAN
+    _CRT_SECURE_NO_WARNINGS
+)
+
 # Enable testing
 enable_testing()
 add_test(NAME test_deflate COMMAND test_deflate)
@@ -123,3 +145,4 @@ add_test(NAME test_encrypt COMMAND test_encrypt)
 add_test(NAME test_slip COMMAND test_slip)
 add_test(NAME test_md5 COMMAND test_md5)
 add_test(NAME test_flash COMMAND test_flash)
+add_test(NAME test_chip COMMAND test_chip)
