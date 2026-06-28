@@ -248,8 +248,8 @@
 
 | 函数 | 说明 |
 |------|------|
-| `deflate_init(ctx, in_buf, in_len, out_buf, out_len)` | 初始化解压器上下文 |
-| `deflate_decompress(ctx)` | 执行 DEFLATE 解压 |
+| `Deflate_Init(ctx, in_buf, in_len, out_buf, out_len)` | 初始化解压器上下文 |
+| `Deflate_Decompress(ctx)` | 执行 DEFLATE 解压 |
 
 **使用示例：**
 
@@ -260,8 +260,8 @@ BYTE compressed[] = { /* ... */ };
 BYTE decompressed[4096];
 DEFLATE_CTX ctx;
 
-deflate_init(&ctx, compressed, sizeof(compressed), decompressed, sizeof(decompressed));
-int ret = deflate_decompress(&ctx);
+Deflate_Init(&ctx, compressed, sizeof(compressed), decompressed, sizeof(decompressed));
+int ret = Deflate_Decompress(&ctx);
 if (ret == DEFLATE_OK) {
     // ctx.out_pos 包含解压后的数据长度
     // decompressed[0..ctx.out_pos-1] 包含解压后的数据

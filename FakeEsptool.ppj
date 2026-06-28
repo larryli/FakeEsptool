@@ -142,8 +142,7 @@ output\trace.obj: \
 output\slip.obj: \
 	src\fesptool\slip.c \
 	src\fesptool\slip.h \
-	src\fesptool_hal.h \
-	src\serial.h
+	src\fesptool_hal.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -153,8 +152,7 @@ output\chip.obj: \
 	src\fesptool\chip.c \
 	src\fesptool\chip.h \
 	src\fesptool\chip_priv.h \
-	src\fesptool_hal.h \
-	src\serial.h
+	src\fesptool_hal.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -166,8 +164,7 @@ output\efuse.obj: \
 	src\fesptool\chip_priv.h \
 	src\fesptool\efuse.h \
 	src\fesptool\efuse_priv.h \
-	src\fesptool_hal.h \
-	src\serial.h
+	src\fesptool_hal.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -176,8 +173,7 @@ output\efuse.obj: \
 output\flash.obj: \
 	src\fesptool\flash.c \
 	src\fesptool\flash.h \
-	src\fesptool_hal.h \
-	src\serial.h
+	src\fesptool_hal.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -190,8 +186,7 @@ output\esptool.obj: \
 	src\fesptool\esptool.h \
 	src\fesptool\flash.h \
 	src\fesptool\slip.h \
-	src\fesptool_hal.h \
-	src\serial.h
+	src\fesptool_hal.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 

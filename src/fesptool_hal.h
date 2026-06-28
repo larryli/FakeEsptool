@@ -19,8 +19,6 @@
 #include <stdint.h>
 #include <windows.h>
 
-#include "serial.h"
-
 /* ========================================================================
  * Engine-side tool functions (snake_case)
  * ======================================================================== */
@@ -99,6 +97,6 @@ void Trace_Write(const char *tag, const char *fmt, ...);
  * Initialization (PascalCase)
  * ======================================================================== */
 
-void FEsptoolInit(HWND hWnd, SERIAL_CTX *serial);
+void FEsptoolInit(HWND hWnd, void *serial);
 
 #endif /* FESPTOOL_HAL_H */

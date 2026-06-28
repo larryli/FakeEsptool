@@ -559,7 +559,7 @@ static int deflate_process_block(DEFLATE_CTX *ctx)
 }
 
 /*
- * deflate_decompress - Decompress DEFLATE data
+ * Deflate_Decompress - Decompress DEFLATE data
  *
  * Main decompression function. Processes all blocks in the input stream
  * until a final block is encountered.

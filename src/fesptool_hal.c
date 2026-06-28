@@ -7,6 +7,7 @@
 
 #include "fesptool_hal.h"
 #include "app_commands.h"
+#include "serial.h"
 #include "utils/trace.h"
 #include <stdio.h>
 
@@ -21,10 +22,10 @@ static SERIAL_CTX *s_serial;
  * Initialization (PascalCase)
  * ======================================================================== */
 
-void FEsptoolInit(HWND hWnd, SERIAL_CTX *serial)
+void FEsptoolInit(HWND hWnd, void *serial)
 {
     s_hWnd = hWnd;
-    s_serial = serial;
+    s_serial = (SERIAL_CTX *)serial;
 }
 
 /* ========================================================================
