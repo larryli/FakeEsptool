@@ -32,6 +32,7 @@ add_executable(FakeEsptool WIN32
     src/utils/encrypt.c
     src/app_logview.c
     src/app_commands.c
+    src/app_protocol.c
     src/dlg/device_props.c
     src/dlg/key_mgmt.c
     src/dlg/port_select.c

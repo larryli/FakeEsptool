@@ -5,6 +5,7 @@
 #ifndef APP_COMMANDS_H
 #define APP_COMMANDS_H
 
+#include "app_protocol.h"
 #include "dlg/dlg.h"
 #include "fesptool/esptool.h"
 #include "serial.h"
@@ -36,27 +37,6 @@ extern HWND g_hStatusbar;
 
 /* Message size limit */
 #define MAX_MSG_SIZE 65536
-
-/*
- * OnEsptoolProcessData - esptool protocol data receive callback
- */
-void OnEsptoolProcessData(SERIAL_CTX *ctx, const BYTE *data, DWORD len,
-                          HWND hNotify);
-
-/*
- * OnEsptoolSignal - esptool protocol signal change callback
- */
-void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify);
-
-/*
- * ResetSignalState - Reset signal state for download mode detection
- */
-void ResetSignalState(void);
-
-/*
- * OnDeviceModified - Callback when device data is modified by protocol
- */
-void OnDeviceModified(void);
 
 /*
  * UpdateMenuState - Update menu and toolbar button states

@@ -53,6 +53,7 @@ FakeEsptool.exe: \
 	output\about.obj \
 	output\app_commands.obj \
 	output\app_logview.obj \
+	output\app_protocol.obj \
 	output\chip.obj \
 	output\config.obj \
 	output\deflate.obj \
@@ -82,6 +83,7 @@ output\main.obj: \
 	src\main.c \
 	src\app_commands.h \
 	src\app_logview.h \
+	src\app_protocol.h \
 	src\device_file.h \
 	src\dlg\dlg.h \
 	src\fesptool\chip.h \
@@ -198,6 +200,7 @@ output\esptool.obj: \
 output\fesptool_hal.obj: \
 	src\fesptool_hal.c \
 	src\app_commands.h \
+	src\app_protocol.h \
 	src\dlg\dlg.h \
 	src\fesptool\chip.h \
 	src\fesptool\efuse.h \
@@ -291,6 +294,7 @@ output\app_commands.obj: \
 	src\app_commands.c \
 	src\app_commands.h \
 	src\app_logview.h \
+	src\app_protocol.h \
 	src\device_file.h \
 	src\dlg\dlg.h \
 	src\fesptool\chip.h \
@@ -312,6 +316,7 @@ output\app_commands.obj: \
 output\key_mgmt.obj: \
 	src\dlg\key_mgmt.c \
 	src\app_commands.h \
+	src\app_protocol.h \
 	src\dlg\dlg.h \
 	src\fesptool\chip.h \
 	src\fesptool\efuse.h \
@@ -356,6 +361,22 @@ output\about.obj: \
 	src\dlg\about.c \
 	src\resource.h \
 	src\utils\lang.h
+	$(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build app_protocol.obj.
+# 
+output\app_protocol.obj: \
+	src\app_protocol.c \
+	src\app_protocol.h \
+	src\fesptool\chip.h \
+	src\fesptool\efuse.h \
+	src\fesptool\esptool.h \
+	src\fesptool\flash.h \
+	src\fesptool\slip.h \
+	src\main.h \
+	src\serial.h \
+	src\utils\trace.h
 	$(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 .SILENT:
