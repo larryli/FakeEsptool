@@ -25,6 +25,8 @@
 
 #define FESP_XTAL_FREQ_40M 0
 #define FESP_XTAL_FREQ_26M 1
+#define FESP_XTAL_FREQ_48M 2
+#define FESP_XTAL_FREQ_32M 3
 
 typedef struct {
     uint8_t usr;
@@ -43,6 +45,10 @@ typedef enum {
     FESP_CHIP_ESP32C2,
     FESP_CHIP_ESP32C3,
     FESP_CHIP_ESP32C6,
+    FESP_CHIP_ESP32C5,
+    FESP_CHIP_ESP32C61,
+    FESP_CHIP_ESP32H2,
+    FESP_CHIP_ESP32P4,
     FESP_CHIP_COUNT
 } fesp_chip_type_t;
 

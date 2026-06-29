@@ -118,6 +118,34 @@ static const KEY_BLOCK_INFO key_blocks_esp32c6[] = {
 };
 #define KEY_BLOCKS_ESP32C6_COUNT 6
 
+static const KEY_BLOCK_INFO key_blocks_esp32c5[] = {
+    {"KEY0", "XTS-AES-128", 0x9C, 32}, {"KEY1", "User Key 1", 0xBC, 32},
+    {"KEY2", "User Key 2", 0xDC, 32},  {"KEY3", "User Key 3", 0xFC, 32},
+    {"KEY4", "User Key 4", 0x11C, 32}, {"KEY5", "User Key 5", 0x13C, 32},
+};
+#define KEY_BLOCKS_ESP32C5_COUNT 6
+
+static const KEY_BLOCK_INFO key_blocks_esp32c61[] = {
+    {"KEY0", "XTS-AES-128", 0x9C, 32}, {"KEY1", "User Key 1", 0xBC, 32},
+    {"KEY2", "User Key 2", 0xDC, 32},  {"KEY3", "User Key 3", 0xFC, 32},
+    {"KEY4", "User Key 4", 0x11C, 32}, {"KEY5", "User Key 5", 0x13C, 32},
+};
+#define KEY_BLOCKS_ESP32C61_COUNT 6
+
+static const KEY_BLOCK_INFO key_blocks_esp32h2[] = {
+    {"KEY0", "XTS-AES-128", 0x9C, 32}, {"KEY1", "User Key 1", 0xBC, 32},
+    {"KEY2", "User Key 2", 0xDC, 32},  {"KEY3", "User Key 3", 0xFC, 32},
+    {"KEY4", "User Key 4", 0x11C, 32}, {"KEY5", "User Key 5", 0x13C, 32},
+};
+#define KEY_BLOCKS_ESP32H2_COUNT 6
+
+static const KEY_BLOCK_INFO key_blocks_esp32p4[] = {
+    {"KEY0", "XTS-AES-128", 0x9C, 32}, {"KEY1", "User Key 1", 0xBC, 32},
+    {"KEY2", "User Key 2", 0xDC, 32},  {"KEY3", "User Key 3", 0xFC, 32},
+    {"KEY4", "User Key 4", 0x11C, 32}, {"KEY5", "User Key 5", 0x13C, 32},
+};
+#define KEY_BLOCKS_ESP32P4_COUNT 6
+
 /*
  * GetKeyBlocks - Get key blocks for current chip type
  *
@@ -149,6 +177,18 @@ static const KEY_BLOCK_INFO *GetKeyBlocks(int *count)
     case FESP_CHIP_ESP32C6:
         *count = KEY_BLOCKS_ESP32C6_COUNT;
         return key_blocks_esp32c6;
+    case FESP_CHIP_ESP32C5:
+        *count = KEY_BLOCKS_ESP32C5_COUNT;
+        return key_blocks_esp32c5;
+    case FESP_CHIP_ESP32C61:
+        *count = KEY_BLOCKS_ESP32C61_COUNT;
+        return key_blocks_esp32c61;
+    case FESP_CHIP_ESP32H2:
+        *count = KEY_BLOCKS_ESP32H2_COUNT;
+        return key_blocks_esp32h2;
+    case FESP_CHIP_ESP32P4:
+        *count = KEY_BLOCKS_ESP32P4_COUNT;
+        return key_blocks_esp32p4;
     default:
         *count = 0;
         return NULL;

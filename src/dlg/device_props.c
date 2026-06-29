@@ -11,6 +11,49 @@
 #include <wchar.h>
 
 /*
+ * PopulateXtalFreqs - Fill XTAL frequency combo for given chip type
+ *
+ * Adds only valid frequency options, selects the current value,
+ * and enables/disables the combo appropriately.
+ */
+static void PopulateXtalFreqs(HWND hXtal, fesp_chip_type_t chip, BYTE curXtal)
+{
+    SendMessageW(hXtal, CB_RESETCONTENT, 0, 0);
+
+    switch (chip) {
+    case FESP_CHIP_ESP8266:
+    case FESP_CHIP_ESP32:
+    case FESP_CHIP_ESP32C2:
+        /* 26MHz, 40MHz selectable */
+        SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"40MHz");
+        SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"26MHz");
+        EnableWindow(hXtal, TRUE);
+        SendMessageW(hXtal, CB_SETCURSEL, curXtal, 0);
+        break;
+    case FESP_CHIP_ESP32C5:
+        /* 40MHz, 48MHz selectable */
+        SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"40MHz");
+        SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"48MHz");
+        EnableWindow(hXtal, TRUE);
+        /* Map: 40MHz=index0, 48MHz=index1; curXtal 0->0, 2->1 */
+        SendMessageW(hXtal, CB_SETCURSEL, curXtal == FESP_XTAL_FREQ_48M ? 1 : 0, 0);
+        break;
+    case FESP_CHIP_ESP32H2:
+        /* Fixed 32MHz */
+        SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"32MHz");
+        EnableWindow(hXtal, FALSE);
+        SendMessageW(hXtal, CB_SETCURSEL, 0, 0);
+        break;
+    default:
+        /* Fixed 40MHz: S2, S3, C3, C6, C61, P4 */
+        SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"40MHz");
+        EnableWindow(hXtal, FALSE);
+        SendMessageW(hXtal, CB_SETCURSEL, 0, 0);
+        break;
+    }
+}
+
+/*
  * DevicePropsDlgProc - Device Properties dialog procedure
  */
 INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
@@ -36,22 +79,17 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
         SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C2");
         SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C3");
         SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C6");
+        SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C5");
+        SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C61");
+        SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-H2");
+        SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-P4");
         SendMessageW(hChip, CB_SETCURSEL, (WPARAM)selectedChip, 0);
 
         HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
         PopulateFlashSizes(hFlash, selectedChip, selectedFlash);
 
         HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
-        SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"40MHz");
-        SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"26MHz");
-        SendMessageW(hXtal, CB_SETCURSEL, g_chip.xtal_freq, 0);
-        /* Disable XTAL freq for fixed-xtal chips */
-        if (selectedChip == FESP_CHIP_ESP32C3 ||
-            selectedChip == FESP_CHIP_ESP32C6 ||
-            selectedChip == FESP_CHIP_ESP32S2 ||
-            selectedChip == FESP_CHIP_ESP32S3) {
-            EnableWindow(hXtal, FALSE);
-        }
+        PopulateXtalFreqs(hXtal, selectedChip, g_chip.xtal_freq);
 
         WCHAR macStr[32];
         wsprintfW(macStr, L"%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1],
@@ -69,16 +107,10 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
                 HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);
                 PopulateFlashSizes(hFlash, (fesp_chip_type_t)chipSel,
                                    g_flash.size);
-                /* Enable/disable XTAL freq combo based on chip type */
+                /* Repopulate XTAL freq combo for new chip type */
                 HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
-                BOOL xtalEditable = (chipSel == FESP_CHIP_ESP8266 ||
-                                     chipSel == FESP_CHIP_ESP32 ||
-                                     chipSel == FESP_CHIP_ESP32C2);
-                EnableWindow(hXtal, xtalEditable);
-                /* Update XTAL freq display for fixed-xtal chips */
-                if (!xtalEditable) {
-                    SendMessageW(hXtal, CB_SETCURSEL, 0, 0); /* 40MHz */
-                }
+                PopulateXtalFreqs(hXtal, (fesp_chip_type_t)chipSel,
+                                  FESP_XTAL_FREQ_40M);
             }
             return TRUE;
 
@@ -114,7 +146,26 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
             }
 
             HWND hXtal = GetDlgItem(hDlg, IDC_XTAL_FREQ_COMBO);
-            BYTE xtalFreq = (BYTE)SendMessageW(hXtal, CB_GETCURSEL, 0, 0);
+            int xtalIdx = (int)SendMessageW(hXtal, CB_GETCURSEL, 0, 0);
+            BYTE xtalFreq;
+            switch (selectedChip) {
+            case FESP_CHIP_ESP8266:
+            case FESP_CHIP_ESP32:
+            case FESP_CHIP_ESP32C2:
+                /* index 0=40MHz, 1=26MHz */
+                xtalFreq = (xtalIdx == 1) ? FESP_XTAL_FREQ_26M : FESP_XTAL_FREQ_40M;
+                break;
+            case FESP_CHIP_ESP32C5:
+                /* index 0=40MHz, 1=48MHz */
+                xtalFreq = (xtalIdx == 1) ? FESP_XTAL_FREQ_48M : FESP_XTAL_FREQ_40M;
+                break;
+            case FESP_CHIP_ESP32H2:
+                xtalFreq = FESP_XTAL_FREQ_32M;
+                break;
+            default:
+                xtalFreq = FESP_XTAL_FREQ_40M;
+                break;
+            }
 
             /* Check if anything changed */
             BOOL changed = (selectedChip != g_chip.type) ||

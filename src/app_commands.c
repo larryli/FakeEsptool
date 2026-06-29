@@ -532,8 +532,13 @@ void UpdateStatusBar(void)
         }
 
         /* Tooltip: "40MHz AA:BB:CC:DD:EE:FF" */
-        const char *xtal =
-            (g_chip.xtal_freq == FESP_XTAL_FREQ_26M) ? "26MHz" : "40MHz";
+        const char *xtal;
+        switch (g_chip.xtal_freq) {
+        case FESP_XTAL_FREQ_26M: xtal = "26MHz"; break;
+        case FESP_XTAL_FREQ_48M: xtal = "48MHz"; break;
+        case FESP_XTAL_FREQ_32M: xtal = "32MHz"; break;
+        default:                 xtal = "40MHz"; break;
+        }
         const BYTE *mac = fesp_chip_get_mac(&g_chip);
         WCHAR tipBuf[64];
         wsprintfW(tipBuf, L"%hs %02X:%02X:%02X:%02X:%02X:%02X", xtal, mac[0],
@@ -1325,7 +1330,13 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     fwprintf(f, L"Chip Type:  %ls\n", chipName);
 
     /* Get xtal freq */
-    const WCHAR *xtalStr = (snap->chip.xtal_freq == 0) ? L"40MHz" : L"26MHz";
+    const WCHAR *xtalStr;
+    switch (snap->chip.xtal_freq) {
+    case FESP_XTAL_FREQ_26M: xtalStr = L"26MHz"; break;
+    case FESP_XTAL_FREQ_48M: xtalStr = L"48MHz"; break;
+    case FESP_XTAL_FREQ_32M: xtalStr = L"32MHz"; break;
+    default:                 xtalStr = L"40MHz"; break;
+    }
     fwprintf(f, L"XTAL Freq:  %ls\n\n", xtalStr);
 
     /* Write MAC address */
@@ -1407,10 +1418,38 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         break;
     }
     case FESP_CHIP_ESP32C3:
-    case FESP_CHIP_ESP32C6: {
+    case FESP_CHIP_ESP32C6:
+    case FESP_CHIP_ESP32H2:
+    case FESP_CHIP_ESP32P4: {
         DWORD crypt_cnt = READ_EFUSE_BITS(0x34, 7UL << 18) >> 18;
         DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 20) >> 20;
-        DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 4) >> 4;
+        DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 0) >> 0;
+        DWORD sec_dl = READ_EFUSE_BITS(0x3C, 1UL << 5) >> 5;
+        fwprintf(f,
+                 L"SPI_BOOT_CRYPT_CNT:                0x%02X (%d bits set)\n",
+                 crypt_cnt, COUNT_BITS(crypt_cnt));
+        fwprintf(f, L"DIS_DOWNLOAD_MANUAL_ENCRYPT:       %lu\n", dl_encrypt);
+        fwprintf(f, L"DIS_DOWNLOAD_MODE:                 %lu\n", dl_mode);
+        fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:          %lu\n", sec_dl);
+        break;
+    }
+    case FESP_CHIP_ESP32C5: {
+        DWORD crypt_cnt = READ_EFUSE_BITS(0x34, 7UL << 16) >> 16;
+        DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 20) >> 20;
+        DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 0) >> 0;
+        DWORD sec_dl = READ_EFUSE_BITS(0x3C, 1UL << 5) >> 5;
+        fwprintf(f,
+                 L"SPI_BOOT_CRYPT_CNT:                0x%02X (%d bits set)\n",
+                 crypt_cnt, COUNT_BITS(crypt_cnt));
+        fwprintf(f, L"DIS_DOWNLOAD_MANUAL_ENCRYPT:       %lu\n", dl_encrypt);
+        fwprintf(f, L"DIS_DOWNLOAD_MODE:                 %lu\n", dl_mode);
+        fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:          %lu\n", sec_dl);
+        break;
+    }
+    case FESP_CHIP_ESP32C61: {
+        DWORD crypt_cnt = READ_EFUSE_BITS(0x30, 7UL << 23) >> 23;
+        DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 14) >> 14;
+        DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 0) >> 0;
         DWORD sec_dl = READ_EFUSE_BITS(0x3C, 1UL << 5) >> 5;
         fwprintf(f,
                  L"SPI_BOOT_CRYPT_CNT:                0x%02X (%d bits set)\n",
@@ -1490,7 +1529,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         break;
     }
     case FESP_CHIP_ESP32C3:
-    case FESP_CHIP_ESP32C6: {
+    case FESP_CHIP_ESP32C6:
+    case FESP_CHIP_ESP32H2: {
         DWORD pad_jtag = READ_EFUSE_BITS(0x30, 1UL << 19) >> 19;
         DWORD soft_jtag = (READ_EFUSE_BITS(0x30, 7UL << 16) >> 16);
         DWORD usb_jtag = READ_EFUSE_BITS(0x30, 1UL << 9) >> 9;
@@ -1512,6 +1552,39 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         fwprintf(f, L"SECURE_BOOT_KEY_REVOKE0:    %lu\n", revoke0);
         fwprintf(f, L"SECURE_BOOT_KEY_REVOKE1:    %lu\n", revoke1);
         fwprintf(f, L"SECURE_BOOT_KEY_REVOKE2:    %lu\n", revoke2);
+        break;
+    }
+    case FESP_CHIP_ESP32C5:
+    case FESP_CHIP_ESP32C61: {
+        DWORD pad_jtag = READ_EFUSE_BITS(0x30, 1UL << 19) >> 19;
+        DWORD soft_jtag = (READ_EFUSE_BITS(0x30, 7UL << 16) >> 16);
+        DWORD usb_jtag = READ_EFUSE_BITS(0x30, 1UL << 9) >> 9;
+        DWORD force_dl = READ_EFUSE_BITS(0x30, 1UL << 12) >> 12;
+        DWORD usb_print = READ_EFUSE_BITS(0x3C, 1UL << 2) >> 2;
+        DWORD sb_en_c5 = (g_chip.type == FESP_CHIP_ESP32C5)
+                              ? READ_EFUSE_BITS(0x38, 1UL << 25) >> 25
+                              : READ_EFUSE_BITS(0x34, 1UL << 26) >> 26;
+        DWORD sb_agg = READ_EFUSE_BITS(0x38, 1UL << 21) >> 21;
+        DWORD revoke0 = READ_EFUSE_BITS(0x34, 1UL << 21) >> 21;
+        DWORD revoke1 = READ_EFUSE_BITS(0x34, 1UL << 22) >> 22;
+        DWORD revoke2 = READ_EFUSE_BITS(0x34, 1UL << 23) >> 23;
+        fwprintf(f, L"DIS_PAD_JTAG:               %lu\n", pad_jtag);
+        fwprintf(f, L"SOFT_DIS_JTAG:              %lu (%d bits set)\n",
+                 soft_jtag, COUNT_BITS(soft_jtag));
+        fwprintf(f, L"DIS_USB_JTAG:               %lu\n", usb_jtag);
+        fwprintf(f, L"DIS_FORCE_DOWNLOAD:         %lu\n", force_dl);
+        fwprintf(f, L"DIS_USB_SERIAL_JTAG_PRINT:  %lu\n", usb_print);
+        fwprintf(f, L"SECURE_BOOT_EN:             %lu\n", sb_en_c5);
+        fwprintf(f, L"SECURE_BOOT_AGGRESSIVE:     %lu\n", sb_agg);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE0:    %lu\n", revoke0);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE1:    %lu\n", revoke1);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE2:    %lu\n", revoke2);
+        break;
+    }
+    case FESP_CHIP_ESP32P4: {
+        DWORD sb_en = READ_EFUSE_BITS(0x38, 1UL << 20) >> 20;
+        fwprintf(f, L"SECURE_BOOT_EN:             %lu\n", sb_en);
+        fwprintf(f, L"(JTAG fields not available)\n");
         break;
     }
     default:
@@ -1567,7 +1640,11 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         break;
     }
     case FESP_CHIP_ESP32C3:
-    case FESP_CHIP_ESP32C6: {
+    case FESP_CHIP_ESP32C6:
+    case FESP_CHIP_ESP32C5:
+    case FESP_CHIP_ESP32C61:
+    case FESP_CHIP_ESP32H2:
+    case FESP_CHIP_ESP32P4: {
         static const KEY_INFO c3c6_keys[] = {
             {"KEY0", 0x9C, 32}, {"KEY1", 0xBC, 32},  {"KEY2", 0xDC, 32},
             {"KEY3", 0xFC, 32}, {"KEY4", 0x11C, 32}, {"KEY5", 0x13C, 32},

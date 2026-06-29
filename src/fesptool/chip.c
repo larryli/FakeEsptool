@@ -97,6 +97,30 @@ static const CHIP_CONFIG chip_configs[FESP_CHIP_COUNT] = {
                            512,
                            true,
                            {0x6F, 0x80, 0xE0, 0x2C}},
+    [FESP_CHIP_ESP32C5] = {"ESP32-C5",
+                           FESP_CHIP_ID_ESP32C5,
+                           IMAGE_FESP_CHIP_ID_ESP32C5,
+                           512,
+                           true,
+                           {0x6F, 0x48, 0x0B, 0x60}},
+    [FESP_CHIP_ESP32C61] = {"ESP32-C61",
+                            FESP_CHIP_ID_ESP32C61,
+                            IMAGE_FESP_CHIP_ID_ESP32C61,
+                            512,
+                            true,
+                            {0x6F, 0x48, 0x0B, 0x60}},
+    [FESP_CHIP_ESP32H2] = {"ESP32-H2",
+                           FESP_CHIP_ID_ESP32H2,
+                           IMAGE_FESP_CHIP_ID_ESP32H2,
+                           512,
+                           true,
+                           {0x6F, 0x08, 0x0B, 0x60}},
+    [FESP_CHIP_ESP32P4] = {"ESP32-P4",
+                           FESP_CHIP_ID_ESP32P4,
+                           IMAGE_FESP_CHIP_ID_ESP32P4,
+                           512,
+                           true,
+                           {0x00, 0x12, 0x12, 0x50}},
 };
 
 /*
@@ -328,7 +352,6 @@ static bool init_esp32s3(fesp_chip_ctx_t *ctx)
         return false;
     }
     write_mac_at_0x44(ctx);
-    write_chip_id_to_efuse(ctx);
 
     /* Set chip revision to v0.0 in eFuse via ECO0 detection workaround.
        ESP32-S3's is_eco0() checks:
@@ -342,10 +365,9 @@ static bool init_esp32s3(fesp_chip_ctx_t *ctx)
     ctx->efuse[0x6C] |= 0x01; /* blk_version_major = 1 */
     ctx->efuse[0x52] |= 0x01; /* blk_version_minor = 1 */
 
-    /* eFuse controller register offsets (from EFUSE_BASE 0x60007000) */
     ctx->efuse_base = FESP_EFUSE_BASE_ESP32S3;
-    ctx->efuse_conf_ofs = 0x1CC; /* EFUSE_CONF_REG */
-    ctx->efuse_cmd_ofs = 0x1D4;  /* EFUSE_CMD_REG */
+    ctx->efuse_conf_ofs = 0x1CC;
+    ctx->efuse_cmd_ofs = 0x1D4;
 
     return true;
 }
@@ -385,17 +407,15 @@ static bool init_esp32c3(fesp_chip_ctx_t *ctx)
         return false;
     }
     write_mac_at_0x44(ctx);
-    write_chip_id_to_efuse(ctx);
 
     /* Set chip revision to 1.0 in eFuse.
        ESP32-C3: EFUSE_BLOCK1_ADDR = 0x60008844
        major at word5 (BLOCK1 + 20) bits[25:24] = uint8_t 0x5B bits[1:0] */
     ctx->efuse[0x5B] |= 0x01; /* major=1, bits[25:24] = 01 */
 
-    /* eFuse controller register offsets (from EFUSE_BASE 0x60008800) */
     ctx->efuse_base = FESP_EFUSE_BASE_ESP32C3;
-    ctx->efuse_conf_ofs = 0x1CC; /* EFUSE_CONF_REG */
-    ctx->efuse_cmd_ofs = 0x1D4;  /* EFUSE_CMD_REG */
+    ctx->efuse_conf_ofs = 0x1CC;
+    ctx->efuse_cmd_ofs = 0x1D4;
 
     return true;
 }
@@ -409,15 +429,96 @@ static bool init_esp32c6(fesp_chip_ctx_t *ctx)
         return false;
     }
     write_mac_at_0x44(ctx);
-    write_chip_id_to_efuse(ctx);
 
     /* ESP32-C6: no chip revision override needed.
        Leave eFuse at 0 -> major=0, minor=0 -> v0.0 */
 
-    /* eFuse controller register offsets (from EFUSE_BASE 0x600B0800) */
     ctx->efuse_base = FESP_EFUSE_BASE_ESP32C6;
-    ctx->efuse_conf_ofs = 0x1CC; /* EFUSE_CONF_REG (same as C3) */
-    ctx->efuse_cmd_ofs = 0x1D4;  /* EFUSE_CMD_REG (same as C3) */
+    ctx->efuse_conf_ofs = 0x1CC;
+    ctx->efuse_cmd_ofs = 0x1D4;
+
+    return true;
+}
+
+/*
+ * init_esp32c5 - Initialize ESP32-C5 chip context
+ */
+static bool init_esp32c5(fesp_chip_ctx_t *ctx)
+{
+    if (!init_chip_common(ctx, FESP_CHIP_ESP32C5)) {
+        return false;
+    }
+    write_mac_at_0x44(ctx);
+
+    /* ESP32-C5: version info in BLOCK1 word2 (offset 0x4C).
+       pkg_version at bits[28:26], major at bits[5:4], minor at bits[3:0].
+       Set revision 1.0: major=1 (bit4), pkg=0 (ESP32-C5). */
+    ctx->efuse[0x4C] |= 0x10;
+
+    ctx->efuse_base = FESP_EFUSE_BASE_ESP32C5;
+    ctx->efuse_conf_ofs = 0x1CC;
+    ctx->efuse_cmd_ofs = 0x1D4;
+
+    return true;
+}
+
+/*
+ * init_esp32c61 - Initialize ESP32-C61 chip context
+ */
+static bool init_esp32c61(fesp_chip_ctx_t *ctx)
+{
+    if (!init_chip_common(ctx, FESP_CHIP_ESP32C61)) {
+        return false;
+    }
+    write_mac_at_0x44(ctx);
+
+    /* ESP32-C61: version info in BLOCK1 word2 (offset 0x4C).
+       pkg_version at bits[28:26], major at bits[5:4], minor at bits[3:0].
+       Set revision 1.0: major=1 (bit4), pkg=0 (ESP32-C61). */
+    ctx->efuse[0x4C] |= 0x10;
+
+    ctx->efuse_base = FESP_EFUSE_BASE_ESP32C61;
+    ctx->efuse_conf_ofs = 0x1CC;
+    ctx->efuse_cmd_ofs = 0x1D4;
+
+    return true;
+}
+
+/*
+ * init_esp32h2 - Initialize ESP32-H2 chip context
+ */
+static bool init_esp32h2(fesp_chip_ctx_t *ctx)
+{
+    if (!init_chip_common(ctx, FESP_CHIP_ESP32H2)) {
+        return false;
+    }
+    write_mac_at_0x44(ctx);
+
+    /* ESP32-H2: version layout same as C6 (from ESP32C6ROM).
+       No write_chip_id_to_efuse needed (uses SECURITY_INFO detection). */
+
+    ctx->efuse_base = FESP_EFUSE_BASE_ESP32H2;
+    ctx->efuse_conf_ofs = 0x1CC;
+    ctx->efuse_cmd_ofs = 0x1D4;
+
+    return true;
+}
+
+/*
+ * init_esp32p4 - Initialize ESP32-P4 chip context
+ */
+static bool init_esp32p4(fesp_chip_ctx_t *ctx)
+{
+    if (!init_chip_common(ctx, FESP_CHIP_ESP32P4)) {
+        return false;
+    }
+    write_mac_at_0x44(ctx);
+
+    /* ESP32-P4: no write_chip_id_to_efuse needed (uses SECURITY_INFO detection). */
+
+    ctx->efuse_base = FESP_EFUSE_BASE_ESP32P4;
+    ctx->efuse_conf_ofs = 0x1CC;
+    ctx->efuse_cmd_ofs = 0x1D4;
 
     return true;
 }
@@ -465,6 +566,22 @@ bool fesp_chip_init(fesp_chip_ctx_t *ctx, fesp_chip_type_t type)
         ctx->spi_reg_base = FESP_SPI_REG_BASE_ESP32C6;
         ctx->spi_offs = &spi_offs_esp32s2;
         break;
+    case FESP_CHIP_ESP32C5:
+        ctx->spi_reg_base = FESP_SPI_REG_BASE_ESP32C5;
+        ctx->spi_offs = &spi_offs_esp32s2;
+        break;
+    case FESP_CHIP_ESP32C61:
+        ctx->spi_reg_base = FESP_SPI_REG_BASE_ESP32C61;
+        ctx->spi_offs = &spi_offs_esp32s2;
+        break;
+    case FESP_CHIP_ESP32H2:
+        ctx->spi_reg_base = FESP_SPI_REG_BASE_ESP32H2;
+        ctx->spi_offs = &spi_offs_esp32s2;
+        break;
+    case FESP_CHIP_ESP32P4:
+        ctx->spi_reg_base = FESP_SPI_REG_BASE_ESP32P4;
+        ctx->spi_offs = &spi_offs_esp32s2;
+        break;
     default:
         /* S3, C2, C3 */
         ctx->spi_reg_base = FESP_SPI_REG_BASE_ESP32S3;
@@ -505,6 +622,26 @@ bool fesp_chip_init(fesp_chip_ctx_t *ctx, fesp_chip_type_t type)
         break;
     case FESP_CHIP_ESP32C6:
         if (!init_esp32c6(ctx)) {
+            goto fail;
+        }
+        break;
+    case FESP_CHIP_ESP32C5:
+        if (!init_esp32c5(ctx)) {
+            goto fail;
+        }
+        break;
+    case FESP_CHIP_ESP32C61:
+        if (!init_esp32c61(ctx)) {
+            goto fail;
+        }
+        break;
+    case FESP_CHIP_ESP32H2:
+        if (!init_esp32h2(ctx)) {
+            goto fail;
+        }
+        break;
+    case FESP_CHIP_ESP32P4:
+        if (!init_esp32p4(ctx)) {
             goto fail;
         }
         break;
@@ -584,6 +721,10 @@ bool fesp_chip_set_mac(fesp_chip_ctx_t *ctx, const uint8_t mac[6])
     case FESP_CHIP_ESP32S3:
     case FESP_CHIP_ESP32C3:
     case FESP_CHIP_ESP32C6:
+    case FESP_CHIP_ESP32C5:
+    case FESP_CHIP_ESP32C61:
+    case FESP_CHIP_ESP32H2:
+    case FESP_CHIP_ESP32P4:
         write_mac_at_0x44(ctx);
         break;
     case FESP_CHIP_ESP32C2:
@@ -687,7 +828,9 @@ uint32_t fesp_chip_read_reg(const fesp_chip_ctx_t *ctx, uint32_t addr)
         addr == FESP_UART_CLKDIV_REG_ESP32S2) {
         uint32_t xtal;
         if (ctx->type == FESP_CHIP_ESP32C3 || ctx->type == FESP_CHIP_ESP32C6 ||
-            ctx->type == FESP_CHIP_ESP32S2 || ctx->type == FESP_CHIP_ESP32S3) {
+            ctx->type == FESP_CHIP_ESP32S2 || ctx->type == FESP_CHIP_ESP32S3 ||
+            ctx->type == FESP_CHIP_ESP32C5 || ctx->type == FESP_CHIP_ESP32C61 ||
+            ctx->type == FESP_CHIP_ESP32H2 || ctx->type == FESP_CHIP_ESP32P4) {
             xtal = 40000000;
         } else {
             switch (ctx->xtal_freq) {
@@ -1007,6 +1150,38 @@ const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx,
                      "waiting for download\r\n",
                      reset_cause, rst);
             break;
+        case FESP_CHIP_ESP32C5:
+            snprintf(buf, buf_size,
+                     "ESP-ROM:esp32c5-20210719\r\n"
+                     "Build:Jul 19 2021\r\n"
+                     "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+                     "waiting for download\r\n",
+                     reset_cause, rst);
+            break;
+        case FESP_CHIP_ESP32C61:
+            snprintf(buf, buf_size,
+                     "ESP-ROM:esp32c61-20210719\r\n"
+                     "Build:Jul 19 2021\r\n"
+                     "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+                     "waiting for download\r\n",
+                     reset_cause, rst);
+            break;
+        case FESP_CHIP_ESP32H2:
+            snprintf(buf, buf_size,
+                     "ESP-ROM:esp32h2-20210719\r\n"
+                     "Build:Jul 19 2021\r\n"
+                     "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+                     "waiting for download\r\n",
+                     reset_cause, rst);
+            break;
+        case FESP_CHIP_ESP32P4:
+            snprintf(buf, buf_size,
+                     "ESP-ROM:esp32p4-20210719\r\n"
+                     "Build:Jul 19 2021\r\n"
+                     "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+                     "waiting for download\r\n",
+                     reset_cause, rst);
+            break;
         default:
             buf[0] = '\0';
             break;
@@ -1106,6 +1281,62 @@ const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx,
         case FESP_CHIP_ESP32C6:
             snprintf(buf, buf_size,
                      "ESP-ROM:esp32c6-20210719\r\n"
+                     "Build:Jul 19 2021\r\n"
+                     "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
+                     "SPIWP:0xee\r\n"
+                     "mode:DIO, clock div:1\r\n"
+                     "load:0x3fff0008,len:8\r\n"
+                     "load:0x3fff0010,len:3680\r\n"
+                     "load:0x40078000,len:8364\r\n"
+                     "load:0x40080000,len:252\r\n"
+                      "entry 0x40080034\r\n",
+                     reset_cause, rst);
+            break;
+        case FESP_CHIP_ESP32C5:
+            snprintf(buf, buf_size,
+                     "ESP-ROM:esp32c5-20210719\r\n"
+                     "Build:Jul 19 2021\r\n"
+                     "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
+                     "SPIWP:0xee\r\n"
+                     "mode:DIO, clock div:1\r\n"
+                     "load:0x3fff0008,len:8\r\n"
+                     "load:0x3fff0010,len:3680\r\n"
+                     "load:0x40078000,len:8364\r\n"
+                     "load:0x40080000,len:252\r\n"
+                     "entry 0x40080034\r\n",
+                     reset_cause, rst);
+            break;
+        case FESP_CHIP_ESP32C61:
+            snprintf(buf, buf_size,
+                     "ESP-ROM:esp32c61-20210719\r\n"
+                     "Build:Jul 19 2021\r\n"
+                     "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
+                     "SPIWP:0xee\r\n"
+                     "mode:DIO, clock div:1\r\n"
+                     "load:0x3fff0008,len:8\r\n"
+                     "load:0x3fff0010,len:3680\r\n"
+                     "load:0x40078000,len:8364\r\n"
+                     "load:0x40080000,len:252\r\n"
+                     "entry 0x40080034\r\n",
+                     reset_cause, rst);
+            break;
+        case FESP_CHIP_ESP32H2:
+            snprintf(buf, buf_size,
+                     "ESP-ROM:esp32h2-20210719\r\n"
+                     "Build:Jul 19 2021\r\n"
+                     "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
+                     "SPIWP:0xee\r\n"
+                     "mode:DIO, clock div:1\r\n"
+                     "load:0x3fff0008,len:8\r\n"
+                     "load:0x3fff0010,len:3680\r\n"
+                     "load:0x40078000,len:8364\r\n"
+                     "load:0x40080000,len:252\r\n"
+                     "entry 0x40080034\r\n",
+                     reset_cause, rst);
+            break;
+        case FESP_CHIP_ESP32P4:
+            snprintf(buf, buf_size,
+                     "ESP-ROM:esp32p4-20210719\r\n"
                      "Build:Jul 19 2021\r\n"
                      "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
                      "SPIWP:0xee\r\n"

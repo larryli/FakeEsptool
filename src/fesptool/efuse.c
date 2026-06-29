@@ -197,6 +197,10 @@ bool fesp_chip_write_reg_modern(fesp_chip_ctx_t *ctx, int offset, uint32_t val)
             switch (ctx->type) {
             case FESP_CHIP_ESP32C3:
             case FESP_CHIP_ESP32C6:
+            case FESP_CHIP_ESP32C5:
+            case FESP_CHIP_ESP32C61:
+            case FESP_CHIP_ESP32H2:
+            case FESP_CHIP_ESP32P4:
                 block_offsets = efuse_block_offsets_c3;
                 num_blocks = (int)(sizeof(efuse_block_offsets_c3) /
                                    sizeof(efuse_block_offsets_c3[0]));
@@ -396,6 +400,22 @@ uint32_t fesp_efuse_get_flash_crypt_cnt(const fesp_chip_ctx_t *ctx)
         return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C6,
                                FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C6) >>
                18;
+    case FESP_CHIP_ESP32C5:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C5,
+                               FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C5) >>
+               16;
+    case FESP_CHIP_ESP32C61:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32C61,
+                               FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C61) >>
+               23;
+    case FESP_CHIP_ESP32H2:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32H2,
+                               FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32H2) >>
+               18;
+    case FESP_CHIP_ESP32P4:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SPI_BOOT_CRYPT_CNT_ESP32P4,
+                               FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32P4) >>
+               18;
     default:
         return 0;
     }
@@ -452,6 +472,22 @@ bool fesp_efuse_is_download_encrypt_disabled(const fesp_chip_ctx_t *ctx)
         return read_efuse_bits(
                    ctx, FESP_EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C6,
                    FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C6) != 0;
+    case FESP_CHIP_ESP32C5:
+        return read_efuse_bits(
+                   ctx, FESP_EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C5,
+                   FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C5) != 0;
+    case FESP_CHIP_ESP32C61:
+        return read_efuse_bits(
+                   ctx, FESP_EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C61,
+                   FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C61) != 0;
+    case FESP_CHIP_ESP32H2:
+        return read_efuse_bits(
+                   ctx, FESP_EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32H2,
+                   FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32H2) != 0;
+    case FESP_CHIP_ESP32P4:
+        return read_efuse_bits(
+                   ctx, FESP_EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32P4,
+                   FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32P4) != 0;
     default:
         return false;
     }
@@ -508,6 +544,18 @@ bool fesp_efuse_is_download_mode_disabled(const fesp_chip_ctx_t *ctx)
     case FESP_CHIP_ESP32C6:
         return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C6,
                                FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C6) != 0;
+    case FESP_CHIP_ESP32C5:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C5,
+                               FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C5) != 0;
+    case FESP_CHIP_ESP32C61:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C61,
+                               FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C61) != 0;
+    case FESP_CHIP_ESP32H2:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32H2,
+                               FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32H2) != 0;
+    case FESP_CHIP_ESP32P4:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32P4,
+                               FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32P4) != 0;
     default:
         return false;
     }
@@ -543,6 +591,18 @@ bool fesp_efuse_is_secure_download_enabled(const fesp_chip_ctx_t *ctx)
     case FESP_CHIP_ESP32C6:
         return read_efuse_bits(ctx, FESP_EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C6,
                                FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C6) != 0;
+    case FESP_CHIP_ESP32C5:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C5,
+                               FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C5) != 0;
+    case FESP_CHIP_ESP32C61:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32C61,
+                               FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C61) != 0;
+    case FESP_CHIP_ESP32H2:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32H2,
+                               FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32H2) != 0;
+    case FESP_CHIP_ESP32P4:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_ENABLE_SECURITY_DL_ESP32P4,
+                               FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32P4) != 0;
     default:
         return false;
     }
@@ -578,6 +638,22 @@ uint32_t fesp_efuse_get_dl_encrypt_disabled(const fesp_chip_ctx_t *ctx)
         return read_efuse_bits(
                    ctx, FESP_EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C6,
                    FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C6) != 0;
+    case FESP_CHIP_ESP32C5:
+        return read_efuse_bits(
+                   ctx, FESP_EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C5,
+                   FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C5) != 0;
+    case FESP_CHIP_ESP32C61:
+        return read_efuse_bits(
+                   ctx, FESP_EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32C61,
+                   FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C61) != 0;
+    case FESP_CHIP_ESP32H2:
+        return read_efuse_bits(
+                   ctx, FESP_EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32H2,
+                   FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32H2) != 0;
+    case FESP_CHIP_ESP32P4:
+        return read_efuse_bits(
+                   ctx, FESP_EFUSE_OFFS_DIS_DL_MANUAL_ENCRYPT_ESP32P4,
+                   FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32P4) != 0;
     default:
         return 0;
     }
@@ -608,6 +684,18 @@ uint32_t fesp_efuse_get_dl_mode_disabled(const fesp_chip_ctx_t *ctx)
     case FESP_CHIP_ESP32C6:
         return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C6,
                                FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C6) != 0;
+    case FESP_CHIP_ESP32C5:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C5,
+                               FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C5) != 0;
+    case FESP_CHIP_ESP32C61:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32C61,
+                               FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C61) != 0;
+    case FESP_CHIP_ESP32H2:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32H2,
+                               FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32H2) != 0;
+    case FESP_CHIP_ESP32P4:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_DOWNLOAD_MODE_ESP32P4,
+                               FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32P4) != 0;
     default:
         return 0;
     }
@@ -641,6 +729,18 @@ uint32_t fesp_efuse_get_secure_boot_flag(const fesp_chip_ctx_t *ctx)
     case FESP_CHIP_ESP32C6:
         return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SECURE_BOOT_EN_ESP32C6,
                                FESP_EFUSE_BIT_SECURE_BOOT_EN_ESP32C6) != 0;
+    case FESP_CHIP_ESP32C5:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SECURE_BOOT_EN_ESP32C5,
+                               FESP_EFUSE_BIT_SECURE_BOOT_EN_ESP32C5) != 0;
+    case FESP_CHIP_ESP32C61:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SECURE_BOOT_EN_ESP32C61,
+                               FESP_EFUSE_BIT_SECURE_BOOT_EN_ESP32C61) != 0;
+    case FESP_CHIP_ESP32H2:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SECURE_BOOT_EN_ESP32H2,
+                               FESP_EFUSE_BIT_SECURE_BOOT_EN_ESP32H2) != 0;
+    case FESP_CHIP_ESP32P4:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SECURE_BOOT_EN_ESP32P4,
+                               FESP_EFUSE_BIT_SECURE_BOOT_EN_ESP32P4) != 0;
     default:
         return 0;
     }
@@ -667,6 +767,17 @@ uint32_t fesp_efuse_get_jtag_flag(const fesp_chip_ctx_t *ctx)
     case FESP_CHIP_ESP32C6:
         return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_PAD_JTAG_ESP32C6,
                                FESP_EFUSE_BIT_DIS_PAD_JTAG_ESP32C6) != 0;
+    case FESP_CHIP_ESP32C5:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_PAD_JTAG_ESP32C5,
+                               FESP_EFUSE_BIT_DIS_PAD_JTAG_ESP32C5) != 0;
+    case FESP_CHIP_ESP32C61:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_PAD_JTAG_ESP32C61,
+                               FESP_EFUSE_BIT_DIS_PAD_JTAG_ESP32C61) != 0;
+    case FESP_CHIP_ESP32H2:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_PAD_JTAG_ESP32H2,
+                               FESP_EFUSE_BIT_DIS_PAD_JTAG_ESP32H2) != 0;
+    case FESP_CHIP_ESP32P4:
+        return 0;
     default:
         return 0;
     }
@@ -701,6 +812,18 @@ bool fesp_efuse_is_secure_boot_enabled(const fesp_chip_ctx_t *ctx)
     case FESP_CHIP_ESP32C6:
         return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SECURE_BOOT_EN_ESP32C6,
                                FESP_EFUSE_BIT_SECURE_BOOT_EN_ESP32C6) != 0;
+    case FESP_CHIP_ESP32C5:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SECURE_BOOT_EN_ESP32C5,
+                               FESP_EFUSE_BIT_SECURE_BOOT_EN_ESP32C5) != 0;
+    case FESP_CHIP_ESP32C61:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SECURE_BOOT_EN_ESP32C61,
+                               FESP_EFUSE_BIT_SECURE_BOOT_EN_ESP32C61) != 0;
+    case FESP_CHIP_ESP32H2:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SECURE_BOOT_EN_ESP32H2,
+                               FESP_EFUSE_BIT_SECURE_BOOT_EN_ESP32H2) != 0;
+    case FESP_CHIP_ESP32P4:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SECURE_BOOT_EN_ESP32P4,
+                               FESP_EFUSE_BIT_SECURE_BOOT_EN_ESP32P4) != 0;
     default:
         return false;
     }
@@ -731,6 +854,17 @@ bool fesp_efuse_is_jtag_disabled(const fesp_chip_ctx_t *ctx)
     case FESP_CHIP_ESP32C6:
         return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_PAD_JTAG_ESP32C6,
                                FESP_EFUSE_BIT_DIS_PAD_JTAG_ESP32C6) != 0;
+    case FESP_CHIP_ESP32C5:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_PAD_JTAG_ESP32C5,
+                               FESP_EFUSE_BIT_DIS_PAD_JTAG_ESP32C5) != 0;
+    case FESP_CHIP_ESP32C61:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_PAD_JTAG_ESP32C61,
+                               FESP_EFUSE_BIT_DIS_PAD_JTAG_ESP32C61) != 0;
+    case FESP_CHIP_ESP32H2:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_PAD_JTAG_ESP32H2,
+                               FESP_EFUSE_BIT_DIS_PAD_JTAG_ESP32H2) != 0;
+    case FESP_CHIP_ESP32P4:
+        return 0;
     default:
         return false;
     }
@@ -777,6 +911,30 @@ int fesp_efuse_get_jtag_disabled_count(const fesp_chip_ctx_t *ctx)
         count += read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_USB_JTAG_ESP32C6,
                                  FESP_EFUSE_BIT_DIS_USB_JTAG_ESP32C6) != 0;
         break;
+    case FESP_CHIP_ESP32C5:
+        count += read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_PAD_JTAG_ESP32C5,
+                                 FESP_EFUSE_BIT_DIS_PAD_JTAG_ESP32C5) != 0;
+        count += read_efuse_bits(ctx, FESP_EFUSE_OFFS_SOFT_DIS_JTAG_ESP32C5,
+                                 FESP_EFUSE_MASK_SOFT_DIS_JTAG_ESP32C5) != 0;
+        count += read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_USB_JTAG_ESP32C5,
+                                 FESP_EFUSE_BIT_DIS_USB_JTAG_ESP32C5) != 0;
+        break;
+    case FESP_CHIP_ESP32C61:
+        count += read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_PAD_JTAG_ESP32C61,
+                                 FESP_EFUSE_BIT_DIS_PAD_JTAG_ESP32C61) != 0;
+        count += read_efuse_bits(ctx, FESP_EFUSE_OFFS_SOFT_DIS_JTAG_ESP32C61,
+                                 FESP_EFUSE_MASK_SOFT_DIS_JTAG_ESP32C61) != 0;
+        count += read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_USB_JTAG_ESP32C61,
+                                 FESP_EFUSE_BIT_DIS_USB_JTAG_ESP32C61) != 0;
+        break;
+    case FESP_CHIP_ESP32H2:
+        count += read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_PAD_JTAG_ESP32H2,
+                                 FESP_EFUSE_BIT_DIS_PAD_JTAG_ESP32H2) != 0;
+        count += read_efuse_bits(ctx, FESP_EFUSE_OFFS_SOFT_DIS_JTAG_ESP32H2,
+                                 FESP_EFUSE_MASK_SOFT_DIS_JTAG_ESP32H2) != 0;
+        count += read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_USB_JTAG_ESP32H2,
+                                 FESP_EFUSE_BIT_DIS_USB_JTAG_ESP32H2) != 0;
+        break;
     default:
         break;
     }
@@ -796,6 +954,9 @@ int fesp_efuse_get_jtag_total_count(const fesp_chip_ctx_t *ctx)
     case FESP_CHIP_ESP32S3:
     case FESP_CHIP_ESP32C3:
     case FESP_CHIP_ESP32C6:
+    case FESP_CHIP_ESP32C5:
+    case FESP_CHIP_ESP32C61:
+    case FESP_CHIP_ESP32H2:
         return 3;
     default:
         return 0;
@@ -823,6 +984,20 @@ uint32_t fesp_efuse_get_soft_jtag_flag(const fesp_chip_ctx_t *ctx)
         return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SOFT_DIS_JTAG_ESP32C6,
                                FESP_EFUSE_MASK_SOFT_DIS_JTAG_ESP32C6) >>
                16;
+    case FESP_CHIP_ESP32C5:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SOFT_DIS_JTAG_ESP32C5,
+                               FESP_EFUSE_MASK_SOFT_DIS_JTAG_ESP32C5) >>
+               16;
+    case FESP_CHIP_ESP32C61:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SOFT_DIS_JTAG_ESP32C61,
+                               FESP_EFUSE_MASK_SOFT_DIS_JTAG_ESP32C61) >>
+               16;
+    case FESP_CHIP_ESP32H2:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_SOFT_DIS_JTAG_ESP32H2,
+                               FESP_EFUSE_MASK_SOFT_DIS_JTAG_ESP32H2) >>
+               16;
+    case FESP_CHIP_ESP32P4:
+        return 0;
     default:
         return 0;
     }
@@ -843,6 +1018,17 @@ uint32_t fesp_efuse_get_usb_jtag_flag(const fesp_chip_ctx_t *ctx)
     case FESP_CHIP_ESP32C6:
         return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_USB_JTAG_ESP32C6,
                                FESP_EFUSE_BIT_DIS_USB_JTAG_ESP32C6) != 0;
+    case FESP_CHIP_ESP32C5:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_USB_JTAG_ESP32C5,
+                               FESP_EFUSE_BIT_DIS_USB_JTAG_ESP32C5) != 0;
+    case FESP_CHIP_ESP32C61:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_USB_JTAG_ESP32C61,
+                               FESP_EFUSE_BIT_DIS_USB_JTAG_ESP32C61) != 0;
+    case FESP_CHIP_ESP32H2:
+        return read_efuse_bits(ctx, FESP_EFUSE_OFFS_DIS_USB_JTAG_ESP32H2,
+                               FESP_EFUSE_BIT_DIS_USB_JTAG_ESP32H2) != 0;
+    case FESP_CHIP_ESP32P4:
+        return 0;
     default:
         return 0;
     }
@@ -882,7 +1068,7 @@ uint8_t fesp_efuse_get_key_purpose(const fesp_chip_ctx_t *ctx, int block)
         return FESP_KEY_PURPOSE_USER;
     }
 
-    /* S2/S3/C3/C6: read KEY_PURPOSE from eFuse.
+    /* S2/S3/C3/C6/C5/C61/H2/P4: read KEY_PURPOSE from eFuse.
        BLOCK0 base varies by chip: ESP32=0x00, S2/S3/C3/C6=0x2C.
        KEY_PURPOSE offsets are relative to BLOCK0 base. */
     if (block > 5) {
@@ -899,7 +1085,9 @@ uint8_t fesp_efuse_get_key_purpose(const fesp_chip_ctx_t *ctx, int block)
     /* Chip-specific BLOCK0 base offset in eFuse array */
     int block0_base =
         (ctx->type == FESP_CHIP_ESP32S2 || ctx->type == FESP_CHIP_ESP32S3 ||
-         ctx->type == FESP_CHIP_ESP32C3 || ctx->type == FESP_CHIP_ESP32C6)
+         ctx->type == FESP_CHIP_ESP32C3 || ctx->type == FESP_CHIP_ESP32C6 ||
+         ctx->type == FESP_CHIP_ESP32C5 || ctx->type == FESP_CHIP_ESP32C61 ||
+         ctx->type == FESP_CHIP_ESP32H2 || ctx->type == FESP_CHIP_ESP32P4)
             ? 0x2C
             : 0x00;
 
@@ -933,9 +1121,11 @@ void fesp_efuse_set_key_purpose(fesp_chip_ctx_t *ctx, int block,
         return;
     }
 
-    /* ESP32-S3/C3/C6: KEY5 cannot have XTS_AES purposes (hardware bug) */
+    /* ESP32-S3/C3/C6/C5/C61/H2/P4: KEY5 cannot have XTS_AES purposes (hardware bug) */
     if ((ctx->type == FESP_CHIP_ESP32S3 || ctx->type == FESP_CHIP_ESP32C3 ||
-         ctx->type == FESP_CHIP_ESP32C6) &&
+         ctx->type == FESP_CHIP_ESP32C6 || ctx->type == FESP_CHIP_ESP32C5 ||
+         ctx->type == FESP_CHIP_ESP32C61 || ctx->type == FESP_CHIP_ESP32H2 ||
+         ctx->type == FESP_CHIP_ESP32P4) &&
         block == 5) {
         if (purpose == FESP_KEY_PURPOSE_XTS_AES_128_KEY ||
             purpose == FESP_KEY_PURPOSE_XTS_AES_256_KEY_1 ||
@@ -952,7 +1142,9 @@ void fesp_efuse_set_key_purpose(fesp_chip_ctx_t *ctx, int block,
     /* Chip-specific BLOCK0 base offset in eFuse array */
     int block0_base =
         (ctx->type == FESP_CHIP_ESP32S2 || ctx->type == FESP_CHIP_ESP32S3 ||
-         ctx->type == FESP_CHIP_ESP32C3 || ctx->type == FESP_CHIP_ESP32C6)
+         ctx->type == FESP_CHIP_ESP32C3 || ctx->type == FESP_CHIP_ESP32C6 ||
+         ctx->type == FESP_CHIP_ESP32C5 || ctx->type == FESP_CHIP_ESP32C61 ||
+         ctx->type == FESP_CHIP_ESP32H2 || ctx->type == FESP_CHIP_ESP32P4)
             ? 0x2C
             : 0x00;
     static const uint8_t rel_offsets[] = {0x08, 0x08, 0x0C, 0x0C, 0x0C, 0x0C};
@@ -1093,6 +1285,54 @@ void fesp_efuse_set_flash_encryption(fesp_chip_ctx_t *ctx, int mode)
             write_efuse_bits(ctx, 0x30,
                              FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C6, 1);
         break;
+    case FESP_CHIP_ESP32C5:
+        clear_efuse_bits(ctx, 0x34, FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C5);
+        clear_efuse_bits(ctx, 0x30,
+                         FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C5);
+        if (mode >= 1) {
+            write_efuse_bits(ctx, 0x34,
+                             FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C5, 1);
+        }
+        if (mode >= 2)
+            write_efuse_bits(ctx, 0x30,
+                             FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C5, 1);
+        break;
+    case FESP_CHIP_ESP32C61:
+        clear_efuse_bits(ctx, 0x30, FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C61);
+        clear_efuse_bits(ctx, 0x30,
+                         FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C61);
+        if (mode >= 1) {
+            write_efuse_bits(ctx, 0x30,
+                             FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32C61, 1);
+        }
+        if (mode >= 2)
+            write_efuse_bits(ctx, 0x30,
+                             FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32C61, 1);
+        break;
+    case FESP_CHIP_ESP32H2:
+        clear_efuse_bits(ctx, 0x34, FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32H2);
+        clear_efuse_bits(ctx, 0x30,
+                         FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32H2);
+        if (mode >= 1) {
+            write_efuse_bits(ctx, 0x34,
+                             FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32H2, 1);
+        }
+        if (mode >= 2)
+            write_efuse_bits(ctx, 0x30,
+                             FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32H2, 1);
+        break;
+    case FESP_CHIP_ESP32P4:
+        clear_efuse_bits(ctx, 0x34, FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32P4);
+        clear_efuse_bits(ctx, 0x30,
+                         FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32P4);
+        if (mode >= 1) {
+            write_efuse_bits(ctx, 0x34,
+                             FESP_EFUSE_MASK_SPI_BOOT_CRYPT_CNT_ESP32P4, 1);
+        }
+        if (mode >= 2)
+            write_efuse_bits(ctx, 0x30,
+                             FESP_EFUSE_BIT_DIS_DL_MANUAL_ENCRYPT_ESP32P4, 1);
+        break;
     default:
         break;
     }
@@ -1173,6 +1413,54 @@ void fesp_efuse_set_download_mode(fesp_chip_ctx_t *ctx, int mode)
         if (mode >= 2) {
             write_efuse_bits(ctx, 0x3C,
                              FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C6, 1);
+        }
+        break;
+    case FESP_CHIP_ESP32C5:
+        clear_efuse_bits(ctx, 0x3C, FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C5);
+        clear_efuse_bits(ctx, 0x3C, FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C5);
+        if (mode >= 1) {
+            write_efuse_bits(ctx, 0x3C,
+                             FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C5, 1);
+        }
+        if (mode >= 2) {
+            write_efuse_bits(ctx, 0x3C,
+                             FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C5, 1);
+        }
+        break;
+    case FESP_CHIP_ESP32C61:
+        clear_efuse_bits(ctx, 0x3C, FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C61);
+        clear_efuse_bits(ctx, 0x3C, FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C61);
+        if (mode >= 1) {
+            write_efuse_bits(ctx, 0x3C,
+                             FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32C61, 1);
+        }
+        if (mode >= 2) {
+            write_efuse_bits(ctx, 0x3C,
+                             FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32C61, 1);
+        }
+        break;
+    case FESP_CHIP_ESP32H2:
+        clear_efuse_bits(ctx, 0x3C, FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32H2);
+        clear_efuse_bits(ctx, 0x3C, FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32H2);
+        if (mode >= 1) {
+            write_efuse_bits(ctx, 0x3C,
+                             FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32H2, 1);
+        }
+        if (mode >= 2) {
+            write_efuse_bits(ctx, 0x3C,
+                             FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32H2, 1);
+        }
+        break;
+    case FESP_CHIP_ESP32P4:
+        clear_efuse_bits(ctx, 0x3C, FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32P4);
+        clear_efuse_bits(ctx, 0x3C, FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32P4);
+        if (mode >= 1) {
+            write_efuse_bits(ctx, 0x3C,
+                             FESP_EFUSE_BIT_ENABLE_SECURITY_DL_ESP32P4, 1);
+        }
+        if (mode >= 2) {
+            write_efuse_bits(ctx, 0x3C,
+                             FESP_EFUSE_BIT_DIS_DOWNLOAD_MODE_ESP32P4, 1);
         }
         break;
     default:
