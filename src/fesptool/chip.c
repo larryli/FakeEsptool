@@ -890,15 +890,13 @@ bool fesp_chip_write_reg(fesp_chip_ctx_t *ctx, uint32_t addr, uint32_t val)
             return fesp_chip_write_reg_modern(ctx, offset, val);
     }
 
-    /* 1b. ESP32: eFuse controller writes at EFUSE_BASE (0x3FF42000) range.
-       espefuse sends PGM_DATA and CMD_REG writes to this address range.
-       Translate to EFUSE_RD_REG_BASE offset (-0x10) for
-       fesp_chip_write_reg_esp32. Must be checked BEFORE SPI register handler
-       (same address range). */
+    /* 1b. ESP32: eFuse controller PGM_DATA writes at EFUSE_BASE (0x3FF00000).
+       espefuse sends PGM_DATA writes to this address range via the ROM
+       bootloader. Same offset layout as EFUSE_RD_REG_BASE. */
     if (ctx->type == FESP_CHIP_ESP32 && ctx->efuse_conf_ofs != 0 &&
-        addr >= FESP_SPI_REG_BASE_ESP32 &&
-        addr < FESP_SPI_REG_BASE_ESP32 + 0x100) {
-        int offset = (int)(addr - FESP_SPI_REG_BASE_ESP32) - 0x10;
+        addr >= FESP_EFUSE_BASE_ESP32 &&
+        addr < FESP_EFUSE_BASE_ESP32 + 0x100) {
+        int offset = (int)(addr - FESP_EFUSE_BASE_ESP32);
         return fesp_chip_write_reg_esp32(ctx, offset, val);
     }
 
