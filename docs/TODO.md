@@ -4,23 +4,6 @@
 
 ---
 
-## 高优先级 - ESP32-S31 支持
-
-支持 esptool 官方已完善支持的 ESP32-S31 芯片（有 stub loader）。
-
-| 芯片 | 特性 | eFuse基址 | SPI基址 | 晶振 | IMAGE_CHIP_ID | 继承 |
-|------|------|-----------|---------|------|---------------|------|
-| ESP32-S31 | WiFi 6+BT5.4+802.15.4, 双核+LP核300MHz | 0x20715000 | 0x20501000 | 40MHz | 32 | ESP32C5ROM |
-
-**注意事项：**
-- eFuse BLOCK1 偏移 0x050（不同于其他芯片的 0x044）
-- KEY_PURPOSE 偏移在 EFUSE_RD_REPEAT_DATA2_REG（0x38），shift 值为 0/5/10/15/20
-- EFUSE_MAX_KEY = 4（仅 KEY0-KEY4）
-- SPI_BOOT_CRYPT_CNT 位于 0x34 bits[23:21]
-- SECURE_BOOT_EN 位于 0x3C bit[2]
-
----
-
 ## 远期规划 - 新芯片支持
 
 支持 esptool 官方新增的 ESP 芯片（部分特性待完善）。

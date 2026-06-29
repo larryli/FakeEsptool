@@ -83,6 +83,7 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
         SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-C61");
         SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-H2");
         SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-P4");
+        SendMessageW(hChip, CB_ADDSTRING, 0, (LPARAM)L"ESP32-S31");
         SendMessageW(hChip, CB_SETCURSEL, (WPARAM)selectedChip, 0);
 
         HWND hFlash = GetDlgItem(hDlg, IDC_FLASH_SIZE_COMBO);

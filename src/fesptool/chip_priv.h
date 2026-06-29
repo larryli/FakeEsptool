@@ -28,6 +28,7 @@
 #define FESP_EFUSE_BASE_ESP32C61 0x600B4800
 #define FESP_EFUSE_BASE_ESP32H2 0x600B0800
 #define FESP_EFUSE_BASE_ESP32P4 0x5012D000
+#define FESP_EFUSE_BASE_ESP32S31 0x20715000
 
 /* ============================================================================
  * MAC eFuse offsets per chip type
@@ -50,6 +51,7 @@
 #define FESP_MAC_EFUSE_BASE_ESP32C61 (FESP_EFUSE_BASE_ESP32C61 + 0x044)
 #define FESP_MAC_EFUSE_BASE_ESP32H2 (FESP_EFUSE_BASE_ESP32H2 + 0x044)
 #define FESP_MAC_EFUSE_BASE_ESP32P4 (FESP_EFUSE_BASE_ESP32P4 + 0x044)
+#define FESP_MAC_EFUSE_BASE_ESP32S31 (FESP_EFUSE_BASE_ESP32S31 + 0x050)
 
 /* ============================================================================
  * SPI register base addresses per chip type
@@ -65,6 +67,7 @@
 #define FESP_SPI_REG_BASE_ESP32C61 0x60003000
 #define FESP_SPI_REG_BASE_ESP32H2 0x60003000
 #define FESP_SPI_REG_BASE_ESP32P4 0x5008D000
+#define FESP_SPI_REG_BASE_ESP32S31 0x20501000
 
 /* ============================================================================
  * UART register addresses per chip type
@@ -121,6 +124,7 @@
 #define FESP_CHIP_ID_ESP32C61 0x2CE0806F
 #define FESP_CHIP_ID_ESP32H2 0x2CE0806F
 #define FESP_CHIP_ID_ESP32P4 0x00000000
+#define FESP_CHIP_ID_ESP32S31 0x00000000
 
 #define IMAGE_FESP_CHIP_ID_ESP8266 0
 #define IMAGE_FESP_CHIP_ID_ESP32 0
@@ -133,6 +137,7 @@
 #define IMAGE_FESP_CHIP_ID_ESP32C61 20
 #define IMAGE_FESP_CHIP_ID_ESP32H2 16
 #define IMAGE_FESP_CHIP_ID_ESP32P4 18
+#define IMAGE_FESP_CHIP_ID_ESP32S31 32
 
 /* ============================================================================
  * Cross-module internal function declarations (defined in efuse.c)

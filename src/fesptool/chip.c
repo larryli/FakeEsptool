@@ -121,6 +121,12 @@ static const CHIP_CONFIG chip_configs[FESP_CHIP_COUNT] = {
                            512,
                            true,
                            {0x00, 0x12, 0x12, 0x50}},
+    [FESP_CHIP_ESP32S31] = {"ESP32-S31",
+                            FESP_CHIP_ID_ESP32S31,
+                            IMAGE_FESP_CHIP_ID_ESP32S31,
+                            512,
+                            true,
+                            {0x00, 0x15, 0x71, 0x20}},
 };
 
 /*
@@ -524,6 +530,38 @@ static bool init_esp32p4(fesp_chip_ctx_t *ctx)
 }
 
 /*
+ * init_esp32s31 - Initialize ESP32-S31 chip context
+ *
+ * S31 inherits from C5 but has different eFuse layout:
+ * - BLOCK1 at EFUSE_BASE + 0x050 (not 0x044)
+ * - MAC at EFUSE_BASE + 0x050
+ * - KEY_PURPOSE at EFUSE_BASE + 0x38 (shifts 0/5/10/15/20)
+ * - Only 5 key blocks (KEY0-4)
+ * - SPI_BOOT_CRYPT_CNT at 0x34 bits[23:21]
+ * - SECURE_BOOT_EN at 0x3C bit[2]
+ */
+static bool init_esp32s31(fesp_chip_ctx_t *ctx)
+{
+    if (!init_chip_common(ctx, FESP_CHIP_ESP32S31)) {
+        return false;
+    }
+
+    /* S31 MAC is at BLOCK1 (EFUSE_BASE + 0x050), not 0x044 */
+    ctx->efuse[0x50] = ctx->mac[5];
+    ctx->efuse[0x51] = ctx->mac[4];
+    ctx->efuse[0x52] = ctx->mac[3];
+    ctx->efuse[0x53] = ctx->mac[2];
+    ctx->efuse[0x54] = ctx->mac[1];
+    ctx->efuse[0x55] = ctx->mac[0];
+
+    ctx->efuse_base = FESP_EFUSE_BASE_ESP32S31;
+    ctx->efuse_conf_ofs = 0x1CC;
+    ctx->efuse_cmd_ofs = 0x1D4;
+
+    return true;
+}
+
+/*
  * fesp_chip_init - Initialize chip context with type-specific defaults
  *
  * Sets up chip properties, allocates eFuse memory, and configures
@@ -580,6 +618,10 @@ bool fesp_chip_init(fesp_chip_ctx_t *ctx, fesp_chip_type_t type)
         break;
     case FESP_CHIP_ESP32P4:
         ctx->spi_reg_base = FESP_SPI_REG_BASE_ESP32P4;
+        ctx->spi_offs = &spi_offs_esp32s2;
+        break;
+    case FESP_CHIP_ESP32S31:
+        ctx->spi_reg_base = FESP_SPI_REG_BASE_ESP32S31;
         ctx->spi_offs = &spi_offs_esp32s2;
         break;
     default:
@@ -642,6 +684,11 @@ bool fesp_chip_init(fesp_chip_ctx_t *ctx, fesp_chip_type_t type)
         break;
     case FESP_CHIP_ESP32P4:
         if (!init_esp32p4(ctx)) {
+            goto fail;
+        }
+        break;
+    case FESP_CHIP_ESP32S31:
+        if (!init_esp32s31(ctx)) {
             goto fail;
         }
         break;
@@ -729,6 +776,15 @@ bool fesp_chip_set_mac(fesp_chip_ctx_t *ctx, const uint8_t mac[6])
         break;
     case FESP_CHIP_ESP32C2:
         write_mac_at_0x40(ctx);
+        break;
+    case FESP_CHIP_ESP32S31:
+        /* S31 MAC at BLOCK1 (EFUSE_BASE + 0x050), not 0x044 */
+        ctx->efuse[0x50] = ctx->mac[5];
+        ctx->efuse[0x51] = ctx->mac[4];
+        ctx->efuse[0x52] = ctx->mac[3];
+        ctx->efuse[0x53] = ctx->mac[2];
+        ctx->efuse[0x54] = ctx->mac[1];
+        ctx->efuse[0x55] = ctx->mac[0];
         break;
     default:
         break;
@@ -830,7 +886,8 @@ uint32_t fesp_chip_read_reg(const fesp_chip_ctx_t *ctx, uint32_t addr)
         if (ctx->type == FESP_CHIP_ESP32C3 || ctx->type == FESP_CHIP_ESP32C6 ||
             ctx->type == FESP_CHIP_ESP32S2 || ctx->type == FESP_CHIP_ESP32S3 ||
             ctx->type == FESP_CHIP_ESP32C5 || ctx->type == FESP_CHIP_ESP32C61 ||
-            ctx->type == FESP_CHIP_ESP32H2 || ctx->type == FESP_CHIP_ESP32P4) {
+            ctx->type == FESP_CHIP_ESP32H2 || ctx->type == FESP_CHIP_ESP32P4 ||
+            ctx->type == FESP_CHIP_ESP32S31) {
             xtal = 40000000;
         } else {
             switch (ctx->xtal_freq) {
@@ -1102,81 +1159,88 @@ const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx,
             break;
         case FESP_CHIP_ESP32:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
-                     "rst:0x%02X (%s),boot:0x3 (DOWNLOAD(UART0/1/2))\r\n"
+                     "ets Jun  8 2016 00:22:57\r\n"
+                     "rst:0x%02X (%s),boot:0x3 (DOWNLOAD_BOOT(UART0/UART1/SDIO_REI_REO_V2))\r\n"
                      "waiting for download\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32S2:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32s2-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
+                     "ESP-ROM:esp32s2-rc4-20191025\r\n"
+                     "Build:Oct 25 2019\r\n"
                      "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
                      "waiting for download\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32S3:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32s3-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
-                     "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+                     "ESP-ROM:esp32s3-20210327\r\n"
+                     "Build:Mar 27 2021\r\n"
+                     "rst:0x%02X (%s),boot:0x0 (DOWNLOAD(USB/UART0))\r\n"
                      "waiting for download\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32C2:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp8684-api2-20220127\r\n"
-                     "Build:Jan 27 2022\r\n"
+                     "ESP-ROM:esp32c2-eco4-20240515\r\n"
+                     "Build:May 15 2024\r\n"
                      "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
                      "waiting for download\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32C3:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32c3-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
+                     "ESP-ROM:esp32c3-api1-20210207\r\n"
+                     "Build:Feb  7 2021\r\n"
                      "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
                      "waiting for download\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32C6:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32c6-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
+                     "ESP-ROM:esp32c6-20220919\r\n"
+                     "Build:Sep 19 2022\r\n"
                      "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
                      "waiting for download\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32C5:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32c5-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
+                     "ESP-ROM:esp32c5-eco2-20250121\r\n"
+                     "Build:Jan 21 2025\r\n"
                      "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
                      "waiting for download\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32C61:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32c61-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
+                     "ESP-ROM:esp32c61-eco3-20250228\r\n"
+                     "Build:Feb 28 2025\r\n"
                      "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
                      "waiting for download\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32H2:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32h2-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
-                     "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+                     "ESP-ROM:esp32h2-20221101\r\n"
+                     "Build:Nov  1 2022\r\n"
+                     "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(USB/UART0))\r\n"
                      "waiting for download\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32P4:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32p4-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
-                     "rst:0x%02X (%s),boot:0x4 (DOWNLOAD(UART0))\r\n"
+                     "ESP-ROM:esp32p4-eco1-20240205\r\n"
+                     "Build:Feb  5 2024\r\n"
+                     "rst:0x%02X (%s),boot:0x107 (DOWNLOAD(USB/UART0/SPI))\r\n"
+                     "waiting for download\r\n",
+                     reset_cause, rst);
+            break;
+        case FESP_CHIP_ESP32S31:
+            snprintf(buf, buf_size,
+                     "ESP-ROM:esp32s31-20251218\r\n"
+                     "Build:Dec 18 2025\r\n"
+                     "rst:0x%02X (%s),boot:0x69 (DOWNLOAD(USB/UART0/SPI))\r\n"
                      "waiting for download\r\n",
                      reset_cause, rst);
             break;
@@ -1206,38 +1270,34 @@ const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx,
             break;
         case FESP_CHIP_ESP32:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
                      "rst:0x%02X (%s),boot:0x13 (SPI_FAST_FLASH_BOOT)\r\n"
-                     "configsip: 0, SPIWP:0x00\r\n"
-                     "clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:"
-                     "0x00,wp_drv:0x00\r\n"
-                     "mode:DIO, clock div:1\r\n"
-                     "load:0x3fff0008,len:8\r\n"
-                     "load:0x3fff0010,len:3680\r\n"
-                     "load:0x40078000,len:8364\r\n"
-                     "load:0x40080000,len:252\r\n"
-                     "entry 0x40080034\r\n",
+                     "configsip: 0, SPIWP:0xee\r\n"
+                     "clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00\r\n"
+                     "mode:DIO, clock div:2\r\n"
+                     "load:0x3fff0030,len:5884\r\n"
+                     "ho 0 tail 12 room 4\r\n"
+                     "load:0x40078000,len:15844\r\n"
+                     "load:0x40080400,len:3560\r\n"
+                     "entry 0x40080604\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32S2:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32s2-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
+                     "ESP-ROM:esp32s2-rc4-20191025\r\n"
+                     "Build:Oct 25 2019\r\n"
                      "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
                      "SPIWP:0xee\r\n"
                      "mode:DIO, clock div:1\r\n"
-                     "load:0x3fff0008,len:8\r\n"
-                     "load:0x3fff0010,len:3680\r\n"
-                     "load:0x40078000,len:8364\r\n"
-                     "load:0x40080000,len:252\r\n"
-                     "entry 0x40080034\r\n",
+                     "load:0x3ffe6108,len:0x17d4\r\n"
+                     "load:0x4004c000,len:0xa9c\r\n"
+                     "load:0x40050000,len:0x3204\r\n"
+                     "entry 0x4004c1b8\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32S3:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32s3-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
+                     "ESP-ROM:esp32s3-20210327\r\n"
+                     "Build:Mar 27 2021\r\n"
                      "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
                      "SPIWP:0xee\r\n"
                      "mode:DIO, clock div:1\r\n"
@@ -1250,8 +1310,8 @@ const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx,
             break;
         case FESP_CHIP_ESP32C2:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp8684-api2-20220127\r\n"
-                     "Build:Jan 27 2022\r\n"
+                     "ESP-ROM:esp32c2-eco4-20240515\r\n"
+                     "Build:May 15 2024\r\n"
                      "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
                      "SPIWP:0xee\r\n"
                      "mode:DIO, clock div:1\r\n"
@@ -1264,86 +1324,94 @@ const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx,
             break;
         case FESP_CHIP_ESP32C3:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32c3-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
-                     "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
+                     "ESP-ROM:esp32c3-api1-20210207\r\n"
+                     "Build:Feb  7 2021\r\n"
+                     "rst:0x%02X (%s),boot:0xc (SPI_FAST_FLASH_BOOT)\r\n"
                      "SPIWP:0xee\r\n"
-                     "mode:DIO, clock div:1\r\n"
-                     "load:0x3fff0008,len:8\r\n"
-                     "load:0x3fff0010,len:3680\r\n"
-                     "load:0x40078000,len:8364\r\n"
-                     "load:0x40080000,len:252\r\n"
-                     "entry 0x40080034\r\n",
+                     "mode:DIO, clock div:2\r\n"
+                     "load:0x3fcd5820,len:0x16b4\r\n"
+                     "load:0x403cc710,len:0x970\r\n"
+                     "load:0x403ce710,len:0x2e90\r\n"
+                     "entry 0x403cc710\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32C6:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32c6-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
-                     "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
+                     "ESP-ROM:esp32c6-20220919\r\n"
+                     "Build:Sep 19 2022\r\n"
+                     "rst:0x%02X (%s),boot:0x6c (SPI_FAST_FLASH_BOOT)\r\n"
+                     "Saved PC:0x4001975a\r\n"
                      "SPIWP:0xee\r\n"
-                     "mode:DIO, clock div:1\r\n"
-                     "load:0x3fff0008,len:8\r\n"
-                     "load:0x3fff0010,len:3680\r\n"
-                     "load:0x40078000,len:8364\r\n"
-                     "load:0x40080000,len:252\r\n"
-                      "entry 0x40080034\r\n",
+                     "mode:DIO, clock div:2\r\n"
+                     "load:0x4086c410,len:0xd50\r\n"
+                     "load:0x4086e610,len:0x2d74\r\n"
+                     "load:0x40875720,len:0x1800\r\n"
+                     "entry 0x4086c410\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32C5:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32c5-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
-                     "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
-                     "SPIWP:0xee\r\n"
-                     "mode:DIO, clock div:1\r\n"
-                     "load:0x3fff0008,len:8\r\n"
-                     "load:0x3fff0010,len:3680\r\n"
-                     "load:0x40078000,len:8364\r\n"
-                     "load:0x40080000,len:252\r\n"
-                     "entry 0x40080034\r\n",
+                     "ESP-ROM:esp32c5-eco2-20250121\r\n"
+                     "Build:Jan 21 2025\r\n"
+                     "rst:0x%02X (%s),boot:0x58 (SPI_FAST_FLASH_BOOT)\r\n"
+                     "SPI mode:DIO, clock div:1\r\n"
+                     "load:0x408556b0,len:0x1710\r\n"
+                     "load:0x4084bba0,len:0xd7c\r\n"
+                     "load:0x4084e5a0,len:0x31bc\r\n"
+                     "entry 0x4084bbaa\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32C61:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32c61-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
-                     "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
-                     "SPIWP:0xee\r\n"
-                     "mode:DIO, clock div:1\r\n"
-                     "load:0x3fff0008,len:8\r\n"
-                     "load:0x3fff0010,len:3680\r\n"
-                     "load:0x40078000,len:8364\r\n"
-                     "load:0x40080000,len:252\r\n"
-                     "entry 0x40080034\r\n",
+                     "ESP-ROM:esp32c61-eco3-20250228\r\n"
+                     "Build:Feb 28 2025\r\n"
+                     "rst:0x%02X (%s),boot:0xc (SPI_FAST_FLASH_BOOT)\r\n"
+                     "Core0 Saved PC:0x4080a438\r\n"
+                     "SPI mode:DIO, clock div:1\r\n"
+                     "load:0x40845c00,len:0x1b80\r\n"
+                     "load:0x4083bd70,len:0xce4\r\n"
+                     "load:0x4083ea70,len:0x3248\r\n"
+                     "load:0x4084a000,len:0x222c\r\n"
+                     "entry 0x4083bd7a\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32H2:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32h2-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
-                     "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
+                     "ESP-ROM:esp32h2-20221101\r\n"
+                     "Build:Nov  1 2022\r\n"
+                     "rst:0x%02X (%s),boot:0xc (SPI_FAST_FLASH_BOOT)\r\n"
                      "SPIWP:0xee\r\n"
-                     "mode:DIO, clock div:1\r\n"
-                     "load:0x3fff0008,len:8\r\n"
-                     "load:0x3fff0010,len:3680\r\n"
-                     "load:0x40078000,len:8364\r\n"
-                     "load:0x40080000,len:252\r\n"
-                     "entry 0x40080034\r\n",
+                     "mode:DIO, clock div:2\r\n"
+                     "load:0x4083cfd0,len:0xc10\r\n"
+                     "load:0x4083efd0,len:0x2d2c\r\n"
+                     "load:0x408460e0,len:0x1790\r\n"
+                     "entry 0x4083cfd0\r\n",
                      reset_cause, rst);
             break;
         case FESP_CHIP_ESP32P4:
             snprintf(buf, buf_size,
-                     "ESP-ROM:esp32p4-20210719\r\n"
-                     "Build:Jul 19 2021\r\n"
-                     "rst:0x%02X (%s),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n"
-                     "SPIWP:0xee\r\n"
-                     "mode:DIO, clock div:1\r\n"
-                     "load:0x3fff0008,len:8\r\n"
-                     "load:0x3fff0010,len:3680\r\n"
-                     "load:0x40078000,len:8364\r\n"
-                     "load:0x40080000,len:252\r\n"
-                     "entry 0x40080034\r\n",
+                     "ESP-ROM:esp32p4-eco2-20240710\r\n"
+                     "Build:Jul 10 2024\r\n"
+                     "rst:0x%02X (%s),boot:0x30f (SPI_FAST_FLASH_BOOT)\r\n"
+                     "SPI mode:DIO, clock div:1\r\n"
+                     "load:0x4ff33ce0,len:0x1174\r\n"
+                     "load:0x4ff29ed0,len:0xccc\r\n"
+                     "load:0x4ff2cbd0,len:0x34fc\r\n"
+                     "entry 0x4ff29ed0\r\n",
+                     reset_cause, rst);
+            break;
+        case FESP_CHIP_ESP32S31:
+            snprintf(buf, buf_size,
+                     "ESP-ROM:esp32s31-20251218\r\n"
+                     "Build:Dec 18 2025\r\n"
+                     "rst:0x%02X (%s),boot:0x78 (SPI_FAST_FLASH_BOOT)\r\n"
+                     "Core0 Saved PC:0x2f004192\r\n"
+                     "Core1 Saved PC:0x2f0042da\r\n"
+                     "SPI mode:DIO, clock div:1\r\n"
+                     "load:0x2f0740c0,len:0x16a0\r\n"
+                     "load:0x2f06a2b0,len:0xc34\r\n"
+                     "load:0x2f06cfb0,len:0x337c\r\n"
+                     "entry 0x2f06a2ba\r\n",
                      reset_cause, rst);
             break;
         default:

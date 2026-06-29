@@ -49,6 +49,7 @@ typedef enum {
     FESP_CHIP_ESP32C61,
     FESP_CHIP_ESP32H2,
     FESP_CHIP_ESP32P4,
+    FESP_CHIP_ESP32S31,
     FESP_CHIP_COUNT
 } fesp_chip_type_t;
 

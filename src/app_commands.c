@@ -1446,6 +1446,19 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:          %lu\n", sec_dl);
         break;
     }
+    case FESP_CHIP_ESP32S31: {
+        DWORD crypt_cnt = READ_EFUSE_BITS(0x34, 7UL << 21) >> 21;
+        DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 20) >> 20;
+        DWORD dl_mode = READ_EFUSE_BITS(0x3C, 1UL << 0) >> 0;
+        DWORD sec_dl = READ_EFUSE_BITS(0x3C, 1UL << 5) >> 5;
+        fwprintf(f,
+                 L"SPI_BOOT_CRYPT_CNT:                0x%02X (%d bits set)\n",
+                 crypt_cnt, COUNT_BITS(crypt_cnt));
+        fwprintf(f, L"DIS_DOWNLOAD_MANUAL_ENCRYPT:       %lu\n", dl_encrypt);
+        fwprintf(f, L"DIS_DOWNLOAD_MODE:                 %lu\n", dl_mode);
+        fwprintf(f, L"ENABLE_SECURITY_DOWNLOAD:          %lu\n", sec_dl);
+        break;
+    }
     case FESP_CHIP_ESP32C61: {
         DWORD crypt_cnt = READ_EFUSE_BITS(0x30, 7UL << 23) >> 23;
         DWORD dl_encrypt = READ_EFUSE_BITS(0x30, 1UL << 14) >> 14;
@@ -1587,6 +1600,30 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         fwprintf(f, L"(JTAG fields not available)\n");
         break;
     }
+    case FESP_CHIP_ESP32S31: {
+        DWORD pad_jtag = READ_EFUSE_BITS(0x30, 1UL << 19) >> 19;
+        DWORD soft_jtag = (READ_EFUSE_BITS(0x30, 7UL << 16) >> 16);
+        DWORD usb_jtag = READ_EFUSE_BITS(0x30, 1UL << 9) >> 9;
+        DWORD force_dl = READ_EFUSE_BITS(0x30, 1UL << 12) >> 12;
+        DWORD usb_print = READ_EFUSE_BITS(0x3C, 1UL << 2) >> 2;
+        DWORD sb_en = READ_EFUSE_BITS(0x3C, 1UL << 2) >> 2;
+        DWORD sb_agg = READ_EFUSE_BITS(0x38, 1UL << 21) >> 21;
+        DWORD revoke0 = READ_EFUSE_BITS(0x34, 1UL << 21) >> 21;
+        DWORD revoke1 = READ_EFUSE_BITS(0x34, 1UL << 22) >> 22;
+        DWORD revoke2 = READ_EFUSE_BITS(0x34, 1UL << 23) >> 23;
+        fwprintf(f, L"DIS_PAD_JTAG:               %lu\n", pad_jtag);
+        fwprintf(f, L"SOFT_DIS_JTAG:              %lu (%d bits set)\n",
+                 soft_jtag, COUNT_BITS(soft_jtag));
+        fwprintf(f, L"DIS_USB_JTAG:               %lu\n", usb_jtag);
+        fwprintf(f, L"DIS_FORCE_DOWNLOAD:         %lu\n", force_dl);
+        fwprintf(f, L"DIS_USB_SERIAL_JTAG_PRINT:  %lu\n", usb_print);
+        fwprintf(f, L"SECURE_BOOT_EN:             %lu\n", sb_en);
+        fwprintf(f, L"SECURE_BOOT_AGGRESSIVE:     %lu\n", sb_agg);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE0:    %lu\n", revoke0);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE1:    %lu\n", revoke1);
+        fwprintf(f, L"SECURE_BOOT_KEY_REVOKE2:    %lu\n", revoke2);
+        break;
+    }
     default:
         fwprintf(f, L"(not available for this chip)\n");
         break;
@@ -1651,6 +1688,15 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         };
         keys = c3c6_keys;
         key_count = 6;
+        break;
+    }
+    case FESP_CHIP_ESP32S31: {
+        static const KEY_INFO s31_keys[] = {
+            {"KEY0", 0x9C, 32}, {"KEY1", 0xBC, 32},  {"KEY2", 0xDC, 32},
+            {"KEY3", 0xFC, 32}, {"KEY4", 0x11C, 32},
+        };
+        keys = s31_keys;
+        key_count = 5;
         break;
     }
     default:

@@ -146,6 +146,13 @@ static const KEY_BLOCK_INFO key_blocks_esp32p4[] = {
 };
 #define KEY_BLOCKS_ESP32P4_COUNT 6
 
+static const KEY_BLOCK_INFO key_blocks_esp32s31[] = {
+    {"KEY0", "XTS-AES-128", 0x9C, 32}, {"KEY1", "User Key 1", 0xBC, 32},
+    {"KEY2", "User Key 2", 0xDC, 32},  {"KEY3", "User Key 3", 0xFC, 32},
+    {"KEY4", "User Key 4", 0x11C, 32},
+};
+#define KEY_BLOCKS_ESP32S31_COUNT 5
+
 /*
  * GetKeyBlocks - Get key blocks for current chip type
  *
@@ -189,6 +196,9 @@ static const KEY_BLOCK_INFO *GetKeyBlocks(int *count)
     case FESP_CHIP_ESP32P4:
         *count = KEY_BLOCKS_ESP32P4_COUNT;
         return key_blocks_esp32p4;
+    case FESP_CHIP_ESP32S31:
+        *count = KEY_BLOCKS_ESP32S31_COUNT;
+        return key_blocks_esp32s31;
     default:
         *count = 0;
         return NULL;
