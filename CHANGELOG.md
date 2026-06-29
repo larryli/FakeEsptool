@@ -4,6 +4,57 @@
 
 ---
 
+## [2026.6.29.0] - 2026-06-29
+
+### 功能增强
+
+- **新增芯片支持（5 款）**：
+  - ESP32-C5：WiFi 6 双频+BT5+802.15.4，RISC-V 单核+LP核 240MHz，支持 40/48MHz 晶振
+  - ESP32-C61：WiFi 6+BT5，RISC-V 单核 160MHz
+  - ESP32-H2：BT5+802.15.4，RISC-V 单核 96MHz，固定 32MHz 晶振
+  - ESP32-P4：高性能 MCU，双核+LP核 400MHz，无无线
+  - ESP32-S31：WiFi 6+BT5.4+802.15.4，双核+LP核 300MHz
+- **晶振频率下拉菜单**：动态填充选项，根据芯片类型显示可用频率
+
+### 重构
+
+- **esptool 协议层重构**：将 `src/esptool/` 迁移至 `src/fesptool/`，新增 HAL 抽象层（`fesptool_hal.c/h`）
+- **设备文件分离**：新增 `device_file.c/h`，将设备文件 I/O 逻辑从 main.c 独立
+- **协议信号处理**：新增 `app_protocol.c/h`，重构串口信号状态机逻辑
+- **函数命名统一**：解压缩、初始化等函数统一为大写开头命名
+- **加密/解压重构**：更新 HAL 接口支持新的上下文结构
+- **日志机制重构**：使用 `FESP_HAL_LOG_HAS_DEBUG` 宏控制调试日志输出
+- **内存管理封装**：新增 `mem.c/h`，封装 Windows Heap API，支持内存泄漏追踪
+- **MD5 实现**：新增 `md5.c/h`，跨平台 MD5 哈希实现
+
+### 单元测试
+
+- 新增 SLIP 协议编码器/解码器测试
+- 新增 MD5 哈希测试（RFC 1321 测试向量）
+- 新增 Flash 存储模拟测试（初始化、读写、擦除、边界条件）
+- 新增 ESP 芯片模拟测试（初始化、关闭、属性访问、MAC 地址）
+- 新增 eFuse 模拟测试（默认状态、加密计数、密钥用途、下载模式）
+- 新增 esptool 协议处理程序测试（初始化/关闭、校验和、SLIP 帧、基本命令）
+
+### 修复
+
+- 修复 ESP32 SPI Flash ID 检测失败（eFuse 控制器地址映射错误拦截 SPI 寄存器写入）
+- 修复 ESP32-C3/C6/S3 的 `write_chip_id_to_efuse` 调用（这些芯片使用 SECURITY_INFO 检测，无需写入 eFuse 0x4C）
+- 修复 ESP32-S31 eFuse BLOCK1 偏移（0x050 而非 0x044）
+- 修正所有芯片启动日志为官方文档/实际硬件捕获值
+- 修复 `Esptool_ProcessFrame` 中的字符类型，使用标准字符类型替代 WCHAR
+- 修复 `Flash_Init` 中 HeapAlloc 参数
+
+### 文档
+
+- 更新 README.md 芯片支持列表（12 款芯片）
+- 更新 REQUIREMENTS.md 芯片支持列表、设备属性描述、晶振频率说明
+- 更新 TODO.md 移除已完成项，修正 ESP32-H21 SPI 基址，将 ESP32-S31 提升为高优先级
+- 更新 DEVELOPMENT.md 架构概览、HAL 接口说明、测试用例说明
+- 更新 API.md 文档以反映新文件和接口变更
+
+---
+
 ## [2026.6.25.0] - 2026-06-25
 
 ### 功能增强

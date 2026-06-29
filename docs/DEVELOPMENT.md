@@ -294,6 +294,11 @@ ctest --test-dir build_tests --build-config Release
 | FESP_CHIP_ESP32C2 | ESP32-C2 |
 | FESP_CHIP_ESP32C3 | ESP32-C3 |
 | FESP_CHIP_ESP32C6 | ESP32-C6 |
+| FESP_CHIP_ESP32C5 | ESP32-C5 |
+| FESP_CHIP_ESP32C61 | ESP32-C61 |
+| FESP_CHIP_ESP32H2 | ESP32-H2 |
+| FESP_CHIP_ESP32P4 | ESP32-P4 |
+| FESP_CHIP_ESP32S31 | ESP32-S31 |
 
 **eFuse 初始化注意事项：**
 - 新增芯片时必须在初始化函数中设置默认芯片版本到 eFuse，否则 esptool 可能禁用 stub flasher
@@ -322,7 +327,7 @@ ctest --test-dir build_tests --build-config Release
 |------|---------|----------|------|
 | ESP8266 | ❌ | ❌ | 芯片不支持 Flash 加密 |
 | ESP32 | ❌ | ✅ | ROM 不支持扩展参数格式 |
-| ESP32-S2/S3/C2/C3/C6 | ✅ | ✅ | |
+| ESP32-S2/S3/C2/C3/C5/C6/C61/H2/P4/S31 | ✅ | ✅ | |
 
 **协议说明**：
 - `FLASH_BEGIN (0x02)` 和 `FLASH_DEFL_BEGIN (0x10)` 支持 `encrypted` 字段

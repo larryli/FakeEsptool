@@ -104,7 +104,7 @@ CAPTION "About FakeEsptool"
 FONT 8, "MS Shell Dlg"
 BEGIN
     ICON            IDI_APP, -1, 10, 10, 20, 20
-    CONTROL         "FakeEsptool v2026.6.25", IDD_APPNAME, "Static", WS_GROUP, 40, 10, 170, 10
+    CONTROL         "FakeEsptool v2026.6.29", IDD_APPNAME, "Static", WS_GROUP, 40, 10, 170, 10
     CONTROL         "Copyright (c) 2026 Larry Li", IDD_COPYRIGHT, "Static", WS_GROUP, 40, 22, 170, 10
     DEFPUSHBUTTON   "OK", IDOK, 85, 78, 50, 14
     CONTROL         "<a href=""https://github.com/larryli/FakeEsptool"">https://github.com/larryli/FakeEsptool</a>", IDD_WEBSITE, "SysLink", WS_TABSTOP, 40, 38, 170, 10
@@ -262,8 +262,8 @@ STRINGTABLE
 }
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 2026,6,25,0
-PRODUCTVERSION 2026,6,25,0
+FILEVERSION 2026,6,29,0
+PRODUCTVERSION 2026,6,29,0
 FILEFLAGSMASK 0x3F
 FILEFLAGS 0x0
 FILEOS VOS__WINDOWS32
@@ -275,10 +275,10 @@ FILESUBTYPE VFT2_UNKNOWN
     BLOCK "040904B0"
     {
       VALUE "FileDescription", "ESP Chip Device Simulator\0"
-      VALUE "FileVersion", "2026.6.25.0\0"
+      VALUE "FileVersion", "2026.6.29.0\0"
       VALUE "LegalCopyright", "Copyright (c) 2025 - 2026 Larry Li\0"
       VALUE "ProductName", "FakeEsptool\0"
-      VALUE "ProductVersion", "2026.6.25.0\0"
+      VALUE "ProductVersion", "2026.6.29.0\0"
     }
   }
   BLOCK "VarFileInfo"
@@ -378,7 +378,7 @@ CAPTION "关于 FakeEsptool"
 FONT 8, "MS Shell Dlg"
 BEGIN
     ICON            IDI_APP, -1, 10, 10, 20, 20
-    CONTROL         "FakeEsptool v2026.6.25", IDD_APPNAME, "Static", WS_GROUP, 40, 10, 170, 10
+    CONTROL         "FakeEsptool v2026.6.29", IDD_APPNAME, "Static", WS_GROUP, 40, 10, 170, 10
     CONTROL         "版权所有 (c) 2026 Larry Li", IDD_COPYRIGHT, "Static", WS_GROUP, 40, 22, 170, 10
     DEFPUSHBUTTON   "确定", IDOK, 85, 78, 50, 14
     CONTROL         "<a href=""https://github.com/larryli/FakeEsptool"">https://github.com/larryli/FakeEsptool</a>", IDD_WEBSITE, "SysLink", WS_TABSTOP, 40, 38, 170, 10
@@ -536,8 +536,8 @@ STRINGTABLE
 }
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 2026,6,25,0
-PRODUCTVERSION 2026,6,25,0
+FILEVERSION 2026,6,29,0
+PRODUCTVERSION 2026,6,29,0
 FILEFLAGSMASK 0x3F
 FILEFLAGS 0x0
 FILEOS VOS__WINDOWS32
@@ -549,10 +549,10 @@ FILESUBTYPE VFT2_UNKNOWN
     BLOCK "080404B0"
     {
       VALUE "FileDescription", "ESP 芯片设备模拟器\0"
-      VALUE "FileVersion", "2026.6.25.0\0"
+      VALUE "FileVersion", "2026.6.29.0\0"
       VALUE "LegalCopyright", "版权所有 (c) 2025 - 2026 Larry Li\0"
       VALUE "ProductName", "FakeEsptool\0"
-      VALUE "ProductVersion", "2026.6.25.0\0"
+      VALUE "ProductVersion", "2026.6.29.0\0"
     }
   }
   BLOCK "VarFileInfo"

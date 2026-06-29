@@ -506,6 +506,7 @@ static bool init_esp32h2(fesp_chip_ctx_t *ctx)
     ctx->efuse_base = FESP_EFUSE_BASE_ESP32H2;
     ctx->efuse_conf_ofs = 0x1CC;
     ctx->efuse_cmd_ofs = 0x1D4;
+    ctx->xtal_freq = FESP_XTAL_FREQ_32M; /* Fixed 32MHz crystal */
 
     return true;
 }
@@ -886,13 +887,16 @@ uint32_t fesp_chip_read_reg(const fesp_chip_ctx_t *ctx, uint32_t addr)
         if (ctx->type == FESP_CHIP_ESP32C3 || ctx->type == FESP_CHIP_ESP32C6 ||
             ctx->type == FESP_CHIP_ESP32S2 || ctx->type == FESP_CHIP_ESP32S3 ||
             ctx->type == FESP_CHIP_ESP32C5 || ctx->type == FESP_CHIP_ESP32C61 ||
-            ctx->type == FESP_CHIP_ESP32H2 || ctx->type == FESP_CHIP_ESP32P4 ||
+            ctx->type == FESP_CHIP_ESP32P4 ||
             ctx->type == FESP_CHIP_ESP32S31) {
             xtal = 40000000;
         } else {
             switch (ctx->xtal_freq) {
             case FESP_XTAL_FREQ_26M:
                 xtal = 26000000;
+                break;
+            case FESP_XTAL_FREQ_32M:
+                xtal = 32000000;
                 break;
             default:
                 xtal = 40000000;
