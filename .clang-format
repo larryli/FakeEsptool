@@ -3,13 +3,5 @@
     IndentWidth: 4,
     TabWidth: 4,
     InsertBraces: true,
-    BreakBeforeBraces: Custom,
-    BraceWrapping: {
-        AfterFunction: true,
-        AfterControlStatement: Never,
-        AfterEnum: false,
-        AfterStruct: false,
-        AfterUnion: false,
-        BeforeElse: false,
-    },
+    BreakBeforeBraces: WebKit,
 }
