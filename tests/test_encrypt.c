@@ -46,16 +46,19 @@ static void test_aes_ecb_nist(void)
     printf("  NIST test vector defined (AES-128-ECB)\n");
     printf("  Key:       ");
     int i;
-    for (i = 0; i < 16; i++)
+    for (i = 0; i < 16; i++) {
         printf("%02X ", nist_key[i]);
+    }
     printf("\n");
     printf("  Plaintext: ");
-    for (i = 0; i < 16; i++)
+    for (i = 0; i < 16; i++) {
         printf("%02X ", nist_plaintext[i]);
+    }
     printf("\n");
     printf("  Expected:  ");
-    for (i = 0; i < 16; i++)
+    for (i = 0; i < 16; i++) {
         printf("%02X ", nist_expected[i]);
+    }
     printf("\n");
 }
 
@@ -90,8 +93,9 @@ static void test_basic_encrypt_decrypt(void)
     /* Debug: output ciphertext */
     printf("  Ciphertext: ");
     int i;
-    for (i = 0; i < 16; i++)
+    for (i = 0; i < 16; i++) {
         printf("%02X ", ciphertext[i]);
+    }
     printf("\n");
 
     /* Test decryption */
@@ -100,14 +104,16 @@ static void test_basic_encrypt_decrypt(void)
 
     /* Debug: output decrypted */
     printf("  Decrypted:  ");
-    for (i = 0; i < 16; i++)
+    for (i = 0; i < 16; i++) {
         printf("%02X ", decrypted[i]);
+    }
     printf("\n");
 
     /* Debug: output expected */
     printf("  Expected:   ");
-    for (i = 0; i < 16; i++)
+    for (i = 0; i < 16; i++) {
         printf("%02X ", plaintext_16[i]);
+    }
     printf("\n");
 
     TEST_ASSERT(memcmp(decrypted, plaintext_16, 16) == 0,

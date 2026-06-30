@@ -6,9 +6,9 @@
 
 #include "../src/fesptool/chip.h"
 #include "../src/fesptool/efuse.h"
+#include "../src/fesptool/esptool.h"
 #include "../src/fesptool/flash.h"
 #include "../src/fesptool/slip.h"
-#include "../src/fesptool/esptool.h"
 #include "hal_test.h"
 #include <stdio.h>
 #include <string.h>
@@ -38,8 +38,9 @@ static int build_frame(const uint8_t *pkt, int pkt_len, uint8_t *out,
 static int build_request(uint8_t cmd, uint32_t value, const uint8_t *data,
                          uint16_t data_len, uint8_t *pkt, int pkt_max)
 {
-    if (8 + data_len > pkt_max)
+    if (8 + data_len > pkt_max) {
         return -1;
+    }
 
     pkt[0] = 0x00; /* direction = request */
     pkt[1] = cmd;
@@ -50,13 +51,15 @@ static int build_request(uint8_t cmd, uint32_t value, const uint8_t *data,
     pkt[6] = (uint8_t)((value >> 16) & 0xFF);
     pkt[7] = (uint8_t)((value >> 24) & 0xFF);
 
-    if (data_len > 0 && data)
+    if (data_len > 0 && data) {
         memcpy(pkt + 8, data, data_len);
+    }
 
     /* Append checksum */
     uint8_t checksum = 0;
-    for (int i = 0; i < 8 + data_len; i++)
+    for (int i = 0; i < 8 + data_len; i++) {
         checksum ^= pkt[i];
+    }
     pkt[8 + data_len] = checksum;
 
     return 8 + data_len + 1;
@@ -357,8 +360,7 @@ static void test_get_security_info(void)
 
     feed_request(&ctx, FESP_CMD_GET_SECURITY_INFO, 0, NULL, 0);
 
-    TEST_ASSERT(stub_get_resp_len() > 0,
-                "GET_SECURITY_INFO produces response");
+    TEST_ASSERT(stub_get_resp_len() > 0, "GET_SECURITY_INFO produces response");
 
     fesp_close(&ctx);
     fesp_flash_close(&flash);
@@ -396,8 +398,8 @@ static void test_erase_flash(void)
     /* Flash should be all 0xFF after erase */
     uint8_t rbuf[4] = {0};
     fesp_flash_read(&flash, 0, rbuf, 4);
-    bool all_ff = (rbuf[0] == 0xFF && rbuf[1] == 0xFF &&
-                   rbuf[2] == 0xFF && rbuf[3] == 0xFF);
+    bool all_ff = (rbuf[0] == 0xFF && rbuf[1] == 0xFF && rbuf[2] == 0xFF &&
+                   rbuf[3] == 0xFF);
     TEST_ASSERT(all_ff, "Flash erased to 0xFF");
 
     fesp_close(&ctx);

@@ -767,8 +767,9 @@ static void HandlePurpose(HWND hDlg, HWND hList)
         /* ESP32-S3/C3/C6 KEY5: disable XTS_AES purposes */
         if (isS3Key5 && (p == FESP_KEY_PURPOSE_XTS_AES_128_KEY ||
                          p == FESP_KEY_PURPOSE_XTS_AES_256_KEY_1 ||
-                         p == FESP_KEY_PURPOSE_XTS_AES_256_KEY_2))
+                         p == FESP_KEY_PURPOSE_XTS_AES_256_KEY_2)) {
             flags |= MF_DISABLED;
+        }
         AppendMenuW(hMenu, flags, (UINT_PTR)(p + 1), GetPurposeName(p));
     }
 

@@ -25,8 +25,9 @@ void *fesp_hal_mem_alloc(DWORD size) { return malloc(size); }
 void *fesp_hal_mem_zero_alloc(DWORD size)
 {
     void *p = malloc(size);
-    if (p)
+    if (p) {
         memset(p, 0, size);
+    }
     return p;
 }
 
@@ -142,8 +143,9 @@ int fesp_hal_encrypt_data(fesp_hal_encrypt_ctx_t *ctx, const BYTE *in_buf,
                           BYTE *out_buf, DWORD len)
 {
     (void)ctx;
-    if (in_buf && out_buf && len > 0)
+    if (in_buf && out_buf && len > 0) {
         memcpy(out_buf, in_buf, len);
+    }
     return 0;
 }
 
@@ -151,8 +153,9 @@ int fesp_hal_decrypt_data(fesp_hal_encrypt_ctx_t *ctx, const BYTE *in_buf,
                           BYTE *out_buf, DWORD len)
 {
     (void)ctx;
-    if (in_buf && out_buf && len > 0)
+    if (in_buf && out_buf && len > 0) {
         memcpy(out_buf, in_buf, len);
+    }
     return 0;
 }
 

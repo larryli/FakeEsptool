@@ -19,8 +19,9 @@ void MD5_Calc(const BYTE *data, DWORD len, BYTE digest[MD5_DIGEST_SIZE])
     memset(digest, 0, MD5_DIGEST_SIZE);
 
     if (!CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_FULL,
-                             CRYPT_VERIFYCONTEXT))
+                             CRYPT_VERIFYCONTEXT)) {
         return;
+    }
 
     if (!CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash)) {
         CryptReleaseContext(hProv, 0);

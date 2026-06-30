@@ -122,11 +122,9 @@ static void test_key_purpose_esp32(void)
     TEST_ASSERT(fesp_efuse_get_key_purpose(&ctx, 0) ==
                     FESP_KEY_PURPOSE_XTS_AES_128_KEY,
                 "BLOCK0 → XTS_AES_128");
-    TEST_ASSERT(fesp_efuse_get_key_purpose(&ctx, 1) ==
-                    FESP_KEY_PURPOSE_USER,
+    TEST_ASSERT(fesp_efuse_get_key_purpose(&ctx, 1) == FESP_KEY_PURPOSE_USER,
                 "BLOCK1 → USER");
-    TEST_ASSERT(fesp_efuse_get_key_purpose(&ctx, 2) ==
-                    FESP_KEY_PURPOSE_USER,
+    TEST_ASSERT(fesp_efuse_get_key_purpose(&ctx, 2) == FESP_KEY_PURPOSE_USER,
                 "BLOCK2 → USER");
     fesp_chip_close(&ctx);
 }
@@ -155,8 +153,7 @@ static void test_key_purpose_esp32s3_set(void)
                 "BLOCK0 → XTS_AES_256_KEY_1");
 
     fesp_efuse_set_key_purpose(&ctx, 2, FESP_KEY_PURPOSE_HMAC_UP);
-    TEST_ASSERT(fesp_efuse_get_key_purpose(&ctx, 2) ==
-                    FESP_KEY_PURPOSE_HMAC_UP,
+    TEST_ASSERT(fesp_efuse_get_key_purpose(&ctx, 2) == FESP_KEY_PURPOSE_HMAC_UP,
                 "BLOCK2 → HMAC_UP");
     fesp_chip_close(&ctx);
 }
@@ -166,11 +163,9 @@ static void test_key_purpose_out_of_range(void)
     printf("\nTest: Key purpose out of range\n");
 
     fesp_chip_ctx_t ctx = init_chip(FESP_CHIP_ESP32S3);
-    TEST_ASSERT(fesp_efuse_get_key_purpose(&ctx, -1) ==
-                    FESP_KEY_PURPOSE_USER,
+    TEST_ASSERT(fesp_efuse_get_key_purpose(&ctx, -1) == FESP_KEY_PURPOSE_USER,
                 "Block -1 → USER");
-    TEST_ASSERT(fesp_efuse_get_key_purpose(&ctx, 6) ==
-                    FESP_KEY_PURPOSE_USER,
+    TEST_ASSERT(fesp_efuse_get_key_purpose(&ctx, 6) == FESP_KEY_PURPOSE_USER,
                 "Block 6 → USER");
     fesp_chip_close(&ctx);
 }
@@ -232,8 +227,8 @@ static void test_apply_block0_defaults_esp32(void)
     fesp_chip_ctx_t ctx = init_chip(FESP_CHIP_ESP32);
     fesp_efuse_apply_block0_defaults(&ctx);
     /* After defaults, some basic bits should be set */
-    TEST_ASSERT(ctx.efuse[0] != 0 || ctx.efuse[1] != 0 ||
-                    ctx.efuse[2] != 0 || ctx.efuse[3] != 0,
+    TEST_ASSERT(ctx.efuse[0] != 0 || ctx.efuse[1] != 0 || ctx.efuse[2] != 0 ||
+                    ctx.efuse[3] != 0,
                 "Block0 not all zeros after defaults");
     fesp_chip_close(&ctx);
 }

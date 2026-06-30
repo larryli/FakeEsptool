@@ -4,12 +4,12 @@
  * Parses SLIP frames, routes commands, and sends responses.
  */
 
+#include "esptool.h"
 #include "../fesptool_hal.h"
 #include "chip.h"
 #include "efuse.h"
 #include "flash.h"
 #include "slip.h"
-#include "esptool.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -275,7 +275,8 @@ static uint32_t defl_flush_buffer(fesp_ctx_t *ctx)
         return FESP_FAIL;
     }
 
-    uint32_t decomp_size = (uint32_t)fesp_hal_deflate_get_output_pos(&deflate_ctx);
+    uint32_t decomp_size =
+        (uint32_t)fesp_hal_deflate_get_output_pos(&deflate_ctx);
     FESP_HAL_LOGI(TAG, "  Decompressed %lu -> %lu bytes at offset 0x%08lX",
                   ctx->defl_buf_size, decomp_size, ctx->defl_offset);
 
@@ -411,7 +412,7 @@ void fesp_send_response_ex(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
 #ifdef __POCC__
 #pragma warn(push)
 // disable Pelles C warning 2802: Possible out-of-bounds store.
-#pragma warn(disable: 2802)
+#pragma warn(disable : 2802)
 #endif
     if (data && data_len > 0) {
         memcpy(&resp[pos], data, data_len);
@@ -798,15 +799,14 @@ static void handle_flash_defl_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 #if FESP_HAL_LOG_HAS_DEBUG
     /* Log key availability */
     int key_len = 0;
-    int key_offset =
-        fesp_efuse_get_encryption_key_offset(ctx->chip, &key_len);
-    FESP_HAL_LOGD(TAG, "efuse_size=%d", key_offset, key_len,
-                    ctx->chip->efuse, ctx->chip->efuse_size);
+    int key_offset = fesp_efuse_get_encryption_key_offset(ctx->chip, &key_len);
+    FESP_HAL_LOGD(TAG, "efuse_size=%d", key_offset, key_len, ctx->chip->efuse,
+                  ctx->chip->efuse_size);
     if (key_offset >= 0 && ctx->chip->efuse &&
         key_offset + key_len <= ctx->chip->efuse_size) {
         const uint8_t *key = &ctx->chip->efuse[key_offset];
-        FESP_HAL_LOGD(TAG, "%02X %02X %02X %02X %02X", key[0], key[1],
-                        key[2], key[3], key[4], key[5], key[6], key[7]);
+        FESP_HAL_LOGD(TAG, "%02X %02X %02X %02X %02X", key[0], key[1], key[2],
+                      key[3], key[4], key[5], key[6], key[7]);
     } else {
         FESP_HAL_LOGD(TAG, "FLASH_DEFL_BEGIN: No encryption key available");
     }
@@ -1757,11 +1757,11 @@ bool fesp_process_frame(fesp_ctx_t *ctx, const uint8_t *frame, int frame_len)
         /* ROM returns ROM_INVALID_RECV_MSG (0x05) for unsupported commands */
         FESP_HAL_LOGI(TAG, "  Unknown command: 0x%02X", pkt->command);
         /* Response format: [status_byte_1 != 0][ROM_INVALID_RECV_MSG] +
-            * padding */
+         * padding */
         uint8_t err_data[4] = {0x01, 0x05, 0x00, 0x00};
         uint8_t status_len = FESP_STATUS_LEN(ctx);
         fesp_send_response_ex(ctx, pkt->command, pkt->value, FESP_OK,
-                                status_len, err_data, 4);
+                              status_len, err_data, 4);
         return false;
     }
 

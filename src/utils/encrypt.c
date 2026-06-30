@@ -283,10 +283,11 @@ static void aes_ecb_encrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
 
     /* Final round: SubBytes, ShiftRows, AddRoundKey (no MixColumns) */
     /* SubBytes */
-    for (row = 0; row < 4; row++)
+    for (row = 0; row < 4; row++) {
         for (col = 0; col < 4; col++) {
             state[row][col] = sbox[state[row][col]];
         }
+    }
 
     /* ShiftRows */
     BYTE temp;
@@ -373,10 +374,11 @@ static void aes_ecb_decrypt(AES_CTX *ctx, const BYTE in[16], BYTE out[16])
     /* Rounds nr-1 to 1 */
     for (round = ctx->nr - 1; round > 0; round--) {
         /* AddRoundKey */
-        for (col = 0; col < 4; col++)
+        for (col = 0; col < 4; col++) {
             for (row = 0; row < 4; row++) {
                 state[row][col] ^= ctx->round_key[round * 16 + row + col * 4];
             }
+        }
 
         /* InvMixColumns */
         for (col = 0; col < 4; col++) {
@@ -453,8 +455,9 @@ static void gf128_mul_alpha(BYTE block[16])
         carry = new_carry;
     }
 
-    if (carry)
+    if (carry) {
         block[0] ^= 0x87; /* x^128 + x^7 + x^2 + x + 1 */
+    }
 }
 
 /*

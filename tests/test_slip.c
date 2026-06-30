@@ -67,7 +67,8 @@ static void test_encode_escape_end(void)
 
     int len = fesp_slip_encode(data, 3, out, sizeof(out));
 
-    TEST_ASSERT(len == 6, "Encoded length is 6 (END + 1 + ESC+ESC_END + 1 + END)");
+    TEST_ASSERT(len == 6,
+                "Encoded length is 6 (END + 1 + ESC+ESC_END + 1 + END)");
     TEST_ASSERT(out[0] == 0xC0, "Starts with END marker");
     TEST_ASSERT(out[1] == 0x01, "First data byte");
     TEST_ASSERT(out[2] == 0xDB, "Escape byte for 0xC0");
@@ -159,7 +160,8 @@ static void test_encode_truncation(void)
     uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05};
     uint8_t out[5] = {0};
 
-    /* Buffer: END(1) + 3 data bytes + END(1) = 5 total, 2 bytes silently dropped */
+    /* Buffer: END(1) + 3 data bytes + END(1) = 5 total, 2 bytes silently
+     * dropped */
     int len = fesp_slip_encode(data, 5, out, sizeof(out));
 
     TEST_ASSERT(len == 5, "Returns 5 (END + 3 data + END)");
@@ -188,9 +190,8 @@ static void test_decode_simple(void)
     TEST_ASSERT(complete, "Frame is complete");
     TEST_ASSERT(fesp_slip_is_complete(&ctx), "is_complete returns true");
     TEST_ASSERT(fesp_slip_get_length(&ctx) == 3, "Payload length is 3");
-    TEST_ASSERT(
-        memcmp(fesp_slip_get_payload(&ctx), "\x01\x02\x03", 3) == 0,
-        "Payload matches");
+    TEST_ASSERT(memcmp(fesp_slip_get_payload(&ctx), "\x01\x02\x03", 3) == 0,
+                "Payload matches");
 }
 
 /* Test D2: Decode frame with escaped 0xC0 */
@@ -261,9 +262,8 @@ static void test_decode_multiple_frames(void)
 
     TEST_ASSERT(complete, "Frame 1 complete");
     TEST_ASSERT(fesp_slip_get_length(&ctx) == 2, "Frame 1 length is 2");
-    TEST_ASSERT(
-        memcmp(fesp_slip_get_payload(&ctx), "\x01\x02", 2) == 0,
-        "Frame 1 payload matches");
+    TEST_ASSERT(memcmp(fesp_slip_get_payload(&ctx), "\x01\x02", 2) == 0,
+                "Frame 1 payload matches");
 
     /* Reset and decode frame 2 */
     fesp_slip_reset(&ctx);
@@ -273,9 +273,8 @@ static void test_decode_multiple_frames(void)
 
     TEST_ASSERT(complete, "Frame 2 complete");
     TEST_ASSERT(fesp_slip_get_length(&ctx) == 3, "Frame 2 length is 3");
-    TEST_ASSERT(
-        memcmp(fesp_slip_get_payload(&ctx), "\x03\x04\x05", 3) == 0,
-        "Frame 2 payload matches");
+    TEST_ASSERT(memcmp(fesp_slip_get_payload(&ctx), "\x03\x04\x05", 3) == 0,
+                "Frame 2 payload matches");
 }
 
 /* Test D6: Decode frame with multiple escapes */
@@ -330,9 +329,8 @@ static void test_decode_noise_before_frame(void)
 
     TEST_ASSERT(complete, "Frame complete after noise");
     TEST_ASSERT(fesp_slip_get_length(&ctx) == 2, "Payload length is 2");
-    TEST_ASSERT(
-        memcmp(fesp_slip_get_payload(&ctx), "\x01\x02", 2) == 0,
-        "Payload matches");
+    TEST_ASSERT(memcmp(fesp_slip_get_payload(&ctx), "\x01\x02", 2) == 0,
+                "Payload matches");
 }
 
 /* Test D9: Decode incomplete frame (no closing END) */
@@ -411,9 +409,8 @@ static void test_roundtrip_simple(void)
 
     TEST_ASSERT(complete, "Decode complete");
     TEST_ASSERT(fesp_slip_get_length(&ctx) == 5, "Length matches");
-    TEST_ASSERT(
-        memcmp(fesp_slip_get_payload(&ctx), original, 5) == 0,
-        "Payload matches original");
+    TEST_ASSERT(memcmp(fesp_slip_get_payload(&ctx), original, 5) == 0,
+                "Payload matches original");
 }
 
 /* Test R2: Encode then decode data with all special bytes */
@@ -433,9 +430,8 @@ static void test_roundtrip_special_bytes(void)
 
     TEST_ASSERT(complete, "Decode complete");
     TEST_ASSERT(fesp_slip_get_length(&ctx) == 6, "Length matches");
-    TEST_ASSERT(
-        memcmp(fesp_slip_get_payload(&ctx), original, 6) == 0,
-        "Payload matches original");
+    TEST_ASSERT(memcmp(fesp_slip_get_payload(&ctx), original, 6) == 0,
+                "Payload matches original");
 }
 
 /* Test R3: Round-trip empty data (edge case: decoder requires payload) */
@@ -474,9 +470,8 @@ static void test_roundtrip_only_special(void)
 
     TEST_ASSERT(complete, "Decode complete");
     TEST_ASSERT(fesp_slip_get_length(&ctx) == 6, "Length matches");
-    TEST_ASSERT(
-        memcmp(fesp_slip_get_payload(&ctx), original, 6) == 0,
-        "Payload matches original");
+    TEST_ASSERT(memcmp(fesp_slip_get_payload(&ctx), original, 6) == 0,
+                "Payload matches original");
 }
 
 /* ========================================================================

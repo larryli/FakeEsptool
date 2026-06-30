@@ -36,7 +36,8 @@ static void PopulateXtalFreqs(HWND hXtal, fesp_chip_type_t chip, BYTE curXtal)
         SendMessageW(hXtal, CB_ADDSTRING, 0, (LPARAM)L"48MHz");
         EnableWindow(hXtal, TRUE);
         /* Map: 40MHz=index0, 48MHz=index1; curXtal 0->0, 2->1 */
-        SendMessageW(hXtal, CB_SETCURSEL, curXtal == FESP_XTAL_FREQ_48M ? 1 : 0, 0);
+        SendMessageW(hXtal, CB_SETCURSEL, curXtal == FESP_XTAL_FREQ_48M ? 1 : 0,
+                     0);
         break;
     case FESP_CHIP_ESP32H2:
         /* Fixed 32MHz */
@@ -154,11 +155,13 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
             case FESP_CHIP_ESP32:
             case FESP_CHIP_ESP32C2:
                 /* index 0=40MHz, 1=26MHz */
-                xtalFreq = (xtalIdx == 1) ? FESP_XTAL_FREQ_26M : FESP_XTAL_FREQ_40M;
+                xtalFreq =
+                    (xtalIdx == 1) ? FESP_XTAL_FREQ_26M : FESP_XTAL_FREQ_40M;
                 break;
             case FESP_CHIP_ESP32C5:
                 /* index 0=40MHz, 1=48MHz */
-                xtalFreq = (xtalIdx == 1) ? FESP_XTAL_FREQ_48M : FESP_XTAL_FREQ_40M;
+                xtalFreq =
+                    (xtalIdx == 1) ? FESP_XTAL_FREQ_48M : FESP_XTAL_FREQ_40M;
                 break;
             case FESP_CHIP_ESP32H2:
                 xtalFreq = FESP_XTAL_FREQ_32M;

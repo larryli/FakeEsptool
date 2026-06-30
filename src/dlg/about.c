@@ -74,9 +74,10 @@ INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
         break;
 
     case WM_NOTIFY:
-        if (((NMHDR *)lParam)->code == NM_CLICK)
+        if (((NMHDR *)lParam)->code == NM_CLICK) {
             ShellExecute(NULL, L"open", ((PNMLINK)lParam)->item.szUrl, NULL,
                          NULL, SW_SHOW);
+        }
         break;
     }
     return FALSE;

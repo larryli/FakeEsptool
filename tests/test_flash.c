@@ -286,8 +286,9 @@ static void test_calc_md5(void)
 
     /* Write known data */
     uint8_t wdata[16];
-    for (int i = 0; i < 16; i++)
+    for (int i = 0; i < 16; i++) {
         wdata[i] = (uint8_t)i;
+    }
     fesp_flash_write(&ctx, 0, wdata, 16);
 
     uint8_t md5_a[16] = {0};
@@ -303,7 +304,8 @@ static void test_calc_md5(void)
     uint8_t md5_c[16] = {0};
     fesp_flash_calc_md5(&ctx, 16, 16, md5_c);
 
-    TEST_ASSERT(memcmp(md5_a, md5_c, 16) != 0, "Different region → different MD5");
+    TEST_ASSERT(memcmp(md5_a, md5_c, 16) != 0,
+                "Different region → different MD5");
 
     fesp_flash_close(&ctx);
 }

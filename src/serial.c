@@ -175,9 +175,10 @@ BOOL Serial_EnumPorts(HWND hCombo)
                     int idx =
                         (int)SendMessageW(hCombo, CB_INSERTSTRING, (WPARAM)-1,
                                           (LPARAM)items[i].text);
-                    if (idx >= 0)
+                    if (idx >= 0) {
                         SendMessageW(hCombo, CB_SETITEMDATA, idx,
                                      items[i].portIdx);
+                    }
                 }
 
                 HeapFree(GetProcessHeap(), 0, items);

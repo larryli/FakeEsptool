@@ -60,8 +60,7 @@ static void test_rfc1321_empty(void)
 
 static void test_rfc1321_a(void)
 {
-    test_hash("a", 1, "0cc175b9c0f1b6a831c399e269772661",
-              "RFC 1321: \"a\"");
+    test_hash("a", 1, "0cc175b9c0f1b6a831c399e269772661", "RFC 1321: \"a\"");
 }
 
 static void test_rfc1321_abc(void)
@@ -85,18 +84,15 @@ static void test_rfc1321_lowercase(void)
 
 static void test_rfc1321_alphanumeric(void)
 {
-    test_hash(
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", 62,
-        "d174ab98d277d9f5a5611c2c9f419d9f",
-        "RFC 1321: alphanumeric");
+    test_hash("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+              62, "d174ab98d277d9f5a5611c2c9f419d9f", "RFC 1321: alphanumeric");
 }
 
 static void test_rfc1321_digits(void)
 {
     test_hash("1234567890123456789012345678901234567890123456789012345678901234"
               "5678901234567890",
-              80, "57edf4a22be3c955ac49da2e2107b67a",
-              "RFC 1321: digits");
+              80, "57edf4a22be3c955ac49da2e2107b67a", "RFC 1321: digits");
 }
 
 /* Binary test vectors from RFC 1321 §A.5 */

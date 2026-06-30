@@ -534,10 +534,18 @@ void UpdateStatusBar(void)
         /* Tooltip: "40MHz AA:BB:CC:DD:EE:FF" */
         const char *xtal;
         switch (g_chip.xtal_freq) {
-        case FESP_XTAL_FREQ_26M: xtal = "26MHz"; break;
-        case FESP_XTAL_FREQ_48M: xtal = "48MHz"; break;
-        case FESP_XTAL_FREQ_32M: xtal = "32MHz"; break;
-        default:                 xtal = "40MHz"; break;
+        case FESP_XTAL_FREQ_26M:
+            xtal = "26MHz";
+            break;
+        case FESP_XTAL_FREQ_48M:
+            xtal = "48MHz";
+            break;
+        case FESP_XTAL_FREQ_32M:
+            xtal = "32MHz";
+            break;
+        default:
+            xtal = "40MHz";
+            break;
         }
         const BYTE *mac = fesp_chip_get_mac(&g_chip);
         WCHAR tipBuf[64];
@@ -1332,10 +1340,18 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     /* Get xtal freq */
     const WCHAR *xtalStr;
     switch (snap->chip.xtal_freq) {
-    case FESP_XTAL_FREQ_26M: xtalStr = L"26MHz"; break;
-    case FESP_XTAL_FREQ_48M: xtalStr = L"48MHz"; break;
-    case FESP_XTAL_FREQ_32M: xtalStr = L"32MHz"; break;
-    default:                 xtalStr = L"40MHz"; break;
+    case FESP_XTAL_FREQ_26M:
+        xtalStr = L"26MHz";
+        break;
+    case FESP_XTAL_FREQ_48M:
+        xtalStr = L"48MHz";
+        break;
+    case FESP_XTAL_FREQ_32M:
+        xtalStr = L"32MHz";
+        break;
+    default:
+        xtalStr = L"40MHz";
+        break;
     }
     fwprintf(f, L"XTAL Freq:  %ls\n\n", xtalStr);
 
@@ -1575,8 +1591,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         DWORD force_dl = READ_EFUSE_BITS(0x30, 1UL << 12) >> 12;
         DWORD usb_print = READ_EFUSE_BITS(0x3C, 1UL << 2) >> 2;
         DWORD sb_en_c5 = (g_chip.type == FESP_CHIP_ESP32C5)
-                              ? READ_EFUSE_BITS(0x38, 1UL << 25) >> 25
-                              : READ_EFUSE_BITS(0x34, 1UL << 26) >> 26;
+                             ? READ_EFUSE_BITS(0x38, 1UL << 25) >> 25
+                             : READ_EFUSE_BITS(0x34, 1UL << 26) >> 26;
         DWORD sb_agg = READ_EFUSE_BITS(0x38, 1UL << 21) >> 21;
         DWORD revoke0 = READ_EFUSE_BITS(0x34, 1UL << 21) >> 21;
         DWORD revoke1 = READ_EFUSE_BITS(0x34, 1UL << 22) >> 22;
@@ -1788,8 +1804,9 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         for (DWORD j = 0; j < 16; j++) {
             if (i + j < snap->efuseSize) {
                 fwprintf(f, L"%02X ", snap->efuse[i + j]);
-            } else
+            } else {
                 fwprintf(f, L"   ");
+            }
             if (j == 7) {
                 fwprintf(f, L" ");
             }
@@ -1818,8 +1835,9 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
         for (DWORD j = 0; j < 16; j++) {
             if (i + j < snap->flashSize) {
                 fwprintf(f, L"%02X ", snap->flashData[i + j]);
-            } else
+            } else {
                 fwprintf(f, L"   ");
+            }
             if (j == 7) {
                 fwprintf(f, L" ");
             }

@@ -521,7 +521,8 @@ static bool init_esp32p4(fesp_chip_ctx_t *ctx)
     }
     write_mac_at_0x44(ctx);
 
-    /* ESP32-P4: no write_chip_id_to_efuse needed (uses SECURITY_INFO detection). */
+    /* ESP32-P4: no write_chip_id_to_efuse needed (uses SECURITY_INFO
+     * detection). */
 
     ctx->efuse_base = FESP_EFUSE_BASE_ESP32P4;
     ctx->efuse_conf_ofs = 0x1CC;
@@ -854,13 +855,15 @@ uint32_t fesp_chip_read_reg(const fesp_chip_ctx_t *ctx, uint32_t addr)
     /* 1. eFuse read (using cached base address) */
     if (ctx->efuse_base != 0) {
         if (try_read_efuse32(ctx, ctx->efuse_base, (uint32_t)ctx->efuse_size,
-                             addr, &val))
+                             addr, &val)) {
             return val;
+        }
         /* ESP32 special: EFUSE_BASE (0x3FF00000) is also valid access path */
         if (ctx->type == FESP_CHIP_ESP32) {
             if (try_read_efuse32(ctx, FESP_EFUSE_BASE_ESP32,
-                                 (uint32_t)ctx->efuse_size, addr, &val))
+                                 (uint32_t)ctx->efuse_size, addr, &val)) {
                 return val;
+            }
         }
     }
 
@@ -887,8 +890,7 @@ uint32_t fesp_chip_read_reg(const fesp_chip_ctx_t *ctx, uint32_t addr)
         if (ctx->type == FESP_CHIP_ESP32C3 || ctx->type == FESP_CHIP_ESP32C6 ||
             ctx->type == FESP_CHIP_ESP32S2 || ctx->type == FESP_CHIP_ESP32S3 ||
             ctx->type == FESP_CHIP_ESP32C5 || ctx->type == FESP_CHIP_ESP32C61 ||
-            ctx->type == FESP_CHIP_ESP32P4 ||
-            ctx->type == FESP_CHIP_ESP32S31) {
+            ctx->type == FESP_CHIP_ESP32P4 || ctx->type == FESP_CHIP_ESP32S31) {
             xtal = 40000000;
         } else {
             switch (ctx->xtal_freq) {
@@ -905,8 +907,9 @@ uint32_t fesp_chip_read_reg(const fesp_chip_ctx_t *ctx, uint32_t addr)
         }
         if (ctx->type == FESP_CHIP_ESP8266) {
             return (2 * xtal) / 115200;
-        } else
+        } else {
             return xtal / 115200;
+        }
     }
 
     /* 5. SPI register read */
@@ -947,16 +950,16 @@ bool fesp_chip_write_reg(fesp_chip_ctx_t *ctx, uint32_t addr, uint32_t val)
 
         if (ctx->type == FESP_CHIP_ESP32) {
             return fesp_chip_write_reg_esp32(ctx, offset, val);
-        } else
+        } else {
             return fesp_chip_write_reg_modern(ctx, offset, val);
+        }
     }
 
     /* 1b. ESP32: eFuse controller PGM_DATA writes at EFUSE_BASE (0x3FF00000).
        espefuse sends PGM_DATA writes to this address range via the ROM
        bootloader. Same offset layout as EFUSE_RD_REG_BASE. */
     if (ctx->type == FESP_CHIP_ESP32 && ctx->efuse_conf_ofs != 0 &&
-        addr >= FESP_EFUSE_BASE_ESP32 &&
-        addr < FESP_EFUSE_BASE_ESP32 + 0x100) {
+        addr >= FESP_EFUSE_BASE_ESP32 && addr < FESP_EFUSE_BASE_ESP32 + 0x100) {
         int offset = (int)(addr - FESP_EFUSE_BASE_ESP32);
         return fesp_chip_write_reg_esp32(ctx, offset, val);
     }
@@ -1164,7 +1167,8 @@ const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx,
         case FESP_CHIP_ESP32:
             snprintf(buf, buf_size,
                      "ets Jun  8 2016 00:22:57\r\n"
-                     "rst:0x%02X (%s),boot:0x3 (DOWNLOAD_BOOT(UART0/UART1/SDIO_REI_REO_V2))\r\n"
+                     "rst:0x%02X (%s),boot:0x3 "
+                     "(DOWNLOAD_BOOT(UART0/UART1/SDIO_REI_REO_V2))\r\n"
                      "waiting for download\r\n",
                      reset_cause, rst);
             break;
@@ -1276,7 +1280,8 @@ const char *fesp_chip_get_boot_message(const fesp_chip_ctx_t *ctx,
             snprintf(buf, buf_size,
                      "rst:0x%02X (%s),boot:0x13 (SPI_FAST_FLASH_BOOT)\r\n"
                      "configsip: 0, SPIWP:0xee\r\n"
-                     "clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00\r\n"
+                     "clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:"
+                     "0x00,wp_drv:0x00\r\n"
                      "mode:DIO, clock div:2\r\n"
                      "load:0x3fff0030,len:5884\r\n"
                      "ho 0 tail 12 room 4\r\n"

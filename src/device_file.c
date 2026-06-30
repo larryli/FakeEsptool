@@ -56,9 +56,10 @@ BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
 
     /* eFuse (variable) */
     ok = ok && WriteFile(hFile, &efuseSize, 4, &written, NULL) && written == 4;
-    if (efuseSize > 0 && chip->efuse)
+    if (efuseSize > 0 && chip->efuse) {
         ok = ok && WriteFile(hFile, chip->efuse, efuseSize, &written, NULL) &&
              written == efuseSize;
+    }
 
     /* Flash data (variable) */
     if (flashSize > 0) {

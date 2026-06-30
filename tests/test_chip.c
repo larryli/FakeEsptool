@@ -31,9 +31,9 @@ static void test_init_all_chip_types(void)
 {
     printf("\nTest: Init all chip types\n");
 
-    fesp_chip_type_t types[] = {FESP_CHIP_ESP8266,   FESP_CHIP_ESP32,
-                                FESP_CHIP_ESP32S2,    FESP_CHIP_ESP32S3,
-                                FESP_CHIP_ESP32C2,    FESP_CHIP_ESP32C3,
+    fesp_chip_type_t types[] = {FESP_CHIP_ESP8266, FESP_CHIP_ESP32,
+                                FESP_CHIP_ESP32S2, FESP_CHIP_ESP32S3,
+                                FESP_CHIP_ESP32C2, FESP_CHIP_ESP32C3,
                                 FESP_CHIP_ESP32C6};
 
     for (int i = 0; i < 7; i++) {
@@ -243,8 +243,8 @@ static void test_boot_message_normal(void)
     fesp_chip_ctx_t ctx;
     fesp_chip_init(&ctx, FESP_CHIP_ESP32);
     char buf[256] = {0};
-    const char *msg = fesp_chip_get_boot_message(&ctx, false, 0, buf,
-                                                 sizeof(buf));
+    const char *msg =
+        fesp_chip_get_boot_message(&ctx, false, 0, buf, sizeof(buf));
     TEST_ASSERT(msg != NULL, "Boot message not NULL");
     TEST_ASSERT(strlen(msg) > 0, "Boot message not empty");
     fesp_chip_close(&ctx);
@@ -257,8 +257,8 @@ static void test_boot_message_download(void)
     fesp_chip_ctx_t ctx;
     fesp_chip_init(&ctx, FESP_CHIP_ESP32);
     char buf[256] = {0};
-    const char *msg = fesp_chip_get_boot_message(&ctx, true, 0, buf,
-                                                 sizeof(buf));
+    const char *msg =
+        fesp_chip_get_boot_message(&ctx, true, 0, buf, sizeof(buf));
     TEST_ASSERT(msg != NULL, "Download message not NULL");
     TEST_ASSERT(strlen(msg) > 0, "Download message not empty");
     fesp_chip_close(&ctx);

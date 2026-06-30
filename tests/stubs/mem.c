@@ -12,8 +12,9 @@ void *Mem_Alloc(unsigned long size) { return malloc(size); }
 void *Mem_ZeroAlloc(unsigned long size)
 {
     void *p = malloc(size);
-    if (p)
+    if (p) {
         memset(p, 0, size);
+    }
     return p;
 }
 
