@@ -62,3 +62,6 @@ Thumbs.db
 
 # test data
 /test-data/
+
+# AI
+/.mimocode/

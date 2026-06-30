@@ -15,10 +15,6 @@
 extern fesp_ctx_t g_esptool;
 extern fesp_chip_ctx_t g_chip;
 
-#if ENABLE_TRACE
-static const char *TAG = "PROTO";
-#endif
-
 /* Signal state for download mode detection */
 static BOOL g_prev_dsr = FALSE;
 static BOOL g_prev_cts = FALSE;
