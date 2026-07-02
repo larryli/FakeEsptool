@@ -32,7 +32,7 @@ IDR_MAIN_MENU MENUEX
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "Device &Properties...", IDM_DEVICE_PROPS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
-    MENUITEM "E&xit                Alt+F4", IDM_EXIT, 0, 0
+    MENUITEM "E&xit", IDM_EXIT, 0, 0
   }
   POPUP "&Serial", 0, 0, 0
   {
@@ -175,8 +175,6 @@ STRINGTABLE
 STRINGTABLE
 {
     IDS_MSG_CONN_TITLE  "Connection"
-    IDS_MSG_CONFIRM_EXIT "Serial port is connected. Are you sure you want to exit?"
-    IDS_MSG_CONFIRM_CAP "Confirm Exit"
     IDS_MSG_PORT_ERROR  "Failed to open serial port"
     IDS_MSG_ERROR       "Error"
     IDS_MSG_SELECT_PORT "Please select a port"
@@ -306,7 +304,7 @@ IDR_MAIN_MENU MENUEX
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "设备属性(&P)...", IDM_DEVICE_PROPS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
-    MENUITEM "退出(&X)             Alt+F4", IDM_EXIT, 0, 0
+    MENUITEM "退出(&X)", IDM_EXIT, 0, 0
   }
   POPUP "串口(&S)", 0, 0, 0
   {
@@ -449,8 +447,6 @@ STRINGTABLE
 STRINGTABLE
 {
     IDS_MSG_CONN_TITLE  "连接"
-    IDS_MSG_CONFIRM_EXIT "串口已连接。确定要退出么？"
-    IDS_MSG_CONFIRM_CAP "确认退出"
     IDS_MSG_PORT_ERROR  "打开串口失败"
     IDS_MSG_ERROR       "错误"
     IDS_MSG_SELECT_PORT "请选择一个端口"

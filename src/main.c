@@ -16,6 +16,7 @@
 #include "serial.h"
 #include "utils/config.h"
 #include "utils/lang.h"
+#include "utils/mem.h"
 #include "utils/trace.h"
 #include <commctrl.h>
 #include <commdlg.h>
@@ -132,6 +133,27 @@ static HDEVNOTIFY g_hDevNotify = NULL; /* Device notification handle */
 WCHAR g_szPort[32] = {0};
 WCHAR g_szSelectedPort[32] = {0};
 LOGFONTW g_logFont = {0}; /* Current font */
+
+/*
+ * ConsoleCtrlHandler - Handle console control events
+ *
+ * Posts WM_CLOSE to main window on close events, allowing graceful
+ * cleanup when the console window is closed (e.g., launched from cmd.exe).
+ */
+static BOOL WINAPI ConsoleCtrlHandler(DWORD ctrlType)
+{
+    switch (ctrlType) {
+    case CTRL_CLOSE_EVENT:
+    case CTRL_C_EVENT:
+    case CTRL_BREAK_EVENT:
+        if (g_hWnd) {
+            PostMessage(g_hWnd, WM_CLOSE, 0, 0);
+        }
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
 
 /* Forward declarations */
 static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam);
@@ -1032,6 +1054,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     TRACE_INIT();
     TRACE_FW(TAG, "=== FakeEsptool Started ===");
 
+    /* Register console control handler for graceful shutdown */
+    SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
+
     /* Parse command line for file path */
     WCHAR cmdFilePath[MAX_PATH] = {0};
     if (lpCmdLine && lpCmdLine[0]) {
@@ -1172,6 +1197,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     }
 
     TRACE_FW(TAG, "=== FakeEsptool Exiting ===");
+
+    Mem_ReportLeaks();
 
     /* Cleanup mutex */
     if (hMutex) {
