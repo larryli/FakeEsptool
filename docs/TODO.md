@@ -120,8 +120,8 @@ ESP32-S31 - 296 字节（无 KEY5）：
 
 | 参数 | 动作 | 校验方 |
 |------|------|--------|
+| `--new [file.esp]` | 强制新实例：关闭已有实例（不保存、断开串口），有文件则打开，无文件则跳过"打开上次文件"提示 | 新实例 |
 | `<file.esp>` | 打开设备文件（已有） | 新实例 |
-| `--blank` | 跳过打开上次文件，直接创建默认设备 | 新实例 |
 | `--chip <chip>` | 设置芯片类型 | 新实例 |
 | `--xtal-freq <freq>` | 设置晶振频率 | 新实例 |
 | `--flash-size <size>` | 设置 flash 大小 | 新实例 |
@@ -137,8 +137,13 @@ ESP32-S31 - 296 字节（无 KEY5）：
 | `--encryption <none\|dev\|release>` | 设置加密状态 | 新实例 |
 | `--download-mode <normal\|secure\|disabled>` | 设置下载模式 | 新实例 |
 | `--save-log <path>` | 保存日志到文件 | 新实例 |
-| `--exit` | 关闭已有实例 | 无 |
+| `--exit` | 关闭已有实例（始终最后执行，无论位置） | 无 |
 | `--force` | 见下方行为表 | 无 |
+
+**参数规则：**
+- `--new` 和 `--force` 必须是第一个参数，二者互斥
+- `--exit` 始终最后执行，无论出现在命令行哪个位置
+- 其余参数从左到右依次执行
 
 **`--force` 行为表（仅影响确认对话框）：**
 
@@ -160,21 +165,23 @@ ESP32-S31 - 296 字节（无 KEY5）：
 **使用示例：**
 
 ```bash
+# 强制新实例，跳过上次文件
+FakeEsptool.exe --new --connect COM10
+
+# 强制新实例，打开指定文件
+FakeEsptool.exe --new device.esp
+
 # 自动化流程：打开设备 → 连接串口 → 等待 esptool 写入 → 导出 → 退出
 FakeEsptool.exe device.esp
 FakeEsptool.exe --connect COM10
 # esptool 通过串口写入数据...
 FakeEsptool.exe --force --export-flash flash.bin --export-efuse efuse.bin --exit
 
+# 强制新实例 + 自定义参数
+FakeEsptool.exe --new --chip ESP32-C3 --xtal-freq 40 --flash-size 4MB --connect COM10
+
 # 覆盖保存
 FakeEsptool.exe --force --save backup.esp --exit
-
-# 设备配置 + 导出
-FakeEsptool.exe device.esp
-FakeEsptool.exe --force --encryption dev --download-mode secure --dump device.txt --exit
-
-# 设备参数配置（跳过上次文件，使用自定义参数）
-FakeEsptool.exe --blank --chip ESP32-C3 --xtal-freq 40 --flash-size 4MB --connect COM10 --exit
 ```
 
 **错误输出：**
