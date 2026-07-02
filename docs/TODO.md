@@ -105,6 +105,100 @@ ESP32-S31 - 296 字节（无 KEY5）：
 
 ---
 
+## 中优先级 - CLI 命令行参数扩展
+
+通过 `WM_COPYDATA` 向已有单例发送指令，新实例发送后立即退出，实现脚本化自动化。
+
+**机制：**
+
+- 新实例解析命令行 → 校验参数 → 发送指令给已有实例 → 退出
+- 已有实例接收指令 → 静默执行（不弹窗，不输出错误）
+- 校验失败由新实例在命令行报错并退出
+- `--exit` 强制最后执行
+
+**参数列表：**
+
+| 参数 | 动作 | 校验方 |
+|------|------|--------|
+| `<file.esp>` | 打开设备文件（已有） | 新实例 |
+| `--blank` | 跳过打开上次文件，直接创建默认设备 | 新实例 |
+| `--chip <chip>` | 设置芯片类型 | 新实例 |
+| `--xtal-freq <freq>` | 设置晶振频率 | 新实例 |
+| `--flash-size <size>` | 设置 flash 大小 | 新实例 |
+| `--connect <port>` | 连接指定串口 | 新实例 |
+| `--reconnect` | 连接上次使用的串口 | 新实例 |
+| `--disconnect` | 断开串口 | 无 |
+| `--save [file]` | 保存 .esp，不带文件名则保存到当前文件 | 新实例 |
+| `--import-flash <path>` | 导入 flash | 新实例 |
+| `--import-efuse <path>` | 导入 eFuse | 新实例 |
+| `--export-flash <path>` | 导出 flash | 新实例 |
+| `--export-efuse <path>` | 导出 eFuse | 新实例 |
+| `--dump <path>` | 导出设备信息到 txt | 新实例 |
+| `--encryption <none\|dev\|release>` | 设置加密状态 | 新实例 |
+| `--download-mode <normal\|secure\|disabled>` | 设置下载模式 | 新实例 |
+| `--save-log <path>` | 保存日志到文件 | 新实例 |
+| `--exit` | 关闭已有实例 | 无 |
+| `--force` | 见下方行为表 | 无 |
+
+**`--force` 行为表（仅影响确认对话框）：**
+
+| 场景 | --force | 无 --force |
+|------|---------|-----------|
+| 打开上次文件提示 | 自动打开 | 弹窗询问 |
+| 断开串口确认 | 自动断开 | 弹窗询问 |
+| 退出时保存确认 | 丢弃，输出警告到 stderr | 弹窗询问 |
+| 覆盖文件确认 | 直接覆盖 | 弹窗询问 |
+
+**CLI 执行模式（独立于 --force）：**
+
+仅在 CLI 路径下生效——新实例通过 WM_COPYDATA 传递命令时，或首个实例启动时携带 CLI 参数时，已有实例设置 `g_cliExecuting` 标志，执行期间错误/警告 MessageBox 改为 TRACE 记录。新实例负责校验并向 stderr 输出错误。
+
+已有实例的原生 GUI 操作（用户手动点击菜单、拖放文件、密钥管理等）不受此标志影响，MessageBox 正常显示。
+
+**例外**：设备移除/断开通知（`IDS_MSG_CONN_LOST`、`IDS_MSG_DEV_REMOVED`）始终弹窗阻塞，不受 `g_cliExecuting` 影响。新实例通过 `SendMessage` 超时（等待 2 秒无响应）检测到已有实例被阻塞，向 stderr 输出错误并退出。
+
+**使用示例：**
+
+```bash
+# 自动化流程：打开设备 → 连接串口 → 等待 esptool 写入 → 导出 → 退出
+FakeEsptool.exe device.esp
+FakeEsptool.exe --connect COM10
+# esptool 通过串口写入数据...
+FakeEsptool.exe --force --export-flash flash.bin --export-efuse efuse.bin --exit
+
+# 覆盖保存
+FakeEsptool.exe --force --save backup.esp --exit
+
+# 设备配置 + 导出
+FakeEsptool.exe device.esp
+FakeEsptool.exe --force --encryption dev --download-mode secure --dump device.txt --exit
+
+# 设备参数配置（跳过上次文件，使用自定义参数）
+FakeEsptool.exe --blank --chip ESP32-C3 --xtal-freq 40 --flash-size 4MB --connect COM10 --exit
+```
+
+**错误输出：**
+
+- 新实例通过 `AttachConsole(ATTACH_PARENT_PROCESS)` 附加到父进程控制台
+- 校验失败时 `fprintf(stderr, ...)` 输出错误信息
+
+**实现内容：**
+
+1. `main.c`: 解析命令行参数，区分文件路径和 `--` 开头的选项
+2. `main.c`: 检测到 CLI 选项时调用 `AttachConsole` + 重定向 stderr
+3. `main.c`: 单例模式下发送 `WM_COPYDATA` 携带命令类型和参数
+4. `main.c`: 解析 `--force` 标志，传递给各处理函数
+5. `main.c`: `--exit` 标志强制排在所有命令之后执行
+6. `app_commands.c`: 各导出/导入/保存函数增加 force 参数，跳过对话框
+7. `app_commands.c`: `--dump` 导出设备信息到 txt（复用 Dump Device As 逻辑）
+8. `app_commands.c`: `--encryption` / `--download-mode` 切换 eFuse 位
+9. `app_commands.c`: `--save-log` 保存日志到文件
+10. `main.c`: CLI 校验函数（文件存在性、串口可用性等）
+11. `docs/REQUIREMENTS.md`: 补充命令行参数说明
+12. `docs/DEVELOPMENT.md`: 记录 CLI 方案缺陷——WM_COPYDATA 单向通信，已有实例执行失败无法回传错误；导出类操作通过发送后检查输出文件间接验证
+
+---
+
 ## 远期规划 - 新芯片支持
 
 支持 esptool 官方新增的 ESP 芯片（部分特性待完善）。
