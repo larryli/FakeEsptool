@@ -1215,6 +1215,13 @@ void Main_OnFlashExport(HWND hMainWnd)
 {
     OPENFILENAMEW ofn = {0};
     WCHAR szFile[MAX_PATH] = {0};
+
+    /* Default filename: chipname_flash.bin */
+    WCHAR defName[MAX_PATH];
+    MultiByteToWideChar(CP_UTF8, 0, g_chip.name, -1, defName, MAX_PATH);
+    wcscat(defName, L"_flash.bin");
+    wcscpy(szFile, defName);
+
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hMainWnd;
     ofn.lpstrFilter = LoadStr(IDS_BIN_FILTER);
