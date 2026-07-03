@@ -29,6 +29,36 @@
 int DeviceFile_GetEfuseBlockSize(fesp_chip_type_t type);
 
 /*
+ * DeviceFile_ExportEfuseBlocks - Export eFuse block data to buffer
+ *
+ * Extracts packed block data from efuse array into output buffer.
+ * Used by Export eFuse menu and CLI --export-efuse.
+ *
+ * @chip:     Pointer to chip context
+ * @out:      Output buffer (must be >= DeviceFile_GetEfuseBlockSize bytes)
+ * @outSize:  Size of output buffer
+ *
+ * Returns TRUE on success, FALSE on failure.
+ */
+BOOL DeviceFile_ExportEfuseBlocks(const fesp_chip_ctx_t *chip, uint8_t *out,
+                                  int outSize);
+
+/*
+ * DeviceFile_ImportEfuseBlocks - Import eFuse block data from buffer
+ *
+ * Writes packed block data from buffer into efuse array.
+ * Used by Import eFuse menu and CLI --import-efuse.
+ *
+ * @chip:     Pointer to chip context
+ * @data:     Input buffer with packed block data
+ * @dataSize: Size of input buffer
+ *
+ * Returns TRUE on success, FALSE on failure.
+ */
+BOOL DeviceFile_ImportEfuseBlocks(fesp_chip_ctx_t *chip, const uint8_t *data,
+                                  int dataSize);
+
+/*
  * DeviceFile_Save - Save device state to .esp file
  *
  * Writes chip config, eFuse data, and flash data to binary file.

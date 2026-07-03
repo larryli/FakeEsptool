@@ -1,4 +1,4 @@
-﻿/*
+﻿﻿﻿﻿/*
  * resource.rc - Resource file for FakeEsptool
  *
  * English (US) resources with LANGUAGE directive support for future i18n.
@@ -45,6 +45,9 @@ IDR_MAIN_MENU MENUEX
   {
     MENUITEM "&Import Flash...", IDM_FLASH_IMPORT, 0, 0
     MENUITEM "&Export Flash...", IDM_FLASH_EXPORT, 0, 0
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    MENUITEM "Import &eFuse...", IDM_EFUSE_IMPORT, 0, 0|MFS_GRAYED
+    MENUITEM "Export eF&use...", IDM_EFUSE_EXPORT, 0, 0|MFS_GRAYED
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "&Key Management...", IDM_KEY_MGMT, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
@@ -153,6 +156,23 @@ BEGIN
     DEFPUSHBUTTON   "&Close", IDC_KEY_CLOSE, 160, 205, 60, 16
 END
 
+IDR_MNU_FLASH_IMPORT MENUEX
+{
+  POPUP "Import", 0, 0, 0
+  {
+    MENUITEM "Import &Flash...", IDM_FLASH_IMPORT, 0, 0
+    MENUITEM "Import &eFuse...", IDM_EFUSE_IMPORT, 0, 0
+  }
+}
+IDR_MNU_FLASH_EXPORT MENUEX
+{
+  POPUP "Export", 0, 0, 0
+  {
+    MENUITEM "Export &Flash...", IDM_FLASH_EXPORT, 0, 0
+    MENUITEM "Export eF&use...", IDM_EFUSE_EXPORT, 0, 0
+  }
+}
+
 STRINGTABLE
 {
     IDS_APP_NAME        "FakeEsptool"
@@ -211,6 +231,7 @@ STRINGTABLE
     IDS_MSG_FAIL_DUMP_THREAD "Failed to create dump thread"
     IDS_MSG_FAIL_DUMP       "Failed to dump device (error: %lu)"
     IDS_MSG_FAIL_UPDATE_DEV "Failed to update device"
+    IDS_MSG_EFUSE_SIZE_MISMATCH "File size (%lu bytes) does not match eFuse block size (%lu bytes)"
     IDS_TXT_FILTER          "Text Files (*.txt)\0*.txt\0All Files (*.*)\0*.*\0"
     IDS_OPEN_DEVICE_TITLE   "Open Device"
     IDS_MSG_OPEN_LAST_FILE  "Open last device file?\n%s"
@@ -235,6 +256,7 @@ STRINGTABLE
     IDS_TIP_XTAL_MAC        "%hs %02X:%02X:%02X:%02X:%02X:%02X"
     IDS_TIP_EFUSE_FIELD     "%hs = 0x%02X"
 }
+
 
 STRINGTABLE
 {
@@ -318,6 +340,9 @@ IDR_MAIN_MENU MENUEX
     MENUITEM "导入 Flash(&I)...", IDM_FLASH_IMPORT, 0, 0
     MENUITEM "导出 Flash(&E)...", IDM_FLASH_EXPORT, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
+    MENUITEM "导入 eFuse(&U)...", IDM_EFUSE_IMPORT, 0, 0|MFS_GRAYED
+    MENUITEM "导出 eFuse(&X)...", IDM_EFUSE_EXPORT, 0, 0|MFS_GRAYED
+    MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "密钥管理(&K)...", IDM_KEY_MGMT, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     POPUP "加密状态(&S)", 0, 0, 0
@@ -369,6 +394,23 @@ BEGIN
     DEFPUSHBUTTON   "确定", IDOK, 100, 75, 50, 14
     PUSHBUTTON      "取消", IDCANCEL, 170, 75, 50, 14
 END
+
+IDR_MNU_FLASH_IMPORT MENUEX
+{
+  POPUP "Import", 0, 0, 0
+  {
+    MENUITEM "导入 Flash(&I)...", IDM_FLASH_IMPORT, 0, 0
+    MENUITEM "导入 eFuse(&U)...", IDM_EFUSE_IMPORT, 0, 0
+  }
+}
+IDR_MNU_FLASH_EXPORT MENUEX
+{
+  POPUP "Export", 0, 0, 0
+  {
+    MENUITEM "导出 Flash(&E)...", IDM_FLASH_EXPORT, 0, 0
+    MENUITEM "导出 eFuse(&X)...", IDM_EFUSE_EXPORT, 0, 0
+  }
+}
 
 IDD_ABOUT DIALOGEX 0, 0, 220, 100
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
@@ -483,6 +525,7 @@ STRINGTABLE
     IDS_MSG_FAIL_DUMP_THREAD "创建 Dump 线程失败"
     IDS_MSG_FAIL_DUMP       "导出设备失败（错误：%lu）"
     IDS_MSG_FAIL_UPDATE_DEV "更新设备失败"
+    IDS_MSG_EFUSE_SIZE_MISMATCH "文件大小（%lu 字节）与 eFuse 块大小（%lu 字节）不匹配"
     IDS_TXT_FILTER          "文本文件 (*.txt)\0*.txt\0所有文件 (*.*)\0*.*\0"
     IDS_OPEN_DEVICE_TITLE   "打开设备"
     IDS_MSG_OPEN_LAST_FILE  "打开上次的设备文件？\n%s"

@@ -109,6 +109,16 @@ void Main_OnFlashImport(HWND hWnd);
 void Main_OnFlashExport(HWND hWnd);
 
 /*
+ * Main_OnEfuseImport - Handle eFuse Import command
+ */
+void Main_OnEfuseImport(HWND hWnd);
+
+/*
+ * Main_OnEfuseExport - Handle eFuse Export command
+ */
+void Main_OnEfuseExport(HWND hWnd);
+
+/*
  * Main_OnDumpDeviceAs - Handle Dump Device As command
  */
 void Main_OnDumpDeviceAs(HWND hWnd);

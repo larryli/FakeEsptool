@@ -28,6 +28,10 @@
 #define IDM_EXIT 2014
 #define IDM_ABOUT 2015
 #define IDM_KEY_MGMT 2016
+#define IDM_EFUSE_IMPORT 2017
+#define IDM_EFUSE_EXPORT 2018
+#define IDR_MNU_FLASH_IMPORT 2019
+#define IDR_MNU_FLASH_EXPORT 2020
 
 /* Encryption state menu IDs */
 #define IDM_ENCRYPT_NONE 2020
@@ -143,6 +147,9 @@
 #define IDS_MSG_ONLY_ESP 10108
 #define IDS_TITLE_UNTITLED 10109
 #define IDS_STATUS_NO_DEVICE 10110
+
+/* eFuse import/export message strings */
+#define IDS_MSG_EFUSE_SIZE_MISMATCH 10250
 
 /* Encryption status strings */
 #define IDS_ENCRYPT_NONE 10120    /* "No Encryption" */

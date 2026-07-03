@@ -104,6 +104,50 @@ static void extract_efuse_blocks(const uint8_t *efuse, int efuse_size,
     }
 }
 
+static void inject_efuse_blocks(uint8_t *efuse, int efuse_size,
+                                const uint8_t *in, fesp_chip_type_t type)
+{
+    int count;
+    const efuse_block_desc_t *desc = get_block_desc(type, &count);
+    int src = 0;
+    for (int i = 0; i < count; i++) {
+        int dst_ofs = desc[i].offset;
+        int bytes = desc[i].words * 4;
+        if (dst_ofs + bytes <= efuse_size) {
+            memcpy(efuse + dst_ofs, in + src, bytes);
+        }
+        src += bytes;
+    }
+}
+
+BOOL DeviceFile_ExportEfuseBlocks(const fesp_chip_ctx_t *chip, uint8_t *out,
+                                  int outSize)
+{
+    if (!chip || !chip->efuse || !out)
+        return FALSE;
+    if (chip->type == FESP_CHIP_ESP8266)
+        return FALSE;
+    int blockSize = DeviceFile_GetEfuseBlockSize(chip->type);
+    if (blockSize <= 0 || outSize < blockSize)
+        return FALSE;
+    extract_efuse_blocks(chip->efuse, chip->efuse_size, out, chip->type);
+    return TRUE;
+}
+
+BOOL DeviceFile_ImportEfuseBlocks(fesp_chip_ctx_t *chip, const uint8_t *data,
+                                  int dataSize)
+{
+    if (!chip || !chip->efuse || !data)
+        return FALSE;
+    if (chip->type == FESP_CHIP_ESP8266)
+        return FALSE;
+    int blockSize = DeviceFile_GetEfuseBlockSize(chip->type);
+    if (blockSize <= 0 || dataSize != blockSize)
+        return FALSE;
+    inject_efuse_blocks(chip->efuse, chip->efuse_size, data, chip->type);
+    return TRUE;
+}
+
 /*
  * DeviceFile_Save - Save device state to .esp file
  *

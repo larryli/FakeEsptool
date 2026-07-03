@@ -329,17 +329,18 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     buttons[btn].fsStyle = BTNS_SEP;
     btn++;
 
-    /* Flash group */
+    /* Flash group - Import dropdown */
     buttons[btn].iBitmap = iBase + 7; /* Import */
     buttons[btn].idCommand = IDM_FLASH_IMPORT;
     buttons[btn].fsState = TBSTATE_ENABLED;
-    buttons[btn].fsStyle = BTNS_BUTTON;
+    buttons[btn].fsStyle = BTNS_BUTTON | BTNS_DROPDOWN;
     btn++;
 
+    /* Flash group - Export dropdown */
     buttons[btn].iBitmap = iBase + 8; /* Export */
     buttons[btn].idCommand = IDM_FLASH_EXPORT;
     buttons[btn].fsState = TBSTATE_ENABLED;
-    buttons[btn].fsStyle = BTNS_BUTTON;
+    buttons[btn].fsStyle = BTNS_BUTTON | BTNS_DROPDOWN;
     btn++;
 
     /* Separator */
@@ -370,6 +371,7 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     btn++;
 
     SendMessageW(g_hToolbar, TB_ADDBUTTONS, btn, (LPARAM)buttons);
+    SendMessageW(g_hToolbar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DRAWDDARROWS);
 
     /* Create status bar */
     g_hStatusbar = CreateWindowExW(
@@ -482,6 +484,12 @@ static LRESULT Main_OnCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
     case IDM_KEY_MGMT:
         Main_CmdKeyMgmt(hWnd);
         break;
+    case IDM_EFUSE_IMPORT:
+        Main_OnEfuseImport(hWnd);
+        break;
+    case IDM_EFUSE_EXPORT:
+        Main_OnEfuseExport(hWnd);
+        break;
     case IDM_DUMP_DEVICE_AS:
         Main_OnDumpDeviceAs(hWnd);
         break;
@@ -572,6 +580,30 @@ static LRESULT Main_OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
             ttt->lpszText = MAKEINTRESOURCEW(IDS_TIP_SAVEAS);
             return 0;
         }
+    } else if (((NMHDR *)lParam)->code == TBN_DROPDOWN) {
+        NMTOOLBARW *nmtb = (NMTOOLBARW *)lParam;
+        int cmdId = nmtb->iItem;
+        UINT menuId = 0;
+
+        if (cmdId == IDM_FLASH_IMPORT) {
+            menuId = IDR_MNU_FLASH_IMPORT;
+        } else if (cmdId == IDM_FLASH_EXPORT) {
+            menuId = IDR_MNU_FLASH_EXPORT;
+        } else {
+            return 0;
+        }
+
+        HMENU hMenu = LoadMenuW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(menuId));
+        if (!hMenu)
+            return 0;
+        HMENU hPopup = GetSubMenu(hMenu, 0);
+
+        POINT pt = {nmtb->rcButton.right, nmtb->rcButton.bottom};
+        ClientToScreen(nmtb->hdr.hwndFrom, &pt);
+        TrackPopupMenu(hPopup, TPM_RIGHTALIGN | TPM_TOPALIGN, pt.x, pt.y,
+                       0, hWnd, NULL);
+        DestroyMenu(hMenu);
+        return TBDDRET_DEFAULT;
     }
     return 0;
 }

@@ -411,6 +411,10 @@ void UpdateMenuState(HWND hWnd)
     EnableMenuItem(hMenu, IDM_RECONNECT, canReconnect ? MF_ENABLED : MF_GRAYED);
     EnableMenuItem(hMenu, IDM_KEY_MGMT, canKeyMgmt ? MF_ENABLED : MF_GRAYED);
 
+    BOOL canEfuse = g_chip.type != FESP_CHIP_ESP8266;
+    EnableMenuItem(hMenu, IDM_EFUSE_IMPORT, canEfuse ? MF_ENABLED : MF_GRAYED);
+    EnableMenuItem(hMenu, IDM_EFUSE_EXPORT, canEfuse ? MF_ENABLED : MF_GRAYED);
+
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_CONNECT, !connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_DISCONNECT, connected);
     SendMessageW(g_hToolbar, TB_ENABLEBUTTON, IDM_RECONNECT, canReconnect);
@@ -1273,6 +1277,179 @@ void Main_OnFlashExport(HWND hMainWnd)
     }
 
     HeapFree(GetProcessHeap(), 0, flashSnapshot);
+}
+
+/*
+ * Main_OnEfuseImport - Handle eFuse Import command
+ *
+ * Imports eFuse block data from .bin file (QEMU-compatible format).
+ * File size must match current chip's block data size.
+ * ESP8266: shows error (no block structure).
+ *
+ * @hMainWnd: Main window handle
+ */
+void Main_OnEfuseImport(HWND hMainWnd)
+{
+    if (g_chip.type == FESP_CHIP_ESP8266) {
+        return;
+    }
+
+    int blockSize = DeviceFile_GetEfuseBlockSize(g_chip.type);
+    if (blockSize <= 0) {
+        return;
+    }
+
+    if (!PromptDisconnectIfNeeded(hMainWnd)) {
+        return;
+    }
+
+    OPENFILENAMEW ofn = {0};
+    WCHAR szFile[MAX_PATH] = {0};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hMainWnd;
+    ofn.lpstrFilter = LoadStr(IDS_BIN_FILTER);
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_FILEMUSTEXIST;
+
+    if (!GetOpenFileNameW(&ofn)) {
+        return;
+    }
+
+    HANDLE hFile = CreateFileW(szFile, GENERIC_READ, 0, NULL, OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_OPEN_FILE),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    DWORD fileSize = GetFileSize(hFile, NULL);
+    if (fileSize != (DWORD)blockSize) {
+        CloseHandle(hFile);
+        WCHAR msg[256];
+        wsprintfW(msg, LoadStr(IDS_MSG_EFUSE_SIZE_MISMATCH), fileSize,
+                  blockSize);
+        MessageBoxW(hMainWnd, msg, LoadStr(IDS_MSG_ERROR),
+                    MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    HCURSOR hOldCursor = SetCursor(LoadCursor(NULL, IDC_WAIT));
+    EnableWindow(hMainWnd, FALSE);
+
+    uint8_t *blockBuf = (uint8_t *)HeapAlloc(GetProcessHeap(), 0, fileSize);
+    if (!blockBuf) {
+        EnableWindow(hMainWnd, TRUE);
+        SetCursor(hOldCursor);
+        CloseHandle(hFile);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    DWORD bytesRead;
+    BOOL ok = ReadFile(hFile, blockBuf, fileSize, &bytesRead, NULL) &&
+              bytesRead == fileSize;
+    CloseHandle(hFile);
+
+    if (ok) {
+        DeviceFile_ImportEfuseBlocks(&g_chip, blockBuf, fileSize);
+    }
+
+    HeapFree(GetProcessHeap(), 0, blockBuf);
+    EnableWindow(hMainWnd, TRUE);
+    SetCursor(hOldCursor);
+
+    if (!ok) {
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_READ_FILE),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    g_deviceModified = TRUE;
+    UpdateTitle(hMainWnd);
+}
+
+/*
+ * Main_OnEfuseExport - Handle eFuse Export command
+ *
+ * Exports eFuse block data to .bin file (QEMU-compatible format).
+ * ESP8266: shows error (no block structure).
+ *
+ * @hMainWnd: Main window handle
+ */
+void Main_OnEfuseExport(HWND hMainWnd)
+{
+    if (g_chip.type == FESP_CHIP_ESP8266) {
+        return;
+    }
+
+    int blockSize = DeviceFile_GetEfuseBlockSize(g_chip.type);
+    if (blockSize <= 0) {
+        return;
+    }
+
+    OPENFILENAMEW ofn = {0};
+    WCHAR szFile[MAX_PATH] = {0};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hMainWnd;
+    ofn.lpstrFilter = LoadStr(IDS_BIN_FILTER);
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+    ofn.lpstrDefExt = L"bin";
+
+    /* Default filename: chipname_efuse.bin */
+    WCHAR defName[MAX_PATH];
+    MultiByteToWideChar(CP_UTF8, 0, g_chip.name, -1, defName, MAX_PATH);
+    wcscat(defName, L"_efuse.bin");
+    wcscpy(szFile, defName);
+    ofn.lpstrFile = szFile;
+
+    if (!GetSaveFileNameW(&ofn)) {
+        return;
+    }
+
+    HCURSOR hOldCursor = SetCursor(LoadCursor(NULL, IDC_WAIT));
+    EnableWindow(hMainWnd, FALSE);
+
+    uint8_t *blockBuf = (uint8_t *)HeapAlloc(GetProcessHeap(), 0, blockSize);
+    if (!blockBuf) {
+        EnableWindow(hMainWnd, TRUE);
+        SetCursor(hOldCursor);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_ALLOC),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    DeviceFile_ExportEfuseBlocks(&g_chip, blockBuf, blockSize);
+
+    HANDLE hFile = CreateFileW(szFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                               FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        HeapFree(GetProcessHeap(), 0, blockBuf);
+        EnableWindow(hMainWnd, TRUE);
+        SetCursor(hOldCursor);
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_CREATE_FILE),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    DWORD written;
+    BOOL ok = WriteFile(hFile, blockBuf, blockSize, &written, NULL) &&
+              written == (DWORD)blockSize;
+    CloseHandle(hFile);
+    HeapFree(GetProcessHeap(), 0, blockBuf);
+
+    EnableWindow(hMainWnd, TRUE);
+    SetCursor(hOldCursor);
+
+    if (!ok) {
+        MessageBoxW(hMainWnd, LoadStr(IDS_MSG_FAIL_WRITE_FILE),
+                    LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+        return;
+    }
 }
 
 /*
