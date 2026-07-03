@@ -187,6 +187,7 @@ BOOL PromptSaveIfNeeded(HWND hWnd)
             ofn.nMaxFile = MAX_PATH;
             ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
             ofn.lpstrDefExt = L"esp";
+            ofn.lpstrTitle = LoadStr(IDS_DLG_TITLE_SAVE_DEVICE);
             if (!GetSaveFileNameW(&ofn)) {
                 return FALSE;
             }
@@ -856,6 +857,7 @@ void Main_CmdOpenDevice(HWND hWnd)
     ofn.lpstrFile = szFile;
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_FILEMUSTEXIST;
+    ofn.lpstrTitle = LoadStr(IDS_DLG_TITLE_OPEN_DEVICE);
     if (GetOpenFileNameW(&ofn)) {
         fesp_flash_close(&g_flash);
         fesp_chip_close(&g_chip);
@@ -951,6 +953,7 @@ void Main_CmdSaveDeviceAs(HWND hWnd)
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
     ofn.lpstrDefExt = L"esp";
+    ofn.lpstrTitle = LoadStr(IDS_DLG_TITLE_SAVE_DEVICE_AS);
     if (GetSaveFileNameW(&ofn)) {
         if (DeviceFile_Save(&g_chip, &g_flash, szFile)) {
             Config_SetLastDeviceFile(szFile);
@@ -1157,6 +1160,7 @@ void Main_OnFlashImport(HWND hMainWnd)
     ofn.lpstrFile = szFile;
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_FILEMUSTEXIST;
+    ofn.lpstrTitle = LoadStr(IDS_DLG_TITLE_IMPORT_FLASH);
 
     if (!GetOpenFileNameW(&ofn)) {
         return;
@@ -1229,6 +1233,7 @@ void Main_OnFlashExport(HWND hMainWnd)
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
     ofn.lpstrDefExt = L"bin";
+    ofn.lpstrTitle = LoadStr(IDS_DLG_TITLE_EXPORT_FLASH);
 
     if (!GetSaveFileNameW(&ofn)) {
         return;
@@ -1318,6 +1323,7 @@ void Main_OnEfuseImport(HWND hMainWnd)
     ofn.lpstrFile = szFile;
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_FILEMUSTEXIST;
+    ofn.lpstrTitle = LoadStr(IDS_DLG_TITLE_IMPORT_EFUSE);
 
     if (!GetOpenFileNameW(&ofn)) {
         return;
@@ -1413,6 +1419,7 @@ void Main_OnEfuseExport(HWND hMainWnd)
     (void)wcscat_s(defName, MAX_PATH, L"_efuse.bin");
     (void)wcscpy_s(szFile, MAX_PATH, defName);
     ofn.lpstrFile = szFile;
+    ofn.lpstrTitle = LoadStr(IDS_DLG_TITLE_EXPORT_EFUSE);
 
     if (!GetSaveFileNameW(&ofn)) {
         return;
@@ -2093,6 +2100,7 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
     ofn.lpstrDefExt = L"txt";
+    ofn.lpstrTitle = LoadStr(IDS_DLG_TITLE_DUMP_DEVICE);
 
     if (!GetSaveFileNameW(&ofn)) {
         return;
@@ -2235,6 +2243,7 @@ void Main_OnLogSaveAs(HWND hMainWnd)
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
     ofn.lpstrDefExt = L"log";
+    ofn.lpstrTitle = LoadStr(IDS_DLG_TITLE_SAVE_LOG);
 
     if (!GetSaveFileNameW(&ofn)) {
         return;

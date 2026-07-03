@@ -151,6 +151,19 @@
 /* eFuse import/export message strings */
 #define IDS_MSG_EFUSE_SIZE_MISMATCH 10250
 
+/* File dialog title strings */
+#define IDS_DLG_TITLE_SAVE_DEVICE 10260
+#define IDS_DLG_TITLE_OPEN_DEVICE 10261
+#define IDS_DLG_TITLE_SAVE_DEVICE_AS 10262
+#define IDS_DLG_TITLE_IMPORT_FLASH 10263
+#define IDS_DLG_TITLE_EXPORT_FLASH 10264
+#define IDS_DLG_TITLE_IMPORT_EFUSE 10265
+#define IDS_DLG_TITLE_EXPORT_EFUSE 10266
+#define IDS_DLG_TITLE_DUMP_DEVICE 10267
+#define IDS_DLG_TITLE_SAVE_LOG 10268
+#define IDS_DLG_TITLE_IMPORT_KEY 10269
+#define IDS_DLG_TITLE_EXPORT_KEY 10270
+
 /* Encryption status strings */
 #define IDS_ENCRYPT_NONE 10120    /* "No Encryption" */
 #define IDS_ENCRYPT_DEV 10121     /* "Encrypted (Dev)" */

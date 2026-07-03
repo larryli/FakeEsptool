@@ -16,6 +16,7 @@
  */
 
 #include "../app_commands.h"
+#include "../utils/lang.h"
 #include "dlg.h"
 #include <commctrl.h>
 #include <stdlib.h>
@@ -511,6 +512,7 @@ static void HandleImport(HWND hDlg, HWND hList)
     ofn.lpstrFile = szFile;
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_FILEMUSTEXIST;
+    ofn.lpstrTitle = LoadStr(IDS_DLG_TITLE_IMPORT_KEY);
 
     if (!GetOpenFileNameW(&ofn)) {
         return;
@@ -598,6 +600,7 @@ static void HandleExport(HWND hDlg, HWND hList)
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
     ofn.lpstrDefExt = L"bin";
+    ofn.lpstrTitle = LoadStr(IDS_DLG_TITLE_EXPORT_KEY);
 
     if (!GetSaveFileNameW(&ofn)) {
         return;
