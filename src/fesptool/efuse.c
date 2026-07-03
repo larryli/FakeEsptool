@@ -365,6 +365,48 @@ void fesp_efuse_apply_block0_defaults(fesp_chip_ctx_t *ctx)
 }
 
 /*
+ * fesp_efuse_clear_volatile - Clear volatile eFuse regions
+ *
+ * Zeros PGM registers and control registers in the efuse array.
+ * Called on serial connect and reset to simulate hardware behavior.
+ */
+void fesp_efuse_clear_volatile(fesp_chip_ctx_t *ctx)
+{
+    if (!ctx->efuse || ctx->efuse_size <= 0) {
+        return;
+    }
+
+    switch (ctx->type) {
+    case FESP_CHIP_ESP32:
+        /* PGM registers: BLOCK0 write (0x01C-0x037), BLOCK1-3 write (0x098-0x0D7) */
+        memset(ctx->efuse + 0x01C, 0, 0x01C);  /* BLOCK0 PGM: 0x01C-0x037 */
+        memset(ctx->efuse + 0x098, 0, 0x040);  /* BLOCK1-3 PGM: 0x098-0x0D7 */
+        /* Control registers start at 0x0D8 */
+        if (ctx->efuse_size > 0x0D8) {
+            memset(ctx->efuse + 0x0D8, 0, ctx->efuse_size - 0x0D8);
+        }
+        break;
+    case FESP_CHIP_ESP8266:
+        /* ESP8266 has no PGM/control registers in efuse array */
+        break;
+    default:
+        /* New architecture (C3/C6/S2/S3/C2/etc.):
+         * PGM registers: 0x000-0x02B (PGM_DATA + PGM_CHECK)
+         * Control registers: 0x1C8+ (CLK, CONF, CMD, INT, etc.) */
+        memset(ctx->efuse, 0, 0x02C);  /* PGM area: 0x000-0x02B */
+        if (ctx->efuse_size > 0x1C8) {
+            memset(ctx->efuse + 0x1C8, 0, ctx->efuse_size - 0x1C8);
+        }
+        break;
+    }
+
+    /* Also clear PGM data register array */
+    memset(ctx->pgm_data, 0, sizeof(ctx->pgm_data));
+
+    FESP_HAL_LOGD(TAG, "eFuse volatile regions cleared");
+}
+
+/*
  * fesp_efuse_get_flash_crypt_cnt - Get flash encryption counter value from
  * eFuse
  *

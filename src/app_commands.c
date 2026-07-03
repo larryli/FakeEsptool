@@ -1042,6 +1042,9 @@ void Main_OnConnect(HWND hMainWnd)
     Serial_SetSignalCallback(&g_serial, (SERIAL_SIGNAL_CB)OnEsptoolSignal);
     ResetSignalState();
 
+    /* Clear volatile eFuse regions on new connection */
+    fesp_efuse_clear_volatile(&g_chip);
+
     TRACE_FW(TAG, "Serial_Open succeeded");
 
     /* Save last connected port */

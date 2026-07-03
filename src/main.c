@@ -598,6 +598,12 @@ static LRESULT Main_OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
             return 0;
         HMENU hPopup = GetSubMenu(hMenu, 0);
 
+        /* Disable eFuse options for ESP8266 */
+        if (g_chip.type == FESP_CHIP_ESP8266) {
+            EnableMenuItem(hPopup, IDM_EFUSE_IMPORT, MF_GRAYED);
+            EnableMenuItem(hPopup, IDM_EFUSE_EXPORT, MF_GRAYED);
+        }
+
         POINT pt = {nmtb->rcButton.right, nmtb->rcButton.bottom};
         ClientToScreen(nmtb->hdr.hwndFrom, &pt);
         TrackPopupMenu(hPopup, TPM_RIGHTALIGN | TPM_TOPALIGN, pt.x, pt.y,

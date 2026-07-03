@@ -45,4 +45,14 @@ void fesp_efuse_set_flash_encryption(fesp_chip_ctx_t *ctx, int mode);
 void fesp_efuse_set_download_mode(fesp_chip_ctx_t *ctx, int mode);
 void fesp_efuse_apply_block0_defaults(fesp_chip_ctx_t *ctx);
 
+/*
+ * fesp_efuse_clear_volatile - Clear volatile eFuse regions
+ *
+ * Zeros PGM registers and control registers in the efuse array.
+ * Called on serial connect and reset to simulate hardware behavior.
+ *
+ * @ctx: Pointer to chip context
+ */
+void fesp_efuse_clear_volatile(fesp_chip_ctx_t *ctx);
+
 #endif /* FESP_EFUSE_H */

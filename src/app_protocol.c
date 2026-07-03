@@ -7,6 +7,7 @@
 
 #include "app_protocol.h"
 #include "fesptool/chip.h"
+#include "fesptool/efuse.h"
 #include "fesptool/esptool.h"
 #include "main.h"
 #include "utils/trace.h"
@@ -138,6 +139,7 @@ void OnEsptoolSignal(SERIAL_CTX *ctx, DWORD modemStatus, HWND hNotify)
         } else if (g_reset_pending && !dsr && !cts) {
             if (g_saw_io0_low) {
                 Serial_PostLog(hNotify, L"SIG", L"Download mode entered");
+                fesp_efuse_clear_volatile(&g_chip);
                 OutputBootMessage(ctx, TRUE, 0x01, hNotify);
             } else {
                 Serial_PostLog(hNotify, L"SIG", L"Hard reset (normal boot)");

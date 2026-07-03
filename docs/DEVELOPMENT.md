@@ -553,6 +553,59 @@ efuse = NULL;
 - 释放后将指针置为 `NULL`，防止悬挂指针
 - GUI 层（`app_commands.c`、`app_logview.c`、`serial.c`、`dlg/*.c`）可继续使用 `HeapAlloc`/`HeapFree`
 
+### 本地化字符串（LoadStr）
+
+GUI 层通过 `LoadStr(id)` 加载本地化字符串，内部使用 `LoadStringW` 从资源表读取。
+
+**实现机制（`utils/lang.c`）：**
+
+- 使用 **环形缓冲池**（4 个 256 宽字符缓冲区），轮转分配
+- 同一表达式中的多个 `LoadStr` 调用不会相互覆盖
+
+**使用约束：**
+
+1. **并发上限**：同一表达式中最多 4 个 `LoadStr` 调用同时存活（当前最大并发为 2，如 `MessageBoxW(LoadStr(A), LoadStr(B))`）
+2. **缓冲区长度**：返回的字符串最长 255 字符（`STR_BUF_LEN - 1`）
+3. **生命周期**：返回的指针指向静态缓冲区，下一次 `LoadStr` 调用可能覆盖旧值。不要跨语句保存指针：
+   ```c
+   // ✗ 错误 - 第二次 LoadStr 可能覆盖第一个
+   const WCHAR *a = LoadStr(IDS_MSG_ERROR);
+   const WCHAR *b = LoadStr(IDS_MSG_WARNING);
+   MessageBoxW(hWnd, a, b, MB_OK);
+
+   // ✓ 正确 - 同一表达式内使用
+   MessageBoxW(hWnd, LoadStr(IDS_MSG_ERROR), LoadStr(IDS_MSG_WARNING), MB_OK);
+   ```
+4. **循环中使用**：避免在循环体内调用 `LoadStr`，除非结果立即消费：
+   ```c
+   // ✗ 危险 - 循环中缓冲区被反复覆盖
+   for (int i = 0; i < n; i++) {
+       const WCHAR *s = LoadStr(ids[i]);
+       // s 指向的缓冲区可能在下次迭代被覆盖
+   }
+
+   // ✓ 安全 - 直接使用返回值
+   for (int i = 0; i < n; i++) {
+       ListView_SetItemText(hList, i, 0, (LPWSTR)LoadStr(ids[i]));
+   }
+   ```
+5. **格式化输出**：配合 `wsprintfW` 使用时，格式串本身占用一个缓冲区：
+   ```c
+   WCHAR msg[256];
+   // LoadStr 占用 1 个缓冲区（格式串），结果写入 msg
+   wsprintfW(msg, LoadStr(IDS_MSG_FLASH_MISMATCH), fileSize, flashSize);
+   // 此处可安全再调用 LoadStr
+   MessageBoxW(hWnd, msg, LoadStr(IDS_MSG_ERROR), MB_OK | MB_ICONERROR);
+   ```
+
+**变更审查要求：**
+
+GUI 代码涉及 `LoadStr` 使用变更后，必须重新审查以下内容：
+- 同一表达式中的 `LoadStr` 调用数量是否超过 4 个
+- 是否有跨语句保存 `LoadStr` 返回指针的情况
+- 循环体中是否有多次 `LoadStr` 调用且结果未立即消费
+- `STR_POOL_SIZE` 和 `STR_BUF_LEN` 是否仍满足需求
+
 ## 调试
 
 ### 启用日志
@@ -857,3 +910,42 @@ FLASH_DEFL_END → 解压 → 写入 flash → 释放缓冲区
 - 如果超时成为问题，可考虑在 `FLASH_DEFL_END` 时就处理（但 ROM 模式不发 END）
 
 **开发建议：** 实现后使用 Python esptool 的 ROM 模式进行多文件烧录测试，验证是否超时。
+
+## .esp 设备文件格式 v2
+
+### 背景
+
+v1 格式将 eFuse 存储为完整寄存器地址空间（288/512 字节），包含 PGM 寄存器、CLK/CONF/CMD 控制寄存器等易失性内容。这些在真实硬件上掉电不保留，QEMU/esp-emulator 也不使用。
+
+v2 格式仅保存块读数据（ROM 部分），与 QEMU 和 esp-emulator 格式兼容。
+
+### 各芯片块数据布局
+
+基于 espefuse `mem_definition.py` 中的块偏移和字数定义：
+
+| 芯片系列 | 块数据大小 | 块数量 |
+|----------|-----------|--------|
+| ESP32 | 124 字节 | 4 |
+| ESP32-C2 | 84 字节 | 4 |
+| S2/S3/C3/C5/C6/C61/H2/P4 | 336 字节 | 11 |
+| ESP32-S31 | 296 字节 | 10 |
+
+块数据从 efuse 数组中按偏移提取并打包为连续字节流。`device_file.c` 中的 `efuse_block_desc_t` 表定义了各芯片的块偏移和字数。
+
+### 向后兼容
+
+加载 v1 文件时自动提取块数据：检测 `version == 1`，从完整 efuse 数组中按块偏移提取有效数据，忽略易失性区域。
+
+### eFuse 导入导出
+
+菜单功能：Storage > Import eFuse / Export eFuse。
+
+- **导出**：调用 `DeviceFile_ExportEfuseBlocks` 提取打包块数据，保存为 `.bin`
+- **导入**：调用 `DeviceFile_ImportEfuseBlocks` 将块数据写回 efuse 数组对应偏移
+- ESP8266 无块结构，菜单项禁用
+
+### espefuse --virt 格式对比
+
+espefuse `--virt --path-efuse-file` 使用完整寄存器地址空间（512 字节），与 v1 格式类似。QEMU/esp-emulator 使用块数据格式（v2）。
+
+两种格式可通过 `tools/efuse_convert.py` 相互转换。
