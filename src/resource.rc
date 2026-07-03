@@ -23,16 +23,16 @@ IDR_MAIN_MENU MENUEX
 {
   POPUP "&Device", 0, 0, 0
   {
-    MENUITEM "&New Device...       Ctrl+N", IDM_NEW_DEVICE, 0, 0
-    MENUITEM "&Open Device...      Ctrl+O", IDM_OPEN_DEVICE, 0, 0
-    MENUITEM "&Save Device         Ctrl+S", IDM_SAVE_DEVICE, 0, 0
-    MENUITEM "Save Device &As...   F12", IDM_SAVE_DEVICE_AS, 0, 0
+    MENUITEM "&New Device...\tCtrl+N", IDM_NEW_DEVICE, 0, 0
+    MENUITEM "&Open Device...\tCtrl+O", IDM_OPEN_DEVICE, 0, 0
+    MENUITEM "&Save Device\tCtrl+S", IDM_SAVE_DEVICE, 0, 0
+    MENUITEM "Save Device &As...\tF12", IDM_SAVE_DEVICE_AS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "Dump Device As...", IDM_DUMP_DEVICE_AS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "Device &Properties...", IDM_DEVICE_PROPS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
-    MENUITEM "E&xit", IDM_EXIT, 0, 0
+    MENUITEM "E&xit\tAlt+F4", IDM_EXIT, 0, 0
   }
   POPUP "&Serial", 0, 0, 0
   {
@@ -66,14 +66,30 @@ IDR_MAIN_MENU MENUEX
   }
   POPUP "&Log", 0, 0, 0
   {
-    MENUITEM "&Clear               Ctrl+L", IDM_LOG_CLEAR, 0, 0
+    MENUITEM "&Clear\tCtrl+L", IDM_LOG_CLEAR, 0, 0
     MENUITEM "Save &as...", IDM_LOG_SAVEAS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "&Font...", IDM_LOG_FONT, 0, 0
   }
   POPUP "&Help", 0, 0, 0
   {
-    MENUITEM "&About               F1", IDM_ABOUT, 0, 0
+    MENUITEM "&About\tF1", IDM_ABOUT, 0, 0
+  }
+}
+
+IDR_MNU_FLASH_IMPORT MENUEX
+{
+  POPUP "Import", 0, 0, 0
+  {
+    MENUITEM "Import &eFuse...", IDM_EFUSE_IMPORT, 0, 0
+  }
+}
+
+IDR_MNU_FLASH_EXPORT MENUEX
+{
+  POPUP "Export", 0, 0, 0
+  {
+    MENUITEM "Export eF&use...", IDM_EFUSE_EXPORT, 0, 0
   }
 }
 
@@ -155,23 +171,6 @@ BEGIN
 
     DEFPUSHBUTTON   "&Close", IDC_KEY_CLOSE, 160, 205, 60, 16
 END
-
-IDR_MNU_FLASH_IMPORT MENUEX
-{
-  POPUP "Import", 0, 0, 0
-  {
-    MENUITEM "Import &Flash...", IDM_FLASH_IMPORT, 0, 0
-    MENUITEM "Import &eFuse...", IDM_EFUSE_IMPORT, 0, 0
-  }
-}
-IDR_MNU_FLASH_EXPORT MENUEX
-{
-  POPUP "Export", 0, 0, 0
-  {
-    MENUITEM "Export &Flash...", IDM_FLASH_EXPORT, 0, 0
-    MENUITEM "Export eF&use...", IDM_EFUSE_EXPORT, 0, 0
-  }
-}
 
 STRINGTABLE
 {
@@ -328,21 +327,21 @@ IDR_MAIN_MENU MENUEX
 {
   POPUP "设备(&D)", 0, 0, 0
   {
-    MENUITEM "新设备(&N)...        Ctrl+N", IDM_NEW_DEVICE, 0, 0
-    MENUITEM "打开设备(&O)...      Ctrl+O", IDM_OPEN_DEVICE, 0, 0
-    MENUITEM "保存设备(&S)         Ctrl+S", IDM_SAVE_DEVICE, 0, 0
-    MENUITEM "设备另存为(&A)...    F12", IDM_SAVE_DEVICE_AS, 0, 0
+    MENUITEM "新设备(&N)...\tCtrl+N", IDM_NEW_DEVICE, 0, 0
+    MENUITEM "打开设备(&O)...\tCtrl+O", IDM_OPEN_DEVICE, 0, 0
+    MENUITEM "保存设备(&S)\tCtrl+S", IDM_SAVE_DEVICE, 0, 0
+    MENUITEM "设备另存为(&A)...\tF12", IDM_SAVE_DEVICE_AS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "导出设备到文本文件...", IDM_DUMP_DEVICE_AS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "设备属性(&P)...", IDM_DEVICE_PROPS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
-    MENUITEM "退出(&X)", IDM_EXIT, 0, 0
+    MENUITEM "退出(&X)\tAlt+F4", IDM_EXIT, 0, 0
   }
   POPUP "串口(&S)", 0, 0, 0
   {
     MENUITEM "连接(&C)", IDM_CONNECT, 0, 0
-    MENUITEM "重新连接(&R)         Ctrl+R", IDM_RECONNECT, 0, 0|MFS_GRAYED
+    MENUITEM "重新连接(&R)\tCtrl+R", IDM_RECONNECT, 0, 0|MFS_GRAYED
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "断开链接(&D)", IDM_DISCONNECT, 0, 0|MFS_GRAYED
   }
@@ -371,14 +370,30 @@ IDR_MAIN_MENU MENUEX
   }
   POPUP "日志(&L)", 0, 0, 0
   {
-    MENUITEM "清除(&C)             Ctrl+L", IDM_LOG_CLEAR, 0, 0
+    MENUITEM "清除(&C)\tCtrl+L", IDM_LOG_CLEAR, 0, 0
     MENUITEM "另存为(&A)...", IDM_LOG_SAVEAS, 0, 0
     MENUITEM "", 0, 0|MFT_SEPARATOR, 0
     MENUITEM "字体(&F)...", IDM_LOG_FONT, 0, 0
   }
   POPUP "帮助(&H)", 0, 0, 0
   {
-    MENUITEM "关于(&A)             F1", IDM_ABOUT, 0, 0
+    MENUITEM "关于(&A)\tF1", IDM_ABOUT, 0, 0
+  }
+}
+
+IDR_MNU_FLASH_IMPORT MENUEX
+{
+  POPUP "Import", 0, 0, 0
+  {
+    MENUITEM "导入 eFuse(&U)...", IDM_EFUSE_IMPORT, 0, 0
+  }
+}
+
+IDR_MNU_FLASH_EXPORT MENUEX
+{
+  POPUP "Export", 0, 0, 0
+  {
+    MENUITEM "导出 eFuse(&X)...", IDM_EFUSE_EXPORT, 0, 0
   }
 }
 
@@ -405,23 +420,6 @@ BEGIN
     DEFPUSHBUTTON   "确定", IDOK, 100, 75, 50, 14
     PUSHBUTTON      "取消", IDCANCEL, 170, 75, 50, 14
 END
-
-IDR_MNU_FLASH_IMPORT MENUEX
-{
-  POPUP "Import", 0, 0, 0
-  {
-    MENUITEM "导入 Flash(&I)...", IDM_FLASH_IMPORT, 0, 0
-    MENUITEM "导入 eFuse(&U)...", IDM_EFUSE_IMPORT, 0, 0
-  }
-}
-IDR_MNU_FLASH_EXPORT MENUEX
-{
-  POPUP "Export", 0, 0, 0
-  {
-    MENUITEM "导出 Flash(&E)...", IDM_FLASH_EXPORT, 0, 0
-    MENUITEM "导出 eFuse(&X)...", IDM_EFUSE_EXPORT, 0, 0
-  }
-}
 
 IDD_ABOUT DIALOGEX 0, 0, 220, 100
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
