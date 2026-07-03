@@ -14,7 +14,19 @@
 
 /* Device file format constants */
 #define DEVICE_FILE_MAGIC 0x45535000 /* "ESP\0" */
-#define DEVICE_FILE_VERSION 1
+#define DEVICE_FILE_VERSION 2
+
+/*
+ * DeviceFile_GetEfuseBlockSize - Get eFuse block data size for QEMU format
+ *
+ * Returns the size of eFuse block read data (ROM portion) for the given chip.
+ * ESP8266 returns 0 (no block structure).
+ *
+ * @type: Chip type enum
+ *
+ * Returns block data size in bytes, or 0 for ESP8266.
+ */
+int DeviceFile_GetEfuseBlockSize(fesp_chip_type_t type);
 
 /*
  * DeviceFile_Save - Save device state to .esp file

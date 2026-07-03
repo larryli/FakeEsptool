@@ -14,10 +14,102 @@
 static const char *TAG = "DEV";
 #endif
 
+/* Block descriptor: offset in efuse array and word count (32-bit words) */
+typedef struct {
+    uint16_t offset;
+    uint8_t words;
+} efuse_block_desc_t;
+
+/* ESP32 blocks: 4 blocks */
+static const efuse_block_desc_t blocks_esp32[] = {
+    {0x000, 7}, {0x038, 8}, {0x058, 8}, {0x078, 8},
+};
+
+/* ESP32-C2 blocks: 4 blocks */
+static const efuse_block_desc_t blocks_c2[] = {
+    {0x02C, 2}, {0x034, 3}, {0x040, 8}, {0x060, 8},
+};
+
+/* S2/S3/C3/C5/C6/C61/H2/P4 blocks: 11 blocks */
+static const efuse_block_desc_t blocks_new_arch[] = {
+    {0x02C, 6}, {0x044, 6}, {0x05C, 8}, {0x07C, 8},
+    {0x09C, 8}, {0x0BC, 8}, {0x0DC, 8}, {0x0FC, 8},
+    {0x11C, 8}, {0x13C, 8}, {0x15C, 8},
+};
+
+/* ESP32-S31 blocks: 10 blocks (no KEY5) */
+static const efuse_block_desc_t blocks_s31[] = {
+    {0x02C, 9}, {0x050, 6}, {0x068, 8}, {0x088, 8},
+    {0x0A8, 8}, {0x0C8, 8}, {0x0E8, 8}, {0x108, 8},
+    {0x128, 8}, {0x148, 8},
+};
+
+static const efuse_block_desc_t *get_block_desc(fesp_chip_type_t type,
+                                                 int *count)
+{
+    switch (type) {
+    case FESP_CHIP_ESP32:
+        *count = 4;
+        return blocks_esp32;
+    case FESP_CHIP_ESP32C2:
+        *count = 4;
+        return blocks_c2;
+    case FESP_CHIP_ESP32S31:
+        *count = 10;
+        return blocks_s31;
+    default:
+        *count = 11;
+        return blocks_new_arch;
+    }
+}
+
+/*
+ * eFuse block data sizes per chip (QEMU-compatible packed format)
+ */
+static const int efuse_block_sizes[FESP_CHIP_COUNT] = {
+    [FESP_CHIP_ESP8266] = 0,
+    [FESP_CHIP_ESP32] = 124,
+    [FESP_CHIP_ESP32S2] = 336,
+    [FESP_CHIP_ESP32S3] = 336,
+    [FESP_CHIP_ESP32C2] = 84,
+    [FESP_CHIP_ESP32C3] = 336,
+    [FESP_CHIP_ESP32C6] = 336,
+    [FESP_CHIP_ESP32C5] = 336,
+    [FESP_CHIP_ESP32C61] = 336,
+    [FESP_CHIP_ESP32H2] = 336,
+    [FESP_CHIP_ESP32P4] = 336,
+    [FESP_CHIP_ESP32S31] = 296,
+};
+
+int DeviceFile_GetEfuseBlockSize(fesp_chip_type_t type)
+{
+    if (type < FESP_CHIP_COUNT)
+        return efuse_block_sizes[type];
+    return 0;
+}
+
+static void extract_efuse_blocks(const uint8_t *efuse, int efuse_size,
+                                 uint8_t *out, fesp_chip_type_t type)
+{
+    int count;
+    const efuse_block_desc_t *desc = get_block_desc(type, &count);
+    int dst = 0;
+    for (int i = 0; i < count; i++) {
+        int src_ofs = desc[i].offset;
+        int bytes = desc[i].words * 4;
+        if (src_ofs + bytes <= efuse_size) {
+            memcpy(out + dst, efuse + src_ofs, bytes);
+        }
+        dst += bytes;
+    }
+}
+
 /*
  * DeviceFile_Save - Save device state to .esp file
  *
- * Writes chip config, eFuse data, and flash data to binary file.
+ * Writes chip config, eFuse block data, and flash data to binary file.
+ * ESP8266: always saves full efuse array (v1 style).
+ * Others: saves packed block data (v2), compatible with QEMU/esp-emulator.
  * On failure, deletes the partially written file.
  */
 BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
@@ -32,13 +124,20 @@ BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
 
     DWORD written;
     DWORD magic = DEVICE_FILE_MAGIC;
-    DWORD version = DEVICE_FILE_VERSION;
+    BOOL is_esp8266 = (chip->type == FESP_CHIP_ESP8266);
+    DWORD version = is_esp8266 ? 1 : DEVICE_FILE_VERSION;
     DWORD chipType = (DWORD)chip->type;
     BYTE xtalFreq = chip->xtal_freq;
     BYTE reserved3[3] = {0};
     DWORD flashSize = flash->size;
-    DWORD efuseSize = (DWORD)chip->efuse_size;
+    DWORD efuseSize;
     BOOL ok = TRUE;
+
+    if (is_esp8266) {
+        efuseSize = (DWORD)chip->efuse_size;
+    } else {
+        efuseSize = (DWORD)DeviceFile_GetEfuseBlockSize(chip->type);
+    }
 
     /* Header (16 bytes) */
     ok = ok && WriteFile(hFile, &magic, 4, &written, NULL) && written == 4;
@@ -57,8 +156,24 @@ BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
     /* eFuse (variable) */
     ok = ok && WriteFile(hFile, &efuseSize, 4, &written, NULL) && written == 4;
     if (efuseSize > 0 && chip->efuse) {
-        ok = ok && WriteFile(hFile, chip->efuse, efuseSize, &written, NULL) &&
-             written == efuseSize;
+        if (is_esp8266) {
+            ok = ok && WriteFile(hFile, chip->efuse, efuseSize, &written,
+                                 NULL) &&
+                 written == efuseSize;
+        } else {
+            uint8_t *blockBuf = (uint8_t *)HeapAlloc(GetProcessHeap(), 0,
+                                                      efuseSize);
+            if (blockBuf) {
+                extract_efuse_blocks(chip->efuse, chip->efuse_size, blockBuf,
+                                     chip->type);
+                ok = ok && WriteFile(hFile, blockBuf, efuseSize, &written,
+                                     NULL) &&
+                     written == efuseSize;
+                HeapFree(GetProcessHeap(), 0, blockBuf);
+            } else {
+                ok = FALSE;
+            }
+        }
     }
 
     /* Flash data (variable) */
@@ -81,7 +196,7 @@ BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
         return FALSE;
     }
 
-    TRACE_PROTO(TAG, "Device saved: %S", filename);
+    TRACE_PROTO(TAG, "Device saved: %S (v%lu)", filename, version);
     return TRUE;
 }
 
@@ -89,8 +204,9 @@ BOOL DeviceFile_Save(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
  * DeviceFile_Load - Load device state from .esp file
  *
  * Reads chip config, eFuse data, and flash data from binary file.
- * Validates magic number and version. Calls fesp_chip_close/fesp_flash_close
- * internally before re-initializing with loaded data.
+ * Validates magic number and version. v1: full efuse array.
+ * v2: packed block data (QEMU-compatible). ESP8266 always uses v1.
+ * Calls fesp_chip_close/fesp_flash_close internally before re-initializing.
  */
 BOOL DeviceFile_Load(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
                      const WCHAR *filename)
@@ -119,7 +235,7 @@ BOOL DeviceFile_Load(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
     }
 
     ok = ok && ReadFile(hFile, &version, 4, &read, NULL) && read == 4;
-    if (!ok || version != DEVICE_FILE_VERSION) {
+    if (!ok || (version != 1 && version != DEVICE_FILE_VERSION)) {
         CloseHandle(hFile);
         TRACE_PROTO(TAG, "Unsupported version: %lu", version);
         return FALSE;
@@ -170,19 +286,58 @@ BOOL DeviceFile_Load(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
     }
 
     if (efuseSize > 0) {
-        if (efuseSize <= (DWORD)chip->efuse_size) {
-            ok = ReadFile(hFile, chip->efuse, efuseSize, &read, NULL) &&
-                 read == efuseSize;
-            if (!ok) {
-                CloseHandle(hFile);
-                TRACE_PROTO(TAG, "Failed to read efuse data");
-                fesp_chip_close(chip);
-                return FALSE;
+        if (version == 1 || chipType == FESP_CHIP_ESP8266) {
+            /* v1: read full efuse array directly */
+            if (efuseSize <= (DWORD)chip->efuse_size) {
+                ok = ReadFile(hFile, chip->efuse, efuseSize, &read, NULL) &&
+                     read == efuseSize;
+            } else {
+                SetFilePointer(hFile, efuseSize, NULL, FILE_CURRENT);
+                TRACE_PROTO(TAG,
+                            "Warning: efuse size mismatch (file=%lu, chip=%d)",
+                            efuseSize, chip->efuse_size);
             }
         } else {
-            SetFilePointer(hFile, efuseSize, NULL, FILE_CURRENT);
-            TRACE_PROTO(TAG, "Warning: efuse size mismatch (file=%lu, chip=%d)",
-                        efuseSize, chip->efuse_size);
+            /* v2: read packed block data and unpack into efuse array */
+            int blockSize = DeviceFile_GetEfuseBlockSize(chip->type);
+            if (blockSize > 0 && efuseSize == (DWORD)blockSize) {
+                uint8_t *blockBuf = (uint8_t *)HeapAlloc(GetProcessHeap(), 0,
+                                                          efuseSize);
+                if (blockBuf) {
+                    ok = ReadFile(hFile, blockBuf, efuseSize, &read, NULL) &&
+                         read == efuseSize;
+                    if (ok) {
+                        int count;
+                        const efuse_block_desc_t *desc =
+                            get_block_desc(chip->type, &count);
+                        int src = 0;
+                        for (int i = 0; i < count; i++) {
+                            int dst_ofs = desc[i].offset;
+                            int bytes = desc[i].words * 4;
+                            if (dst_ofs + bytes <= chip->efuse_size) {
+                                memcpy(chip->efuse + dst_ofs, blockBuf + src,
+                                       bytes);
+                            }
+                            src += bytes;
+                        }
+                    }
+                    HeapFree(GetProcessHeap(), 0, blockBuf);
+                } else {
+                    ok = FALSE;
+                }
+            } else {
+                SetFilePointer(hFile, efuseSize, NULL, FILE_CURRENT);
+                TRACE_PROTO(TAG,
+                            "Warning: v2 efuse size mismatch (file=%lu, "
+                            "expected=%d)",
+                            efuseSize, blockSize);
+            }
+        }
+        if (!ok) {
+            CloseHandle(hFile);
+            TRACE_PROTO(TAG, "Failed to read efuse data");
+            fesp_chip_close(chip);
+            return FALSE;
         }
     }
 
@@ -211,7 +366,7 @@ BOOL DeviceFile_Load(fesp_chip_ctx_t *chip, fesp_flash_ctx_t *flash,
 
     CloseHandle(hFile);
 
-    TRACE_PROTO(TAG, "Device loaded: %s, %lu MB", chip->name,
-                flashSize / (1024 * 1024));
+    TRACE_PROTO(TAG, "Device loaded: %s, %lu MB (v%lu)", chip->name,
+                flashSize / (1024 * 1024), version);
     return TRUE;
 }
