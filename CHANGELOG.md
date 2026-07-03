@@ -4,6 +4,45 @@
 
 ---
 
+## [2026.7.3.0] - 2026-07-03
+
+### 功能增强
+
+- **eFuse 块数据导入导出（QEMU 兼容）**：
+  - 新增 Storage 菜单 Import eFuse / Export eFuse 功能
+  - 导出格式与 QEMU/esp-emulator 块数据格式兼容
+  - 支持所有芯片（ESP8266 菜单禁用）
+  - 工具栏导入/导出按钮改为下拉菜单，包含 Flash 和 eFuse 选项
+- **eFuse 易失数据清除**：
+  - 串口连接和设备收到 RESET 信号时，自动清除 eFuse 易失性区域（PGM 寄存器、控制寄存器）
+  - 2 线连接（无 DTR/RTS）下通过断开重连触发清除
+- **.esp 设备文件格式升级 v2**：
+  - 新芯片保存 v2 格式：eFuse 仅包含块读数据（QEMU 兼容）
+  - ESP8266 保持 v1 格式
+  - v1 文件加载自动兼容，提取块数据
+- **文件对话框标题**：
+  - 所有 Open/Save 对话框添加中英文标题
+- **工具栏下拉菜单**：
+  - Import/Export 按钮改为下拉样式，支持 Flash 和 eFuse 选项
+  - ESP8266 时 eFuse 选项禁用
+
+### 工具
+
+- **efuse_convert.py**：
+  - 新增 QEMU 块数据格式 ↔ espefuse --virt 格式相互转换脚本
+  - 支持全部 11 种芯片
+
+### 编码改进
+
+- 启用 C11 安全字符串函数（`__STDC_WANT_LIB_EXT1__`）
+- 全部 `wcscpy`/`wcscat`/`swprintf` 替换为 `_s` 安全版本
+
+### 文档
+
+- REQUIREMENTS.md：新增 eFuse 导入导出菜单说明、设备文件格式 v2 描述、工具栏下拉菜单说明
+- DEVELOPMENT.md：新增 .esp v2 格式说明、eFuse 导入导出实现、espefuse --virt 格式对比、LoadStr 使用规范
+- README.md：2 线连接说明补充 PGM 限制和 RESET 信号说明
+
 ## [2026.6.29.0] - 2026-06-29
 
 ### 功能增强
