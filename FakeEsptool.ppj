@@ -9,7 +9,7 @@ POC_PROJECT_MODE = Release#
 POC_PROJECT_RESULTDIR = .#
 POC_PROJECT_OUTPUTDIR = output#
 !if "$(POC_PROJECT_MODE)" == "Release"
-CCFLAGS = -Tx64-coff -arch:AVX2 -std:C11 -Ot -Ox -Ob1 -fp:precise -W1 -Gz -Ze -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -D_CRT_SECURE_NO_WARNINGS#
+CCFLAGS = -Tx64-coff -arch:AVX2 -std:C11 -Ot -Ox -Ob1 -fp:precise -W1 -Gz -Ze -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -D_CRT_SECURE_NO_WARNINGS -D__STDC_WANT_LIB_EXT1__=1#
 ASFLAGS = -AAMD64 -Gz#
 RCFLAGS = #
 LINKFLAGS = -machine:x64 -subsystem:windows kernel32.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib setupapi.lib shlwapi.lib uuid.lib Shell32.lib Version.lib#
@@ -26,7 +26,7 @@ POC_PROJECT_ARGUMENTS = #
 POC_PROJECT_WORKPATH = .#
 POC_PROJECT_ZIPEXTRA = #
 !elseif "$(POC_PROJECT_MODE)" == "Debug"
-CCFLAGS = -Tx64-coff -std:C11 -Zi -MT -Ot -Ob1 -fp:precise -W1 -Gz -Ze -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -D_CRT_SECURE_NO_WARNINGS -DENABLE_TRACE_FW=1 -DENABLE_TRACE_PROTO=1#
+CCFLAGS = -Tx64-coff -std:C11 -Zi -MT -Ot -Ob1 -fp:precise -W1 -Gz -Ze -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -D_CRT_SECURE_NO_WARNINGS -D__STDC_WANT_LIB_EXT1__=1 -DENABLE_TRACE_FW=1 -DENABLE_TRACE_PROTO=1#
 ASFLAGS = -AAMD64 -Zi -Gz#
 RCFLAGS = #
 LINKFLAGS = -machine:x64 -debug -debugtype:both -subsystem:windows kernel32.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib setupapi.lib shlwapi.lib uuid.lib Shell32.lib Version.lib#

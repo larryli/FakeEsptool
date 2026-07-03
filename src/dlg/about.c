@@ -35,23 +35,23 @@ INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
                     TCHAR szBuf[MAX_PATH];
 
                     /* Product name + version */
-                    swprintf(szBuf, MAX_PATH,
+                    (void)swprintf_s(szBuf, MAX_PATH,
                              L"\\StringFileInfo\\%04X%04X\\%ls", *pLang,
                              *(pLang + 1), L"ProductName");
                     if (VerQueryValue(pInfo, szBuf, &ptr, &size)) {
                         void *ptr2;
-                        swprintf(szBuf, MAX_PATH,
+                        (void)swprintf_s(szBuf, MAX_PATH,
                                  L"\\StringFileInfo\\%04X%04X\\%ls", *pLang,
                                  *(pLang + 1), L"ProductVersion");
                         if (VerQueryValue(pInfo, szBuf, &ptr2, &size)) {
-                            swprintf(szBuf, MAX_PATH, L"%ls v%ls", (LPTSTR)ptr,
+                            (void)swprintf_s(szBuf, MAX_PATH, L"%ls v%ls", (LPTSTR)ptr,
                                      (LPTSTR)ptr2);
                             SetDlgItemText(hDlg, IDD_APPNAME, szBuf);
                         }
                     }
 
                     /* Copyright */
-                    swprintf(szBuf, MAX_PATH,
+                    (void)swprintf_s(szBuf, MAX_PATH,
                              L"\\StringFileInfo\\%04X%04X\\%ls", *pLang,
                              *(pLang + 1), L"LegalCopyright");
                     if (VerQueryValue(pInfo, szBuf, &ptr, &size)) {

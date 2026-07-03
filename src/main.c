@@ -839,7 +839,7 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
         if (DeviceFile_Load(&g_chip, &g_flash, cmdFilePath)) {
             Config_SetLastDeviceFile(cmdFilePath);
             g_deviceModified = FALSE;
-            wcscpy(g_deviceFile, cmdFilePath);
+            (void)wcscpy_s(g_deviceFile, MAX_PATH, cmdFilePath);
             UpdateStatusBar();
             UpdateTitle(hWnd);
             SetWindowTextW(g_hEdit, L"");
@@ -866,7 +866,7 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam)
             if (ret == IDYES) {
                 if (DeviceFile_Load(&g_chip, &g_flash, lastFile)) {
                     g_deviceModified = FALSE;
-                    wcscpy(g_deviceFile, lastFile);
+                    (void)wcscpy_s(g_deviceFile, MAX_PATH, lastFile);
                     UpdateMenuState(hWnd);
                     UpdateStatusBar();
                     UpdateTitle(hWnd);
@@ -1117,7 +1117,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         if (cmdFilePath[0]) {
             WCHAR fullPath[MAX_PATH] = {0};
             if (GetFullPathNameW(cmdFilePath, MAX_PATH, fullPath, NULL)) {
-                wcscpy(cmdFilePath, fullPath);
+                (void)wcscpy_s(cmdFilePath, MAX_PATH, fullPath);
             }
         }
     }
@@ -1206,7 +1206,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         DWORD attr = GetFileAttributesW(cmdFilePath);
         if (attr != INVALID_FILE_ATTRIBUTES &&
             !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
-            wcscpy(s_cmdFilePath, cmdFilePath);
+            (void)wcscpy_s(s_cmdFilePath, MAX_PATH, cmdFilePath);
         } else {
             TRACE_FW(TAG, "Command line file not found: %ls", cmdFilePath);
             MessageBoxW(NULL, LoadStr(IDS_MSG_FILE_NOT_FOUND),

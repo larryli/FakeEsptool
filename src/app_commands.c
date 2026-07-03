@@ -1219,8 +1219,8 @@ void Main_OnFlashExport(HWND hMainWnd)
     /* Default filename: chipname_flash.bin */
     WCHAR defName[MAX_PATH];
     MultiByteToWideChar(CP_UTF8, 0, g_chip.name, -1, defName, MAX_PATH);
-    wcscat(defName, L"_flash.bin");
-    wcscpy(szFile, defName);
+    (void)wcscat_s(defName, MAX_PATH, L"_flash.bin");
+    (void)wcscpy_s(szFile, MAX_PATH, defName);
 
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hMainWnd;
@@ -1410,8 +1410,8 @@ void Main_OnEfuseExport(HWND hMainWnd)
     /* Default filename: chipname_efuse.bin */
     WCHAR defName[MAX_PATH];
     MultiByteToWideChar(CP_UTF8, 0, g_chip.name, -1, defName, MAX_PATH);
-    wcscat(defName, L"_efuse.bin");
-    wcscpy(szFile, defName);
+    (void)wcscat_s(defName, MAX_PATH, L"_efuse.bin");
+    (void)wcscpy_s(szFile, MAX_PATH, defName);
     ofn.lpstrFile = szFile;
 
     if (!GetSaveFileNameW(&ofn)) {
@@ -2110,7 +2110,7 @@ void Main_OnDumpDeviceAs(HWND hMainWnd)
     /* Copy device info */
     snap->chip = g_chip;
     snap->flash = g_flash;
-    wcscpy(snap->deviceFile, g_deviceFile);
+    (void)wcscpy_s(snap->deviceFile, MAX_PATH, g_deviceFile);
     snap->hWnd = hMainWnd;
     lstrcpyW(snap->filename, szFile);
 

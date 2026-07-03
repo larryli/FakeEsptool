@@ -12,6 +12,9 @@ project(FakeEsptool C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+# Enable C11 safe functions (_s suffix)
+add_compile_definitions(__STDC_WANT_LIB_EXT1__=1)
+
 # Source files
 add_executable(FakeEsptool WIN32
     src/main.c
