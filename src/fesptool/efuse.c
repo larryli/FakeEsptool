@@ -83,6 +83,37 @@ static const uint8_t efuse_block_lengths_esp32[] = {
     8, /* BLOCK3 */
 };
 
+/* ESP32-S31 eFuse block lengths in words
+ * Source: espefuse/efuse/esp32s31/mem_definition.py (BLOCK0 = 9, BLOCK1 = 6) */
+static const uint8_t efuse_block_lengths_s31[] = {
+    9, /* BLOCK0 */
+    6, /* BLOCK1/MAC */
+    8, /* BLOCK2/SYS_DATA */
+    8, /* BLOCK3/USR_DATA */
+    8, /* BLOCK_KEY0 */
+    8, /* BLOCK_KEY1 */
+    8, /* BLOCK_KEY2 */
+    8, /* BLOCK_KEY3 */
+    8, /* BLOCK_KEY4 */
+    8, /* BLOCK_SYS_DATA2 */
+};
+
+/* ESP32-S2/S3 eFuse block lengths in words
+ * Source: espefuse/efuse/esp32s2/mem_definition.py (BLOCK0 = 6, BLOCK1 = 6) */
+static const uint8_t efuse_block_lengths_s2[] = {
+    6, /* BLOCK0 */
+    6, /* BLOCK1/MAC */
+    8, /* BLOCK2/SYS_DATA */
+    8, /* BLOCK3/USR_DATA */
+    8, /* BLOCK_KEY0 */
+    8, /* BLOCK_KEY1 */
+    8, /* BLOCK_KEY2 */
+    8, /* BLOCK_KEY3 */
+    8, /* BLOCK_KEY4 */
+    8, /* BLOCK_KEY5 */
+    8, /* BLOCK_SYS_DATA2 */
+};
+
 /* ESP32 eFuse block write offsets (from EFUSE_RD_REG_BASE 0x3FF5A000) */
 static const uint32_t efuse_block_wr_offsets_esp32[] = {
     0x01C, /* BLOCK0 write */
@@ -188,7 +219,7 @@ bool fesp_chip_write_reg_modern(fesp_chip_ctx_t *ctx, int offset, uint32_t val)
     /* PGM_DATA registers */
     if (offset < EFUSE_PGM_DATA_SIZE && (offset & 3) == 0) {
         int idx = offset / 4;
-        if (idx < 8) {
+        if (idx < EFUSE_PGM_DATA_SIZE / 4) { /* 11 words: PGM_DATA0-7 + CHECK_VALUE0-2 */
             ctx->pgm_data[idx] = val;
             FESP_HAL_LOGD(TAG, "PGM_DATA%d = 0x%08lX", idx, val);
         }
@@ -207,16 +238,25 @@ bool fesp_chip_write_reg_modern(fesp_chip_ctx_t *ctx, int offset, uint32_t val)
         if (val & 0x02) {
             int block = (int)((val >> 2) & 0xF);
             const uint32_t *block_offsets = NULL;
+            const uint8_t *block_lengths = NULL;
             int num_blocks = 0;
+            int num_lengths = 0;
 
             switch (ctx->type) {
+            case FESP_CHIP_ESP32S31:
+                block_offsets = efuse_block_offsets_s31;
+                num_blocks = (int)(sizeof(efuse_block_offsets_s31) /
+                                   sizeof(efuse_block_offsets_s31[0]));
+                block_lengths = efuse_block_lengths_s31;
+                num_lengths = (int)(sizeof(efuse_block_lengths_s31) /
+                                    sizeof(efuse_block_lengths_s31[0]));
+                break;
             case FESP_CHIP_ESP32C3:
             case FESP_CHIP_ESP32C6:
             case FESP_CHIP_ESP32C5:
             case FESP_CHIP_ESP32C61:
             case FESP_CHIP_ESP32H2:
             case FESP_CHIP_ESP32P4:
-            case FESP_CHIP_ESP32S31:
                 block_offsets = efuse_block_offsets_s31;
                 num_blocks = (int)(sizeof(efuse_block_offsets_s31) /
                                    sizeof(efuse_block_offsets_s31[0]));
@@ -226,6 +266,9 @@ bool fesp_chip_write_reg_modern(fesp_chip_ctx_t *ctx, int offset, uint32_t val)
                 block_offsets = efuse_block_offsets_s2;
                 num_blocks = (int)(sizeof(efuse_block_offsets_s2) /
                                    sizeof(efuse_block_offsets_s2[0]));
+                block_lengths = efuse_block_lengths_s2;
+                num_lengths = (int)(sizeof(efuse_block_lengths_s2) /
+                                    sizeof(efuse_block_lengths_s2[0]));
                 break;
             case FESP_CHIP_ESP32C2:
                 block_offsets = efuse_block_offsets_c2;
@@ -238,11 +281,15 @@ bool fesp_chip_write_reg_modern(fesp_chip_ctx_t *ctx, int offset, uint32_t val)
 
             if (block_offsets && block < num_blocks) {
                 int block_offset = (int)block_offsets[block];
-                for (int i = 0; i < 8; i++) {
+                int block_len = (block_lengths && block < num_lengths)
+                                    ? (int)block_lengths[block]
+                                    : 8;
+                for (int i = 0; i < block_len; i++) {
                     efuse_write32(ctx, block_offset + i * 4, ctx->pgm_data[i]);
                 }
-                FESP_HAL_LOGD(TAG, "eFuse BURN block%d at offset 0x%X", block,
-                              block_offset);
+                FESP_HAL_LOGD(TAG, "eFuse BURN block%d at offset 0x%X (%d words)",
+                              block, block_offset, block_len);
+                memset(ctx->pgm_data, 0, sizeof(ctx->pgm_data));
             }
         }
         return true;
