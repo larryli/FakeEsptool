@@ -27,6 +27,21 @@ static const uint32_t efuse_block_offsets_c3[] = {
     0x15C, /* BLOCK_SYS_DATA2 (8 words) */
 };
 
+/* ESP32-S31 eFuse block read-back offsets
+ * Source: espefuse/efuse/esp32s31/mem_definition.py __base_rd_regs offsets */
+static const uint32_t efuse_block_offsets_s31[] = {
+    0x02C, /* BLOCK0 (9 words) */
+    0x050, /* BLOCK1/MAC (6 words) */
+    0x068, /* BLOCK2/SYS_DATA (8 words) */
+    0x088, /* BLOCK3/USR_DATA (8 words) */
+    0x0A8, /* BLOCK_KEY0 (8 words) */
+    0x0C8, /* BLOCK_KEY1 (8 words) */
+    0x0E8, /* BLOCK_KEY2 (8 words) */
+    0x108, /* BLOCK_KEY3 (8 words) */
+    0x128, /* BLOCK_KEY4 (8 words) */
+    0x148, /* BLOCK_SYS_DATA2 (8 words) */
+};
+
 /* ESP32-C2 eFuse block read-back offsets (from DR_REG_EFUSE_BASE 0x60008800) */
 static const uint32_t efuse_block_offsets_c2[] = {
     0x02C, /* BLOCK0 */
@@ -202,9 +217,9 @@ bool fesp_chip_write_reg_modern(fesp_chip_ctx_t *ctx, int offset, uint32_t val)
             case FESP_CHIP_ESP32H2:
             case FESP_CHIP_ESP32P4:
             case FESP_CHIP_ESP32S31:
-                block_offsets = efuse_block_offsets_c3;
-                num_blocks = (int)(sizeof(efuse_block_offsets_c3) /
-                                   sizeof(efuse_block_offsets_c3[0]));
+                block_offsets = efuse_block_offsets_s31;
+                num_blocks = (int)(sizeof(efuse_block_offsets_s31) /
+                                   sizeof(efuse_block_offsets_s31[0]));
                 break;
             case FESP_CHIP_ESP32S2:
             case FESP_CHIP_ESP32S3:
@@ -1276,8 +1291,8 @@ int fesp_efuse_get_encryption_key_offset(const fesp_chip_ctx_t *ctx,
 
     /* ESP32-S31: 5 key blocks, scan KEY_PURPOSE at 0x38 */
     if (ctx->type == FESP_CHIP_ESP32S31) {
-        static const uint32_t s31_key_block_offsets[] = {0x9C, 0xBC, 0xDC, 0xFC,
-                                                         0x11C};
+        static const uint32_t s31_key_block_offsets[] = {0x0A8, 0x0C8, 0x0E8,
+                                                         0x108, 0x128};
         for (int i = 0; i < 5; i++) {
             uint8_t purpose = fesp_efuse_get_key_purpose(ctx, i);
             if (purpose == FESP_KEY_PURPOSE_XTS_AES_128_KEY ||

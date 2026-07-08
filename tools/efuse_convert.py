@@ -2,7 +2,7 @@
 """
 efuse_convert.py - Convert between QEMU/esp-emulator eFuse format and espefuse --virt format.
 
-QEMU/esp-emulator format: packed block read data (124/84/336/296 bytes)
+QEMU/esp-emulator format: packed block read data (124/84/336/316 bytes)
 espefuse --virt format: full register address space (288/512 bytes)
 
 Usage:
@@ -75,7 +75,7 @@ QEMU_SIZES = {
     "esp32c2": 84,
     "esp32s2": 336, "esp32s3": 336, "esp32c3": 336, "esp32c5": 336,
     "esp32c6": 336, "esp32c61": 336, "esp32h2": 336, "esp32p4": 336,
-    "esp32s31": 296,
+    "esp32s31": 316,
 }
 
 # espefuse --virt register space sizes

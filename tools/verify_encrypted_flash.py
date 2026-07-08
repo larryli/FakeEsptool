@@ -105,7 +105,7 @@ KEY_BLOCK_OFFSETS = [0x9C, 0xBC, 0xDC, 0xFC, 0x11C, 0x13C]
 # ESP32-S31: 5 key blocks, 5-bit KEY_PURPOSE fields at 0x38
 S31_KEY_PURPOSE_OFFSET = 0x38
 S31_KEY_PURPOSE_SHIFTS = [0, 5, 10, 15, 20]
-S31_KEY_BLOCK_OFFSETS = [0x9C, 0xBC, 0xDC, 0xFC, 0x11C]
+S31_KEY_BLOCK_OFFSETS = [0x0A8, 0x0C8, 0x0E8, 0x108, 0x128]
 
 # SPI_BOOT_CRYPT_CNT: relative offset within BLOCK0, mask, shift
 SPI_BOOT_CRYPT_CNT_REL = {
@@ -127,6 +127,44 @@ FIXED_KEY_INFO = {
     1: (0x38, 32),   # ESP32: BLOCK1, 256-bit (no KEY_PURPOSE)
     4: (0x60, 32),   # ESP32-C2: BLOCK_KEY0, 256-bit (only one key block)
 }
+
+# eFuse block descriptors per chip_type for .esp v2 packed format.
+# Mirrors src/device_file.c get_block_desc(): (register_offset, word_count).
+# .esp v2 stores QEMU-compatible packed blocks, NOT register space, so the
+# packed data must be expanded into register space before indexing by the
+# register offsets used below (BLOCK0_BASE, KEY_PURPOSE, KEY blocks).
+EFUSE_BLOCKS = {
+    0: (288, []),  # ESP8266: v1 full register array, no packing
+    1: (288, [(0x000, 7), (0x038, 8), (0x058, 8), (0x078, 8)]),
+    4: (512, [(0x02C, 2), (0x034, 3), (0x040, 8), (0x060, 8)]),
+    11: (512, [(0x02C, 9), (0x050, 6), (0x068, 8), (0x088, 8),
+               (0x0A8, 8), (0x0C8, 8), (0x0E8, 8), (0x108, 8),
+               (0x128, 8), (0x148, 8)]),
+}
+# S2/S3/C3/C5/C6/C61/H2/P4: 11-block layout
+EFUSE_BLOCKS_DEFAULT = (512, [(0x02C, 6), (0x044, 6), (0x05C, 8), (0x07C, 8),
+                              (0x09C, 8), (0x0BC, 8), (0x0DC, 8), (0x0FC, 8),
+                              (0x11C, 8), (0x13C, 8), (0x15C, 8)])
+
+
+def get_efuse_blocks(chip_type):
+    """Return (reg_size, blocks) for chip_type; default is 11-block layout."""
+    if chip_type in (2, 3, 5, 6, 7, 8, 9, 10):
+        return EFUSE_BLOCKS_DEFAULT
+    return EFUSE_BLOCKS.get(chip_type, EFUSE_BLOCKS_DEFAULT)
+
+
+def unpack_esp_efuse(packed, chip_type):
+    """Expand .esp v2 packed block data into register-space bytearray."""
+    reg_size, blocks = get_efuse_blocks(chip_type)
+    reg = bytearray(reg_size)
+    src = 0
+    for off, words in blocks:
+        n = words * 4
+        if src + n <= len(packed):
+            reg[off:off + n] = packed[src:src + n]
+        src += n
+    return bytes(reg)
 
 
 def read_device_header(f):
@@ -386,6 +424,11 @@ def verify_encrypted_flash(flash_dir, device_file):
         header = read_device_header(f)
         efuse_data = read_efuse_data(f, header['efuse_size'])
         flash_data = read_flash_data(f, header['efuse_size'], header['flash_size'])
+
+    # .esp v2 stores QEMU-packed eFuse blocks; expand to register space
+    # so that register offsets (BLOCK0_BASE, KEY_PURPOSE, KEY blocks) are valid.
+    if header['version'] == 2 and header['chip_type'] != 0:
+        efuse_data = unpack_esp_efuse(efuse_data, header['chip_type'])
 
     # Calculate device flash MD5
     flash_md5 = calc_md5(flash_data)

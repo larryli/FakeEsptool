@@ -78,7 +78,7 @@ static const int efuse_block_sizes[FESP_CHIP_COUNT] = {
     [FESP_CHIP_ESP32C61] = 336,
     [FESP_CHIP_ESP32H2] = 336,
     [FESP_CHIP_ESP32P4] = 336,
-    [FESP_CHIP_ESP32S31] = 296,
+    [FESP_CHIP_ESP32S31] = 316,
 };
 
 int DeviceFile_GetEfuseBlockSize(fesp_chip_type_t type)

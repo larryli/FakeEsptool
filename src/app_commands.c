@@ -1902,8 +1902,8 @@ static DWORD WINAPI DumpThreadProc(LPVOID lpParam)
     }
     case FESP_CHIP_ESP32S31: {
         static const KEY_INFO s31_keys[] = {
-            {"KEY0", 0x9C, 32}, {"KEY1", 0xBC, 32},  {"KEY2", 0xDC, 32},
-            {"KEY3", 0xFC, 32}, {"KEY4", 0x11C, 32},
+            {"KEY0", 0x0A8, 32}, {"KEY1", 0x0C8, 32},  {"KEY2", 0x0E8, 32},
+            {"KEY3", 0x108, 32}, {"KEY4", 0x128, 32},
         };
         keys = s31_keys;
         key_count = 5;
