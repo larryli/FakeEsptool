@@ -782,7 +782,7 @@ static void handle_flash_defl_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Release mode: reject plaintext writes when encryption is active */
     if (!encrypted && fesp_efuse_is_flash_encryption_enabled(ctx->chip) &&
         fesp_efuse_is_download_encrypt_disabled(ctx->chip)) {
-        TAG, FESP_HAL_LOGE(TAG, "  Release mode: plaintext flash disabled");
+        FESP_HAL_LOGE(TAG, "  Release mode: plaintext flash disabled");
         uint8_t status_len = FESP_STATUS_LEN(ctx);
         fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_BEGIN,
                               ctx->last_read_val, FESP_FAIL, status_len, NULL,
@@ -790,9 +790,9 @@ static void handle_flash_defl_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         return;
     }
 
-    FESP_HAL_LOGD(TAG, "fesp_chip_type_t=%d stub_mode=%d", encrypted,
+    FESP_HAL_LOGD(TAG, "encrypted=%d chip_type=%d stub_mode=%d", encrypted,
                   ctx->chip->type, ctx->stub_mode);
-    FESP_HAL_LOGD(TAG, "IsDownloadEncryptDisabled=%d",
+    FESP_HAL_LOGD(TAG, "IsFlashEncryptionEnabled=%d IsDownloadEncryptDisabled=%d",
                   fesp_efuse_is_flash_encryption_enabled(ctx->chip),
                   fesp_efuse_is_download_encrypt_disabled(ctx->chip));
 
@@ -800,13 +800,14 @@ static void handle_flash_defl_begin(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
     /* Log key availability */
     int key_len = 0;
     int key_offset = fesp_efuse_get_encryption_key_offset(ctx->chip, &key_len);
-    FESP_HAL_LOGD(TAG, "efuse_size=%d", key_offset, key_len, ctx->chip->efuse,
+    FESP_HAL_LOGD(TAG, "key_offset=%d key_len=%d efuse=%p efuse_size=%d",
+                  key_offset, key_len, ctx->chip->efuse,
                   ctx->chip->efuse_size);
     if (key_offset >= 0 && ctx->chip->efuse &&
         key_offset + key_len <= ctx->chip->efuse_size) {
         const uint8_t *key = &ctx->chip->efuse[key_offset];
-        FESP_HAL_LOGD(TAG, "%02X %02X %02X %02X %02X", key[0], key[1], key[2],
-                      key[3], key[4], key[5], key[6], key[7]);
+        FESP_HAL_LOGD(TAG, "%02X %02X %02X %02X %02X %02X %02X %02X", key[0],
+                      key[1], key[2], key[3], key[4], key[5], key[6], key[7]);
     } else {
         FESP_HAL_LOGD(TAG, "FLASH_DEFL_BEGIN: No encryption key available");
     }
