@@ -51,7 +51,7 @@ static void test_hash(const char *input, int len, const char *expected_hex,
                 "Digest matches RFC 1321");
 }
 
-/* RFC 1321 §A.5 - Test suite */
+/* RFC 1321 Appendix A.5 - Test suite */
 static void test_rfc1321_empty(void)
 {
     test_hash("", 0, "d41d8cd98f00b204e9800998ecf8427e",
@@ -95,7 +95,7 @@ static void test_rfc1321_digits(void)
               80, "57edf4a22be3c955ac49da2e2107b67a", "RFC 1321: digits");
 }
 
-/* Binary test vectors from RFC 1321 §A.5 */
+/* Binary test vectors from RFC 1321 Appendix A.5 */
 static void test_rfc1321_one_byte_zero(void)
 {
     BYTE input = 0x00;

@@ -76,11 +76,11 @@ static void test_flash_crypt_cnt_esp32(void)
 
     fesp_chip_ctx_t ctx = init_chip(FESP_CHIP_ESP32);
     /* ESP32: FLASH_CRYPT_CNT at offset 0x00, mask 0x7F << 20
-     * To set count=3: set bits 20-21 → byte 0x02 = 0x30 */
+     * To set count=3: set bits 20-21 -> byte 0x02 = 0x30 */
     ctx.efuse[0x02] = 0x30;
     uint32_t cnt = fesp_efuse_get_flash_crypt_cnt(&ctx);
     TEST_ASSERT(cnt == 3, "Count is 3");
-    /* count=3 = binary 011, has 2 ones (even) → NOT enabled */
+    /* count=3 = binary 011, has 2 ones (even) -> NOT enabled */
     TEST_ASSERT(!fesp_efuse_is_flash_encryption_enabled(&ctx),
                 "Even popcount (3=011) does not enable encryption");
     fesp_chip_close(&ctx);
@@ -91,17 +91,17 @@ static void test_flash_crypt_cnt_even(void)
     printf("\nTest: Flash crypt count popcount parity\n");
 
     fesp_chip_ctx_t ctx = init_chip(FESP_CHIP_ESP32);
-    /* count=1: bit 20 only → byte 0x02 = 0x10, popcount=1 (odd) → enabled */
+    /* count=1: bit 20 only -> byte 0x02 = 0x10, popcount=1 (odd) -> enabled */
     ctx.efuse[0x02] = 0x10;
     TEST_ASSERT(fesp_efuse_is_flash_encryption_enabled(&ctx),
                 "Count=1 (popcount 1, odd) → enabled");
 
-    /* count=3: bits 20-21 → byte 0x02 = 0x30, popcount=2 (even) → disabled */
+    /* count=3: bits 20-21 -> byte 0x02 = 0x30, popcount=2 (even) -> disabled */
     ctx.efuse[0x02] = 0x30;
     TEST_ASSERT(!fesp_efuse_is_flash_encryption_enabled(&ctx),
                 "Count=3 (popcount 2, even) → disabled");
 
-    /* count=7: bits 20-22 → byte 0x02 = 0x70, popcount=3 (odd) → enabled */
+    /* count=7: bits 20-22 -> byte 0x02 = 0x70, popcount=3 (odd) -> enabled */
     ctx.efuse[0x02] = 0x70;
     TEST_ASSERT(fesp_efuse_is_flash_encryption_enabled(&ctx),
                 "Count=7 (popcount 3, odd) → enabled");
@@ -179,7 +179,7 @@ static void test_download_encrypt_disabled_esp32(void)
     printf("\nTest: Download encrypt disabled (ESP32)\n");
 
     fesp_chip_ctx_t ctx = init_chip(FESP_CHIP_ESP32);
-    /* ESP32: DISABLE_DL_ENCRYPT at offset 0x18, bit 7 → byte 0x18 = 0x80 */
+    /* ESP32: DISABLE_DL_ENCRYPT at offset 0x18, bit 7 -> byte 0x18 = 0x80 */
     ctx.efuse[0x18] = 0x80;
     TEST_ASSERT(fesp_efuse_is_download_encrypt_disabled(&ctx),
                 "DL encrypt disabled");
@@ -191,7 +191,7 @@ static void test_download_mode_disabled_esp32(void)
     printf("\nTest: Download mode disabled (ESP32)\n");
 
     fesp_chip_ctx_t ctx = init_chip(FESP_CHIP_ESP32);
-    /* ESP32: UART_DOWNLOAD_DIS at offset 0x00, bit 27 → byte 0x03 = 0x08 */
+    /* ESP32: UART_DOWNLOAD_DIS at offset 0x00, bit 27 -> byte 0x03 = 0x08 */
     ctx.efuse[0x03] = 0x08;
     TEST_ASSERT(fesp_efuse_is_download_mode_disabled(&ctx),
                 "Download mode disabled");
