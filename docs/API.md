@@ -82,6 +82,7 @@
 | `fesp_send_response(ctx, cmd, req_val, status, data, len)` | 发送响应（4字节状态） |
 | `fesp_send_response_ex(ctx, cmd, req_val, status, status_len, data, len)` | 发送响应（可配置状态长度） |
 | `fesp_calc_checksum(data, len)` | 计算校验和 |
+| `fesp_close(ctx)` | 释放持久化资源（HAL 等） |
 
 **注意：** `SendResponseEx` 的 `status` 参数仅用于日志记录（TRACE_PROTO 和 Serial_PostLogF），不包含在响应包中。`status_len` 参数决定响应 Data 字段的总长度（`data_len` + 状态码），当 `data=NULL` 且 `data_len>0` 时，函数自动填充零字节（表示成功）。`SendResponse` 是 `SendResponseEx` 的便捷封装，固定使用 4 字节状态长度。
 
@@ -135,7 +136,8 @@
 | `fesp_chip_set_flash_size(ctx, size)` | 设置Flash大小 |
 | `fesp_chip_get_flash_size(ctx)` | 获取Flash大小 |
 | `fesp_chip_get_chip_id(ctx)` | 获取芯片ID |
-| `fesp_chip_get_efuse(ctx)` | 获取efuse数据 |
+| `fesp_chip_get_efuse(ctx)` | 获取efuse数据（只读） |
+| `fesp_chip_get_efuse_mut(ctx)` | 获取efuse数据（可写指针） |
 | `fesp_chip_get_efuse_size(ctx)` | 获取efuse大小 |
 | `fesp_chip_get_boot_baud_rate(ctx)` | 获取启动日志波特率 |
 | `fesp_chip_get_boot_message(ctx, download_mode, reset_cause)` | 获取启动日志文本 |
@@ -338,41 +340,26 @@ Decrypt_Data(&ctx, ciphertext, plaintext, sizeof(ciphertext));
 
 ---
 
-## device.h
+## device_file.h
 
-**数据结构：**
-
-| 结构体 | 说明 |
-|--------|------|
-| `DEVICE_CTX` | 设备上下文 |
-
-**DEVICE_CTX 字段：**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `chip` | fesp_chip_ctx_t | 芯片特性（类型、MAC、eFuse、晶振频率） |
-| `flash` | fesp_flash_ctx_t | Flash 存储（数据缓冲区、大小） |
-| `filename` | WCHAR[MAX_PATH] | 当前文件路径 |
-| `modified` | BOOL | 数据修改标记 |
+`.esp` 设备文件（GUI 层）的保存与加载，不属于 esptool 协议模拟引擎。
 
 **常量：**
 
 | 常量 | 值 | 说明 |
 |------|-----|------|
-| `DEVICE_MAGIC` | `0x45535000` | 文件魔数 ("ESP\0") |
-| `DEVICE_VERSION` | `1` | 文件格式版本 |
+| `DEVICE_FILE_MAGIC` | `0x45535000` | 文件魔数 ("ESP\0") |
+| `DEVICE_FILE_VERSION` | `2` | 文件格式版本（ESP8266 写为 1，其余芯片写为 2） |
 
 **函数：**
 
 | 函数 | 说明 |
 |------|------|
-| `Device_Init(ctx, chipType, flashSize, mac)` | 初始化设备 |
-| `Device_Close(ctx)` | 释放设备资源 |
-| `Device_Save(ctx, filename)` | 保存设备到 .esp 文件 |
-| `Device_Load(ctx, filename)` | 从 .esp 文件加载设备 |
-| `Device_IsModified(ctx)` | 检查是否已修改 |
-| `Device_SetModified(ctx, modified)` | 设置修改标记 |
-| `Device_GetFilename(ctx)` | 获取当前文件路径 |
+| `DeviceFile_GetEfuseBlockSize(type)` | 获取 QEMU 格式 eFuse 块数据大小（字节）；ESP8266 返回 0 |
+| `DeviceFile_ExportEfuseBlocks(chip, out, outSize)` | 导出 eFuse 块数据到缓冲区 |
+| `DeviceFile_ImportEfuseBlocks(chip, data, dataSize)` | 从缓冲区导入 eFuse 块数据 |
+| `DeviceFile_Save(chip, flash, filename)` | 保存设备到 .esp 文件 |
+| `DeviceFile_Load(chip, flash, filename)` | 从 .esp 文件加载设备 |
 
 ---
 

@@ -31,7 +31,9 @@ import os
 
 # Device file constants
 DEVICE_MAGIC = 0x45535000  # "ESP\0"
-DEVICE_VERSION = 1
+# Device file format version: ESP8266 = 1, all other chips = 2
+DEVICE_VERSION_MIN = 1
+DEVICE_VERSION_MAX = 2
 
 # Header size: magic(4) + version(4) + chipType(4) + xtalFreq(1) + reserved(3) + mac(6) + reserved(2) + flashSize(4) + efuseSize(4)
 HEADER_SIZE = 32
@@ -45,6 +47,11 @@ CHIP_TYPES = {
     4: "ESP32-C2",
     5: "ESP32-C3",
     6: "ESP32-C6",
+    7: "ESP32-C5",
+    8: "ESP32-C61",
+    9: "ESP32-H2",
+    10: "ESP32-P4",
+    11: "ESP32-S31",
 }
 
 # Crystal frequency mapping
@@ -61,7 +68,7 @@ def read_device_header(f):
         raise ValueError(f"Invalid magic: 0x{magic:08X} (expected 0x{DEVICE_MAGIC:08X})")
 
     version = struct.unpack('<I', f.read(4))[0]
-    if version != DEVICE_VERSION:
+    if version < DEVICE_VERSION_MIN or version > DEVICE_VERSION_MAX:
         raise ValueError(f"Unsupported version: {version}")
 
     chip_type = struct.unpack('<I', f.read(4))[0]

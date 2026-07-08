@@ -438,7 +438,7 @@ case WM_DROPFILES:
 
 **Main_OpenDeviceFile 函数**：
 - 复用 `PromptDisconnectIfNeeded` 和 `PromptSaveIfNeeded`
-- 调用 `Device_Load` 加载设备文件
+- 调用 `DeviceFile_Load` 加载设备文件
 - 更新 UI 状态和配置
 
 ### Dump Device As 功能

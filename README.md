@@ -149,7 +149,9 @@ FakeEsptool/
 ├── src/                        # 源代码（具体请参考开发文档）
 ├── tests/                      # 测试代码（具体请参考开发文档）
 ├── tools/                      # 工具
-│   └── verify_flash.py         # 烧录验证工具
+│   ├── verify_flash.py         # 烧录验证工具（普通 Flash）
+│   ├── verify_encrypted_flash.py # 加密烧录验证工具（AES-XTS 解密后比对）
+│   └── efuse_convert.py        # eFuse 格式转换（QEMU <-> espefuse --virt）
 ├── docs/                       # 文档
 │   ├── REQUIREMENTS.md         # 需求规格
 │   ├── DEVELOPMENT.md          # 开发文档
