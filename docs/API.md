@@ -10,18 +10,18 @@
 
 | 结构体 | 说明 |
 |--------|------|
-| `fesp_packet_t` | 协议数据包（约 32KB） |
+| `fesp_packet_t` | 协议数据包（`FESP_SLIP_MAX_FRAME - 8` 字节） |
 | `fesp_ctx_t` | 协议上下文（包含 fesp_packet_t 预分配缓冲区） |
 
 **fesp_packet_t 字段：**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `direction` | BYTE | 请求 (0x00) 或响应 (0x01) |
-| `command` | BYTE | 命令码 |
-| `size` | WORD | 数据载荷大小 |
-| `value` | DWORD | 命令相关值 |
-| `data[fesp_packet_t_DATA_MAX]` | BYTE | 数据载荷 |
+| `direction` | uint8_t | 请求 (0x00) 或响应 (0x01) |
+| `command` | uint8_t | 命令码 |
+| `size` | uint16_t | 数据载荷大小 |
+| `value` | uint32_t | 命令相关值 |
+| `data[fesp_packet_t_DATA_MAX]` | uint8_t | 数据载荷 |
 
 **fesp_ctx_t 字段：**
 
@@ -31,32 +31,31 @@
 | `chip` | fesp_chip_ctx_t* | 指向设备芯片数据（不拥有） |
 | `flash` | fesp_flash_ctx_t* | 指向设备 Flash 数据（不拥有） |
 | `pkt` | fesp_packet_t | 预分配数据包缓冲区（避免栈溢出） |
-| `state` | ESP_STATE | 协议状态机 |
-| `synced` | BOOL | SYNC 握手完成标志 |
-| `stub_mode` | BOOL | Stub 运行标志 |
-| `hNotify` | HWND | UI 通知窗口 |
-| `onModified` | ESP_MODIFIED_CB | 设备修改回调 |
-| `onWrite` | ESP_WRITE_CB | 串口写回调 |
-| `onBaudRate` | ESP_BAUDRATE_CB | 波特率修改回调 |
-| `flash_offset` | DWORD | 当前 Flash 写入偏移 |
-| `flash_seq` | DWORD | 当前 Flash 写入序列号 |
-| `last_read_val` | DWORD | 上次 READ_REG 的值 |
-| `flash_uncompressed_size` | DWORD | DEFLATE 解压大小 |
-| `defl_buf` | BYTE* | 压缩数据积累缓冲区 |
-| `defl_buf_size` | DWORD | 当前积累数据大小 |
-| `defl_buf_cap` | DWORD | 缓冲区容量 |
-| `defl_offset` | DWORD | 当前 deflate 会话的 Flash 偏移 |
-| `defl_unc_size` | DWORD | 当前 deflate 会话的未压缩大小 |
+| `state` | fesp_state_t | 协议状态机 |
+| `synced` | bool | SYNC 握手完成标志 |
+| `stub_mode` | bool | Stub 运行标志 |
+| `flash_offset` | uint32_t | 当前 Flash 写入偏移 |
+| `flash_seq` | uint32_t | 当前 Flash 写入序列号 |
+| `last_read_val` | uint32_t | 上次 READ_REG 的值 |
+| `flash_uncompressed_size` | uint32_t | DEFLATE 解压大小 |
+| `defl_buf` | uint8_t* | 压缩数据积累缓冲区 |
+| `defl_buf_size` | uint32_t | 当前积累数据大小 |
+| `defl_buf_cap` | uint32_t | 缓冲区容量（等于 `uncompressed_size`） |
+| `defl_offset` | uint32_t | 当前 deflate 会话的 Flash 偏移 |
+| `defl_unc_size` | uint32_t | 当前 deflate 会话的未压缩大小 |
+| `flash_encrypted` | bool | 加密写入标志（FLASH_BEGIN 的 encrypted 字段） |
+| `decomp_buf` | uint8_t* | 解压输出缓冲区 |
+| `decomp_buf_cap` | uint32_t | 解压输出缓冲区容量 |
 
-**ESP_STATE 枚举：**
+**fesp_state_t 枚举：**
 
 | 值 | 说明 |
 |------|------|
-| `ESP_STATE_IDLE` | 初始状态，等待 SYNC |
-| `ESP_STATE_SYNCED` | 已同步，等待芯片检测 |
-| `ESP_STATE_READY` | 芯片已检测，可接受命令 |
-| `ESP_STATE_FLASH_WRITING` | FLASH_BEGIN 已发送，等待数据 |
-| `ESP_STATE_MEM_WRITING` | MEM_BEGIN 已发送，等待数据 |
+| `FESP_STATE_IDLE` | 初始状态，等待 SYNC |
+| `FESP_STATE_SYNCED` | 已同步，等待芯片检测 |
+| `FESP_STATE_READY` | 芯片已检测，可接受命令 |
+| `FESP_STATE_FLASH_WRITING` | FLASH_BEGIN 已发送，等待数据 |
+| `FESP_STATE_MEM_WRITING` | MEM_BEGIN 已发送，等待数据 |
 
 **状态转换规则：**
 
@@ -101,12 +100,12 @@
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `usr` | BYTE | SPI_USR 偏移 |
-| `usr1` | BYTE | SPI_USR1 偏移 |
-| `usr2` | BYTE | SPI_USR2 偏移 |
-| `w0` | BYTE | SPI_W0 偏移 |
-| `mosi_dlen` | BYTE | SPI_MOSI_DLEN 偏移（0=不支持） |
-| `miso_dlen` | BYTE | SPI_MISO_DLEN 偏移（0=不支持） |
+| `usr` | uint8_t | SPI_USR 偏移 |
+| `usr1` | uint8_t | SPI_USR1 偏移 |
+| `usr2` | uint8_t | SPI_USR2 偏移 |
+| `w0` | uint8_t | SPI_W0 偏移 |
+| `mosi_dlen` | uint8_t | SPI_MOSI_DLEN 偏移（0=不支持） |
+| `miso_dlen` | uint8_t | SPI_MISO_DLEN 偏移（0=不支持） |
 
 **常量：**
 
@@ -114,13 +113,32 @@
 |------|-----|------|
 | `FESP_CHIP_DETECT_REG` | `0x40001000` | 芯片检测魔数寄存器地址（用于 esptool 自动识别） |
 
-**fesp_chip_ctx_t eFuse 控制器字段（用于 C2/C3/C6 烧录模拟）：**
+**fesp_chip_ctx_t 字段：**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `pgm_data[8]` | DWORD[] | PGM_DATA0-7 暂存区（烧录数据暂存） |
-| `efuse_conf_ofs` | DWORD | CONF_REG 相对 EFUSE_BASE 的偏移（0 = 无控制器） |
-| `efuse_cmd_ofs` | DWORD | CMD_REG 相对 EFUSE_BASE 的偏移 |
+| `type` | fesp_chip_type_t | 芯片类型枚举 |
+| `name` | char[32] | 芯片名称 |
+| `mac` | uint8_t[6] | MAC 地址 |
+| `efuse` | uint8_t* | eFuse 数据缓冲区 |
+| `efuse_size` | int | eFuse 数据大小（字节） |
+| `flash_size` | uint32_t | Flash 大小（字节） |
+| `flash_id` | uint32_t | Flash 芯片 ID |
+| `xtal_freq` | uint8_t | 晶振频率枚举 |
+| `sector_size` | uint32_t | 扇区大小（字节） |
+| `block_size` | uint32_t | 块大小（字节） |
+| `page_size` | uint32_t | 页大小（字节） |
+| `chip_id` | uint32_t | 魔数（用于 READ_REG 芯片检测） |
+| `security_chip_id` | uint32_t | IMAGE_CHIP_ID（用于 GET_SECURITY_INFO） |
+| `pkg_version` | uint32_t | 封装版本 |
+| `has_usb` | bool | 是否支持 USB |
+| `spi_reg_base` | uint32_t | SPI 寄存器基地址 |
+| `spi_offs` | const fesp_spi_offsets_t* | SPI 寄存器偏移指针 |
+| `spi_regs` | uint32_t[64] | SPI 寄存器暂存区 |
+| `efuse_base` | uint32_t | eFuse 基地址 |
+| `pgm_data[32]` | uint32_t[] | PGM_DATA0-31 暂存区（烧录数据暂存） |
+| `efuse_conf_ofs` | uint32_t | CONF_REG 相对 EFUSE_BASE 的偏移（0 = 无控制器） |
+| `efuse_cmd_ofs` | uint32_t | CMD_REG 相对 EFUSE_BASE 的偏移 |
 
 **函数：**
 
@@ -140,9 +158,10 @@
 | `fesp_chip_get_efuse_mut(ctx)` | 获取efuse数据（可写指针） |
 | `fesp_chip_get_efuse_size(ctx)` | 获取efuse大小 |
 | `fesp_chip_get_boot_baud_rate(ctx)` | 获取启动日志波特率 |
-| `fesp_chip_get_boot_message(ctx, download_mode, reset_cause)` | 获取启动日志文本 |
+| `fesp_chip_get_boot_message(ctx, download_mode, reset_cause, buf, buf_size)` | 获取启动日志文本 |
 | `fesp_efuse_is_flash_encryption_enabled(ctx)` | 检查 Flash 加密是否启用 |
 | `fesp_efuse_is_download_encrypt_disabled(ctx)` | 检查下载模式加密是否禁用（量产模式） |
+| `fesp_efuse_is_download_decrypt_disabled(ctx)` | 检查下载模式解密是否禁用 |
 | `fesp_efuse_is_download_mode_disabled(ctx)` | 检查下载模式是否禁用 |
 | `fesp_efuse_is_secure_download_enabled(ctx)` | 检查安全下载模式是否启用 |
 | `fesp_efuse_is_secure_boot_enabled(ctx)` | 检查安全启动是否启用 |
@@ -157,9 +176,12 @@
 | `fesp_efuse_get_soft_jtag_flag(ctx)` | 获取 SOFT_DIS_JTAG 原始值 |
 | `fesp_efuse_get_usb_jtag_flag(ctx)` | 获取 DIS_USB_JTAG 原始值 |
 | `fesp_efuse_get_key_purpose(ctx, block)` | 获取密钥块用途 |
+| `fesp_efuse_set_key_purpose(ctx, block, purpose)` | 设置密钥块用途 |
 | `fesp_efuse_get_encryption_key_offset(ctx, key_len)` | 获取加密密钥 eFuse 偏移和长度 |
 | `fesp_efuse_set_flash_encryption(ctx, mode)` | **GUI 层**：设置加密状态（0=无, 1=开发, 2=量产） |
 | `fesp_efuse_set_download_mode(ctx, mode)` | **GUI 层**：设置下载模式（0=正常, 1=安全, 2=禁用） |
+| `fesp_efuse_apply_block0_defaults(ctx)` | 应用 Block0 默认值 |
+| `fesp_efuse_clear_volatile(ctx)` | 清除 eFuse 易失性区域（PGM 寄存器、控制寄存器） |
 
 **fesp_chip_write_reg eFuse 控制器行为：**
 - 对于有控制器的芯片（C2/C3/C6，`efuse_conf_ofs != 0`）：
@@ -183,8 +205,8 @@
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `data` | BYTE* | Flash 数据缓冲区 |
-| `size` | DWORD | Flash 大小（字节） |
+| `data` | uint8_t* | Flash 数据缓冲区 |
+| `size` | uint32_t | Flash 大小（字节） |
 
 **函数：**
 
@@ -396,6 +418,49 @@ Decrypt_Data(&ctx, ciphertext, plaintext, sizeof(ciphertext));
 - `FlushFileBuffers` 只保证数据到达 USB 串口芯片的内部 FIFO，不保证 FIFO 已物理发出
 - 切换波特率前需等待 FIFO 排空，否则 FIFO 中剩余字节以错误波特率发送导致数据损坏
 - 当前实现按 `256 * 10 / BaudRate` 计算延迟（256 字节 FIFO + 起止位），com0com 等虚拟串口不受影响
+
+---
+
+## fesptool_hal.h
+
+平台抽象层，定义模拟引擎的所有外部依赖。移植时只需替换此头文件和对应的 `.c` 实现。
+
+**引擎侧函数（引擎 → 平台实现）：**
+
+| 函数 | 说明 |
+|------|------|
+| `fesp_hal_write(data, len)` | 写入串口数据，返回写入字节数 |
+| `fesp_hal_set_baud_rate(baud)` | 切换波特率 |
+| `fesp_hal_modified()` | 通知 GUI 设备数据已修改 |
+
+**工具函数（引擎 ← 平台实现）：**
+
+| 函数 | 说明 |
+|------|------|
+| `fesp_hal_mem_alloc(size)` | 内存分配（未初始化） |
+| `fesp_hal_mem_zero_alloc(size)` | 内存分配（零初始化） |
+| `fesp_hal_mem_free(ptr)` | 内存释放（NULL 安全） |
+| `fesp_hal_md5_calc(data, len, digest)` | 计算 MD5 哈希 |
+| `fesp_hal_deflate_init(ctx, in_buf, in_len, out_buf, out_len)` | 初始化 DEFLATE 解压器 |
+| `fesp_hal_deflate_decompress(ctx)` | 执行 DEFLATE 解压 |
+| `fesp_hal_deflate_get_output_pos(ctx)` | 获取解压输出位置 |
+| `fesp_hal_encrypt_init(ctx, key, key_len, flash_addr)` | 初始化 AES-XTS 加密上下文 |
+| `fesp_hal_encrypt_data(ctx, in_buf, out_buf, len)` | 加密数据 |
+| `fesp_hal_decrypt_data(ctx, in_buf, out_buf, len)` | 解密数据 |
+
+**日志宏：**
+
+| 宏 | 说明 |
+|----|------|
+| `FESP_HAL_LOGD(tag, fmt, ...)` | Debug 日志（编译期可控，输出到 .log 文件） |
+| `FESP_HAL_LOGI(tag, fmt, ...)` | Info 日志（始终启用，输出到 GUI 窗口） |
+| `FESP_HAL_LOGE(tag, fmt, ...)` | Error 日志（始终启用，输出到 GUI 窗口） |
+
+**初始化：**
+
+| 函数 | 说明 |
+|------|------|
+| `FEsptoolInit(hWnd, serial)` | 传入窗口句柄和串口上下文，初始化 HAL |
 
 ---
 
