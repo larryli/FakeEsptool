@@ -414,20 +414,16 @@ void fesp_send_response_ex(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
     resp[pos++] = (uint8_t)((req_val >> 16) & 0xFF);
     resp[pos++] = (uint8_t)((req_val >> 24) & 0xFF);
 
-#ifdef __POCC__
-#pragma warn(push)
-// disable Pelles C warning 2802: Possible out-of-bounds store.
-#pragma warn(disable : 2802)
-#endif
-    if (data && data_len > 0) {
-        memcpy(&resp[pos], data, data_len);
-    } else if (data_len > 0) {
-        memset(&resp[pos], 0, data_len);
+    /* Redundant guard viewed by static analyzer: pos==8 after header,
+       data_len was checked against sizeof(resp)-8 above. */
+    if (data_len > 0 && data_len <= sizeof(resp) - pos) {
+        if (data) {
+            memcpy(&resp[pos], data, data_len);
+        } else {
+            memset(&resp[pos], 0, data_len);
+        }
+        pos += data_len;
     }
-    pos += data_len;
-#ifdef __POCC__
-#pragma warn(pop)
-#endif
 
     /* SLIP encoding: worst case each byte needs escaping (2 bytes) + 2 frame
        markers. Use stack buffer for typical responses (<256 bytes encoded). */
