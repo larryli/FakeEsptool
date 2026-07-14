@@ -11,22 +11,6 @@
 static const char *TAG = "EFUSE";
 #endif
 
-/* ESP32-C3 eFuse block read-back offsets (from DR_REG_EFUSE_BASE 0x60008800)
- * Source: espefuse/efuse/esp32c3/mem_definition.py __base_rd_regs offsets */
-static const uint32_t efuse_block_offsets_c3[] = {
-    0x02C, /* BLOCK0 (6 words) */
-    0x044, /* BLOCK1/MAC (6 words) */
-    0x05C, /* BLOCK2/SYS_DATA (8 words) */
-    0x07C, /* BLOCK3/USR_DATA (8 words) */
-    0x09C, /* BLOCK_KEY0 (8 words) */
-    0x0BC, /* BLOCK_KEY1 (8 words) */
-    0x0DC, /* BLOCK_KEY2 (8 words) */
-    0x0FC, /* BLOCK_KEY3 (8 words) */
-    0x11C, /* BLOCK_KEY4 (8 words) */
-    0x13C, /* BLOCK_KEY5 (8 words) */
-    0x15C, /* BLOCK_SYS_DATA2 (8 words) */
-};
-
 /* ESP32-S31 eFuse block read-back offsets
  * Source: espefuse/efuse/esp32s31/mem_definition.py __base_rd_regs offsets */
 static const uint32_t efuse_block_offsets_s31[] = {
