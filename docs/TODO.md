@@ -4,6 +4,42 @@
 
 ---
 
+## 高优先级 - 协议层防御性校验加固
+
+当前协议层对外部输入缺少边界校验，存在整数溢出和静默成功等风险。
+
+### 代码修复
+
+| # | 文件 | 函数 | 问题 | 修复要点 |
+|---|------|------|------|----------|
+| 1 | `esptool.c` | `handle_read_flash` | `bsize` 来自网络包无上限，`bsize * 2 + 2` 可整数溢出，导致 SLIP 编码越界写入；`bsize=0` 时死循环 | 拒绝 `bsize == 0` 或 `bsize > (FESP_SLIP_MAX_FRAME - 2) / 2` |
+| 2 | `flash.c` | `fesp_flash_erase` | `addr + len` 整数溢出可回绕，绕过地址范围检查，在错误区域擦除 | 改为 `len > ctx->size - addr` 判断，消除溢出 |
+| 3 | `esptool.c` | `handle_flash_data` / `handle_flash_defl_data` | `data_len > pkt->size - 16` 时静默成功，既不处理数据也不报错 | 条件为 false 时返回 FESP_FAIL |
+| 4 | `esptool.c` | `handle_read_flash` | `addr + offset` 循环累加可能溢出（风险较低，flash.c 内部兜底） | 循环前校验 `addr <= UINT32_MAX - len` |
+| 5 | `esptool.c` | `fesp_process_frame` | 缺少 `ctx` / `ctx->chip` / `ctx->flash` 的 NULL 检查 | 函数入口处添加 NULL 守卫 |
+| 6 | `esptool.c` | `handle_flash_defl_data` | `defl_buf_size + data_len` 整数溢出可绕过缓冲区溢出检查，导致 memcpy 堆越界写入 | 溢出前检查 `defl_buf_size > UINT32_MAX - data_len` |
+| 7 | `esptool.c` | `handle_flash_data` | `flash_offset += data_len` 累加可溢出，绕过后续边界检查 | 累加前检查 `flash_offset > UINT32_MAX - data_len` |
+| 8 | `esptool.c` | `handle_flash_end` | `defl_flush_buffer` 失败后仅记日志，仍返回 FESP_OK 且状态切为 READY，Flash 数据残缺但客户端认为成功 | 失败时返回 FESP_FAIL |
+| 9 | `esptool.c` | `CHECK_PKT_SIZE` 宏 | 包过小静默 `return` 不发错误响应，客户端超时而非收到明确错误码 | 过小时发送 FESP_FAIL 响应 |
+| 10 | `esptool.c` | `handle_read_flash` | 先发 ACK 再分配内存，分配失败时 ACK 已发出，客户端挂起等待数据帧 | 先分配再发 ACK |
+| 11 | `esptool.c` | `fesp_send_response_ex` | `fesp_slip_encode` 返回 ≤0 时静默丢弃，无错误日志 | 编码失败时记录日志 |
+
+### 测试补充
+
+| # | 测试文件 | 场景 | 验证点 |
+|---|---------|------|--------|
+| 12 | `test_esptool.c` | `handle_read_flash` bsize=0 | 返回失败，无死循环 |
+| 13 | `test_esptool.c` | `handle_read_flash` bsize=0x80000000 | 返回失败，不崩溃 |
+| 14 | `test_esptool.c` | `handle_flash_data` data_len 远大于 pkt->size | 返回失败，不复现静默成功 |
+| 15 | `test_flash.c` | `fesp_flash_erase` addr=0xFFFFFF00, len=0x200 | 返回 false，不写入低地址 |
+| 16 | `test_esptool.c` | FLASH_DATA 在 IDLE 状态下发送 | 返回失败（状态机拒绝） |
+| 17 | `test_esptool.c` | MEM_DATA 带错误 checksum | 返回失败 |
+| 18 | `test_esptool.c` | `handle_flash_defl_data` defl_buf_size + data_len 溢出 | 返回失败，无 memcpy 调用 |
+| 19 | `test_esptool.c` | `handle_flash_end` defl_flush 失败模拟 | 返回 FESP_FAIL，非 FESP_OK |
+| 20 | `test_esptool.c` | `handle_read_flash` ACK 后分配失败（注入 OOM） | 不发 ACK（需先改顺序） |
+
+---
+
 ## 中优先级 - CLI 命令行参数扩展
 
 通过 `WM_COPYDATA` 向已有单例发送指令，新实例发送后立即退出，实现脚本化自动化。
