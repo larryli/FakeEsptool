@@ -117,19 +117,20 @@ bool fesp_flash_write(fesp_flash_ctx_t *ctx, uint32_t addr, const uint8_t *data,
  */
 bool fesp_flash_erase(fesp_flash_ctx_t *ctx, uint32_t addr, uint32_t len)
 {
-    if (!ctx->data || len == 0 || addr >= ctx->size) {
+    if (!ctx->data || len == 0 || addr >= ctx->size ||
+        len > ctx->size - addr) {
         return false;
     }
 
     /* Align to sector boundaries (4KB) */
     uint32_t start_sector =
         (addr / FESP_FLASH_SECTOR_SIZE) * FESP_FLASH_SECTOR_SIZE;
-    uint32_t end_addr = addr + len;
     uint32_t end_sector =
-        ((end_addr + FESP_FLASH_SECTOR_SIZE - 1) / FESP_FLASH_SECTOR_SIZE) *
+        ((addr + len + FESP_FLASH_SECTOR_SIZE - 1) /
+         FESP_FLASH_SECTOR_SIZE) *
         FESP_FLASH_SECTOR_SIZE;
 
-    /* Clamp to flash size */
+    /* Clamp to flash size (addr + len already verified not to overflow) */
     if (end_sector > ctx->size) {
         end_sector = ctx->size;
     }

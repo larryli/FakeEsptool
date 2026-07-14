@@ -57,11 +57,16 @@ static const FESP_CMD_INFO commandTable[256] = {
 
 #define ESP_RESP_BUF_SIZE 8192
 
-/* Minimum packet size check macro */
+/* Minimum packet size check macro - sends error response on failure.
+   NOTE: Requires 'ctx' and 'pkt' to be in scope as fesp_ctx_t* and
+   fesp_packet_t* respectively. Returns from caller on size mismatch. */
 #define CHECK_PKT_SIZE(pkt, min_size)                                          \
     if ((pkt)->size < (min_size)) {                                            \
         FESP_HAL_LOGD(TAG, "Packet too small: cmd=0x%02X size=%u min=%u",      \
                       (pkt)->command, (pkt)->size, (min_size));                \
+        uint8_t _sl = FESP_STATUS_LEN(ctx);                                    \
+        fesp_send_response_ex(ctx, (pkt)->command, ctx->last_read_val,         \
+                              FESP_FAIL, _sl, NULL, _sl);                      \
         return;                                                                \
     }
 
@@ -446,6 +451,11 @@ void fesp_send_response_ex(fesp_ctx_t *ctx, uint8_t cmd, uint32_t req_val,
     int enc_len = fesp_slip_encode(resp, pos, encoded, encoded_max);
     if (enc_len > 0) {
         fesp_hal_write(encoded, (uint32_t)enc_len);
+    } else {
+        FESP_HAL_LOGD(TAG,
+                      "SLIP encode failed or buffer too small: cmd=0x%02X "
+                      "pos=%d max=%lu",
+                      cmd, pos, encoded_max);
     }
 
     if (used_heap) {
@@ -924,8 +934,9 @@ static void handle_flash_defl_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 
         /* Accumulate compressed data into buffer */
         if (ctx->defl_buf_cap > 0 && data_len > 0) {
-            /* Check buffer overflow */
-            if (ctx->defl_buf_size + data_len > ctx->defl_buf_cap) {
+            /* Check buffer overflow, guarding against uint32_t wraparound */
+            if (ctx->defl_buf_size > UINT32_MAX - data_len ||
+                ctx->defl_buf_size + data_len > ctx->defl_buf_cap) {
                 FESP_HAL_LOGE(TAG, "  Deflate buffer overflow");
                 defl_free_buffer(ctx);
                 uint8_t status_len = FESP_STATUS_LEN(ctx);
@@ -943,6 +954,14 @@ static void handle_flash_defl_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         }
 
         ctx->flash_seq = seq + 1;
+    } else {
+        FESP_HAL_LOGE(TAG, "  Data length mismatch: data_len=%lu pkt->size=%u",
+                      data_len, pkt->size);
+        uint8_t status_len = FESP_STATUS_LEN(ctx);
+        fesp_send_response_ex(ctx, FESP_CMD_FLASH_DEFL_DATA,
+                              ctx->last_read_val, FESP_FAIL, status_len, NULL,
+                              status_len);
+        return;
     }
 
     /* Stub mode: 2-byte status; ROM mode: 4-byte status */
@@ -1008,24 +1027,41 @@ static void handle_read_flash(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
 
     FESP_HAL_LOGI(TAG, "  addr=0x%08lX len=%lu bsize=%lu", addr, len, bsize);
 
+    /* Reject invalid block size to prevent integer overflow in bsize * 2 + 2
+       and infinite loop when bsize == 0. */
+    if (bsize == 0 || bsize > (FESP_SLIP_MAX_FRAME - 2) / 2) {
+        FESP_HAL_LOGE(TAG, "  Invalid block size: %lu", bsize);
+        fesp_send_response_ex(ctx, FESP_CMD_READ_FLASH, ctx->last_read_val,
+                              FESP_FAIL, 2, NULL, 2);
+        return;
+    }
+
+    /* Reject overflow in addr + offset loop accumulation */
+    if (len > 0 && addr > UINT32_MAX - (len - 1)) {
+        FESP_HAL_LOGE(TAG, "  Address overflow: addr=0x%08lX len=%lu", addr,
+                      len);
+        fesp_send_response_ex(ctx, FESP_CMD_READ_FLASH, ctx->last_read_val,
+                              FESP_FAIL, 2, NULL, 2);
+        return;
+    }
+
+    /* Allocate buffers BEFORE sending ACK, so allocation failure doesn't leave
+       the client waiting for data frames that will never arrive. */
+    uint32_t encoded_max = bsize * 2 + 2;
+    uint8_t *buf = (uint8_t *)fesp_hal_mem_alloc(bsize);
+    uint8_t *encoded = (uint8_t *)fesp_hal_mem_alloc(encoded_max);
+    if (!buf || !encoded) {
+        FESP_HAL_LOGE(TAG, "  Failed to allocate read buffers");
+        fesp_hal_mem_free(buf);
+        fesp_hal_mem_free(encoded);
+        fesp_send_response_ex(ctx, FESP_CMD_READ_FLASH, ctx->last_read_val,
+                              FESP_FAIL, 2, NULL, 2);
+        return;
+    }
+
     /* Step 1: Send command ACK (2-byte status in command response) */
     fesp_send_response_ex(ctx, FESP_CMD_READ_FLASH, ctx->last_read_val, FESP_OK,
                           2, NULL, 2);
-
-    /* Allocate buffers once before the loop */
-    uint8_t *buf = (uint8_t *)fesp_hal_mem_alloc(bsize);
-    if (!buf) {
-        FESP_HAL_LOGE(TAG, "  Failed to allocate read buffer");
-        return;
-    }
-
-    uint32_t encoded_max = bsize * 2 + 2;
-    uint8_t *encoded = (uint8_t *)fesp_hal_mem_alloc(encoded_max);
-    if (!encoded) {
-        fesp_hal_mem_free(buf);
-        FESP_HAL_LOGE(TAG, "  Failed to allocate encode buffer");
-        return;
-    }
 
     /* Step 2: Send flash data as separate SLIP frames */
     uint32_t offset = 0;
@@ -1292,10 +1328,25 @@ static void handle_flash_data(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
                                   FESP_FAIL, status_len, NULL, status_len);
             return;
         }
+        /* Guard against flash_offset wraparound before writing */
+        if (ctx->flash_offset > UINT32_MAX - data_len) {
+            FESP_HAL_LOGE(TAG, "  Flash offset overflow");
+            uint8_t status_len = FESP_STATUS_LEN(ctx);
+            fesp_send_response_ex(ctx, FESP_CMD_FLASH_DATA, ctx->last_read_val,
+                                  FESP_FAIL, status_len, NULL, status_len);
+            return;
+        }
         fesp_flash_write(ctx->flash, ctx->flash_offset, payload, data_len);
 
         ctx->flash_offset += data_len;
         ctx->flash_seq = seq + 1;
+    } else {
+        FESP_HAL_LOGE(TAG, "  Data length mismatch: data_len=%lu pkt->size=%u",
+                      data_len, pkt->size);
+        uint8_t status_len = FESP_STATUS_LEN(ctx);
+        fesp_send_response_ex(ctx, FESP_CMD_FLASH_DATA, ctx->last_read_val,
+                              FESP_FAIL, status_len, NULL, status_len);
+        return;
     }
 
     fesp_hal_modified();
@@ -1331,6 +1382,11 @@ static void handle_flash_end(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         FESP_HAL_LOGI(TAG, "  Flushing pending compressed data");
         if (defl_flush_buffer(ctx) != FESP_OK) {
             FESP_HAL_LOGE(TAG, "  Failed to flush compressed data");
+            ctx->state = FESP_STATE_READY;
+            uint8_t status_len = FESP_STATUS_LEN(ctx);
+            fesp_send_response_ex(ctx, FESP_CMD_FLASH_END, pkt->value,
+                                  FESP_FAIL, status_len, NULL, status_len);
+            return;
         }
     }
 
@@ -1543,6 +1599,10 @@ static void handle_run_user_code(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
  */
 bool fesp_process_frame(fesp_ctx_t *ctx, const uint8_t *frame, int frame_len)
 {
+    if (!ctx || !ctx->chip || !ctx->flash) {
+        return false;
+    }
+
     fesp_packet_t *pkt = &ctx->pkt;
 
     FESP_HAL_LOGD(TAG, "RX frame len=%d", frame_len);
