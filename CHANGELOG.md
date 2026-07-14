@@ -4,6 +4,33 @@
 
 ---
 
+## [2026.7.14.0] - 2026-07-14
+
+### 安全修复
+
+- **协议层防御性校验加固**：修复 11 处整数溢出、静默成功、空指针解引用等安全问题
+  - `handle_read_flash`：拒绝 `bsize=0`（死循环）和超大 `bsize`（`bsize*2+2` 整数溢出导致 SLIP 编码越界写入）
+  - `handle_read_flash`：ACK 移到内存分配成功后发送，避免 OOM 时客户端挂起
+  - `handle_read_flash`：循环前校验 `addr+offset` 不溢出
+  - `handle_flash_defl_data`：`defl_buf_size+data_len` 溢出前检查，防止 memcpy 堆越界写入
+  - `handle_flash_defl_data`：`data_len` 与 `pkt->size` 不匹配时返回 FESP_FAIL（非静默成功）
+  - `handle_flash_data`：`flash_offset` 累加前溢出检查
+  - `handle_flash_data`：`data_len` 与 `pkt->size` 不匹配时返回 FESP_FAIL
+  - `handle_flash_end`：`defl_flush_buffer` 失败时返回 FESP_FAIL（非静默成功）
+  - `fesp_flash_erase`：`addr+len` 整数溢出改为 `len > ctx->size - addr` 判断
+  - `fesp_process_frame`：添加 `ctx`/`chip`/`flash` NULL 守卫
+  - `CHECK_PKT_SIZE` 宏：包过小时发送 FESP_FAIL 响应（非静默丢弃）
+  - `fesp_send_response_ex`：SLIP 编码失败时记录日志
+- **Pelles C 兼容**：移除 `esptool.c` 中 `#pragma warn(disable : 2802)`，用代码可证明的边界检查替代
+
+### 文档
+
+- PROTOCOL.md 附录 A：芯片列表从 7 款扩充为 12 款（新增 C5/C61/H2/P4/S31）
+- PROTOCOL.md 3.22 节：IMAGE_CHIP_ID 表和 GET_SECURITY_INFO 行为表同步扩充
+- esptool.c 注释：`handle_get_security_info` 芯片列表同步更新
+
+---
+
 ## [2026.7.3.0] - 2026-07-03
 
 ### 功能增强
