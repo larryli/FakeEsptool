@@ -1352,8 +1352,8 @@ static void handle_flash_end(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
  *   so esptool falls back to magic value detection.
  * - ESP32-S2: Returns 14-byte response (12 payload + 2 status, no chip_id).
  *   esptool parses as ESP32-S2 (chip_id=None), falls back to magic value.
- * - ESP32-S3/C2/C3/C6: Returns 22-byte response (20 payload + 2 status)
- *   with IMAGE_CHIP_ID for chip detection.
+ * - ESP32-S3/C2/C3/C5/C6/C61/H2/P4/S31: Returns 22-byte response
+ *   (20 payload + 2 status) with IMAGE_CHIP_ID for chip detection.
  *
  * Response data format: [payload:N][status:2]
  * Status bytes are at the END of the data field.
@@ -1399,8 +1399,8 @@ static void handle_get_security_info(fesp_ctx_t *ctx, const fesp_packet_t *pkt)
         return;
     }
 
-    /* ESP32 stub, ESP32-S3, C2, C3, C6: Return 22-byte response with
-       IMAGE_CHIP_ID.
+    /* ESP32 stub, ESP32-S3, C2, C3, C5, C6, C61, H2, P4, S31:
+       Return 22-byte response with IMAGE_CHIP_ID.
        [flags:4][flash_crypt_cnt:1][key_purposes:7][chip_id:4][api_version:4][status:2]
        For ESP32 stub, chip_id = EFUSE_CHIP_ID (0x00F01D83). */
     uint32_t chip_id = (ctx->chip->type == FESP_CHIP_ESP32)

@@ -1074,7 +1074,14 @@ Data: 00 00 00 00 (flags) + 00 (crypt_cnt) + 00 00 00 00 00 00 00 (key_purposes)
 | ESP32-S3 | 9 | 0x00000009 |
 | ESP32-C2 | 12 | 0x7C41A06F |
 | ESP32-C3 | 5 | 0x6921506F |
+| ESP32-C5 | 23 | 0x2CE0806F |
 | ESP32-C6 | 13 | 0x2CE0806F |
+| ESP32-C61 | 20 | 0x2CE0806F |
+| ESP32-H2 | 16 | 0x2CE0806F |
+| ESP32-P4 | 18 | 0x00000000 |
+| ESP32-S31 | 32 | 0x00000000 |
+
+**注意：** ESP32-C5/C6/C61/H2 共享同一 magic value（0x2CE0806F），ESP32-P4 和 ESP32-S31 的 magic value 为 0x00000000，均依赖 IMAGE_CHIP_ID 进行芯片识别，不以 magic value 回退。
 
 **各芯片 GET_SECURITY_INFO 行为：**
 
@@ -1086,7 +1093,12 @@ Data: 00 00 00 00 (flags) + 00 (crypt_cnt) + 00 00 00 00 00 00 00 (key_purposes)
 | ESP32-S3 | 返回 22 字节，chip_id=9 | IMAGE_CHIP_ID |
 | ESP32-C2 | 返回 22 字节，chip_id=12 | IMAGE_CHIP_ID |
 | ESP32-C3 | 返回 22 字节，chip_id=5 | IMAGE_CHIP_ID |
+| ESP32-C5 | 返回 22 字节，chip_id=23 | IMAGE_CHIP_ID |
 | ESP32-C6 | 返回 22 字节，chip_id=13 | IMAGE_CHIP_ID |
+| ESP32-C61 | 返回 22 字节，chip_id=20 | IMAGE_CHIP_ID |
+| ESP32-H2 | 返回 22 字节，chip_id=16 | IMAGE_CHIP_ID |
+| ESP32-P4 | 返回 22 字节，chip_id=18 | IMAGE_CHIP_ID |
+| ESP32-S31 | 返回 22 字节，chip_id=32 | IMAGE_CHIP_ID |
 
 **芯片检测流程：**
 1. 客户端首先尝试 GET_SECURITY_INFO 获取 chip_id（IMAGE_CHIP_ID）
@@ -1505,10 +1517,15 @@ Stub 上传成功后，设备行为发生变化：
 | `0x1B31506F` | ESP32-C3 | 备选魔数 |
 | `0x4881606F` | ESP32-C3 | 备选魔数 |
 | `0x4361606F` | ESP32-C3 | 备选魔数 |
+| `0x2CE0806F` | ESP32-C5 | 与 C6/C61/H2 共享 |
 | `0x2CE0806F` | ESP32-C6 | |
+| `0x2CE0806F` | ESP32-C61 | 与 C5/C6/H2 共享 |
+| `0x2CE0806F` | ESP32-H2 | 与 C5/C6/C61 共享 |
+| `0x00000000` | ESP32-P4 | 无有效 magic value，依赖 IMAGE_CHIP_ID |
+| `0x00000000` | ESP32-S31 | 无有效 magic value，依赖 IMAGE_CHIP_ID |
 | `0xFFF0C101` | ESP8266 | |
 
-**注意：** 本文档仅覆盖 ESP32、ESP32-S2、ESP32-S3、ESP32-C2、ESP32-C3、ESP32-C6、ESP8266 共 7 款芯片。
+**注意：** 本文档覆盖 ESP8266、ESP32、ESP32-S2、ESP32-S3、ESP32-C2、ESP32-C3、ESP32-C5、ESP32-C6、ESP32-C61、ESP32-H2、ESP32-P4、ESP32-S31 共 12 款芯片。ESP32-C5/C6/C61/H2 共享同一 magic value（`0x2CE0806F`），ESP32-P4 和 ESP32-S31 的 magic value 为 `0x00000000`（无实际意义），这些芯片均通过 IMAGE_CHIP_ID 进行主要识别，不以 magic value 回退。
 
 ### A.3 读取流程
 
