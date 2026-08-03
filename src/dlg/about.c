@@ -6,6 +6,7 @@
 
 #include "../resource.h"
 #include "../utils/lang.h"
+#include "dlg.h"
 #include <commctrl.h>
 #include <shellapi.h>
 #include <stdio.h>
@@ -20,6 +21,8 @@ INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg) {
     case WM_INITDIALOG: {
+        DlgCenterOnParent(hDlg);
+
         /* Read version info from exe */
         TCHAR szPath[MAX_PATH];
         GetModuleFileName(NULL, szPath, MAX_PATH);
@@ -36,24 +39,24 @@ INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 
                     /* Product name + version */
                     (void)swprintf_s(szBuf, MAX_PATH,
-                             L"\\StringFileInfo\\%04X%04X\\%ls", *pLang,
-                             *(pLang + 1), L"ProductName");
+                                     L"\\StringFileInfo\\%04X%04X\\%ls", *pLang,
+                                     *(pLang + 1), L"ProductName");
                     if (VerQueryValue(pInfo, szBuf, &ptr, &size)) {
                         void *ptr2;
-                        (void)swprintf_s(szBuf, MAX_PATH,
-                                 L"\\StringFileInfo\\%04X%04X\\%ls", *pLang,
-                                 *(pLang + 1), L"ProductVersion");
+                        (void)swprintf_s(
+                            szBuf, MAX_PATH, L"\\StringFileInfo\\%04X%04X\\%ls",
+                            *pLang, *(pLang + 1), L"ProductVersion");
                         if (VerQueryValue(pInfo, szBuf, &ptr2, &size)) {
-                            (void)swprintf_s(szBuf, MAX_PATH, L"%ls v%ls", (LPTSTR)ptr,
-                                     (LPTSTR)ptr2);
+                            (void)swprintf_s(szBuf, MAX_PATH, L"%ls v%ls",
+                                             (LPTSTR)ptr, (LPTSTR)ptr2);
                             SetDlgItemText(hDlg, IDD_APPNAME, szBuf);
                         }
                     }
 
                     /* Copyright */
                     (void)swprintf_s(szBuf, MAX_PATH,
-                             L"\\StringFileInfo\\%04X%04X\\%ls", *pLang,
-                             *(pLang + 1), L"LegalCopyright");
+                                     L"\\StringFileInfo\\%04X%04X\\%ls", *pLang,
+                                     *(pLang + 1), L"LegalCopyright");
                     if (VerQueryValue(pInfo, szBuf, &ptr, &size)) {
                         SetDlgItemText(hDlg, IDD_COPYRIGHT, (LPTSTR)ptr);
                     }

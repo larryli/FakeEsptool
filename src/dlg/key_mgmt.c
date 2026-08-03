@@ -810,18 +810,7 @@ static void HandlePurpose(HWND hDlg, HWND hList)
  */
 static void HandleInitDialog(HWND hDlg)
 {
-    /* Center dialog on parent */
-    HWND hParent = GetParent(hDlg);
-    if (hParent) {
-        RECT rcParent, rcDlg;
-        GetWindowRect(hParent, &rcParent);
-        GetWindowRect(hDlg, &rcDlg);
-        int x =
-            (rcParent.left + rcParent.right - (rcDlg.right - rcDlg.left)) / 2;
-        int y =
-            (rcParent.top + rcParent.bottom - (rcDlg.bottom - rcDlg.top)) / 2;
-        SetWindowPos(hDlg, NULL, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-    }
+    DlgCenterOnParent(hDlg);
 
     /* Set dialog title with chip name */
     WCHAR title[TITLE_MAX];

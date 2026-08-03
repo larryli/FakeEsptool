@@ -18,6 +18,8 @@ INT_PTR CALLBACK PortSelectDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
     (void)lParam;
     switch (msg) {
     case WM_INITDIALOG: {
+        DlgCenterOnParent(hDlg);
+
         HWND hCombo = GetDlgItem(hDlg, IDC_PORT_COMBO);
         if (!Serial_EnumPorts(hCombo)) {
             EndDialog(hDlg, IDCANCEL);

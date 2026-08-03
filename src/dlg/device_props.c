@@ -67,6 +67,8 @@ INT_PTR CALLBACK DevicePropsDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
     (void)lParam;
     switch (msg) {
     case WM_INITDIALOG: {
+        DlgCenterOnParent(hDlg);
+
         /* Save current values */
         selectedChip = g_chip.type;
         selectedFlash = g_flash.size;

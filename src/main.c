@@ -593,9 +593,11 @@ static LRESULT Main_OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
-        HMENU hMenu = LoadMenuW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(menuId));
-        if (!hMenu)
+        HMENU hMenu =
+            LoadMenuW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(menuId));
+        if (!hMenu) {
             return 0;
+        }
         HMENU hPopup = GetSubMenu(hMenu, 0);
 
         /* Disable eFuse options for ESP8266 */
@@ -606,8 +608,8 @@ static LRESULT Main_OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
 
         POINT pt = {nmtb->rcButton.right, nmtb->rcButton.bottom};
         ClientToScreen(nmtb->hdr.hwndFrom, &pt);
-        TrackPopupMenu(hPopup, TPM_RIGHTALIGN | TPM_TOPALIGN, pt.x, pt.y,
-                       0, hWnd, NULL);
+        TrackPopupMenu(hPopup, TPM_RIGHTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0,
+                       hWnd, NULL);
         DestroyMenu(hMenu);
         return TBDDRET_DEFAULT;
     }

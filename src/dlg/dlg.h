@@ -65,4 +65,22 @@ INT_PTR CALLBACK KeyMgmtDlgProc(HWND hDlg, UINT msg, WPARAM wParam,
  */
 BOOL ShowPortSelectDialog(HWND hWnd);
 
+/*
+ * DlgCenterOnParent: Center dialog on parent
+ */
+VOID inline DlgCenterOnParent(HWND hDlg)
+{
+    HWND hParent = GetParent(hDlg);
+    if (hParent) {
+        RECT rcParent, rcDlg;
+        GetWindowRect(hParent, &rcParent);
+        GetWindowRect(hDlg, &rcDlg);
+        int x =
+            (rcParent.left + rcParent.right - (rcDlg.right - rcDlg.left)) / 2;
+        int y =
+            (rcParent.top + rcParent.bottom - (rcDlg.bottom - rcDlg.top)) / 2;
+        SetWindowPos(hDlg, NULL, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+    }
+}
+
 #endif /* DLG_H */
