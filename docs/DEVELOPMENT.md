@@ -148,79 +148,95 @@ FESP_HAL_LOGD(TAG, "debug message");  // 编译期可控（ENABLE_TRACE）
 
 ### CMake
 
+`CMakeLists.txt` 支持 MSVC 与 Pelles C（CMake 4.4.0+/Ninja）。
+默认构建目录为 `build`，切换工具链或配置前先删除该目录：
+
 ```powershell
-# 配置
-cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -B build
-
-# 编译（Release）
-cmake --build build --config Release -j
-
-# 编译（Debug）
-cmake --build build --config Debug
-
-# 启用调试日志
-cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DENABLE_TRACE_PROTO=ON -DENABLE_TRACE_FW=ON -B build
-cmake --build build --config Release -j
-
-# 禁用 RX/TX hex dump 中的 ASCII 解码（减少日志 tokens，适合 Agents 分析）
-cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DLOG_NOT_SHOW_ASCII=ON -B build
-cmake --build build --config Release -j
-
-# 启用内存泄漏追踪
-cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DENABLE_MEM_DEBUG=ON -B build
-cmake --build build --config Release -j
+rmdir /s /q build
 ```
 
-**构建选项：**
+**MSVC（Visual Studio Build Tools）**
 
-| 选项 | 默认值 | 说明 |
-|------|--------|------|
-| `ENABLE_TRACE_FW` | OFF | 启用框架调试日志（TRACE_FW） |
-| `ENABLE_TRACE_PROTO` | OFF | 启用协议调试日志（TRACE_PROTO） |
-| `LOG_NOT_SHOW_ASCII` | OFF | 禁用 RX/TX hex dump 中的 ASCII 解码 |
-| `ENABLE_MEM_DEBUG` | OFF | 启用内存分配泄漏追踪 |
-
-输出：`build/Release/FakeEsptool.exe`（Release）或 `build/Debug/FakeEsptool.exe`（Debug）
-
-### Pelles C
-
-项目提供 Pelles C 项目文件 `FakeEsptool.ppj`，可使用 Pelles C 14.10 构建。
-
-**环境要求：**
-- Pelles C 14.10 或更高版本
-- 安装路径：`C:\Program Files\PellesC`（默认）
-
-**构建命令：**
+需要 CMake 3.20+：
 
 ```powershell
-# 设置环境变量
+# 配置（在 VsDevCmd.bat 环境中）
+cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -B build
+
+# 编译（Release / Debug）
+cmake --build build --config Release -j
+cmake --build build --config Debug
+```
+
+**Pelles C（CMake 4.4.0+ / Ninja）**
+
+需要 Pelles C 14.10+，且 `LIB` 同时包含 `Lib\Win64`（Windows 导入库）与 `Lib`（C 运行时 `crt64.lib`）：
+
+```powershell
+# 设置 Pelles C 环境（库 / 头文件路径）
+$env:LIB = "C:\Program Files\PellesC\Lib\Win64;C:\Program Files\PellesC\Lib"
+$env:INCLUDE = "C:\Program Files\PellesC\Include\Win;C:\Program Files\PellesC\Include"
 $env:PATH = "C:\Program Files\PellesC\Bin;$env:PATH"
 $env:PellesCDir = "C:\Program Files\PellesC"
 
-# 构建（Release）
-pomake /f FakeEsptool.ppj
+# 配置与编译
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -B build
+cmake --build build
+```
 
-# 构建（Debug）
+**构建选项（两种工具链通用）：**
+
+```powershell
+# 启用调试日志
+cmake -DENABLE_TRACE_PROTO=ON -DENABLE_TRACE_FW=ON -B build
+
+# 禁用 RX/TX hex dump 中的 ASCII 解码
+cmake -DLOG_NOT_SHOW_ASCII=ON -B build
+
+# 启用内存泄漏追踪
+cmake -DENABLE_MEM_DEBUG=ON -B build
+```
+
+| 选项 | 默认值 | 说明 |
+|------|--------|------|
+| `ENABLE_TRACE_FW` | OFF* | 启用框架调试日志（TRACE_FW）。Debug 配置下默认开启 |
+| `ENABLE_TRACE_PROTO` | OFF* | 启用协议调试日志（TRACE_PROTO）。Debug 配置下默认开启 |
+| `LOG_NOT_SHOW_ASCII` | OFF | 禁用 RX/TX hex dump 中的 ASCII 解码 |
+| `ENABLE_MEM_DEBUG` | OFF | 启用内存分配泄漏追踪 |
+
+*\* Debug 配置默认开启 `ENABLE_TRACE_FW` 与 `ENABLE_TRACE_PROTO`。*
+
+MSVC 输出：`build/Release/FakeEsptool.exe`（Release）或 `build/Debug/FakeEsptool.exe`（Debug）
+Pelles C 输出：`build/FakeEsptool.exe`（单配置）
+
+### Pelles C IDE（可选）
+
+除 CMake 外，`FakeEsptool.ppj` 提供 Pelles C IDE 的独立项目文件，`pomake` 构建：
+
+```powershell
+# 设置 Pelles C 环境
+$env:PATH = "C:\Program Files\PellesC\Bin;$env:PATH"
+$env:PellesCDir = "C:\Program Files\PellesC"
+
+# 构建（Release / Debug）
+pomake /f FakeEsptool.ppj
 pomake /f FakeEsptool.ppj "POC_PROJECT_MODE=Debug"
 ```
 
-**项目文件：**
-- `FakeEsptool.ppj` - Pelles C 项目文件
-- `FakeEsptool.ppx` - Pelles C 工作区设置
-
-**输出：** `FakeEsptool.exe`（项目根目录）
-
-**注意事项：**
-- Pelles C 使用 `-arch:AVX2` 编译选项，需要支持 AVX2 的 CPU
-- Release 模式启用 `-Ot -Ox -Ob1` 优化
-- Debug 模式启用 `-Zi` 调试信息并定义 `ENABLE_TRACE_FW=1` 和 `ENABLE_TRACE_PROTO=1`
+输出：`FakeEsptool.exe`（项目根目录）。Release 启用 `-Ot -Ox -Ob1` 优化与 AVX2 指令，Debug 启用 `-Zi` 与 `ENABLE_TRACE_FW`/`ENABLE_TRACE_PROTO`。项目含代码签名步骤（需证书，否则 Release 签名阶段失败）。
 
 ### 测试
 
 ```powershell
+# 配置（MSVC 加 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded；Pelles C 加 -G Ninja -DCMAKE_BUILD_TYPE=Release）
 cmake -B build_tests -S tests
+
+# 编译
 cmake --build build_tests --config Release -j
-ctest --test-dir build_tests --build-config Release
+
+# 运行
+cd build_tests
+ctest --output-on-failure
 ```
 
 ## esptool 协议
@@ -796,18 +812,14 @@ All flash segments verified successfully.
 3. 使用 `TEST_ASSERT` 宏编写测试用例
 4. 运行测试验证
 
-**构建与运行**：
+测试配置与运行见上文「编译 > 测试」段落（独立 `build_tests` 目录）。
+
+也可直接运行各测试 exe：MSVC 位于 `build_tests/Release/`，Pelles C 位于 `build_tests/`。
 
 ```powershell
-# 配置测试
-cmake -B build_tests -S tests
-
-# 编译测试
-cmake --build build_tests --config Release
-
-# 运行全部测试
 foreach ($t in @("test_deflate","test_encrypt","test_slip","test_md5","test_flash","test_chip","test_efuse","test_esptool")) {
-    & "build_tests\Release\$t.exe"
+    & "build_tests\Release\$t.exe"        # MSVC
+    # & "build_tests\$t.exe"              # Pelles C
 }
 ```
 

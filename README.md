@@ -69,21 +69,40 @@ cmake --build build --config Release -j
 
 输出：`build/Release/FakeEsptool.exe`
 
-### Pelles C
+### Pelles C（CMake >= 4.4.0 或 IDE 项目）
 
-```powershell
-# 编译
-pomake /f FakeEsptool.ppj
-```
+Pelles C 有两种构建方式：
 
-输出：`FakeEsptool.exe`
+1. **CMake 统一构建**（推荐）：需配合 Ninja 生成器与 Pelles C 的 `LIB`/`INCLUDE` 环境变量：
+
+   ```powershell
+   # 设置 Pelles C 环境
+   $env:LIB = "C:\Program Files\PellesC\Lib\Win64;C:\Program Files\PellesC\Lib"
+   $env:INCLUDE = "C:\Program Files\PellesC\Include\Win;C:\Program Files\PellesC\Include"
+   $env:PATH = "C:\Program Files\PellesC\Bin;$env:PATH"
+   $env:PellesCDir = "C:\Program Files\PellesC"
+
+   # 配置与编译
+   cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -B build
+   cmake --build build
+   ```
+
+   输出：`build/FakeEsptool.exe`
+
+2. **Pelles C IDE 项目**（可选）：直接用 `FakeEsptool.ppj` 与 `pomake` 构建：
+
+   ```powershell
+   pomake /f FakeEsptool.ppj
+   ```
+
+   输出：`FakeEsptool.exe`（项目根目录）。
 
 ## 使用
 
 ### 快速开始
 
 1. 创建虚拟串口对或连接实体串口（见下方详细说明）
-2. 运行 `build\Release\FakeEsptool.exe`（自动创建默认 ESP32 设备）
+2. 运行 `build\Release\FakeEsptool.exe`（MSVC）或 `build\FakeEsptool.exe`（Pelles C，自动创建默认 ESP32 设备）
 3. 如需修改设备参数，使用 File > Device Properties
 4. Serial > Connect 选择串口
 5. 用 esptool 客户端连接另一端进行烧录测试

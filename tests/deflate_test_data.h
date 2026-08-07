@@ -383,25 +383,4 @@ static const BYTE test_all_bytes_compressed[] = {
     0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF, 0xAD,
     0xF6, 0x7F, 0x81};
 
-/* Test data table */
-static const TEST_DATA test_cases[] = {
-    {"test_hello", test_hello_original, sizeof(test_hello_original),
-     test_hello_compressed, sizeof(test_hello_compressed)},
-    {"test_repeat", test_repeat_original, sizeof(test_repeat_original),
-     test_repeat_compressed, sizeof(test_repeat_compressed)},
-    {"test_binary", test_binary_original, sizeof(test_binary_original),
-     test_binary_compressed, sizeof(test_binary_compressed)},
-    {"test_zeros", test_zeros_original, sizeof(test_zeros_original),
-     test_zeros_compressed, sizeof(test_zeros_compressed)},
-    {"test_pseudo_random", test_pseudo_random_original,
-     sizeof(test_pseudo_random_original), test_pseudo_random_compressed,
-     sizeof(test_pseudo_random_compressed)},
-    {"test_single_byte", test_single_byte_original,
-     sizeof(test_single_byte_original), test_single_byte_compressed,
-     sizeof(test_single_byte_compressed)},
-    {"test_all_bytes", test_all_bytes_original, sizeof(test_all_bytes_original),
-     test_all_bytes_compressed, sizeof(test_all_bytes_compressed)}};
-
-#define TEST_CASE_COUNT 7
-
 #endif /* DEFLATE_TEST_DATA_H */

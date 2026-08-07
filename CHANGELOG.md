@@ -244,6 +244,12 @@ ESP 芯片设备端模拟器的第一个正式版本。
 
 ## [未发布]
 
+### 构建系统
+
+- **构建系统双轨**：CMake（MSVC / Pelles C + Ninja）为统一主路径；`FakeEsptool.ppj` 保留为 Pelles C IDE 独立构建可选项（`pomake`），二者并存
+- **测试构建统一**：`tests/CMakeLists.txt` 工具链适配与主项目对齐（MSVC / Pelles C + Ninja），移除过时的 `NMake Makefiles` 说明；Pelles C 下显式链接系统库
+- **文档同步**：`README.md` / `docs/DEVELOPMENT.md` 同时描述 CMake 与 Pelles C IDE 两种构建方式，Pelles C 单配置（Ninja）构建说明与 Debug/Release 切换约定
+
 ### 计划功能
 
 详见 [TODO.md](docs/TODO.md)。

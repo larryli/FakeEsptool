@@ -1,12 +1,31 @@
 # CMakeLists.txt - Build configuration for tests
 #
-# Build: mkdir build_tests && cd build_tests
-#        cmake .. -G "NMake Makefiles"
-#        cmake --build .
-#        ctest
+# Supported toolchains (same as the main project):
+#   - MSVC (Visual Studio Build Tools)   : any CMake >= 3.20
+#   - Pelles C (compiler id "PellesC")    : CMake >= 4.4.0 (native support added in 4.4)
+#
+# The toolchain is auto-detected; no extra flags are required to select it.
+# This is a standalone project, so it uses its own build directory.
+#
+# MSVC (multi-config generator):
+#   cmake -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -B build_tests
+#   cmake --build build_tests --config Release -j
+#   cd build_tests && ctest
+#
+# Pelles C (single-config generator, CMake >= 4.4.0 + Ninja):
+#   cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -B build_tests
+#   cmake --build build_tests
+#   cd build_tests && ctest
+#
+# Note: CTest >= 4.4 does not accept -B/--test-dir; run ctest from the build dir.
 
 cmake_minimum_required(VERSION 3.20)
 project(FakeEsptoolTests C)
+
+# Pelles C gained native CMake support in 4.4.0 (compiler id "PellesC").
+if(CMAKE_C_COMPILER_ID STREQUAL "PellesC" AND CMAKE_VERSION VERSION_LESS 4.4.0)
+    message(FATAL_ERROR "Pelles C builds require CMake >= 4.4.0 (found ${CMAKE_VERSION}).")
+endif()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -195,3 +214,35 @@ add_test(NAME test_flash COMMAND test_flash)
 add_test(NAME test_chip COMMAND test_chip)
 add_test(NAME test_efuse COMMAND test_efuse)
 add_test(NAME test_esptool COMMAND test_esptool)
+
+# --- Toolchain specific settings -------------------------------------------
+
+set(TEST_TARGETS
+    test_deflate
+    test_slip
+    test_encrypt
+    test_md5
+    test_flash
+    test_chip
+    test_efuse
+    test_esptool
+)
+
+if(MSVC)
+    message(STATUS "Test toolchain: MSVC (${CMAKE_C_COMPILER_VERSION})")
+elseif(CMAKE_C_COMPILER_ID STREQUAL "PellesC")
+    # Pelles C: explicitly link the system import libraries the tests need.
+    # (MSVC links kernel32/user32/gdi32 implicitly; Pelles C does not.)
+    foreach(t ${TEST_TARGETS})
+        target_link_libraries(${t} PRIVATE
+            kernel32
+            user32
+            gdi32
+            advapi32
+            uuid
+        )
+    endforeach()
+    message(STATUS "Test toolchain: Pelles C (${CMAKE_C_COMPILER_VERSION})")
+else()
+    message(WARNING "Unsupported toolchain (${CMAKE_C_COMPILER_ID}); build may fail.")
+endif()
