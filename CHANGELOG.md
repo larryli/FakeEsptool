@@ -250,6 +250,10 @@ ESP 芯片设备端模拟器的第一个正式版本。
 - **测试构建统一**：`tests/CMakeLists.txt` 工具链适配与主项目对齐（MSVC / Pelles C + Ninja），移除过时的 `NMake Makefiles` 说明；Pelles C 下显式链接系统库
 - **文档同步**：`README.md` / `docs/DEVELOPMENT.md` 同时描述 CMake 与 Pelles C IDE 两种构建方式，Pelles C 单配置（Ninja）构建说明与 Debug/Release 切换约定
 
+### 用户界面
+
+- **对话框居中**：新增 `DlgCenterOnParent()` 函数，子对话框在父窗口居中；应用于关于、设备属性、端口选择、密钥管理对话框
+
 ### 计划功能
 
 详见 [TODO.md](docs/TODO.md)。
