@@ -259,12 +259,31 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
         0, 0, hWnd, (HMENU)IDC_MAIN_TOOLBAR, hInst, NULL);
 
     SendMessageW(g_hToolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
-    SendMessageW(g_hToolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(16, 16));
 
-    /* Load merged toolbar bitmap (12 icons) */
+    /* Choose the toolbar icon size from the current DPI. A 96-DPI (100%)
+       display keeps the 16x16 strip; anything >= 120 DPI (125%) uses the
+       32x32 high-DPI strip. The choice is made once at creation time;
+       recreate-time changes across monitors can be handled in WM_DPICHANGED. */
+    int icon = 16;
+    HDC hdcTB = GetDC(hWnd);
+    if (hdcTB) {
+        int dpi = GetDeviceCaps(hdcTB, LOGPIXELSX);
+        ReleaseDC(hWnd, hdcTB);
+        if (dpi >= 120) {
+            icon = 32;
+        }
+    }
+    UINT bmpId = (icon == 32) ? IDB_TOOLBAR32 : IDB_TOOLBAR;
+
+    /* Set the per-icon bitmap size and a slightly larger button. */
+    SendMessageW(g_hToolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(icon, icon));
+    SendMessageW(g_hToolbar, TB_SETBUTTONSIZE, 0, MAKELPARAM(icon + 7, icon + 6));
+
+    /* Load merged toolbar bitmap (12 icons).
+       wParam must be the real icon count so the strip is sliced correctly. */
     TBADDBITMAP tbab = {0};
     tbab.hInst = hInst;
-    tbab.nID = IDB_TOOLBAR;
+    tbab.nID = bmpId;
     int iBase = (int)SendMessageW(g_hToolbar, TB_ADDBITMAP, 12, (LPARAM)&tbab);
 
     /* Toolbar buttons: New, Open, Save | DeviceProps |

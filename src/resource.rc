@@ -1,4 +1,4 @@
-﻿﻿/*
+﻿/*
  * resource.rc - Resource file for FakeEsptool
  *
  * English (US) resources with LANGUAGE directive support for future i18n.
@@ -11,6 +11,7 @@
 /* Shared resources (language independent) */
 IDI_APP ICON "res/app.ico"
 IDB_TOOLBAR BITMAP "res/toolbar.bmp"
+IDB_TOOLBAR32 BITMAP "res/toolbar32.bmp"
 1 RT_MANIFEST "res/res1.xml"
 
 /* ============================================================ */

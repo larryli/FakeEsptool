@@ -79,6 +79,7 @@
 
 /* Toolbar bitmap resources */
 #define IDB_TOOLBAR 7001
+#define IDB_TOOLBAR32 7002   /* 32x32 high-DPI toolbar bitmap strip */
 
 /* String IDs */
 #define IDS_APP_NAME 10001
