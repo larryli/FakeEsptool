@@ -511,9 +511,9 @@ void UpdateStatusBar(void)
     }
 
     /* Status bar part widths are fixed pixel values that must scale with DPI;
-       otherwise the segments stay too narrow on high-DPI (PerMonitorV2) displays
-       while the status bar text (system font) is DPI-scaled, making the layout
-       look wrong. The factor is dpi / 96 (identity at 96 DPI). */
+       otherwise the segments stay too narrow on high-DPI displays while the
+       status bar text (system font) is DPI-scaled, making the layout look
+       wrong. The factor is dpi / 96 (identity at 96 DPI). */
     HDC hdc = GetDC(g_hStatusbar);
     int dpi = hdc ? GetDeviceCaps(hdc, LOGPIXELSX) : 96;
     ReleaseDC(g_hStatusbar, hdc);
@@ -776,7 +776,7 @@ void ApplyFontToEdit(HWND hEdit, LOGFONTW *plf)
     /* Convert the LOGFONT pixel height to RichEdit twips (1/1440 inch).
        Twips are a physical unit, so the factor is 1440 / dpi. A hardcoded
        *15 (valid only at 96 DPI) scales text far too large on high-DPI
-       (PerMonitorV2) displays. Use the edit control's actual DPI instead. */
+       displays. Use the edit control's actual DPI instead. */
     HDC hdc = GetDC(hEdit);
     int dpi = hdc ? GetDeviceCaps(hdc, LOGPIXELSY) : 96;
     ReleaseDC(hEdit, hdc);

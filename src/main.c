@@ -173,7 +173,6 @@ static LRESULT Main_OnAppInit(HWND hWnd, WPARAM wParam, LPARAM lParam);
 static LRESULT Main_OnDestroy(HWND hWnd, WPARAM wParam, LPARAM lParam);
 static LRESULT Main_OnCopyData(HWND hWnd, WPARAM wParam, LPARAM lParam);
 static LRESULT Main_OnDropFiles(HWND hWnd, WPARAM wParam, LPARAM lParam);
-static LRESULT Main_OnDpiChanged(HWND hWnd, WPARAM wParam, LPARAM lParam);
 
 /*
  * OnDeviceModified - Callback when device data is modified by protocol
@@ -238,8 +237,6 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam,
         return Main_OnCopyData(hWnd, wParam, lParam);
     case WM_DROPFILES:
         return Main_OnDropFiles(hWnd, wParam, lParam);
-    case WM_DPICHANGED:
-        return Main_OnDpiChanged(hWnd, wParam, lParam);
     }
     return DefWindowProcW(hWnd, msg, wParam, lParam);
 }
@@ -248,9 +245,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam,
  * CreateToolbar - Create and populate the main toolbar (DPI-aware)
  *
  * The icon strip (16x16 or 32x32) is chosen from the current DPI and loaded
- * via TB_ADDBITMAP with the real icon count (12). Because the bitmap is DPI
- * specific, callers must destroy and recreate this toolbar when the window
- * DPI changes (see WM_DPICHANGED handling in WndProc).
+ * via TB_ADDBITMAP with the real icon count (12). Under System DPI awareness
+ * the process DPI is fixed, so the strip is selected once at creation time.
  */
 static void CreateToolbar(HWND hWnd, HINSTANCE hInst)
 {
@@ -404,7 +400,7 @@ static LRESULT Main_OnCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     FEsptoolInit(g_hWnd, &g_serial);
     HINSTANCE hInst = ((CREATESTRUCT *)lParam)->hInstance;
 
-    /* Create toolbar (DPI-aware; recreated on WM_DPICHANGED) */
+    /* Create toolbar (DPI-aware) */
     CreateToolbar(hWnd, hInst);
 
     /* Create status bar */
@@ -474,43 +470,6 @@ static LRESULT Main_OnSize(HWND hWnd, WPARAM wParam, LPARAM lParam)
                  rcClient.bottom - toolbarH - statusH, SWP_NOZORDER);
 
     UpdateStatusBar();
-    return 0;
-}
-
-/*
- * Main_OnDpiChanged - Handle WM_DPICHANGED
- *
- * The window DPI changed (e.g. the window was dragged onto a monitor with a
- * different DPI). Resize the window to the suggested rectangle, then rebuild
- * the DPI-dependent UI and re-layout:
- *   - toolbar icon strip (16/32) via a full recreate,
- *   - log font (now scaled to the new DPI),
- *   - status bar part widths (scaled in UpdateStatusBar).
- */
-static LRESULT Main_OnDpiChanged(HWND hWnd, WPARAM wParam, LPARAM lParam)
-{
-    (void)wParam;
-
-    /* Resize the window to the rectangle the system suggests. */
-    const RECT *pRect = (const RECT *)lParam;
-    SetWindowPos(hWnd, NULL, pRect->left, pRect->top,
-                 pRect->right - pRect->left, pRect->bottom - pRect->top,
-                 SWP_NOZORDER | SWP_NOACTIVATE);
-
-    /* Recreate the toolbar with the new DPI's icon strip. */
-    if (g_hToolbar) {
-        DestroyWindow(g_hToolbar);
-        g_hToolbar = NULL;
-    }
-    CreateToolbar(hWnd, (HINSTANCE)GetModuleHandleW(NULL));
-
-    /* Restore toolbar button enabled/disabled states on the new toolbar. */
-    UpdateMenuState(hWnd);
-
-    /* Re-apply the log font (scales to the new DPI) and re-layout everything. */
-    ApplyFontToEdit(g_hEdit, &g_logFont);
-    Main_OnSize(hWnd, 0, 0);
-
     return 0;
 }
 
