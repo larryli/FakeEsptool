@@ -510,12 +510,20 @@ void UpdateStatusBar(void)
         return;
     }
 
+    /* Status bar part widths are fixed pixel values that must scale with DPI;
+       otherwise the segments stay too narrow on high-DPI (PerMonitorV2) displays
+       while the status bar text (system font) is DPI-scaled, making the layout
+       look wrong. The factor is dpi / 96 (identity at 96 DPI). */
+    HDC hdc = GetDC(g_hStatusbar);
+    int dpi = hdc ? GetDeviceCaps(hdc, LOGPIXELSX) : 96;
+    ReleaseDC(g_hStatusbar, hdc);
+
     int parts[6];
-    parts[0] = STATUS_PART1_WIDTH;
-    parts[1] = parts[0] + STATUS_PART2_WIDTH;
-    parts[2] = parts[1] + STATUS_PART3_WIDTH;
-    parts[3] = parts[2] + STATUS_PART4_WIDTH;
-    parts[4] = parts[3] + STATUS_PART5_WIDTH;
+    parts[0] = MulDiv(STATUS_PART1_WIDTH, dpi, 96);
+    parts[1] = parts[0] + MulDiv(STATUS_PART2_WIDTH, dpi, 96);
+    parts[2] = parts[1] + MulDiv(STATUS_PART3_WIDTH, dpi, 96);
+    parts[3] = parts[2] + MulDiv(STATUS_PART4_WIDTH, dpi, 96);
+    parts[4] = parts[3] + MulDiv(STATUS_PART5_WIDTH, dpi, 96);
     parts[5] = -1;
     SendMessageW(g_hStatusbar, SB_SETPARTS, 6, (LPARAM)parts);
 
@@ -764,7 +772,19 @@ void ApplyFontToEdit(HWND hEdit, LOGFONTW *plf)
     CHARFORMAT2W cf = {0};
     cf.cbSize = sizeof(CHARFORMAT2W);
     cf.dwMask = CFM_FACE | CFM_SIZE | CFM_WEIGHT;
-    cf.yHeight = plf->lfHeight * 15; /* Convert to twips (1/1440 inch) */
+
+    /* Convert the LOGFONT pixel height to RichEdit twips (1/1440 inch).
+       Twips are a physical unit, so the factor is 1440 / dpi. A hardcoded
+       *15 (valid only at 96 DPI) scales text far too large on high-DPI
+       (PerMonitorV2) displays. Use the edit control's actual DPI instead. */
+    HDC hdc = GetDC(hEdit);
+    int dpi = hdc ? GetDeviceCaps(hdc, LOGPIXELSY) : 96;
+    ReleaseDC(hEdit, hdc);
+    int px = plf->lfHeight;
+    if (px < 0) {
+        px = -px;
+    }
+    cf.yHeight = MulDiv(px, 1440, dpi);
     cf.wWeight = (WORD)plf->lfWeight;
     lstrcpyW(cf.szFaceName, plf->lfFaceName);
     SendMessageW(hEdit, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
